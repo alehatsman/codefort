@@ -43,6 +43,27 @@ func ListComments(db *sql.DB, issueID int64) ([]api.Comment, error) {
 	return comments, rows.Err()
 }
 
+// DeleteComment removes a comment by id, but only if requester matches
+// the comment's author. Returns ErrNotFound or ErrForbidden so the
+// handler can pick the right HTTP status.
+func DeleteComment(db *sql.DB, commentID int64, requester string) error {
+	var author string
+	err := db.QueryRow(`SELECT author FROM issue_comments WHERE id = ?`, commentID).Scan(&author)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if author != requester {
+		return ErrForbidden
+	}
+	if _, err := db.Exec(`DELETE FROM issue_comments WHERE id = ?`, commentID); err != nil {
+		return err
+	}
+	return nil
+}
+
 func scanComment(s scanner) (api.Comment, error) {
 	var c api.Comment
 	var created int64

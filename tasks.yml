@@ -33,6 +33,27 @@ tasks:
       - cmd:
           argv: ["go", "build", "-o", "bin/moongit", "./cmd/moongit"]
 
+  install:
+    desc: Build both binaries into ~/.local/bin + create mgitd/mgit aliases (no systemd changes)
+    steps:
+      - file.write:
+          path: "{{ home }}/.local/bin"
+          state: directory
+      - cmd:
+          argv: ["go", "build", "-o", "{{ binary_path }}", "./cmd/moongitd"]
+      - cmd:
+          argv: ["go", "build", "-o", "{{ client_path }}", "./cmd/moongit"]
+      - file.write:
+          path: "{{ home }}/.local/bin/mgitd"
+          src: "{{ binary_path }}"
+          state: link
+      - file.write:
+          path: "{{ home }}/.local/bin/mgit"
+          src: "{{ client_path }}"
+          state: link
+      - log:
+          msg: "installed moongitd + moongit to {{ home }}/.local/bin (aliases: mgitd, mgit)"
+
   test:
     desc: Run unit tests
     steps:
@@ -68,6 +89,28 @@ tasks:
         cwd: web
       - cmd:
           argv: ["npm", "run", "build"]
+        cwd: web
+
+  ui-test-install:
+    desc: One-time install of Playwright browser binaries (chromium ~150MB)
+    steps:
+      - shell:
+          cmd: "npm install"
+          creates: web/node_modules
+        cwd: web
+      - cmd:
+          argv: ["npx", "playwright", "install", "chromium"]
+        cwd: web
+
+  ui-test:
+    desc: Run Playwright E2E tests (auto-spawns Vite dev server, mocks /api/*)
+    steps:
+      - shell:
+          cmd: "npm install"
+          creates: web/node_modules
+        cwd: web
+      - cmd:
+          argv: ["npx", "playwright", "test"]
         cwd: web
 
   clean:

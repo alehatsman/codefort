@@ -86,6 +86,34 @@ type Repo struct {
 	TotalIssues int       `json:"total_issues"`
 }
 
+// TreeEntry is one item in a repository directory listing.
+type TreeEntry struct {
+	Name string `json:"name"`           // basename, relative to the listed dir
+	Path string `json:"path"`           // full path from the repo root
+	Type string `json:"type"`           // "blob" (file) | "tree" (dir)
+	Size int64  `json:"size,omitempty"` // bytes for blobs; 0 for trees
+}
+
+// Tree is a directory listing at Path on a ref. Entries are ordered
+// directories-first, then alphabetically.
+type Tree struct {
+	Ref     string      `json:"ref"`     // branch name, e.g. "main"
+	Path    string      `json:"path"`    // "" for the repo root
+	Entries []TreeEntry `json:"entries"` // empty for an unborn (no commits) repo
+}
+
+// Blob is a single file's contents at Path on a ref. For binary files or
+// files larger than the server's display cap, Content is empty and the
+// flag (Binary / TooLarge) says why.
+type Blob struct {
+	Ref      string `json:"ref"`
+	Path     string `json:"path"`
+	Size     int64  `json:"size"`
+	Binary   bool   `json:"binary"`
+	TooLarge bool   `json:"too_large"`
+	Content  string `json:"content"` // text; empty when Binary or TooLarge
+}
+
 // Token represents an API token's metadata. The plaintext token itself
 // is never returned over the API — it's only shown once at creation time
 // by the moongitd CLI.

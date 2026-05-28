@@ -75,6 +75,8 @@ Environment:
     MOONGIT_DATA_DIR    data dir for SQLite + repos (default "data")
     MOONGIT_DB_PATH     SQLite path (default "$MOONGIT_DATA_DIR/moongit.db")
     MOONGIT_REPOS_DIR   bare repo root (default "$MOONGIT_DATA_DIR/repos")
+    MOONGIT_DEX_URL     dex serve base URL for the Intel tab (e.g. http://127.0.0.1:8080; empty disables it)
+    MOONGIT_DEX_TOKEN   bearer token for dex (DEX_SERVE_TOKEN); empty for token-less loopback
 `)
 }
 

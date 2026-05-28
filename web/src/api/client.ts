@@ -1,62 +1,121 @@
-import type { Comment, Issue, Repo } from "./types";
+import type {
+  Blob,
+  ClaimIssueInput,
+  Comment,
+  CreateCommentInput,
+  CreateIssueInput,
+  Intel,
+  IntelSearchInput,
+  IntelSearchResult,
+  Issue,
+  Repo,
+  Tree,
+  UpdateIssueInput,
+  Whoami,
+} from "./types"
 
-const TOKEN_KEY = "moongit_token";
+const TOKEN_KEY = "moongit_token"
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(TOKEN_KEY)
 }
 
 export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(TOKEN_KEY, token)
 }
 
 export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_KEY)
 }
 
-/** ApiError carries the HTTP status so callers can branch on 401 etc. */
+/** ApiError carries the HTTP status so callers can branch on 401, 409, etc. */
 export class ApiError extends Error {
-  status: number;
+  status: number
   constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
+    super(message)
+    this.status = status
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = getToken();
-  const headers = new Headers(init.headers);
-  headers.set("Accept", "application/json");
-  if (init.body && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
+interface RequestOpts {
+  method?: string
+  body?: unknown
+}
+
+async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
+  const token = getToken()
+  const headers = new Headers()
+  headers.set("Accept", "application/json")
+  if (opts.body !== undefined) {
+    headers.set("Content-Type", "application/json")
   }
   if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+    headers.set("Authorization", `Bearer ${token}`)
   }
 
-  const resp = await fetch(path, { ...init, headers });
-  const raw = await resp.text();
+  const resp = await fetch(path, {
+    method: opts.method ?? "GET",
+    headers,
+    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+  })
+
+  const raw = await resp.text()
   if (!resp.ok) {
-    let msg = raw;
+    let message = raw || resp.statusText
     try {
-      msg = JSON.parse(raw).error ?? raw;
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed.error === "string") message = parsed.error
     } catch {
-      // raw stays as-is
+      // raw stays as message
     }
-    throw new ApiError(resp.status, msg || resp.statusText);
+    throw new ApiError(resp.status, message)
   }
-  if (!raw) return undefined as T;
-  return JSON.parse(raw) as T;
+  if (!raw) return undefined as T
+  return JSON.parse(raw) as T
 }
 
 export const api = {
+  whoami: () => request<Whoami>("/api/whoami"),
+
   listRepos: () => request<Repo[]>("/api/repos"),
-  getRepo: (owner: string, repo: string) =>
-    request<Repo>(`/api/repos/${owner}/${repo}`),
-  listIssues: (owner: string, repo: string, query: string = "") =>
+  getRepo: (owner: string, repo: string) => request<Repo>(`/api/repos/${owner}/${repo}`),
+
+  getTree: (owner: string, repo: string, path = "") =>
+    request<Tree>(
+      `/api/repos/${owner}/${repo}/tree${path ? `?path=${encodeURIComponent(path)}` : ""}`
+    ),
+  getBlob: (owner: string, repo: string, path: string) =>
+    request<Blob>(`/api/repos/${owner}/${repo}/blob?path=${encodeURIComponent(path)}`),
+
+  listIssues: (owner: string, repo: string, query = "") =>
     request<Issue[]>(`/api/repos/${owner}/${repo}/issues${query ? `?${query}` : ""}`),
   getIssue: (owner: string, repo: string, n: number) =>
     request<Issue>(`/api/repos/${owner}/${repo}/issues/${n}`),
+  createIssue: (owner: string, repo: string, body: CreateIssueInput) =>
+    request<Issue>(`/api/repos/${owner}/${repo}/issues`, { method: "POST", body }),
+  updateIssue: (owner: string, repo: string, n: number, body: UpdateIssueInput) =>
+    request<Issue>(`/api/repos/${owner}/${repo}/issues/${n}`, { method: "PATCH", body }),
+  claimIssue: (owner: string, repo: string, n: number, body: ClaimIssueInput) =>
+    request<Issue>(`/api/repos/${owner}/${repo}/issues/${n}/claim`, { method: "POST", body }),
+  unclaimIssue: (owner: string, repo: string, n: number) =>
+    request<Issue>(`/api/repos/${owner}/${repo}/issues/${n}/unclaim`, { method: "POST" }),
+
   listComments: (owner: string, repo: string, n: number) =>
     request<Comment[]>(`/api/repos/${owner}/${repo}/issues/${n}/comments`),
-};
+  createComment: (owner: string, repo: string, n: number, body: CreateCommentInput) =>
+    request<Comment>(`/api/repos/${owner}/${repo}/issues/${n}/comments`, {
+      method: "POST",
+      body,
+    }),
+  deleteComment: (owner: string, repo: string, n: number, commentID: number) =>
+    request<void>(`/api/repos/${owner}/${repo}/issues/${n}/comments/${commentID}`, {
+      method: "DELETE",
+    }),
+
+  getIntel: (owner: string, repo: string) => request<Intel>(`/api/repos/${owner}/${repo}/intel`),
+  intelSearch: (owner: string, repo: string, body: IntelSearchInput) =>
+    request<IntelSearchResult>(`/api/repos/${owner}/${repo}/intel/search`, {
+      method: "POST",
+      body,
+    }),
+}

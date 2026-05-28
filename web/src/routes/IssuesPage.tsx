@@ -1,54 +1,57 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
-import { api } from "../api/client";
-import type { IssueState } from "../api/types";
-
-const STATES: IssueState[] = ["todo", "in_progress", "done", "closed"];
+import { useState } from "react"
+import { Link, useNavigate, useParams } from "react-router-dom"
+import { useIssues, useRepo } from "../api/queries"
+import { ISSUE_STATES, type IssueState } from "../api/types"
+import NewIssueForm from "../components/NewIssueForm"
+import RepoHeader from "../components/RepoHeader"
+import StateIcon from "../components/StateIcon"
+import IssuesViewSwitch from "../components/IssuesViewSwitch"
 
 export default function IssuesPage() {
-  const { owner = "", repo = "" } = useParams();
-  const [activeStates, setActiveStates] = useState<IssueState[]>(["todo", "in_progress"]);
-  const [unassignedOnly, setUnassignedOnly] = useState(false);
+  const { owner = "", repo = "" } = useParams()
+  const navigate = useNavigate()
+  const [activeStates, setActiveStates] = useState<IssueState[]>(["todo", "in_progress"])
+  const [unassignedOnly, setUnassignedOnly] = useState(false)
 
-  const query = new URLSearchParams();
-  if (activeStates.length > 0) query.set("state", activeStates.join(","));
-  if (unassignedOnly) query.set("assignee", "null");
+  const repoQ = useRepo(owner, repo)
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["issues", owner, repo, query.toString()],
-    queryFn: () => api.listIssues(owner, repo, query.toString()),
-    enabled: !!owner && !!repo,
-  });
+  const query = new URLSearchParams()
+  if (activeStates.length > 0) query.set("state", activeStates.join(","))
+  if (unassignedOnly) query.set("assignee", "null")
+
+  const { data, isLoading, error } = useIssues(owner, repo, query.toString())
 
   function toggleState(s: IssueState) {
-    setActiveStates((prev) =>
-      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
-    );
+    setActiveStates((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]))
   }
 
   return (
     <div className="issues">
-      <nav className="crumbs">
-        <Link to="/">repos</Link>
-        <span className="muted"> / </span>
-        <Link to={`/${owner}/${repo}`}>{owner} / {repo}</Link>
-        <span className="muted"> / </span>
-        <strong>issues</strong>
-      </nav>
+      <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
 
-      <h2>Issues</h2>
+      <div className="issues__header">
+        <div className="issues__header-left">
+          <h2>Issues</h2>
+          <IssuesViewSwitch />
+        </div>
+        <NewIssueForm
+          owner={owner}
+          repo={repo}
+          onCreated={(n) => navigate(`/${owner}/${repo}/issues/${n}`)}
+        />
+      </div>
 
       <div className="filters">
         <div className="filter-row">
           <span className="filter-label">state:</span>
-          {STATES.map((s) => (
+          {ISSUE_STATES.map((s) => (
             <label key={s} className="chip">
               <input
                 type="checkbox"
                 checked={activeStates.includes(s)}
                 onChange={() => toggleState(s)}
               />
+              <StateIcon state={s} size={12} />
               {s}
             </label>
           ))}
@@ -66,29 +69,29 @@ export default function IssuesPage() {
       {isLoading && <div className="loading">Loading…</div>}
       {error && <div className="error">{(error as Error).message}</div>}
 
-      {data && data.length === 0 && (
-        <div className="empty">No issues match these filters.</div>
-      )}
+      {data && data.length === 0 && <div className="empty">No issues match these filters.</div>}
 
       {data && data.length > 0 && (
         <ul className="issue-list">
           {data.map((iss) => (
             <li key={iss.id} className="issue-row">
-              <Link
-                to={`/${owner}/${repo}/issues/${iss.number}`}
-                className="issue-row__link"
-              >
-                <span className={`badge badge--${iss.state}`}>{iss.state}</span>
-                <span className="issue-row__num">#{iss.number}</span>
-                <span className="issue-row__title">{iss.title}</span>
-                <span className="issue-row__assignee muted">
-                  {iss.assignee ? `@${iss.assignee}` : "—"}
+              <Link to={`/${owner}/${repo}/issues/${iss.number}`} className="issue-row__link">
+                <span className="issue-row__icon">
+                  <StateIcon state={iss.state} />
                 </span>
+                <span className="issue-row__main">
+                  <span className="issue-row__title">{iss.title}</span>
+                  <span className="issue-row__meta">
+                    #{iss.number} opened {new Date(iss.created_at).toLocaleDateString()} by{" "}
+                    {iss.author}
+                  </span>
+                </span>
+                <span className="issue-row__side">{iss.assignee ? `@${iss.assignee}` : ""}</span>
               </Link>
             </li>
           ))}
         </ul>
       )}
     </div>
-  );
+  )
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Config struct {
@@ -10,6 +11,13 @@ type Config struct {
 	DataDir  string
 	DBPath   string
 	ReposDir string
+
+	// DexURL is the base URL of a dex `serve` daemon (e.g.
+	// http://127.0.0.1:8080). Empty disables the Intel tab. DexToken is
+	// the bearer token dex was started with (DEX_SERVE_TOKEN); empty when
+	// dex runs token-less on loopback.
+	DexURL   string
+	DexToken string
 }
 
 // Load reads MOONGIT_* environment variables and resolves the data directory
@@ -28,6 +36,8 @@ func Load() (*Config, error) {
 	cfg.DataDir = dataDir
 	cfg.DBPath = envOr("MOONGIT_DB_PATH", filepath.Join(dataDir, "moongit.db"))
 	cfg.ReposDir = envOr("MOONGIT_REPOS_DIR", filepath.Join(dataDir, "repos"))
+	cfg.DexURL = strings.TrimRight(envOr("MOONGIT_DEX_URL", ""), "/")
+	cfg.DexToken = envOr("MOONGIT_DEX_TOKEN", "")
 
 	return cfg, nil
 }

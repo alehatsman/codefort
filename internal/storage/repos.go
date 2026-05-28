@@ -5,7 +5,10 @@ import (
 	"errors"
 )
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound  = errors.New("not found")
+	ErrForbidden = errors.New("forbidden")
+)
 
 // EnsureUser returns the user id, creating the row if absent.
 func EnsureUser(db *sql.DB, name string) (int64, error) {

@@ -48,6 +48,19 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 	})
 }
 
+// handleWhoami returns the authenticated token's identity. UI uses this
+// to render "you" indicators and decide what mutations to surface.
+func (s *Server) handleWhoami(w http.ResponseWriter, r *http.Request) {
+	tok, ok := TokenFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "no token on context")
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Name string `json:"name"`
+	}{Name: tok.Name})
+}
+
 // identityFromContext returns the authenticated token's name, used to
 // stamp the canonical author/assignee on writes. Returns "anonymous"
 // when no token is on the context — this only happens on public

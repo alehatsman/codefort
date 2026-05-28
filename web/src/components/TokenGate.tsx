@@ -1,23 +1,23 @@
-import { useState } from "react";
-import { setToken } from "../api/client";
+import { useState } from "react"
+import { setToken } from "../api/client"
 
 interface Props {
-  onSet: () => void;
+  onSet: () => void
 }
 
 export default function TokenGate({ onSet }: Props) {
-  const [value, setValue] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [value, setValue] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
   function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = value.trim();
+    e.preventDefault()
+    const trimmed = value.trim()
     if (!trimmed.startsWith("mgt_")) {
-      setError("Tokens start with mgt_");
-      return;
+      setError("Tokens start with mgt_")
+      return
     }
-    setToken(trimmed);
-    onSet();
+    setToken(trimmed)
+    onSet()
   }
 
   return (
@@ -41,5 +41,5 @@ export default function TokenGate({ onSet }: Props) {
         </form>
       </div>
     </div>
-  );
+  )
 }

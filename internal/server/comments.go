@@ -53,6 +53,27 @@ func (s *Server) handleCreateComment(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, c)
 }
 
+func (s *Server) handleDeleteComment(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("comment_id"), 10, 64)
+	if err != nil || id <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid comment id")
+		return
+	}
+	requester := identityFromContext(r)
+	err = storage.DeleteComment(s.db, id, requester)
+	switch {
+	case errors.Is(err, storage.ErrNotFound):
+		writeError(w, http.StatusNotFound, "comment not found")
+	case errors.Is(err, storage.ErrForbidden):
+		writeError(w, http.StatusForbidden, "only the author can delete this comment")
+	case err != nil:
+		s.logger.Error("delete comment", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 // lookupIssueOrFail resolves {owner}/{repo}/issues/{number} to the issue's
 // internal row id, writing an HTTP error and returning ok=false on failure.
 func (s *Server) lookupIssueOrFail(w http.ResponseWriter, r *http.Request) (int64, bool) {

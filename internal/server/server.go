@@ -7,16 +7,23 @@ import (
 	"strings"
 
 	"github.com/alehatsman/moongit/internal/config"
+	"github.com/alehatsman/moongit/internal/dex"
 )
 
 type Server struct {
 	cfg    *config.Config
 	db     *sql.DB
 	logger *slog.Logger
+	dex    *dex.Client // nil when MOONGIT_DEX_URL is unset (Intel disabled)
 }
 
 func New(cfg *config.Config, db *sql.DB, logger *slog.Logger) *Server {
-	return &Server{cfg: cfg, db: db, logger: logger}
+	return &Server{
+		cfg:    cfg,
+		db:     db,
+		logger: logger,
+		dex:    dex.New(cfg.DexURL, cfg.DexToken),
+	}
 }
 
 // Handler composes the request graph. Routing is split across two muxes
@@ -46,8 +53,13 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) apiHandler() http.Handler {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("GET /api/whoami", s.handleWhoami)
+
 	mux.HandleFunc("GET /api/repos", s.handleListRepos)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}", s.handleGetRepo)
+
+	mux.HandleFunc("GET /api/repos/{owner}/{repo}/tree", s.handleTree)
+	mux.HandleFunc("GET /api/repos/{owner}/{repo}/blob", s.handleBlob)
 
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues", s.handleCreateIssue)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues", s.handleListIssues)
@@ -57,6 +69,10 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/unclaim", s.handleUnclaimIssue)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleListComments)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleCreateComment)
+	mux.HandleFunc("DELETE /api/repos/{owner}/{repo}/issues/{number}/comments/{comment_id}", s.handleDeleteComment)
+
+	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel", s.handleIntel)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/intel/search", s.handleIntelSearch)
 
 	return mux
 }
