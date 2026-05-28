@@ -1,18 +1,21 @@
-# Tasks for moongit. Run with `mooncake task <name>`.
-# Lists all tasks: `mooncake task`.
+# Imperative operations. Run with `mooncake task <name>`.
+# List all tasks: `mooncake task`.
+#
+# Host setup is declarative — see mooncake.yml and run `mooncake apply`.
 
 version: "1.0"
 
 vars:
-  # User-level service paths. Override via --vars for system-level installs.
+  # Match the install paths in mooncake.yml so backup/restore/uninstall
+  # operate on the same locations the systemd service uses.
   binary_path: "{{ home }}/.local/bin/moongitd"
   client_path: "{{ home }}/.local/bin/moongit"
   data_dir:    "{{ home }}/.local/share/moongit"
   unit_path:   "{{ home }}/.config/systemd/user/moongit.service"
   backup_dir:  "{{ home }}/.local/share/moongit/backups"
-  addr:        ":8080"
 
 tasks:
+  # ---- dev loop ---------------------------------------------------------
   tidy:
     desc: Sync Go module dependencies
     steps:
@@ -20,7 +23,7 @@ tasks:
           argv: ["go", "mod", "tidy"]
 
   build:
-    desc: Build both binaries (moongitd + moongit) into ./bin/
+    desc: Build both binaries to ./bin/ (dev tree)
     steps:
       - file.write:
           path: bin
@@ -37,7 +40,7 @@ tasks:
           argv: ["go", "test", "./..."]
 
   run:
-    desc: Run moongitd in the foreground (Ctrl-C to stop)
+    desc: Run moongitd in the foreground against ./data/ (dev mode)
     steps:
       - file.write:
           path: data/repos
@@ -45,62 +48,20 @@ tasks:
       - cmd:
           argv: ["go", "run", "./cmd/moongitd"]
 
+  clean:
+    desc: Remove dev build artifacts (keeps ./data/)
+    steps:
+      - shell:
+          cmd: "rm -rf bin"
+
+  # ---- ops (work against the installed location) ------------------------
   create-repo:
-    desc: 'Init a bare repo and register it. Pass --vars with {owner, name}'
+    desc: 'Register and init a repo against the installed data dir. Pass --vars with {owner, name}'
     steps:
-      - file.write:
-          path: "data/repos/{{ owner }}/{{ name }}.git"
-          state: directory
-      - shell:
-          cmd: "git init --bare data/repos/{{ owner }}/{{ name }}.git"
-          creates: "data/repos/{{ owner }}/{{ name }}.git/HEAD"
       - cmd:
-          argv: ["go", "run", "./cmd/moongitd", "repo", "create", "{{ owner }}/{{ name }}"]
-
-  install:
-    desc: 'Install both binaries + a user-level systemd service. Override --vars for system-level.'
-    steps:
-      - file.write:
-          path: "{{ home }}/.local/bin"
-          state: directory
-      - file.write:
-          path: "{{ data_dir }}"
-          state: directory
-      - file.write:
-          path: "{{ data_dir }}/repos"
-          state: directory
-      - file.write:
-          path: "{{ home }}/.config/systemd/user"
-          state: directory
-      - cmd:
-          argv: ["go", "build", "-o", "{{ binary_path }}", "./cmd/moongitd"]
-      - cmd:
-          argv: ["go", "build", "-o", "{{ client_path }}", "./cmd/moongit"]
-      - file.template:
-          src: deploy/moongit.service.tmpl
-          dest: "{{ unit_path }}"
-          vars:
-            binary_path: "{{ binary_path }}"
-            addr: "{{ addr }}"
-            data_dir: "{{ data_dir }}"
-      - shell:
-          cmd: "systemctl --user daemon-reload"
-      - shell:
-          cmd: "systemctl --user enable --now moongit.service"
-      - log:
-          msg: "moongit installed; check status with `systemctl --user status moongit`"
-
-  uninstall:
-    desc: Stop the systemd service and remove installed binaries + unit file
-    steps:
-      - shell:
-          cmd: "systemctl --user disable --now moongit.service || true"
-      - shell:
-          cmd: "rm -f {{ unit_path }} {{ binary_path }} {{ client_path }}"
-      - shell:
-          cmd: "systemctl --user daemon-reload"
-      - log:
-          msg: "moongit uninstalled (data dir {{ data_dir }} preserved)"
+          argv: ["{{ binary_path }}", "repo", "create", "{{ owner }}/{{ name }}"]
+        env:
+          MOONGIT_DATA_DIR: "{{ data_dir }}"
 
   backup:
     desc: Snapshot the SQLite DB + bare repos to a timestamped tarball
@@ -114,7 +75,6 @@ tasks:
             ts=$(date -u +%Y%m%dT%H%M%SZ)
             tmp=$(mktemp -d)
             trap "rm -rf $tmp" EXIT
-            # Online backup — safe while moongitd is running.
             sqlite3 "{{ data_dir }}/moongit.db" ".backup '$tmp/moongit.db'"
             tar czf "{{ backup_dir }}/moongit-$ts.tar.gz" \
               -C "{{ data_dir }}" repos \
@@ -136,8 +96,14 @@ tasks:
       - shell:
           cmd: "systemctl --user start moongit.service || true"
 
-  clean:
-    desc: Remove build artifacts (keeps data/)
+  uninstall:
+    desc: Reverse of `mooncake apply` — stop service, remove binaries + unit
     steps:
       - shell:
-          cmd: "rm -rf bin"
+          cmd: "systemctl --user disable --now moongit.service || true"
+      - shell:
+          cmd: "rm -f {{ unit_path }} {{ binary_path }} {{ client_path }}"
+      - shell:
+          cmd: "systemctl --user daemon-reload"
+      - log:
+          msg: "moongit uninstalled (data dir {{ data_dir }} preserved)"

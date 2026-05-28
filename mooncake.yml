@@ -1,23 +1,67 @@
-# Host provisioning for a moongit deployment.
-# Preview: `mooncake plan`. Run: `mooncake apply`.
+# moongit host setup. Declarative: `mooncake apply` brings the current
+# host to the state described below. Idempotent — re-run is safe.
+# Imperative operations (build, test, run, create-repo, backup, …) live
+# in tasks.yml.
 
-- name: Ensure git binary is installed
-  pkg:
-    name: git
-    state: present
-  become: true
+version: "1.0"
 
-- name: Ensure data dir exists
-  file.write:
-    path: data
-    state: directory
+vars:
+  # User-level install (no sudo, runs under your account). Override
+  # any of these with --vars file.yml for a system-wide install.
+  binary_path: "{{ home }}/.local/bin/moongitd"
+  client_path: "{{ home }}/.local/bin/moongit"
+  data_dir:    "{{ home }}/.local/share/moongit"
+  unit_path:   "{{ home }}/.config/systemd/user/moongit.service"
+  addr:        ":8080"
 
-- name: Ensure repos dir exists
-  file.write:
-    path: data/repos
-    state: directory
+steps:
+  - name: Ensure git binary is installed
+    pkg:
+      name: git
+      state: present
+    as_user: root
 
-- name: Ensure bin dir exists
-  file.write:
-    path: bin
-    state: directory
+  - name: Ensure local bin dir exists
+    file.write:
+      path: "{{ home }}/.local/bin"
+      state: directory
+
+  - name: Ensure data dir exists
+    file.write:
+      path: "{{ data_dir }}"
+      state: directory
+
+  - name: Ensure repos dir exists
+    file.write:
+      path: "{{ data_dir }}/repos"
+      state: directory
+
+  - name: Ensure systemd user dir exists
+    file.write:
+      path: "{{ home }}/.config/systemd/user"
+      state: directory
+
+  - name: Build moongitd binary
+    cmd:
+      argv: ["go", "build", "-o", "{{ binary_path }}", "./cmd/moongitd"]
+
+  - name: Build moongit client
+    cmd:
+      argv: ["go", "build", "-o", "{{ client_path }}", "./cmd/moongit"]
+
+  - name: Render systemd unit
+    file.template:
+      src: deploy/moongit.service.tmpl
+      dest: "{{ unit_path }}"
+      vars:
+        binary_path: "{{ binary_path }}"
+        addr: "{{ addr }}"
+        data_dir: "{{ data_dir }}"
+
+  - name: Reload systemd
+    shell:
+      cmd: "systemctl --user daemon-reload"
+
+  - name: Enable and start moongit
+    shell:
+      cmd: "systemctl --user enable --now moongit.service"

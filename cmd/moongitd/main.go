@@ -9,7 +9,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -169,7 +171,7 @@ func runTokenCreate(args []string) error {
 	if len(args) != 1 {
 		return errors.New("usage: moongitd token create <name>")
 	}
-	db, err := openDB()
+	_, db, err := openDB()
 	if err != nil {
 		return err
 	}
@@ -196,7 +198,7 @@ func runTokenList(args []string) error {
 	if len(args) != 0 {
 		return errors.New("usage: moongitd token list")
 	}
-	db, err := openDB()
+	_, db, err := openDB()
 	if err != nil {
 		return err
 	}
@@ -229,7 +231,7 @@ func runTokenRevoke(args []string) error {
 	if len(args) != 1 {
 		return errors.New("usage: moongitd token revoke <name>")
 	}
-	db, err := openDB()
+	_, db, err := openDB()
 	if err != nil {
 		return err
 	}
@@ -245,24 +247,25 @@ func runTokenRevoke(args []string) error {
 }
 
 // openDB centralizes the load/ensure/open/migrate sequence used by CLI
-// subcommands that need direct DB access (token, repo).
-func openDB() (*sql.DB, error) {
+// subcommands that need direct DB access (token, repo). Returns the
+// loaded config too so callers can resolve paths like ReposDir.
+func openDB() (*config.Config, *sql.DB, error) {
 	cfg, err := config.Load()
 	if err != nil {
-		return nil, fmt.Errorf("config: %w", err)
+		return nil, nil, fmt.Errorf("config: %w", err)
 	}
 	if err := cfg.EnsureDirs(); err != nil {
-		return nil, fmt.Errorf("ensure dirs: %w", err)
+		return nil, nil, fmt.Errorf("ensure dirs: %w", err)
 	}
 	db, err := storage.Open(cfg.DBPath)
 	if err != nil {
-		return nil, fmt.Errorf("storage: %w", err)
+		return nil, nil, fmt.Errorf("storage: %w", err)
 	}
 	if err := storage.Migrate(db); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("migrate: %w", err)
+		return nil, nil, fmt.Errorf("migrate: %w", err)
 	}
-	return db, nil
+	return cfg, db, nil
 }
 
 func runRepoCreate(args []string) error {
@@ -275,16 +278,27 @@ func runRepoCreate(args []string) error {
 	}
 	name = strings.TrimSuffix(name, ".git")
 
-	db, err := openDB()
+	cfg, db, err := openDB()
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
+	repoDir := filepath.Join(cfg.ReposDir, owner, name+".git")
+	if _, err := os.Stat(filepath.Join(repoDir, "HEAD")); errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(repoDir, 0o755); err != nil {
+			return fmt.Errorf("mkdir repo: %w", err)
+		}
+		out, err := exec.Command("git", "init", "--bare", repoDir).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git init --bare: %w: %s", err, strings.TrimSpace(string(out)))
+		}
+	}
+
 	id, err := storage.EnsureRepo(db, owner, name)
 	if err != nil {
 		return fmt.Errorf("ensure repo: %w", err)
 	}
-	fmt.Printf("repo registered: %s/%s (id=%d)\n", owner, name, id)
+	fmt.Printf("repo registered: %s/%s (id=%d) at %s\n", owner, name, id, repoDir)
 	return nil
 }
