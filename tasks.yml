@@ -48,6 +48,28 @@ tasks:
       - cmd:
           argv: ["go", "run", "./cmd/moongitd"]
 
+  ui:
+    desc: Start the Vite dev server on :5173 (proxies /api/* to the daemon on :8080)
+    steps:
+      - shell:
+          cmd: "npm install"
+          creates: web/node_modules
+        cwd: web
+      - cmd:
+          argv: ["npm", "run", "dev"]
+        cwd: web
+
+  ui-build:
+    desc: Build the UI for production into web/dist/
+    steps:
+      - shell:
+          cmd: "npm install"
+          creates: web/node_modules
+        cwd: web
+      - cmd:
+          argv: ["npm", "run", "build"]
+        cwd: web
+
   clean:
     desc: Remove dev build artifacts (keeps ./data/)
     steps:

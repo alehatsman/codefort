@@ -22,16 +22,11 @@ func TokenFromContext(ctx context.Context) (api.Token, bool) {
 	return t, ok
 }
 
-// withAuth wraps next, requiring a valid Bearer token on every request
-// except the public allowlist (/healthz and the git smart-HTTP routes).
-// Git transport auth lands in a later iteration alongside SSH support.
+// withAuth requires a valid Bearer token on every request. Mount it only
+// on the /api/* sub-mux — /healthz and the git smart-HTTP routes live
+// on the root mux and skip auth entirely.
 func (s *Server) withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isPublicPath(r.URL.Path) {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		raw, err := bearerToken(r)
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, err.Error())
@@ -51,23 +46,6 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), tokenCtxKey{}, tok)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-}
-
-// isPublicPath returns true for paths that bypass auth. Kept explicit
-// (rather than prefix-matching) so adding a new public path is a
-// conscious change.
-func isPublicPath(path string) bool {
-	if path == "/healthz" {
-		return true
-	}
-	// Git smart-HTTP — unauthenticated for this iteration. SSH transport
-	// + Basic auth for git lands separately.
-	if strings.HasSuffix(path, "/info/refs") ||
-		strings.HasSuffix(path, "/git-upload-pack") ||
-		strings.HasSuffix(path, "/git-receive-pack") {
-		return true
-	}
-	return false
 }
 
 // identityFromContext returns the authenticated token's name, used to

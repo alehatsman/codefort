@@ -76,6 +76,16 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
+// Repo is the public view of a registered repository for UI/CLI clients.
+type Repo struct {
+	ID          int64     `json:"id"`
+	Owner       string    `json:"owner"`
+	Name        string    `json:"name"`
+	CreatedAt   time.Time `json:"created_at"`
+	OpenIssues  int       `json:"open_issues"`
+	TotalIssues int       `json:"total_issues"`
+}
+
 // Token represents an API token's metadata. The plaintext token itself
 // is never returned over the API — it's only shown once at creation time
 // by the moongitd CLI.

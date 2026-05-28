@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/alehatsman/moongit/internal/config"
 )
@@ -18,12 +19,36 @@ func New(cfg *config.Config, db *sql.DB, logger *slog.Logger) *Server {
 	return &Server{cfg: cfg, db: db, logger: logger}
 }
 
+// Handler composes the request graph. Routing is split across two muxes
+// because git smart-HTTP uses bare-wildcard patterns (/{owner}/{repo}/...)
+// that Go's ServeMux refuses to coexist with /api/ on the same mux. A
+// top-level prefix dispatcher keeps them apart, and also cleanly scopes
+// auth to the API mux.
 func (s *Server) Handler() http.Handler {
+	apiAuth := s.withAuth(s.apiHandler())
+	gitMux := s.gitHandler()
+
+	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/healthz":
+			s.handleHealth(w, r)
+		case strings.HasPrefix(r.URL.Path, "/api/"):
+			apiAuth.ServeHTTP(w, r)
+		default:
+			// Git smart-HTTP, no auth in this slice.
+			gitMux.ServeHTTP(w, r)
+		}
+	})
+
+	return s.withLogging(root)
+}
+
+func (s *Server) apiHandler() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /healthz", s.handleHealth)
+	mux.HandleFunc("GET /api/repos", s.handleListRepos)
+	mux.HandleFunc("GET /api/repos/{owner}/{repo}", s.handleGetRepo)
 
-	// Issues API.
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues", s.handleCreateIssue)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues", s.handleListIssues)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues/{number}", s.handleGetIssue)
@@ -33,12 +58,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleListComments)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleCreateComment)
 
-	// Git smart-HTTP. Pattern matches /{owner}/{repo}.git/{op...}.
+	return mux
+}
+
+func (s *Server) gitHandler() http.Handler {
+	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{owner}/{repo}/info/refs", s.handleInfoRefs)
 	mux.HandleFunc("POST /{owner}/{repo}/git-upload-pack", s.handleServiceRPC("git-upload-pack"))
 	mux.HandleFunc("POST /{owner}/{repo}/git-receive-pack", s.handleServiceRPC("git-receive-pack"))
-
-	return s.withLogging(s.withAuth(mux))
+	return mux
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
