@@ -27,6 +27,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues", s.handleCreateIssue)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues", s.handleListIssues)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues/{number}", s.handleGetIssue)
+	mux.HandleFunc("PATCH /api/repos/{owner}/{repo}/issues/{number}", s.handleUpdateIssue)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/claim", s.handleClaimIssue)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/unclaim", s.handleUnclaimIssue)
+	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleListComments)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleCreateComment)
 
 	// Git smart-HTTP. Pattern matches /{owner}/{repo}.git/{op...}.
 	mux.HandleFunc("GET /{owner}/{repo}/info/refs", s.handleInfoRefs)

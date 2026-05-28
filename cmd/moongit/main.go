@@ -48,18 +48,25 @@ func printUsage(w io.Writer) {
 	fmt.Fprint(w, `moongit — client for the moongit server
 
 USAGE:
-    moongit issue create --title <t> [--body <b>] [--author <a>]
-    moongit issue list
-    moongit issue show <number>
+    moongit issue create  --title <t> [--body <b>] [--author <a>]
+    moongit issue list    [--state s,s] [--assignee a|null] [--limit n]
+    moongit issue show    <number>
+    moongit issue set-state <number> <todo|in_progress|done|closed>
+    moongit issue claim   <number> [--as <id>] [--state s]
+    moongit issue unclaim <number>
+    moongit issue comment <number> --body <b> [--author <a>]
 
-Run inside a git checkout whose 'origin' remote points at a moongit server.
-The target repo is parsed from the remote URL.
+Agent identity: --as / --author default to MOONGIT_AGENT env, then
+git config user.name.
+
+Run inside a git checkout whose 'origin' remote points at a moongit
+server. The target repo is parsed from the remote URL.
 `)
 }
 
 func runIssue(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit issue <create|list|show>")
+		return errors.New("usage: moongit issue <create|list|show|set-state|claim|unclaim|comment>")
 	}
 	switch args[0] {
 	case "create":
@@ -68,9 +75,34 @@ func runIssue(args []string) error {
 		return runIssueList(args[1:])
 	case "show":
 		return runIssueShow(args[1:])
+	case "set-state":
+		return runIssueSetState(args[1:])
+	case "claim":
+		return runIssueClaim(args[1:])
+	case "unclaim":
+		return runIssueUnclaim(args[1:])
+	case "comment":
+		return runIssueComment(args[1:])
 	default:
 		return fmt.Errorf("unknown issue subcommand: %s", args[0])
 	}
+}
+
+// agentIdentity returns the caller's identity for assignment / comment
+// authorship. Resolution order: explicit flag, MOONGIT_AGENT env var,
+// git config user.name.
+func agentIdentity(flagValue string) (string, error) {
+	if flagValue != "" {
+		return flagValue, nil
+	}
+	if v := os.Getenv("MOONGIT_AGENT"); v != "" {
+		return v, nil
+	}
+	v, err := gitConfig("user.name")
+	if err != nil {
+		return "", fmt.Errorf("agent identity not set: pass --as/--author, set MOONGIT_AGENT, or configure git user.name")
+	}
+	return v, nil
 }
 
 func runIssueCreate(args []string) error {
@@ -123,14 +155,33 @@ func runIssueCreate(args []string) error {
 }
 
 func runIssueList(args []string) error {
-	if len(args) > 0 {
-		return errors.New("usage: moongit issue list")
+	fs := flag.NewFlagSet("issue list", flag.ContinueOnError)
+	state := fs.String("state", "", "filter by state(s), comma-separated (todo,in_progress,done,closed)")
+	assignee := fs.String("assignee", "", "filter by assignee; 'null' for unassigned")
+	limit := fs.Int("limit", 0, "max results (default 100, max 1000)")
+	if err := fs.Parse(args); err != nil {
+		return err
 	}
 	target, err := discoverTarget()
 	if err != nil {
 		return err
 	}
+
+	q := url.Values{}
+	if *state != "" {
+		q.Set("state", *state)
+	}
+	if *assignee != "" {
+		q.Set("assignee", *assignee)
+	}
+	if *limit > 0 {
+		q.Set("limit", strconv.Itoa(*limit))
+	}
+
 	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues", target.server, target.owner, target.repo)
+	if len(q) > 0 {
+		endpoint += "?" + q.Encode()
+	}
 	resp, raw, err := httpDo(http.MethodGet, endpoint, nil, "")
 	if err != nil {
 		return err
@@ -147,7 +198,12 @@ func runIssueList(args []string) error {
 		return nil
 	}
 	for _, iss := range issues {
-		fmt.Printf("#%-4d  [%s]  %s  — %s\n", iss.Number, iss.State, iss.Title, iss.Author)
+		assignee := "—"
+		if iss.Assignee != nil {
+			assignee = *iss.Assignee
+		}
+		fmt.Printf("#%-4d  [%-11s]  @%-20s  %s  — %s\n",
+			iss.Number, iss.State, assignee, iss.Title, iss.Author)
 	}
 	return nil
 }
@@ -177,12 +233,197 @@ func runIssueShow(args []string) error {
 		return fmt.Errorf("decode response: %w", err)
 	}
 	fmt.Printf("#%d  %s\n", iss.Number, iss.Title)
-	fmt.Printf("state:   %s\n", iss.State)
-	fmt.Printf("author:  %s\n", iss.Author)
-	fmt.Printf("created: %s\n", iss.CreatedAt.Local().Format(time.RFC3339))
+	fmt.Printf("state:    %s\n", iss.State)
+	fmt.Printf("author:   %s\n", iss.Author)
+	if iss.Assignee != nil {
+		fmt.Printf("assignee: %s\n", *iss.Assignee)
+	} else {
+		fmt.Printf("assignee: (unassigned)\n")
+	}
+	fmt.Printf("created:  %s\n", iss.CreatedAt.Local().Format(time.RFC3339))
 	if iss.Body != "" {
 		fmt.Printf("\n%s\n", iss.Body)
 	}
+
+	// Comments timeline.
+	commentsEndpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d/comments", target.server, target.owner, target.repo, num)
+	cresp, craw, cerr := httpDo(http.MethodGet, commentsEndpoint, nil, "")
+	if cerr == nil && cresp.StatusCode == http.StatusOK {
+		var comments []api.Comment
+		if json.Unmarshal(craw, &comments) == nil && len(comments) > 0 {
+			fmt.Printf("\nComments (%d):\n", len(comments))
+			for _, c := range comments {
+				fmt.Printf("  [%s] %s: %s\n", c.CreatedAt.Local().Format(time.RFC3339), c.Author, c.Body)
+			}
+		}
+	}
+	return nil
+}
+
+func runIssueSetState(args []string) error {
+	if len(args) != 2 {
+		return errors.New("usage: moongit issue set-state <number> <todo|in_progress|done|closed>")
+	}
+	num, err := strconv.Atoi(args[0])
+	if err != nil || num <= 0 {
+		return fmt.Errorf("invalid issue number: %s", args[0])
+	}
+	state := api.IssueState(args[1])
+	if !state.Valid() {
+		return fmt.Errorf("invalid state %q (want one of: %v)", args[1], api.AllIssueStates)
+	}
+
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+
+	payload, err := json.Marshal(api.UpdateIssueRequest{State: state})
+	if err != nil {
+		return err
+	}
+
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d", target.server, target.owner, target.repo, num)
+	resp, raw, err := httpDo(http.MethodPatch, endpoint, bytes.NewReader(payload), "application/json")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	var iss api.Issue
+	if err := json.Unmarshal(raw, &iss); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	fmt.Printf("#%d  %s  → %s\n", iss.Number, iss.Title, iss.State)
+	return nil
+}
+
+func runIssueClaim(args []string) error {
+	if len(args) < 1 {
+		return errors.New("usage: moongit issue claim <number> [--as <id>] [--state <s>]")
+	}
+	num, err := strconv.Atoi(args[0])
+	if err != nil || num <= 0 {
+		return fmt.Errorf("invalid issue number: %s", args[0])
+	}
+
+	fs := flag.NewFlagSet("issue claim", flag.ContinueOnError)
+	as := fs.String("as", "", "agent identity (default: $MOONGIT_AGENT or git user.name)")
+	stateFlag := fs.String("state", "", "optional state transition (e.g. in_progress)")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("unexpected extra args: %v", fs.Args())
+	}
+	assignee, err := agentIdentity(*as)
+	if err != nil {
+		return err
+	}
+	state := api.IssueState(*stateFlag)
+	if state != "" && !state.Valid() {
+		return fmt.Errorf("invalid state %q (want one of: %v)", *stateFlag, api.AllIssueStates)
+	}
+
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(api.ClaimRequest{Assignee: assignee, State: state})
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d/claim", target.server, target.owner, target.repo, num)
+	resp, raw, err := httpDo(http.MethodPost, endpoint, bytes.NewReader(payload), "application/json")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode == http.StatusConflict {
+		return fmt.Errorf("issue #%d already claimed", num)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	var iss api.Issue
+	if err := json.Unmarshal(raw, &iss); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	fmt.Printf("#%d  claimed by @%s  [%s]\n", iss.Number, *iss.Assignee, iss.State)
+	return nil
+}
+
+func runIssueUnclaim(args []string) error {
+	if len(args) != 1 {
+		return errors.New("usage: moongit issue unclaim <number>")
+	}
+	num, err := strconv.Atoi(args[0])
+	if err != nil || num <= 0 {
+		return fmt.Errorf("invalid issue number: %s", args[0])
+	}
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d/unclaim", target.server, target.owner, target.repo, num)
+	resp, raw, err := httpDo(http.MethodPost, endpoint, nil, "application/json")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	fmt.Printf("#%d  unclaimed\n", num)
+	return nil
+}
+
+func runIssueComment(args []string) error {
+	if len(args) < 1 {
+		return errors.New("usage: moongit issue comment <number> --body <b> [--author <a>]")
+	}
+	num, err := strconv.Atoi(args[0])
+	if err != nil || num <= 0 {
+		return fmt.Errorf("invalid issue number: %s", args[0])
+	}
+
+	fs := flag.NewFlagSet("issue comment", flag.ContinueOnError)
+	body := fs.String("body", "", "comment body (required)")
+	author := fs.String("author", "", "comment author (default: $MOONGIT_AGENT or git user.name)")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("unexpected extra args: %v", fs.Args())
+	}
+	if strings.TrimSpace(*body) == "" {
+		return errors.New("--body is required")
+	}
+	who, err := agentIdentity(*author)
+	if err != nil {
+		return err
+	}
+
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(api.CreateCommentRequest{Author: who, Body: *body})
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d/comments", target.server, target.owner, target.repo, num)
+	resp, raw, err := httpDo(http.MethodPost, endpoint, bytes.NewReader(payload), "application/json")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	var c api.Comment
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	fmt.Printf("commented on #%d by %s at %s\n", num, c.Author, c.CreatedAt.Local().Format(time.RFC3339))
 	return nil
 }
 

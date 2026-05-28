@@ -48,7 +48,13 @@ func (s *Server) handleListIssues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	issues, err := storage.ListIssues(s.db, repoID)
+	filter, err := parseListFilter(r.URL.Query())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	issues, err := storage.ListIssues(s.db, repoID, filter)
 	if err != nil {
 		s.logger.Error("list issues", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -82,6 +88,109 @@ func (s *Server) handleGetIssue(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, iss)
 }
 
+func (s *Server) handleUpdateIssue(w http.ResponseWriter, r *http.Request) {
+	num, err := strconv.Atoi(r.PathValue("number"))
+	if err != nil || num <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid issue number")
+		return
+	}
+
+	var req api.UpdateIssueRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if !req.State.Valid() {
+		writeError(w, http.StatusBadRequest, "invalid state: "+string(req.State))
+		return
+	}
+
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	iss, err := storage.UpdateIssue(s.db, repoID, num, req.State)
+	if errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "issue not found")
+		return
+	}
+	if err != nil {
+		s.logger.Error("update issue", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, iss)
+}
+
+func (s *Server) handleClaimIssue(w http.ResponseWriter, r *http.Request) {
+	num, err := strconv.Atoi(r.PathValue("number"))
+	if err != nil || num <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid issue number")
+		return
+	}
+
+	var req api.ClaimRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	req.Assignee = strings.TrimSpace(req.Assignee)
+	if req.Assignee == "" {
+		writeError(w, http.StatusBadRequest, "assignee is required")
+		return
+	}
+	if req.State != "" && !req.State.Valid() {
+		writeError(w, http.StatusBadRequest, "invalid state: "+string(req.State))
+		return
+	}
+
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	iss, err := storage.Claim(s.db, repoID, num, req.Assignee, req.State)
+	switch {
+	case errors.Is(err, storage.ErrNotFound):
+		writeError(w, http.StatusNotFound, "issue not found")
+		return
+	case errors.Is(err, storage.ErrAlreadyClaimed):
+		writeError(w, http.StatusConflict, "issue already claimed")
+		return
+	case err != nil:
+		s.logger.Error("claim issue", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, iss)
+}
+
+func (s *Server) handleUnclaimIssue(w http.ResponseWriter, r *http.Request) {
+	num, err := strconv.Atoi(r.PathValue("number"))
+	if err != nil || num <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid issue number")
+		return
+	}
+
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	iss, err := storage.Unclaim(s.db, repoID, num)
+	if errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "issue not found")
+		return
+	}
+	if err != nil {
+		s.logger.Error("unclaim issue", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, iss)
+}
+
 // lookupRepoOrFail resolves the repo from the request's {owner}/{repo} path
 // values, writing an appropriate HTTP error and returning ok=false on
 // failure. Trailing ".git" on the repo segment is stripped.
@@ -100,6 +209,36 @@ func (s *Server) lookupRepoOrFail(w http.ResponseWriter, r *http.Request) (int64
 		return 0, false
 	}
 	return repoID, true
+}
+
+// parseListFilter pulls list filters from URL query params. Returns a
+// validated ListFilter or an error suitable for an HTTP 400 body.
+func parseListFilter(q map[string][]string) (storage.ListFilter, error) {
+	f := storage.ListFilter{}
+	for _, raw := range q["state"] {
+		for s := range strings.SplitSeq(raw, ",") {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				continue
+			}
+			st := api.IssueState(s)
+			if !st.Valid() {
+				return f, errors.New("invalid state: " + s)
+			}
+			f.States = append(f.States, st)
+		}
+	}
+	if v := q["assignee"]; len(v) > 0 {
+		f.Assignee = v[0]
+	}
+	if v := q["limit"]; len(v) > 0 {
+		n, err := strconv.Atoi(v[0])
+		if err != nil || n < 0 {
+			return f, errors.New("invalid limit")
+		}
+		f.Limit = n
+	}
+	return f, nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

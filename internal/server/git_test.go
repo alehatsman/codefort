@@ -1,9 +1,14 @@
 package server
 
 import (
+	"net/url"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/moongit/internal/storage"
 )
 
 func TestPktLine(t *testing.T) {
@@ -68,6 +73,103 @@ func TestRepoPath(t *testing.T) {
 			want := filepath.Join(root, tt.wantTail)
 			if got != want {
 				t.Errorf("got %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestParseListFilter(t *testing.T) {
+	tests := []struct {
+		name      string
+		raw       string
+		wantErr   bool
+		errSubstr string
+		want      storage.ListFilter
+	}{
+		{
+			name: "empty",
+			raw:  "",
+			want: storage.ListFilter{},
+		},
+		{
+			name: "single state",
+			raw:  "state=todo",
+			want: storage.ListFilter{States: []api.IssueState{api.IssueTodo}},
+		},
+		{
+			name: "multiple state comma-separated",
+			raw:  "state=todo,in_progress",
+			want: storage.ListFilter{States: []api.IssueState{api.IssueTodo, api.IssueInProgress}},
+		},
+		{
+			name: "multiple state via repeated param",
+			raw:  "state=todo&state=done",
+			want: storage.ListFilter{States: []api.IssueState{api.IssueTodo, api.IssueDone}},
+		},
+		{
+			name:      "invalid state rejected",
+			raw:       "state=bogus",
+			wantErr:   true,
+			errSubstr: "invalid state",
+		},
+		{
+			name: "assignee plain",
+			raw:  "assignee=claude-code",
+			want: storage.ListFilter{Assignee: "claude-code"},
+		},
+		{
+			name: "assignee null literal",
+			raw:  "assignee=null",
+			want: storage.ListFilter{Assignee: "null"},
+		},
+		{
+			name: "limit",
+			raw:  "limit=25",
+			want: storage.ListFilter{Limit: 25},
+		},
+		{
+			name:      "negative limit rejected",
+			raw:       "limit=-1",
+			wantErr:   true,
+			errSubstr: "invalid limit",
+		},
+		{
+			name:      "non-numeric limit rejected",
+			raw:       "limit=abc",
+			wantErr:   true,
+			errSubstr: "invalid limit",
+		},
+		{
+			name: "combined",
+			raw:  "state=todo,in_progress&assignee=null&limit=10",
+			want: storage.ListFilter{
+				States:   []api.IssueState{api.IssueTodo, api.IssueInProgress},
+				Assignee: "null",
+				Limit:    10,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q, err := url.ParseQuery(tt.raw)
+			if err != nil {
+				t.Fatalf("parse query: %v", err)
+			}
+			got, err := parseListFilter(q)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got %+v", got)
+				}
+				if tt.errSubstr != "" && !strings.Contains(err.Error(), tt.errSubstr) {
+					t.Errorf("error %q missing substring %q", err.Error(), tt.errSubstr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %+v, want %+v", got, tt.want)
 			}
 		})
 	}
