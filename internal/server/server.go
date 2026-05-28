@@ -38,7 +38,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /{owner}/{repo}/git-upload-pack", s.handleServiceRPC("git-upload-pack"))
 	mux.HandleFunc("POST /{owner}/{repo}/git-receive-pack", s.handleServiceRPC("git-receive-pack"))
 
-	return s.withLogging(mux)
+	return s.withLogging(s.withAuth(mux))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {

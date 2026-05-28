@@ -23,15 +23,13 @@ func (s *Server) handleCreateIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.Title = strings.TrimSpace(req.Title)
-	req.Author = strings.TrimSpace(req.Author)
 	if req.Title == "" {
 		writeError(w, http.StatusBadRequest, "title is required")
 		return
 	}
-	if req.Author == "" {
-		writeError(w, http.StatusBadRequest, "author is required")
-		return
-	}
+	// Identity is stamped from the authenticated token; client-supplied
+	// author is ignored.
+	req.Author = identityFromContext(r)
 
 	iss, err := storage.CreateIssue(s.db, repoID, req)
 	if err != nil {
@@ -135,11 +133,9 @@ func (s *Server) handleClaimIssue(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
-	req.Assignee = strings.TrimSpace(req.Assignee)
-	if req.Assignee == "" {
-		writeError(w, http.StatusBadRequest, "assignee is required")
-		return
-	}
+	// Identity is stamped from the authenticated token; client-supplied
+	// assignee is ignored.
+	req.Assignee = identityFromContext(r)
 	if req.State != "" && !req.State.Valid() {
 		writeError(w, http.StatusBadRequest, "invalid state: "+string(req.State))
 		return

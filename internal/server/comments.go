@@ -36,16 +36,13 @@ func (s *Server) handleCreateComment(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
-	req.Author = strings.TrimSpace(req.Author)
 	req.Body = strings.TrimSpace(req.Body)
-	if req.Author == "" {
-		writeError(w, http.StatusBadRequest, "author is required")
-		return
-	}
 	if req.Body == "" {
 		writeError(w, http.StatusBadRequest, "body is required")
 		return
 	}
+	// Identity stamped from the authenticated token.
+	req.Author = identityFromContext(r)
 
 	c, err := storage.CreateComment(s.db, issueID, req)
 	if err != nil {

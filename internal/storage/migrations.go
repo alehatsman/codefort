@@ -55,6 +55,21 @@ var migrations = []string{
 	);
 	CREATE INDEX IF NOT EXISTS idx_issue_comments_issue ON issue_comments(issue_id);
 	`,
+
+	// 3: API tokens. Plaintext never stored — only sha256(token).
+	// last_used_at is nullable (never-used tokens have NULL).
+	// revoked_at is nullable (NULL = active, set = revoked).
+	`
+	CREATE TABLE IF NOT EXISTS tokens (
+	    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+	    name          TEXT NOT NULL UNIQUE,
+	    hashed_token  TEXT NOT NULL UNIQUE,
+	    created_at    INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+	    last_used_at  INTEGER,
+	    revoked_at    INTEGER
+	);
+	CREATE INDEX IF NOT EXISTS idx_tokens_hash ON tokens(hashed_token);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

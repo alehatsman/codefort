@@ -48,16 +48,17 @@ func printUsage(w io.Writer) {
 	fmt.Fprint(w, `moongit — client for the moongit server
 
 USAGE:
-    moongit issue create  --title <t> [--body <b>] [--author <a>]
+    moongit issue create  --title <t> [--body <b>]
     moongit issue list    [--state s,s] [--assignee a|null] [--limit n]
     moongit issue show    <number>
     moongit issue set-state <number> <todo|in_progress|done|closed>
-    moongit issue claim   <number> [--as <id>] [--state s]
+    moongit issue claim   <number> [--state s]
     moongit issue unclaim <number>
-    moongit issue comment <number> --body <b> [--author <a>]
+    moongit issue comment <number> --body <b>
 
-Agent identity: --as / --author default to MOONGIT_AGENT env, then
-git config user.name.
+Identity: the server stamps author/assignee from the name of the token
+in MOONGIT_TOKEN. Mint a token with "moongitd token create <name>" and
+export MOONGIT_TOKEN=mgt_... before running the client.
 
 Run inside a git checkout whose 'origin' remote points at a moongit
 server. The target repo is parsed from the remote URL.
@@ -88,40 +89,16 @@ func runIssue(args []string) error {
 	}
 }
 
-// agentIdentity returns the caller's identity for assignment / comment
-// authorship. Resolution order: explicit flag, MOONGIT_AGENT env var,
-// git config user.name.
-func agentIdentity(flagValue string) (string, error) {
-	if flagValue != "" {
-		return flagValue, nil
-	}
-	if v := os.Getenv("MOONGIT_AGENT"); v != "" {
-		return v, nil
-	}
-	v, err := gitConfig("user.name")
-	if err != nil {
-		return "", fmt.Errorf("agent identity not set: pass --as/--author, set MOONGIT_AGENT, or configure git user.name")
-	}
-	return v, nil
-}
 
 func runIssueCreate(args []string) error {
 	fs := flag.NewFlagSet("issue create", flag.ContinueOnError)
 	title := fs.String("title", "", "issue title (required)")
 	body := fs.String("body", "", "issue body")
-	author := fs.String("author", "", "issue author (defaults to git config user.name)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if strings.TrimSpace(*title) == "" {
 		return errors.New("--title is required")
-	}
-	if *author == "" {
-		v, err := gitConfig("user.name")
-		if err != nil {
-			return fmt.Errorf("--author not set and git config user.name unreadable: %w", err)
-		}
-		*author = v
 	}
 
 	target, err := discoverTarget()
@@ -130,7 +107,7 @@ func runIssueCreate(args []string) error {
 	}
 
 	payload, err := json.Marshal(api.CreateIssueRequest{
-		Title: *title, Body: *body, Author: *author,
+		Title: *title, Body: *body,
 	})
 	if err != nil {
 		return err
@@ -301,7 +278,7 @@ func runIssueSetState(args []string) error {
 
 func runIssueClaim(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: moongit issue claim <number> [--as <id>] [--state <s>]")
+		return errors.New("usage: moongit issue claim <number> [--state <s>]")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -309,17 +286,12 @@ func runIssueClaim(args []string) error {
 	}
 
 	fs := flag.NewFlagSet("issue claim", flag.ContinueOnError)
-	as := fs.String("as", "", "agent identity (default: $MOONGIT_AGENT or git user.name)")
 	stateFlag := fs.String("state", "", "optional state transition (e.g. in_progress)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
 		return fmt.Errorf("unexpected extra args: %v", fs.Args())
-	}
-	assignee, err := agentIdentity(*as)
-	if err != nil {
-		return err
 	}
 	state := api.IssueState(*stateFlag)
 	if state != "" && !state.Valid() {
@@ -330,7 +302,7 @@ func runIssueClaim(args []string) error {
 	if err != nil {
 		return err
 	}
-	payload, err := json.Marshal(api.ClaimRequest{Assignee: assignee, State: state})
+	payload, err := json.Marshal(api.ClaimRequest{State: state})
 	if err != nil {
 		return err
 	}
@@ -388,7 +360,6 @@ func runIssueComment(args []string) error {
 
 	fs := flag.NewFlagSet("issue comment", flag.ContinueOnError)
 	body := fs.String("body", "", "comment body (required)")
-	author := fs.String("author", "", "comment author (default: $MOONGIT_AGENT or git user.name)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -398,16 +369,12 @@ func runIssueComment(args []string) error {
 	if strings.TrimSpace(*body) == "" {
 		return errors.New("--body is required")
 	}
-	who, err := agentIdentity(*author)
-	if err != nil {
-		return err
-	}
 
 	target, err := discoverTarget()
 	if err != nil {
 		return err
 	}
-	payload, err := json.Marshal(api.CreateCommentRequest{Author: who, Body: *body})
+	payload, err := json.Marshal(api.CreateCommentRequest{Body: *body})
 	if err != nil {
 		return err
 	}
@@ -481,18 +448,6 @@ func gitRemoteURL(name string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func gitConfig(key string) (string, error) {
-	cmd := exec.Command("git", "config", "--get", key)
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	v := strings.TrimSpace(string(out))
-	if v == "" {
-		return "", fmt.Errorf("git config %s is empty", key)
-	}
-	return v, nil
-}
 
 func httpDo(method, urlStr string, body io.Reader, contentType string) (*http.Response, []byte, error) {
 	req, err := http.NewRequest(method, urlStr, body)
@@ -503,6 +458,9 @@ func httpDo(method, urlStr string, body io.Reader, contentType string) (*http.Re
 		req.Header.Set("Content-Type", contentType)
 	}
 	req.Header.Set("Accept", "application/json")
+	if tok := os.Getenv("MOONGIT_TOKEN"); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)

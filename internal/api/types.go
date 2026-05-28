@@ -43,18 +43,19 @@ type Issue struct {
 type CreateIssueRequest struct {
 	Title  string `json:"title"`
 	Body   string `json:"body,omitempty"`
-	Author string `json:"author"`
+	Author string `json:"-"` // populated server-side from token
 }
 
 type UpdateIssueRequest struct {
 	State IssueState `json:"state"`
 }
 
-// ClaimRequest atomically takes ownership of an issue. The server only
-// succeeds if the issue is currently unassigned (409 otherwise). State is
-// optional — if set, transitioned in the same operation.
+// ClaimRequest atomically takes ownership of an issue. The server stamps
+// the assignee from the authenticated token's name; the request body
+// only carries an optional state transition. Succeeds only if the issue
+// is currently unassigned (409 otherwise).
 type ClaimRequest struct {
-	Assignee string     `json:"assignee"`
+	Assignee string     `json:"-"` // populated server-side from token; ignored on the wire
 	State    IssueState `json:"state,omitempty"`
 }
 
@@ -67,10 +68,21 @@ type Comment struct {
 }
 
 type CreateCommentRequest struct {
-	Author string `json:"author"`
+	Author string `json:"-"` // populated server-side from token
 	Body   string `json:"body"`
 }
 
 type ErrorResponse struct {
 	Error string `json:"error"`
+}
+
+// Token represents an API token's metadata. The plaintext token itself
+// is never returned over the API — it's only shown once at creation time
+// by the moongitd CLI.
+type Token struct {
+	ID         int64      `json:"id"`
+	Name       string     `json:"name"`
+	CreatedAt  time.Time  `json:"created_at"`
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	RevokedAt  *time.Time `json:"revoked_at,omitempty"`
 }
