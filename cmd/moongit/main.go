@@ -104,7 +104,7 @@ func runIssueCreate(args []string) error {
 		return err
 	}
 
-	endpoint := fmt.Sprintf("%s/api/v1/repos/%s/%s/issues", target.server, target.owner, target.repo)
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues", target.server, target.owner, target.repo)
 	resp, raw, err := httpDo(http.MethodPost, endpoint, bytes.NewReader(payload), "application/json")
 	if err != nil {
 		return err
@@ -130,7 +130,7 @@ func runIssueList(args []string) error {
 	if err != nil {
 		return err
 	}
-	endpoint := fmt.Sprintf("%s/api/v1/repos/%s/%s/issues", target.server, target.owner, target.repo)
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues", target.server, target.owner, target.repo)
 	resp, raw, err := httpDo(http.MethodGet, endpoint, nil, "")
 	if err != nil {
 		return err
@@ -164,7 +164,7 @@ func runIssueShow(args []string) error {
 	if err != nil {
 		return err
 	}
-	endpoint := fmt.Sprintf("%s/api/v1/repos/%s/%s/issues/%d", target.server, target.owner, target.repo, num)
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d", target.server, target.owner, target.repo, num)
 	resp, raw, err := httpDo(http.MethodGet, endpoint, nil, "")
 	if err != nil {
 		return err
@@ -193,15 +193,22 @@ type target struct {
 	repo   string
 }
 
+// discoverTarget derives the moongit server URL and owner/repo from the
+// current git checkout's `origin` remote. MOONGIT_SERVER overrides the
+// derived server URL (host part); owner and repo always come from the remote.
 func discoverTarget() (target, error) {
-	if v := os.Getenv("MOONGIT_SERVER"); v != "" && os.Getenv("MOONGIT_OWNER") != "" && os.Getenv("MOONGIT_REPO") != "" {
-		return target{server: strings.TrimRight(v, "/"), owner: os.Getenv("MOONGIT_OWNER"), repo: os.Getenv("MOONGIT_REPO")}, nil
-	}
 	remote, err := gitRemoteURL("origin")
 	if err != nil {
 		return target{}, fmt.Errorf("read git remote 'origin': %w (run inside a checkout of the target repo)", err)
 	}
-	return parseRemote(remote)
+	t, err := parseRemote(remote)
+	if err != nil {
+		return target{}, err
+	}
+	if override := os.Getenv("MOONGIT_SERVER"); override != "" {
+		t.server = strings.TrimRight(override, "/")
+	}
+	return t, nil
 }
 
 func parseRemote(remote string) (target, error) {
@@ -221,11 +228,7 @@ func parseRemote(remote string) (target, error) {
 	if !ok || owner == "" || repo == "" {
 		return target{}, fmt.Errorf("remote path %q is not <owner>/<repo>(.git)", u.Path)
 	}
-	srv := u.Scheme + "://" + u.Host
-	if v := os.Getenv("MOONGIT_SERVER"); v != "" {
-		srv = strings.TrimRight(v, "/")
-	}
-	return target{server: srv, owner: owner, repo: repo}, nil
+	return target{server: u.Scheme + "://" + u.Host, owner: owner, repo: repo}, nil
 }
 
 func gitRemoteURL(name string) (string, error) {

@@ -17,10 +17,10 @@ var validServices = map[string]struct{}{
 	"git-receive-pack": {}, // push
 }
 
-// repoPath resolves {owner}/{repo}.git under ReposDir, rejecting traversal.
+// repoPath resolves {owner}/{repo}.git under reposDir, rejecting traversal.
 // The router pattern matches /{owner}/{repo}/... but real git clients hit
 // /{owner}/{repo}.git/..., so {repo} arrives as "name.git". We accept either.
-func (s *Server) repoPath(owner, repo string) (string, error) {
+func repoPath(reposDir, owner, repo string) (string, error) {
 	if owner == "" || repo == "" {
 		return "", fmt.Errorf("missing owner or repo")
 	}
@@ -33,9 +33,9 @@ func (s *Server) repoPath(owner, repo string) (string, error) {
 	if !strings.HasSuffix(repo, ".git") {
 		repo += ".git"
 	}
-	full := filepath.Join(s.cfg.ReposDir, owner, repo)
+	full := filepath.Join(reposDir, owner, repo)
 
-	rel, err := filepath.Rel(s.cfg.ReposDir, full)
+	rel, err := filepath.Rel(reposDir, full)
 	if err != nil || strings.HasPrefix(rel, "..") {
 		return "", fmt.Errorf("path escapes repos dir")
 	}
@@ -49,7 +49,7 @@ func (s *Server) handleInfoRefs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	repoDir, err := s.repoPath(r.PathValue("owner"), r.PathValue("repo"))
+	repoDir, err := repoPath(s.cfg.ReposDir, r.PathValue("owner"), r.PathValue("repo"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -90,7 +90,7 @@ func (s *Server) handleServiceRPC(service string) http.HandlerFunc {
 			return
 		}
 
-		repoDir, err := s.repoPath(r.PathValue("owner"), r.PathValue("repo"))
+		repoDir, err := repoPath(s.cfg.ReposDir, r.PathValue("owner"), r.PathValue("repo"))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

@@ -12,7 +12,10 @@ import (
 )
 
 func (s *Server) handleCreateIssue(w http.ResponseWriter, r *http.Request) {
-	owner, repo := r.PathValue("owner"), normalizeRepo(r.PathValue("repo"))
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
 
 	var req api.CreateIssueRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -30,17 +33,6 @@ func (s *Server) handleCreateIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	repoID, err := storage.LookupRepo(s.db, owner, repo)
-	if errors.Is(err, storage.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "repo not registered: "+owner+"/"+repo)
-		return
-	}
-	if err != nil {
-		s.logger.Error("lookup repo", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-
 	iss, err := storage.CreateIssue(s.db, repoID, req)
 	if err != nil {
 		s.logger.Error("create issue", "err", err)
@@ -51,16 +43,8 @@ func (s *Server) handleCreateIssue(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListIssues(w http.ResponseWriter, r *http.Request) {
-	owner, repo := r.PathValue("owner"), normalizeRepo(r.PathValue("repo"))
-
-	repoID, err := storage.LookupRepo(s.db, owner, repo)
-	if errors.Is(err, storage.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "repo not registered: "+owner+"/"+repo)
-		return
-	}
-	if err != nil {
-		s.logger.Error("lookup repo", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
 		return
 	}
 
@@ -74,22 +58,14 @@ func (s *Server) handleListIssues(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetIssue(w http.ResponseWriter, r *http.Request) {
-	owner, repo := r.PathValue("owner"), normalizeRepo(r.PathValue("repo"))
-
 	num, err := strconv.Atoi(r.PathValue("number"))
 	if err != nil || num <= 0 {
 		writeError(w, http.StatusBadRequest, "invalid issue number")
 		return
 	}
 
-	repoID, err := storage.LookupRepo(s.db, owner, repo)
-	if errors.Is(err, storage.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "repo not registered: "+owner+"/"+repo)
-		return
-	}
-	if err != nil {
-		s.logger.Error("lookup repo", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
 		return
 	}
 
@@ -106,10 +82,24 @@ func (s *Server) handleGetIssue(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, iss)
 }
 
-// normalizeRepo strips a trailing .git so the issues API accepts both
-// "/api/v1/repos/aleh/hello/issues" and "/api/v1/repos/aleh/hello.git/issues".
-func normalizeRepo(name string) string {
-	return strings.TrimSuffix(name, ".git")
+// lookupRepoOrFail resolves the repo from the request's {owner}/{repo} path
+// values, writing an appropriate HTTP error and returning ok=false on
+// failure. Trailing ".git" on the repo segment is stripped.
+func (s *Server) lookupRepoOrFail(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	owner := r.PathValue("owner")
+	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
+
+	repoID, err := storage.LookupRepo(s.db, owner, repo)
+	if errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "repo not registered: "+owner+"/"+repo)
+		return 0, false
+	}
+	if err != nil {
+		s.logger.Error("lookup repo", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return 0, false
+	}
+	return repoID, true
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

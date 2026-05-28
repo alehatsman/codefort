@@ -25,42 +25,32 @@ func CreateIssue(db *sql.DB, repoID int64, req api.CreateIssueRequest) (api.Issu
 		return api.Issue{}, err
 	}
 
-	res, err := tx.Exec(
-		"INSERT INTO issues(repo_id, number, title, body, author) VALUES (?, ?, ?, ?, ?)",
-		repoID, next, req.Title, req.Body, req.Author,
-	)
-	if err != nil {
-		return api.Issue{}, err
-	}
-	id, err := res.LastInsertId()
+	row := tx.QueryRow(`
+		INSERT INTO issues(repo_id, number, title, body, author, state)
+		VALUES (?, ?, ?, ?, ?, ?)
+		RETURNING id, number, title, body, author, state, created_at, updated_at
+	`, repoID, next, req.Title, req.Body, req.Author, string(api.IssueOpen))
+
+	iss, err := scanIssue(row)
 	if err != nil {
 		return api.Issue{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return api.Issue{}, err
 	}
-
-	return getIssueByID(db, id)
+	return iss, nil
 }
 
 func GetIssue(db *sql.DB, repoID int64, number int) (api.Issue, error) {
-	var iss api.Issue
-	var created, updated int64
-	err := db.QueryRow(`
+	row := db.QueryRow(`
 		SELECT id, number, title, body, author, state, created_at, updated_at
 		FROM issues WHERE repo_id = ? AND number = ?
-	`, repoID, number).Scan(
-		&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State, &created, &updated,
-	)
+	`, repoID, number)
+	iss, err := scanIssue(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return iss, ErrNotFound
 	}
-	if err != nil {
-		return iss, err
-	}
-	iss.CreatedAt = time.Unix(created, 0).UTC()
-	iss.UpdatedAt = time.Unix(updated, 0).UTC()
-	return iss, nil
+	return iss, err
 }
 
 func ListIssues(db *sql.DB, repoID int64) ([]api.Issue, error) {
@@ -75,30 +65,26 @@ func ListIssues(db *sql.DB, repoID int64) ([]api.Issue, error) {
 
 	issues := make([]api.Issue, 0)
 	for rows.Next() {
-		var iss api.Issue
-		var created, updated int64
-		if err := rows.Scan(
-			&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State, &created, &updated,
-		); err != nil {
+		iss, err := scanIssue(rows)
+		if err != nil {
 			return nil, err
 		}
-		iss.CreatedAt = time.Unix(created, 0).UTC()
-		iss.UpdatedAt = time.Unix(updated, 0).UTC()
 		issues = append(issues, iss)
 	}
 	return issues, rows.Err()
 }
 
-func getIssueByID(db *sql.DB, id int64) (api.Issue, error) {
+// scanner abstracts *sql.Row and *sql.Rows so scanIssue can serve both.
+type scanner interface {
+	Scan(dest ...any) error
+}
+
+func scanIssue(s scanner) (api.Issue, error) {
 	var iss api.Issue
 	var created, updated int64
-	err := db.QueryRow(`
-		SELECT id, number, title, body, author, state, created_at, updated_at
-		FROM issues WHERE id = ?
-	`, id).Scan(
+	if err := s.Scan(
 		&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State, &created, &updated,
-	)
-	if err != nil {
+	); err != nil {
 		return iss, err
 	}
 	iss.CreatedAt = time.Unix(created, 0).UTC()

@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS issues (
     title      TEXT NOT NULL,
     body       TEXT NOT NULL DEFAULT '',
     author     TEXT NOT NULL,
-    state      TEXT NOT NULL DEFAULT 'open',
+    state      TEXT NOT NULL,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     UNIQUE (repo_id, number)

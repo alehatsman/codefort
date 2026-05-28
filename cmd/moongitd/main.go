@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -50,7 +51,7 @@ func main() {
 	}
 }
 
-func printUsage(w *os.File) {
+func printUsage(w io.Writer) {
 	fmt.Fprint(w, `moongitd — moongit server daemon
 
 USAGE:
@@ -70,6 +71,9 @@ func runServe(logger *slog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
+	}
+	if err := cfg.EnsureDirs(); err != nil {
+		return fmt.Errorf("ensure dirs: %w", err)
 	}
 
 	db, err := storage.Open(cfg.DBPath)
@@ -140,6 +144,9 @@ func runRepoCreate(args []string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
+	}
+	if err := cfg.EnsureDirs(); err != nil {
+		return fmt.Errorf("ensure dirs: %w", err)
 	}
 	db, err := storage.Open(cfg.DBPath)
 	if err != nil {
