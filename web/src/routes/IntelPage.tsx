@@ -114,14 +114,13 @@ export default function IntelPage() {
             >
               <option value="semantic">Semantic</option>
               <option value="symbol">Symbol</option>
+              <option value="ask">Ask</option>
+              <option value="callers">Callers</option>
+              <option value="callees">Callees</option>
             </select>
             <input
               className="input"
-              placeholder={
-                kind === "semantic"
-                  ? "Ask the codebase — e.g. where is auth validated?"
-                  : "Exact identifier — e.g. handleIntelSearch"
-              }
+              placeholder={placeholderFor(kind)}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -159,10 +158,12 @@ function SearchHits({
     )
   }
   if (result.hits.length === 0) {
-    return <div className="empty">No matches.</div>
+    return <div className="empty">No matches{result.hint ? ` (${result.hint})` : ""}.</div>
   }
   return (
-    <ul className="intel__hits">
+    <>
+      {result.hint && <div className="intel__hint muted small">{result.hint}</div>}
+      <ul className="intel__hits">
       {result.hits.map((h, i) => (
         <li key={`${h.path}:${h.start_line}:${i}`} className="hit">
           <div className="hit__head">
@@ -185,8 +186,24 @@ function SearchHits({
           {h.content && <pre className="hit__code">{h.content}</pre>}
         </li>
       ))}
-    </ul>
+      </ul>
+    </>
   )
+}
+
+function placeholderFor(kind: IntelSearchKind): string {
+  switch (kind) {
+    case "semantic":
+      return "Ask the codebase — e.g. where is auth validated?"
+    case "symbol":
+      return "Exact identifier — e.g. handleIntelSearch"
+    case "ask":
+      return "Free-form question — dex picks the strategy"
+    case "callers":
+      return "Symbol whose callers you want — e.g. Open, (*Server).Handler"
+    case "callees":
+      return "Symbol whose callees you want — e.g. Run, ResolveProject"
+  }
 }
 
 function formatTime(s: string): string {

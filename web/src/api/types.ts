@@ -114,7 +114,7 @@ export interface Intel {
   project?: IntelProject
 }
 
-export type IntelSearchKind = "semantic" | "symbol"
+export type IntelSearchKind = "semantic" | "symbol" | "ask" | "callers" | "callees"
 
 export interface IntelSearchInput {
   query: string

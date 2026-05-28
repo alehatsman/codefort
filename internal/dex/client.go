@@ -133,6 +133,46 @@ func (c *Client) FindSymbol(ctx context.Context, projectID, name string, k int) 
 	return c.search(ctx, "/v1/projects/"+projectID+"/search/symbol", body)
 }
 
+// Ask sends a free-form question to dex's /ask endpoint. We flatten its
+// semantic_hits into the common Hit shape so the Intel tab can reuse the
+// existing renderer. The graph + suggested_reads sections of the response
+// are richer but need a different UI; they're discarded for now.
+func (c *Client) Ask(ctx context.Context, projectID, question string, k int) (*SearchResult, error) {
+	body := map[string]any{"question": question}
+	if k > 0 {
+		body["k"] = k
+	}
+	var raw askEnvelope
+	if err := c.do(ctx, http.MethodPost, "/v1/projects/"+projectID+"/ask", body, &raw); err != nil {
+		return nil, err
+	}
+	return raw.toSearchResult(), nil
+}
+
+// Callers returns call-graph predecessors of name (functions that invoke it).
+// Each hit is one call site, surfaced as a Hit pointing at the call-site
+// file:line so the UI can render and link to it uniformly.
+func (c *Client) Callers(ctx context.Context, projectID, name string, k int) (*SearchResult, error) {
+	return c.callEdge(ctx, projectID, "callers", name, k)
+}
+
+// Callees returns call-graph successors of name (functions it invokes).
+func (c *Client) Callees(ctx context.Context, projectID, name string, k int) (*SearchResult, error) {
+	return c.callEdge(ctx, projectID, "callees", name, k)
+}
+
+func (c *Client) callEdge(ctx context.Context, projectID, edge, name string, k int) (*SearchResult, error) {
+	body := map[string]any{"name": name}
+	if k > 0 {
+		body["k"] = k
+	}
+	var raw callEdgeEnvelope
+	if err := c.do(ctx, http.MethodPost, "/v1/projects/"+projectID+"/graph/"+edge, body, &raw); err != nil {
+		return nil, err
+	}
+	return raw.toSearchResult(), nil
+}
+
 func (c *Client) search(ctx context.Context, path string, body map[string]any) (*SearchResult, error) {
 	var out SearchResult
 	if err := c.do(ctx, http.MethodPost, path, body, &out); err != nil {
@@ -189,4 +229,113 @@ func (c *Client) do(ctx context.Context, method, path string, body any, out any)
 		return nil
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+// askEnvelope mirrors dex's /ask response shape. Only the fields the Intel
+// tab surfaces are unmarshaled; graph + suggested_reads are dropped on the
+// floor for now (different UX, separate slice).
+type askEnvelope struct {
+	Status       string   `json:"status"`
+	Hint         string   `json:"hint,omitempty"`
+	Intent       string   `json:"intent,omitempty"`
+	SemanticHits []askHit `json:"semantic_hits"`
+}
+
+type askHit struct {
+	Path      string  `json:"path"`
+	StartLine int     `json:"start_line"`
+	EndLine   int     `json:"end_line"`
+	Score     float32 `json:"score"`
+	Kind      string  `json:"kind"`
+	Reason    string  `json:"reason,omitempty"`
+	Content   string  `json:"content,omitempty"`
+}
+
+func (a askEnvelope) toSearchResult() *SearchResult {
+	out := &SearchResult{Status: a.Status, Hits: make([]Hit, 0, len(a.SemanticHits))}
+	if a.Hint != "" {
+		out.Hint = a.Hint
+	} else if a.Intent != "" {
+		out.Hint = "intent: " + a.Intent
+	}
+	for _, h := range a.SemanticHits {
+		role := a.Intent
+		if h.Reason != "" && role != "" {
+			role = a.Intent + " · " + h.Reason
+		} else if h.Reason != "" {
+			role = h.Reason
+		}
+		out.Hits = append(out.Hits, Hit{
+			Path:      h.Path,
+			Kind:      h.Kind,
+			StartLine: h.StartLine,
+			EndLine:   h.EndLine,
+			Score:     h.Score,
+			Role:      role,
+			Content:   h.Content,
+		})
+	}
+	return out
+}
+
+// callEdgeEnvelope mirrors dex's /graph/callers and /graph/callees
+// responses. Targets are the symbol(s) the request resolved to; hits are
+// the call-graph neighbors.
+type callEdgeEnvelope struct {
+	Status  string        `json:"status"`
+	Hint    string        `json:"hint,omitempty"`
+	Targets []callTarget  `json:"targets"`
+	Hits    []callEdgeHit `json:"hits"`
+}
+
+type callTarget struct {
+	QualifiedName string `json:"qualified_name"`
+	Package       string `json:"package,omitempty"`
+	Kind          string `json:"kind"`
+	Path          string `json:"path"`
+	StartLine     int    `json:"start_line"`
+}
+
+type callEdgeHit struct {
+	QualifiedName string `json:"qualified_name"`
+	Package       string `json:"package,omitempty"`
+	Kind          string `json:"kind"`
+	Path          string `json:"path"`
+	StartLine     int    `json:"start_line"`
+	EndLine       int    `json:"end_line"`
+	CallSitePath  string `json:"call_site_path"`
+	CallSiteLine  int    `json:"call_site_line"`
+	Content       string `json:"content,omitempty"`
+}
+
+func (e callEdgeEnvelope) toSearchResult() *SearchResult {
+	out := &SearchResult{Status: e.Status, Hits: make([]Hit, 0, len(e.Hits))}
+	switch {
+	case e.Hint != "":
+		out.Hint = e.Hint
+	case len(e.Targets) > 0:
+		names := make([]string, 0, len(e.Targets))
+		for _, t := range e.Targets {
+			n := t.QualifiedName
+			if t.Package != "" {
+				n = t.Package + "." + n
+			}
+			names = append(names, n)
+		}
+		out.Hint = "resolved: " + strings.Join(names, ", ")
+	}
+	for _, h := range e.Hits {
+		// Surface the call site (where the call expression sits) as the
+		// primary location — clicking through goes to the caller's code,
+		// which is what someone exploring "who calls Foo?" wants.
+		out.Hits = append(out.Hits, Hit{
+			Path:      h.CallSitePath,
+			Kind:      h.Kind,
+			StartLine: h.CallSiteLine,
+			EndLine:   h.CallSiteLine,
+			Role:      h.QualifiedName,
+			Content:   h.Content,
+		})
+	}
+	return out
 }

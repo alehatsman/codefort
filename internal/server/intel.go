@@ -131,6 +131,12 @@ func (s *Server) handleIntelSearch(w http.ResponseWriter, r *http.Request) {
 	switch req.Kind {
 	case "symbol":
 		res, err = s.dex.FindSymbol(r.Context(), proj.ID, req.Query, maxHits)
+	case "ask":
+		res, err = s.dex.Ask(r.Context(), proj.ID, req.Query, maxHits)
+	case "callers":
+		res, err = s.dex.Callers(r.Context(), proj.ID, req.Query, maxHits)
+	case "callees":
+		res, err = s.dex.Callees(r.Context(), proj.ID, req.Query, maxHits)
 	default:
 		res, err = s.dex.Search(r.Context(), proj.ID, req.Query, maxHits)
 	}
