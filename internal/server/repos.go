@@ -1,8 +1,15 @@
 package server
 
 import (
+	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -39,6 +46,88 @@ func (s *Server) handleGetRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, toAPIRepo(row))
+}
+
+func (s *Server) handleCreateRepo(w http.ResponseWriter, r *http.Request) {
+	var req api.CreateRepoRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	owner := strings.TrimSpace(req.Owner)
+	name := strings.TrimSuffix(strings.TrimSpace(req.Name), ".git")
+	if !validRepoComponent(owner) {
+		writeError(w, http.StatusBadRequest, "invalid owner (allowed: letters, digits, . _ -)")
+		return
+	}
+	if !validRepoComponent(name) {
+		writeError(w, http.StatusBadRequest, "invalid repo name (allowed: letters, digits, . _ -)")
+		return
+	}
+
+	// Reject up front so the UI can surface a clean 409 instead of
+	// silently reusing an existing repo (CreateRepo is idempotent).
+	if _, err := storage.LookupRepo(s.db, owner, name); err == nil {
+		writeError(w, http.StatusConflict, "repo already exists: "+owner+"/"+name)
+		return
+	} else if !errors.Is(err, storage.ErrNotFound) {
+		s.logger.Error("lookup repo", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if _, _, err := CreateRepo(s.db, s.cfg.ReposDir, owner, name); err != nil {
+		s.logger.Error("create repo", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	row, err := storage.GetRepoSummary(s.db, owner, name)
+	if err != nil {
+		s.logger.Error("get repo after create", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, toAPIRepo(row))
+}
+
+// repoComponentRe constrains owner/name to a path-safe charset so they map
+// cleanly onto the on-disk repos dir and the git smart-HTTP routes.
+var repoComponentRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+func validRepoComponent(s string) bool {
+	if s == "" || s == "." || s == ".." || len(s) > 100 {
+		return false
+	}
+	return repoComponentRe.MatchString(s)
+}
+
+// CreateRepo provisions a bare git repository on disk and registers it in the
+// database. Idempotent: an existing on-disk repo or DB row is reused. Returns
+// the repo id and its on-disk path. Shared by the HTTP API and the CLI.
+func CreateRepo(db *sql.DB, reposDir, owner, name string) (int64, string, error) {
+	repoDir := filepath.Join(reposDir, owner, name+".git")
+	if _, err := os.Stat(filepath.Join(repoDir, "HEAD")); errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(repoDir, 0o755); err != nil {
+			return 0, "", fmt.Errorf("mkdir repo: %w", err)
+		}
+		// -b main pins the bare repo's HEAD to refs/heads/main so the
+		// default-branch doesn't follow the user's local git config (which
+		// is commonly still `master` on older boxes). Without this, the
+		// first push of a `main` branch leaves HEAD pointing at an unborn
+		// `master` and read endpoints (tree/blob) show an empty repo even
+		// though objects are present.
+		out, err := exec.Command("git", "init", "--bare", "-b", "main", repoDir).CombinedOutput()
+		if err != nil {
+			return 0, "", fmt.Errorf("git init --bare: %w: %s", err, strings.TrimSpace(string(out)))
+		}
+	}
+
+	id, err := storage.EnsureRepo(db, owner, name)
+	if err != nil {
+		return 0, "", fmt.Errorf("ensure repo: %w", err)
+	}
+	return id, repoDir, nil
 }
 
 func toAPIRepo(r storage.RepoSummary) api.Repo {

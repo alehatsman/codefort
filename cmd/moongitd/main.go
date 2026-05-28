@@ -9,9 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -286,20 +284,9 @@ func runRepoCreate(args []string) error {
 	}
 	defer db.Close()
 
-	repoDir := filepath.Join(cfg.ReposDir, owner, name+".git")
-	if _, err := os.Stat(filepath.Join(repoDir, "HEAD")); errors.Is(err, os.ErrNotExist) {
-		if err := os.MkdirAll(repoDir, 0o755); err != nil {
-			return fmt.Errorf("mkdir repo: %w", err)
-		}
-		out, err := exec.Command("git", "init", "--bare", repoDir).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("git init --bare: %w: %s", err, strings.TrimSpace(string(out)))
-		}
-	}
-
-	id, err := storage.EnsureRepo(db, owner, name)
+	id, repoDir, err := server.CreateRepo(db, cfg.ReposDir, owner, name)
 	if err != nil {
-		return fmt.Errorf("ensure repo: %w", err)
+		return err
 	}
 	fmt.Printf("repo registered: %s/%s (id=%d) at %s\n", owner, name, id, repoDir)
 	return nil

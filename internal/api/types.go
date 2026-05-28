@@ -86,6 +86,13 @@ type Repo struct {
 	TotalIssues int       `json:"total_issues"`
 }
 
+// CreateRepoRequest provisions a new repository: a bare git repo on disk
+// plus its database registration.
+type CreateRepoRequest struct {
+	Owner string `json:"owner"`
+	Name  string `json:"name"`
+}
+
 // TreeEntry is one item in a repository directory listing.
 type TreeEntry struct {
 	Name string `json:"name"`           // basename, relative to the listed dir

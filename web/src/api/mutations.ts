@@ -5,8 +5,17 @@ import type {
   ClaimIssueInput,
   CreateCommentInput,
   CreateIssueInput,
+  CreateRepoInput,
   UpdateIssueInput,
 } from "./types"
+
+export function useCreateRepo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateRepoInput) => api.createRepo(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.repos() }),
+  })
+}
 
 // Helper: invalidate everything that's affected by a write to one issue.
 // A new/updated issue can change repo counts and issue lists; comment
