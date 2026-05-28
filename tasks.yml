@@ -1,0 +1,51 @@
+# Tasks for moongit. Run with `mooncake task <name>`.
+# Lists all tasks: `mooncake task`.
+
+version: "1.0"
+
+tasks:
+  tidy:
+    desc: Sync Go module dependencies
+    steps:
+      - cmd:
+          argv: ["go", "mod", "tidy"]
+
+  build:
+    desc: Build the moongitd binary into ./bin/moongitd
+    steps:
+      - file.write:
+          path: bin
+          state: directory
+      - cmd:
+          argv: ["go", "build", "-o", "bin/moongitd", "./cmd/moongitd"]
+
+  test:
+    desc: Run unit tests
+    steps:
+      - cmd:
+          argv: ["go", "test", "./..."]
+
+  run:
+    desc: Run moongitd in the foreground (Ctrl-C to stop)
+    steps:
+      - file.write:
+          path: data/repos
+          state: directory
+      - cmd:
+          argv: ["go", "run", "./cmd/moongitd"]
+
+  create-repo:
+    desc: 'Init a bare repo. Pass --vars with {owner, name}'
+    steps:
+      - file.write:
+          path: "data/repos/{{ owner }}/{{ name }}.git"
+          state: directory
+      - shell:
+          cmd: "git init --bare data/repos/{{ owner }}/{{ name }}.git"
+          creates: "data/repos/{{ owner }}/{{ name }}.git/HEAD"
+
+  clean:
+    desc: Remove build artifacts (keeps data/)
+    steps:
+      - shell:
+          cmd: "rm -rf bin"

@@ -1,0 +1,12 @@
+# Mooncake — local state and plan artifacts
+.mooncake/
+*.plan.json
+*.plan.yaml
+
+# Go build artifacts
+/bin/
+*.test
+*.out
+
+# Runtime data (SQLite db, bare repos)
+/data/

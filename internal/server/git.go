@@ -1,0 +1,154 @@
+package server
+
+import (
+	"compress/gzip"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+)
+
+// validServices lists the git smart-HTTP services we accept on /info/refs.
+var validServices = map[string]struct{}{
+	"git-upload-pack":  {}, // fetch / clone
+	"git-receive-pack": {}, // push
+}
+
+// repoPath resolves {owner}/{repo}.git under ReposDir, rejecting traversal.
+// The router pattern matches /{owner}/{repo}/... but real git clients hit
+// /{owner}/{repo}.git/..., so {repo} arrives as "name.git". We accept either.
+func (s *Server) repoPath(owner, repo string) (string, error) {
+	if owner == "" || repo == "" {
+		return "", fmt.Errorf("missing owner or repo")
+	}
+	if strings.ContainsAny(owner, "/\\") || strings.ContainsAny(repo, "/\\") {
+		return "", fmt.Errorf("invalid owner or repo")
+	}
+	if owner == ".." || repo == ".." || strings.HasPrefix(owner, ".") || strings.HasPrefix(repo, ".") {
+		return "", fmt.Errorf("invalid owner or repo")
+	}
+	if !strings.HasSuffix(repo, ".git") {
+		repo += ".git"
+	}
+	full := filepath.Join(s.cfg.ReposDir, owner, repo)
+
+	rel, err := filepath.Rel(s.cfg.ReposDir, full)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("path escapes repos dir")
+	}
+	return full, nil
+}
+
+func (s *Server) handleInfoRefs(w http.ResponseWriter, r *http.Request) {
+	service := r.URL.Query().Get("service")
+	if _, ok := validServices[service]; !ok {
+		http.Error(w, "service not supported", http.StatusForbidden)
+		return
+	}
+
+	repoDir, err := s.repoPath(r.PathValue("owner"), r.PathValue("repo"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if _, err := os.Stat(repoDir); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", fmt.Sprintf("application/x-%s-advertisement", service))
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := w.Write(pktLine("# service=" + service + "\n")); err != nil {
+		return
+	}
+	if _, err := w.Write([]byte("0000")); err != nil {
+		return
+	}
+
+	cmd := exec.CommandContext(r.Context(), "git",
+		strings.TrimPrefix(service, "git-"),
+		"--stateless-rpc",
+		"--advertise-refs",
+		repoDir,
+	)
+	cmd.Stdout = w
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		s.logger.Error("info/refs git failed", "service", service, "repo", repoDir, "err", err)
+	}
+}
+
+func (s *Server) handleServiceRPC(service string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Content-Type"); got != "application/x-"+service+"-request" {
+			http.Error(w, "unexpected content-type", http.StatusUnsupportedMediaType)
+			return
+		}
+
+		repoDir, err := s.repoPath(r.PathValue("owner"), r.PathValue("repo"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if _, err := os.Stat(repoDir); err != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		body, err := decodeBody(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		defer body.Close()
+
+		w.Header().Set("Content-Type", fmt.Sprintf("application/x-%s-result", service))
+		w.Header().Set("Cache-Control", "no-cache")
+
+		cmd := exec.CommandContext(r.Context(), "git",
+			strings.TrimPrefix(service, "git-"),
+			"--stateless-rpc",
+			repoDir,
+		)
+		cmd.Stdin = body
+		cmd.Stdout = w
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			s.logger.Error("service rpc git failed", "service", service, "repo", repoDir, "err", err)
+		}
+	}
+}
+
+// decodeBody handles gzip-encoded request bodies that git clients sometimes send.
+func decodeBody(r *http.Request) (io.ReadCloser, error) {
+	if r.Header.Get("Content-Encoding") != "gzip" {
+		return r.Body, nil
+	}
+	gr, err := gzip.NewReader(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	return &gzipBody{Reader: gr, src: r.Body}, nil
+}
+
+type gzipBody struct {
+	*gzip.Reader
+	src io.ReadCloser
+}
+
+func (g *gzipBody) Close() error {
+	_ = g.Reader.Close()
+	return g.src.Close()
+}
+
+// pktLine wraps payload in git's pkt-line framing: 4-byte hex length prefix
+// (length includes the 4 bytes themselves) followed by payload.
+func pktLine(payload string) []byte {
+	n := len(payload) + 4
+	return fmt.Appendf(nil, "%04x%s", n, payload)
+}

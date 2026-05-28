@@ -1,0 +1,23 @@
+# Host provisioning for a moongit deployment.
+# Preview: `mooncake plan`. Run: `mooncake apply`.
+
+- name: Ensure git binary is installed
+  pkg:
+    name: git
+    state: present
+  become: true
+
+- name: Ensure data dir exists
+  file.write:
+    path: data
+    state: directory
+
+- name: Ensure repos dir exists
+  file.write:
+    path: data/repos
+    state: directory
+
+- name: Ensure bin dir exists
+  file.write:
+    path: bin
+    state: directory
