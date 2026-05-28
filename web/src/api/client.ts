@@ -4,6 +4,7 @@ import type {
   Comment,
   CreateCommentInput,
   CreateIssueInput,
+  CreateRepoInput,
   Intel,
   IntelSearchInput,
   IntelSearchResult,
@@ -78,6 +79,7 @@ export const api = {
   whoami: () => request<Whoami>("/api/whoami"),
 
   listRepos: () => request<Repo[]>("/api/repos"),
+  createRepo: (body: CreateRepoInput) => request<Repo>("/api/repos", { method: "POST", body }),
   getRepo: (owner: string, repo: string) => request<Repo>(`/api/repos/${owner}/${repo}`),
 
   getTree: (owner: string, repo: string, path = "") =>

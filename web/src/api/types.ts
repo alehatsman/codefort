@@ -38,6 +38,11 @@ export interface Comment {
   created_at: string
 }
 
+export interface CreateRepoInput {
+  owner: string
+  name: string
+}
+
 export interface CreateIssueInput {
   title: string
   body?: string
