@@ -11,13 +11,15 @@ tasks:
           argv: ["go", "mod", "tidy"]
 
   build:
-    desc: Build the moongitd binary into ./bin/moongitd
+    desc: Build both binaries (moongitd + moongit) into ./bin/
     steps:
       - file.write:
           path: bin
           state: directory
       - cmd:
           argv: ["go", "build", "-o", "bin/moongitd", "./cmd/moongitd"]
+      - cmd:
+          argv: ["go", "build", "-o", "bin/moongit", "./cmd/moongit"]
 
   test:
     desc: Run unit tests
@@ -35,7 +37,7 @@ tasks:
           argv: ["go", "run", "./cmd/moongitd"]
 
   create-repo:
-    desc: 'Init a bare repo. Pass --vars with {owner, name}'
+    desc: 'Init a bare repo and register it. Pass --vars with {owner, name}'
     steps:
       - file.write:
           path: "data/repos/{{ owner }}/{{ name }}.git"
@@ -43,6 +45,8 @@ tasks:
       - shell:
           cmd: "git init --bare data/repos/{{ owner }}/{{ name }}.git"
           creates: "data/repos/{{ owner }}/{{ name }}.git/HEAD"
+      - cmd:
+          argv: ["go", "run", "./cmd/moongitd", "repo", "create", "{{ owner }}/{{ name }}"]
 
   clean:
     desc: Remove build artifacts (keeps data/)

@@ -23,6 +23,11 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 
+	// Issues API.
+	mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/issues", s.handleCreateIssue)
+	mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/issues", s.handleListIssues)
+	mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/issues/{number}", s.handleGetIssue)
+
 	// Git smart-HTTP. Pattern matches /{owner}/{repo}.git/{op...}.
 	mux.HandleFunc("GET /{owner}/{repo}/info/refs", s.handleInfoRefs)
 	mux.HandleFunc("POST /{owner}/{repo}/git-upload-pack", s.handleServiceRPC("git-upload-pack"))

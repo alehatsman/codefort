@@ -1,0 +1,107 @@
+package storage
+
+import (
+	"database/sql"
+	"errors"
+	"time"
+
+	"github.com/alehatsman/moongit/internal/api"
+)
+
+// CreateIssue allocates the next per-repo issue number and inserts the row.
+// The (repo_id, number) UNIQUE constraint + SQLite's single-writer guarantee
+// keep numbering monotonic without explicit locking.
+func CreateIssue(db *sql.DB, repoID int64, req api.CreateIssueRequest) (api.Issue, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return api.Issue{}, err
+	}
+	defer tx.Rollback()
+
+	var next int
+	if err := tx.QueryRow(
+		"SELECT COALESCE(MAX(number), 0) + 1 FROM issues WHERE repo_id = ?", repoID,
+	).Scan(&next); err != nil {
+		return api.Issue{}, err
+	}
+
+	res, err := tx.Exec(
+		"INSERT INTO issues(repo_id, number, title, body, author) VALUES (?, ?, ?, ?, ?)",
+		repoID, next, req.Title, req.Body, req.Author,
+	)
+	if err != nil {
+		return api.Issue{}, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return api.Issue{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return api.Issue{}, err
+	}
+
+	return getIssueByID(db, id)
+}
+
+func GetIssue(db *sql.DB, repoID int64, number int) (api.Issue, error) {
+	var iss api.Issue
+	var created, updated int64
+	err := db.QueryRow(`
+		SELECT id, number, title, body, author, state, created_at, updated_at
+		FROM issues WHERE repo_id = ? AND number = ?
+	`, repoID, number).Scan(
+		&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State, &created, &updated,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return iss, ErrNotFound
+	}
+	if err != nil {
+		return iss, err
+	}
+	iss.CreatedAt = time.Unix(created, 0).UTC()
+	iss.UpdatedAt = time.Unix(updated, 0).UTC()
+	return iss, nil
+}
+
+func ListIssues(db *sql.DB, repoID int64) ([]api.Issue, error) {
+	rows, err := db.Query(`
+		SELECT id, number, title, body, author, state, created_at, updated_at
+		FROM issues WHERE repo_id = ? ORDER BY number DESC
+	`, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	issues := make([]api.Issue, 0)
+	for rows.Next() {
+		var iss api.Issue
+		var created, updated int64
+		if err := rows.Scan(
+			&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State, &created, &updated,
+		); err != nil {
+			return nil, err
+		}
+		iss.CreatedAt = time.Unix(created, 0).UTC()
+		iss.UpdatedAt = time.Unix(updated, 0).UTC()
+		issues = append(issues, iss)
+	}
+	return issues, rows.Err()
+}
+
+func getIssueByID(db *sql.DB, id int64) (api.Issue, error) {
+	var iss api.Issue
+	var created, updated int64
+	err := db.QueryRow(`
+		SELECT id, number, title, body, author, state, created_at, updated_at
+		FROM issues WHERE id = ?
+	`, id).Scan(
+		&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State, &created, &updated,
+	)
+	if err != nil {
+		return iss, err
+	}
+	iss.CreatedAt = time.Unix(created, 0).UTC()
+	iss.UpdatedAt = time.Unix(updated, 0).UTC()
+	return iss, nil
+}
