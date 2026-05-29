@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react"
 import { useLocation, useParams } from "react-router-dom"
-import { useBlob, useRepo, useTree } from "../api/queries"
+import { useBlob, useIntel, useIntelOverview, useRepo, useTree } from "../api/queries"
 import RepoHeader from "../components/RepoHeader"
 import FileTree from "../components/FileTree"
 import PathBreadcrumb from "../components/PathBreadcrumb"
@@ -48,13 +48,19 @@ interface ViewProps {
 
 function TreeView({ owner, repo, path }: ViewProps) {
   const treeQ = useTree(owner, repo, path)
+  // Repo-level overview belongs on the root view only; gate the dex round
+  // trip on the repo being indexed so subdirectory listings stay cheap.
+  const isRoot = path === ""
+  const intelQ = useIntel(owner, repo)
+  const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
+  const overviewQ = useIntelOverview(owner, repo, isRoot && isIndexed)
 
   if (treeQ.isLoading) return <div className="loading">Loading…</div>
   if (treeQ.error) return <div className="error">{(treeQ.error as Error).message}</div>
   if (!treeQ.data) return null
 
   // Empty root listing == unborn repo (no commits pushed yet).
-  if (path === "" && treeQ.data.entries.length === 0) {
+  if (isRoot && treeQ.data.entries.length === 0) {
     return (
       <div className="empty" style={{ border: "1px solid var(--border)", borderRadius: 6 }}>
         <p>
@@ -70,7 +76,19 @@ function TreeView({ owner, repo, path }: ViewProps) {
     )
   }
 
-  return <FileTree owner={owner} repo={repo} entries={treeQ.data.entries} />
+  return (
+    <>
+      <FileTree owner={owner} repo={repo} entries={treeQ.data.entries} />
+      {isRoot && overviewQ.data?.repo_summary && (
+        <section className="overview">
+          <div className="overview__repo">
+            <h3 className="ask__heading">Repository overview</h3>
+            <div className="overview__prose">{overviewQ.data.repo_summary}</div>
+          </div>
+        </section>
+      )}
+    </>
+  )
 }
 
 function BlobView({ owner, repo, path }: ViewProps) {
