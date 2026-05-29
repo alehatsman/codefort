@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react"
-import { useLocation, useParams } from "react-router-dom"
+import { useLocation, useNavigate, useParams } from "react-router-dom"
 import { useBlob, useIntel, useIntelOverview, useRepo, useTree } from "../api/queries"
 import RepoHeader from "../components/RepoHeader"
 import FileTree from "../components/FileTree"
@@ -7,6 +7,7 @@ import ReadmeCard from "../components/ReadmeCard"
 import OverviewCard from "../components/OverviewCard"
 import PathBreadcrumb from "../components/PathBreadcrumb"
 import { findReadme } from "../lib/readme"
+import { useListNav } from "../lib/keyboardNav"
 
 // The highlighter grammars are heavy; load them only when a file is viewed.
 const CodeView = lazy(() => import("../components/CodeView"))
@@ -50,6 +51,7 @@ interface ViewProps {
 }
 
 function TreeView({ owner, repo, path }: ViewProps) {
+  const navigate = useNavigate()
   const treeQ = useTree(owner, repo, path)
   // The dex overview carries both the repo summary and one summary per
   // package (keyed by directory path), so a single cached query per repo
@@ -58,6 +60,18 @@ function TreeView({ owner, repo, path }: ViewProps) {
   const intelQ = useIntel(owner, repo)
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
   const overviewQ = useIntelOverview(owner, repo, isIndexed)
+
+  // j/k select a file/folder; Enter opens it. h/l are left to useTabNav.
+  const entries = treeQ.data?.entries ?? []
+  const { index } = useListNav({
+    count: entries.length,
+    onActivate: (i) => {
+      const e = entries[i]
+      if (!e) return
+      const kind = e.type === "tree" ? "tree" : "blob"
+      navigate(`/${owner}/${repo}/${kind}/${e.path}`)
+    },
+  })
 
   if (treeQ.isLoading) return <div className="loading">Loading…</div>
   if (treeQ.error) return <div className="error">{(treeQ.error as Error).message}</div>
@@ -87,12 +101,12 @@ function TreeView({ owner, repo, path }: ViewProps) {
   // dex didn't summarize simply render no card.
   const ov = overviewQ.data
   const summary = isRoot
-    ? ov?.repo_summary ?? ""
-    : ov?.packages.find((p) => p.path === path)?.summary ?? ""
+    ? (ov?.repo_summary ?? "")
+    : (ov?.packages.find((p) => p.path === path)?.summary ?? "")
 
   return (
     <>
-      <FileTree owner={owner} repo={repo} entries={treeQ.data.entries} />
+      <FileTree owner={owner} repo={repo} entries={treeQ.data.entries} selectedIndex={index} />
       <OverviewCard
         title={isRoot ? "Repository overview" : "Folder overview"}
         path={isRoot ? undefined : path}

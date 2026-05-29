@@ -2,10 +2,21 @@ import { Link, useNavigate } from "react-router-dom"
 import { useRepos } from "../api/queries"
 import NewRepoForm from "../components/NewRepoForm"
 import StateIcon from "../components/StateIcon"
+import { useListNav } from "../lib/keyboardNav"
 
 export default function ReposPage() {
   const { data, isLoading, error } = useRepos()
   const navigate = useNavigate()
+
+  // hjkl roves the repo grid; Enter opens the selected repo.
+  const { index } = useListNav({
+    count: data?.length ?? 0,
+    horizontal: true,
+    onActivate: (i) => {
+      const r = data?.[i]
+      if (r) navigate(`/${r.owner}/${r.name}`)
+    },
+  })
 
   return (
     <div className="repos">
@@ -25,8 +36,12 @@ export default function ReposPage() {
 
       {data && data.length > 0 && (
         <div className="card-grid">
-          {data.map((r) => (
-            <div key={r.id} className="card">
+          {data.map((r, i) => (
+            <div
+              key={r.id}
+              className={`card ${i === index ? "is-vim-selected" : ""}`}
+              data-vim-selected={i === index ? "true" : undefined}
+            >
               <div className="card__title">
                 <Link to={`/${r.owner}/${r.name}`}>
                   <span className="muted">{r.owner}/</span>
@@ -42,7 +57,9 @@ export default function ReposPage() {
                   <span className="muted">{r.total_issues} total</span>
                 </span>
                 <span className="card__meta-item">
-                  <span className="muted">created {new Date(r.created_at).toLocaleDateString()}</span>
+                  <span className="muted">
+                    created {new Date(r.created_at).toLocaleDateString()}
+                  </span>
                 </span>
               </div>
             </div>
