@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/moongit/internal/ci"
 )
 
 func main() {
@@ -36,6 +37,8 @@ func run(args []string) error {
 	switch args[0] {
 	case "issue":
 		return runIssue(args[1:])
+	case "ci":
+		return runCI(args[1:])
 	case "help", "-h", "--help":
 		printUsage(os.Stdout)
 		return nil
@@ -57,6 +60,8 @@ USAGE:
     moongit issue unclaim <number>
     moongit issue delete  <number> [--yes]
     moongit issue comment <number> --body <b>
+
+    moongit ci validate  [path]   (defaults to ./mgitci.yml)
 
 Identity: the server stamps author/assignee from the name of the token
 in MOONGIT_TOKEN. Mint a token with "moongitd token create <name>" and
@@ -511,6 +516,56 @@ func runIssueComment(args []string) error {
 		return fmt.Errorf("decode response: %w", err)
 	}
 	fmt.Printf("commented on #%d by %s at %s\n", num, c.Author, c.CreatedAt.Local().Format(time.RFC3339))
+	return nil
+}
+
+// runCI dispatches `moongit ci <subcommand>`. CI subcommands are local-only
+// (no server round-trip): they operate on the mgitci.yml in the working copy.
+func runCI(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: moongit ci validate [path]")
+	}
+	switch args[0] {
+	case "validate":
+		return runCIValidate(args[1:])
+	default:
+		return fmt.Errorf("unknown ci subcommand: %s", args[0])
+	}
+}
+
+// runCIValidate parses and validates an mgitci.yml locally, reporting the
+// jobs and their dependencies on success. It hits no server — it's the
+// authoring-time check before pushing a pipeline.
+func runCIValidate(args []string) error {
+	fs := flag.NewFlagSet("ci validate", flag.ContinueOnError)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	path := "mgitci.yml"
+	if fs.NArg() == 1 {
+		path = fs.Arg(0)
+	} else if fs.NArg() > 1 {
+		return fmt.Errorf("unexpected extra args: %v", fs.Args()[1:])
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	pipeline, err := ci.Parse(data)
+	if err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+
+	fmt.Printf("%s: ok — %d job(s)\n", path, len(pipeline.Jobs))
+	for _, name := range pipeline.JobNames() {
+		job := pipeline.Jobs[name]
+		needs := ""
+		if len(job.Needs) > 0 {
+			needs = " (needs: " + strings.Join(job.Needs, ", ") + ")"
+		}
+		fmt.Printf("  %s — %d step(s)%s\n", name, len(job.Steps), needs)
+	}
 	return nil
 }
 
