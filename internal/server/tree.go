@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"mime"
 	"net/http"
 	"os"
 	"os/exec"
@@ -141,6 +142,87 @@ func (s *Server) handleBlob(w http.ResponseWriter, r *http.Request) {
 	}
 	blob.Content = string(content)
 	writeJSON(w, http.StatusOK, blob)
+}
+
+// handleRaw streams a file's raw bytes from the default branch with a
+// best-effort Content-Type. Unlike handleBlob (which returns JSON and drops
+// binary content), this serves the bytes directly so the web UI can load
+// images referenced from rendered markdown. Bearer-authed like its siblings.
+//
+// Because a repo can contain hand-crafted HTML/SVG, a direct navigation to
+// this endpoint must not execute script in our origin: the response carries a
+// `sandbox` CSP and nosniff, which neutralise scripts on navigation while
+// leaving <img> subresource loads (the only way the UI uses this) unaffected.
+func (s *Server) handleRaw(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+		return
+	}
+	repoDir, ok := s.repoDirOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	p, err := cleanTreePath(r.URL.Query().Get("path"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if p == "" {
+		writeError(w, http.StatusBadRequest, "path is required")
+		return
+	}
+
+	treeish := "HEAD:" + p
+	typ, err := gitOutput(r.Context(), repoDir, "cat-file", "-t", treeish)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "path not found: "+p)
+		return
+	}
+	switch strings.TrimSpace(string(typ)) {
+	case "blob":
+		// ok
+	case "tree":
+		writeError(w, http.StatusBadRequest, "path is a directory: "+p)
+		return
+	default:
+		writeError(w, http.StatusNotFound, "path not found: "+p)
+		return
+	}
+
+	sizeOut, err := gitOutput(r.Context(), repoDir, "cat-file", "-s", treeish)
+	if err != nil {
+		s.logger.Error("raw size", "repo", repoDir, "path", p, "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if size, _ := strconv.ParseInt(strings.TrimSpace(string(sizeOut)), 10, 64); size > maxBlobBytes {
+		writeError(w, http.StatusRequestEntityTooLarge, "file too large")
+		return
+	}
+
+	content, err := gitOutput(r.Context(), repoDir, "cat-file", "blob", treeish)
+	if err != nil {
+		s.logger.Error("raw content", "repo", repoDir, "path", p, "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.Header().Set("Content-Type", rawContentType(p, content))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	w.Header().Set("Content-Length", strconv.Itoa(len(content)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(content)
+}
+
+// rawContentType picks a Content-Type for a raw blob: file extension first
+// (so .svg, .css and friends keep their real type), then content sniffing as
+// a fallback for extensionless files.
+func rawContentType(p string, content []byte) string {
+	if ct := mime.TypeByExtension(path.Ext(p)); ct != "" {
+		return ct
+	}
+	return http.DetectContentType(content)
 }
 
 // repoDirOrFail resolves the on-disk bare repo path, writing a 4xx and

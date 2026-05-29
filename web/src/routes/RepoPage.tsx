@@ -3,7 +3,9 @@ import { useLocation, useParams } from "react-router-dom"
 import { useBlob, useRepo, useTree } from "../api/queries"
 import RepoHeader from "../components/RepoHeader"
 import FileTree from "../components/FileTree"
+import ReadmeCard from "../components/ReadmeCard"
 import PathBreadcrumb from "../components/PathBreadcrumb"
+import { findReadme } from "../lib/readme"
 
 // The highlighter grammars are heavy; load them only when a file is viewed.
 const CodeView = lazy(() => import("../components/CodeView"))
@@ -70,7 +72,14 @@ function TreeView({ owner, repo, path }: ViewProps) {
     )
   }
 
-  return <FileTree owner={owner} repo={repo} entries={treeQ.data.entries} />
+  const readme = findReadme(treeQ.data.entries)
+
+  return (
+    <>
+      <FileTree owner={owner} repo={repo} entries={treeQ.data.entries} />
+      {readme && <ReadmeCard owner={owner} repo={repo} dirPath={path} entry={readme} />}
+    </>
+  )
 }
 
 function BlobView({ owner, repo, path }: ViewProps) {

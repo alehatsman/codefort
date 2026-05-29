@@ -122,6 +122,39 @@ func TestSortEntries(t *testing.T) {
 	}
 }
 
+func TestRawContentType(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    string
+		content []byte
+		wantPfx string // Content-Type prefix (charset params vary by platform)
+	}{
+		{name: "png by extension", path: "docs/logo.png", wantPfx: "image/png"},
+		{name: "svg by extension", path: "icon.svg", wantPfx: "image/svg+xml"},
+		{name: "uppercase extension", path: "PHOTO.JPG", wantPfx: "image/jpeg"},
+		{
+			name:    "extensionless falls back to sniff",
+			path:    "LICENSE",
+			content: []byte("PNG fake? no — plain text\n"),
+			wantPfx: "text/plain",
+		},
+		{
+			name:    "extensionless png sniffed",
+			path:    "blob",
+			content: []byte("\x89PNG\r\n\x1a\n"),
+			wantPfx: "image/png",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := rawContentType(tt.path, tt.content)
+			if !strings.HasPrefix(got, tt.wantPfx) {
+				t.Errorf("rawContentType(%q) = %q, want prefix %q", tt.path, got, tt.wantPfx)
+			}
+		})
+	}
+}
+
 func TestIsBinary(t *testing.T) {
 	tests := []struct {
 		name string
