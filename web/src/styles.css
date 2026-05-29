@@ -1806,6 +1806,59 @@ h3 {
   white-space: pre-wrap;
   line-height: var(--leading-relaxed);
 }
+
+/* Collapsible overview card on the Code tab (repo root / per-folder). */
+.overview-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.overview-card__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: 10px var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+}
+.overview-card__head::-webkit-details-marker {
+  display: none;
+}
+.overview-card__head::before {
+  content: "▾";
+  display: inline-block;
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+.overview-card:not([open]) .overview-card__head::before {
+  content: "▸";
+}
+.overview-card__head:hover {
+  background: var(--bg-canvas);
+}
+.overview-card__title {
+  color: var(--fg);
+}
+.overview-card__path {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--accent);
+  background: none;
+  padding: 0;
+}
+.overview-card__prose {
+  padding: 0 var(--space-4) 14px;
+  padding-top: 14px;
+  white-space: pre-wrap;
+  line-height: var(--leading-relaxed);
+  color: var(--fg);
+  border-top: 1px solid var(--border-muted);
+}
 .overview__pkgs {
   list-style: none;
   margin: 0;
