@@ -7,6 +7,7 @@ import CommentForm from "../components/CommentForm"
 import StateIcon from "../components/StateIcon"
 import Avatar from "../components/Avatar"
 import CommentItem from "../components/CommentItem"
+import DeleteIssueButton from "../components/DeleteIssueButton"
 
 export default function IssuePage() {
   const { owner = "", repo = "", number: numStr = "" } = useParams()
@@ -86,6 +87,10 @@ export default function IssuePage() {
               state={iss.state}
               me={me.data?.name}
             />
+          </section>
+          <section className="sidebar__section">
+            <h3 className="sidebar__label">Danger zone</h3>
+            <DeleteIssueButton owner={owner} repo={repo} number={iss.number} />
           </section>
         </aside>
       </div>

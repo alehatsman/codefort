@@ -1192,6 +1192,15 @@ pre {
   padding: 3px 10px;
   font-size: var(--text-sm);
 }
+.btn--danger {
+  color: var(--state-closed);
+  border-color: var(--border);
+}
+.btn--danger:hover:not(:disabled) {
+  color: white;
+  background: var(--state-closed);
+  border-color: var(--state-closed);
+}
 
 .input,
 .textarea {

@@ -55,6 +55,35 @@ func GetIssue(db *sql.DB, repoID int64, number int) (api.Issue, error) {
 	return iss, err
 }
 
+// DeleteIssue hard-deletes an issue and its comments. Comments are removed
+// explicitly in the same transaction rather than relying on the FK ON DELETE
+// CASCADE, so the behavior holds even if the foreign_keys pragma is ever off.
+// Returns ErrNotFound if (repoID, number) doesn't exist. Repo issue counts
+// are computed on read, so nothing else needs touching.
+func DeleteIssue(db *sql.DB, repoID int64, number int) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var id int64
+	err = tx.QueryRow(`SELECT id FROM issues WHERE repo_id = ? AND number = ?`, repoID, number).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM issue_comments WHERE issue_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM issues WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // ErrNoUpdateFields is returned by UpdateIssue when every field is nil —
 // there's nothing to change. The handler maps it to 400.
 var ErrNoUpdateFields = errors.New("no fields to update")
