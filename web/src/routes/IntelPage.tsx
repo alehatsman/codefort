@@ -148,44 +148,33 @@ export default function IntelPage() {
 }
 
 /**
- * OverviewSection renders the at-a-glance index dump (repo-level summary
- * + per-package summaries) dex composed at index time. Shown by default
- * when the repo is indexed so you can read it without typing a query.
+ * OverviewSection renders the per-package summaries dex composed at index
+ * time. The repo-level summary now lives on the Code tab under the tree.
  */
 function OverviewSection({ overview }: { overview: IntelOverview }) {
-  if (!overview.repo_summary && overview.packages.length === 0) {
+  if (overview.packages.length === 0) {
     return null
   }
   return (
     <section className="overview">
-      {overview.repo_summary && (
-        <div className="overview__repo">
-          <h3 className="ask__heading">Repository overview</h3>
-          <div className="overview__prose">{overview.repo_summary}</div>
-        </div>
-      )}
-      {overview.packages.length > 0 && (
-        <>
-          <h3 className="ask__heading">
-            Packages <span className="muted small">({overview.packages.length})</span>
-          </h3>
-          <ul className="overview__pkgs">
-            {overview.packages.map((p) => (
-              <li key={p.path} className="overview-pkg">
-                <details>
-                  <summary>
-                    <code className="overview-pkg__path">{p.path}</code>
-                    <span className="overview-pkg__preview muted small">
-                      {firstLine(p.summary)}
-                    </span>
-                  </summary>
-                  <div className="overview-pkg__body">{p.summary}</div>
-                </details>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      <h3 className="ask__heading">
+        Packages <span className="muted small">({overview.packages.length})</span>
+      </h3>
+      <ul className="overview__pkgs">
+        {overview.packages.map((p) => (
+          <li key={p.path} className="overview-pkg">
+            <details>
+              <summary>
+                <code className="overview-pkg__path">{p.path}</code>
+                <span className="overview-pkg__preview muted small">
+                  {firstLine(p.summary)}
+                </span>
+              </summary>
+              <div className="overview-pkg__body">{p.summary}</div>
+            </details>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }
