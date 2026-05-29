@@ -71,12 +71,16 @@ func UpdateIssue(db *sql.DB, repoID int64, number int, state api.IssueState) (ap
 	return iss, err
 }
 
-// Claim atomically sets assignee (and optionally state) on an unassigned
-// issue. Returns ErrAlreadyClaimed if assignee is already set,
+// Claim atomically takes ownership of an issue, stamping claimed_at as the
+// lease start. It succeeds when the issue is unclaimed, when the same
+// assignee re-claims (heartbeat — refreshes the lease), or when the existing
+// claim is older than lease (orphaned by a crashed agent). A non-positive
+// lease disables expiry: only unclaimed issues and heartbeats succeed.
+// Returns ErrAlreadyClaimed if a live claim is held by someone else,
 // ErrNotFound if the issue doesn't exist.
-func Claim(db *sql.DB, repoID int64, number int, assignee string, state api.IssueState) (api.Issue, error) {
-	// Compare-and-set: only update if assignee IS NULL. If 0 rows are
-	// affected, distinguish "not found" from "already claimed" by reading.
+func Claim(db *sql.DB, repoID int64, number int, assignee string, state api.IssueState, lease time.Duration) (api.Issue, error) {
+	// Compare-and-set in a single UPDATE — the WHERE clause is the lock.
+	// If 0 rows change, distinguish "not found" from "live claim by other".
 	tx, err := db.Begin()
 	if err != nil {
 		return api.Issue{}, err
@@ -89,12 +93,19 @@ func Claim(db *sql.DB, repoID int64, number int, assignee string, state api.Issu
 		setState = ", state = ?"
 		args = append(args, string(state))
 	}
-	args = append(args, repoID, number)
+	// WHERE args: repo, number, heartbeat-owner, [lease seconds].
+	args = append(args, repoID, number, assignee)
+	expiry := ""
+	if lease > 0 {
+		expiry = " OR claimed_at <= strftime('%s','now') - ?"
+		args = append(args, int64(lease.Seconds()))
+	}
 
 	res, err := tx.Exec(`
 		UPDATE issues
-		   SET assignee = ?`+setState+`, updated_at = strftime('%s','now')
-		 WHERE repo_id = ? AND number = ? AND assignee IS NULL
+		   SET assignee = ?, claimed_at = strftime('%s','now'), updated_at = strftime('%s','now')`+setState+`
+		 WHERE repo_id = ? AND number = ?
+		   AND (assignee IS NULL OR assignee = ?`+expiry+`)
 	`, args...)
 	if err != nil {
 		return api.Issue{}, err
@@ -104,7 +115,7 @@ func Claim(db *sql.DB, repoID int64, number int, assignee string, state api.Issu
 		return api.Issue{}, err
 	}
 	if n == 0 {
-		// Distinguish missing-issue from already-claimed.
+		// Distinguish missing-issue from a live claim held by someone else.
 		row := tx.QueryRow(`SELECT 1 FROM issues WHERE repo_id = ? AND number = ?`, repoID, number)
 		var one int
 		if err := row.Scan(&one); err != nil {
@@ -124,20 +135,43 @@ func Claim(db *sql.DB, repoID int64, number int, assignee string, state api.Issu
 	return iss, tx.Commit()
 }
 
-// Unclaim clears the assignee. Idempotent — returns ErrNotFound only when
-// the issue doesn't exist, not when it was already unclaimed.
-func Unclaim(db *sql.DB, repoID int64, number int) (api.Issue, error) {
-	row := db.QueryRow(`
+// Unclaim clears the assignee and claim lease, but only for the current
+// owner. Returns ErrNotFound if the issue doesn't exist, ErrNotOwner if a
+// different agent holds the claim. Unclaiming an already-unclaimed issue is
+// idempotent success (the result is the same regardless of who asks).
+func Unclaim(db *sql.DB, repoID int64, number int, caller string) (api.Issue, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return api.Issue{}, err
+	}
+	defer tx.Rollback()
+
+	cur, err := scanIssue(tx.QueryRow(
+		`SELECT `+issueColumns+` FROM issues WHERE repo_id = ? AND number = ?`, repoID, number))
+	if errors.Is(err, sql.ErrNoRows) {
+		return api.Issue{}, ErrNotFound
+	}
+	if err != nil {
+		return api.Issue{}, err
+	}
+	// Already unclaimed — nothing to do, same outcome for any caller.
+	if cur.Assignee == nil {
+		return cur, tx.Commit()
+	}
+	if *cur.Assignee != caller {
+		return api.Issue{}, ErrNotOwner
+	}
+
+	iss, err := scanIssue(tx.QueryRow(`
 		UPDATE issues
-		   SET assignee = NULL, updated_at = strftime('%s','now')
+		   SET assignee = NULL, claimed_at = NULL, updated_at = strftime('%s','now')
 		 WHERE repo_id = ? AND number = ?
 		 RETURNING `+issueColumns+`
-	`, repoID, number)
-	iss, err := scanIssue(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return iss, ErrNotFound
+	`, repoID, number))
+	if err != nil {
+		return api.Issue{}, err
 	}
-	return iss, err
+	return iss, tx.Commit()
 }
 
 // ListFilter narrows the result set for ListIssues. Empty fields are
@@ -201,7 +235,7 @@ func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error
 
 // issueColumns is the canonical select list, used everywhere so scanIssue
 // stays in sync with INSERT/UPDATE RETURNING and SELECT.
-const issueColumns = "id, number, title, body, author, state, assignee, created_at, updated_at"
+const issueColumns = "id, number, title, body, author, state, assignee, claimed_at, created_at, updated_at"
 
 // scanner abstracts *sql.Row and *sql.Rows so scanIssue can serve both.
 type scanner interface {
@@ -211,15 +245,20 @@ type scanner interface {
 func scanIssue(s scanner) (api.Issue, error) {
 	var iss api.Issue
 	var assignee sql.NullString
+	var claimed sql.NullInt64
 	var created, updated int64
 	if err := s.Scan(
 		&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State,
-		&assignee, &created, &updated,
+		&assignee, &claimed, &created, &updated,
 	); err != nil {
 		return iss, err
 	}
 	if assignee.Valid {
 		iss.Assignee = &assignee.String
+	}
+	if claimed.Valid {
+		ts := time.Unix(claimed.Int64, 0).UTC()
+		iss.ClaimedAt = &ts
 	}
 	iss.CreatedAt = time.Unix(created, 0).UTC()
 	iss.UpdatedAt = time.Unix(updated, 0).UTC()

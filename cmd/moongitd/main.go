@@ -97,6 +97,14 @@ func runServe(logger *slog.Logger) error {
 		return fmt.Errorf("migrate: %w", err)
 	}
 
+	// Read-only pool, opened after Migrate so the file is already in WAL.
+	// Lets concurrent reads (a polling fleet of agents) bypass the writer.
+	rdb, err := storage.OpenRead(cfg.DBPath)
+	if err != nil {
+		return fmt.Errorf("storage (read): %w", err)
+	}
+	defer rdb.Close()
+
 	n, err := storage.CountActiveTokens(db)
 	if err != nil {
 		return fmt.Errorf("count tokens: %w", err)
@@ -106,7 +114,7 @@ func runServe(logger *slog.Logger) error {
 			"Run `moongitd token create <name>` to bootstrap.")
 	}
 
-	srv := server.New(cfg, db, logger)
+	srv := server.New(cfg, db, rdb, logger)
 	httpSrv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           srv.Handler(),

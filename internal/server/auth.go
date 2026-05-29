@@ -32,7 +32,7 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 			writeError(w, http.StatusUnauthorized, err.Error())
 			return
 		}
-		tok, err := storage.LookupToken(s.db, raw)
+		tok, err := storage.LookupToken(s.rdb, raw)
 		if errors.Is(err, storage.ErrNotFound) {
 			writeError(w, http.StatusUnauthorized, "invalid token")
 			return
@@ -42,6 +42,8 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
+		// Record usage on the writer; best-effort, off the auth critical path.
+		storage.TouchToken(s.db, tok.ID)
 
 		ctx := context.WithValue(r.Context(), tokenCtxKey{}, tok)
 		next.ServeHTTP(w, r.WithContext(ctx))

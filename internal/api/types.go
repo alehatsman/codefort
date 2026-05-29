@@ -35,7 +35,8 @@ type Issue struct {
 	Body      string     `json:"body,omitempty"`
 	Author    string     `json:"author"`
 	State     IssueState `json:"state"`
-	Assignee  *string    `json:"assignee"` // nil = unassigned. Explicit null in JSON.
+	Assignee  *string    `json:"assignee"`   // nil = unassigned. Explicit null in JSON.
+	ClaimedAt *time.Time `json:"claimed_at"` // when Assignee took the issue; nil when unassigned
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 }

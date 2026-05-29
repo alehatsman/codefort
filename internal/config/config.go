@@ -1,9 +1,11 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -11,6 +13,13 @@ type Config struct {
 	DataDir  string
 	DBPath   string
 	ReposDir string
+
+	// ClaimLease is how long an issue claim stays exclusive before another
+	// agent may steal it. A claim older than this is treated as orphaned
+	// (the owner crashed or lost context). The owner refreshes the lease by
+	// re-claiming (heartbeat). Zero disables expiry — claims hold until
+	// explicitly unclaimed. Set via MOONGIT_CLAIM_LEASE (default 60m).
+	ClaimLease time.Duration
 
 	// DexURL is the base URL of a dex `serve` daemon (e.g.
 	// http://127.0.0.1:8080). Empty disables the Intel tab. DexToken is
@@ -38,6 +47,12 @@ func Load() (*Config, error) {
 	cfg.ReposDir = envOr("MOONGIT_REPOS_DIR", filepath.Join(dataDir, "repos"))
 	cfg.DexURL = strings.TrimRight(envOr("MOONGIT_DEX_URL", ""), "/")
 	cfg.DexToken = envOr("MOONGIT_DEX_TOKEN", "")
+
+	lease, err := time.ParseDuration(envOr("MOONGIT_CLAIM_LEASE", "60m"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_CLAIM_LEASE: %w", err)
+	}
+	cfg.ClaimLease = lease
 
 	return cfg, nil
 }

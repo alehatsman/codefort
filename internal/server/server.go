@@ -1,26 +1,33 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/alehatsman/moongit/internal/config"
 	"github.com/alehatsman/moongit/internal/dex"
 )
 
 type Server struct {
-	cfg    *config.Config
+	cfg *config.Config
+	// db is the single-writer pool (all mutations). rdb is the read-only
+	// pool — concurrent reads that don't queue behind the writer. Handlers
+	// pick explicitly: writes use db, pure reads use rdb.
 	db     *sql.DB
+	rdb    *sql.DB
 	logger *slog.Logger
 	dex    *dex.Client // nil when MOONGIT_DEX_URL is unset (Intel disabled)
 }
 
-func New(cfg *config.Config, db *sql.DB, logger *slog.Logger) *Server {
+func New(cfg *config.Config, db, rdb *sql.DB, logger *slog.Logger) *Server {
 	return &Server{
 		cfg:    cfg,
 		db:     db,
+		rdb:    rdb,
 		logger: logger,
 		dex:    dex.New(cfg.DexURL, cfg.DexToken),
 	}
@@ -87,7 +94,22 @@ func (s *Server) gitHandler() http.Handler {
 	return mux
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+// handleHealth probes the writer pool, not just process liveness. The
+// single-writer connection is what wedges first under load, and a bare 200
+// would read false-green to the supervisor while the control plane is stuck.
+// A short timeout bounds how long a hung writer can hold the check open.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	var one int
+	if err := s.db.QueryRowContext(ctx, "SELECT 1").Scan(&one); err != nil {
+		s.logger.Error("healthz db check failed", "err", err)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.Error(w, "db unavailable\n", http.StatusServiceUnavailable)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok\n"))

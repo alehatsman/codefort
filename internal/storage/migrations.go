@@ -70,6 +70,16 @@ var migrations = []string{
 	);
 	CREATE INDEX IF NOT EXISTS idx_tokens_hash ON tokens(hashed_token);
 	`,
+
+	// 4: claim leases. claimed_at records when the current assignee took
+	// the issue, so an orphaned claim (crashed agent) can expire and be
+	// reclaimed. Invariant: claimed_at IS NOT NULL iff assignee IS NOT NULL.
+	// Backfill existing claims from updated_at so they carry a real age
+	// rather than being instantly stealable post-migration.
+	`
+	ALTER TABLE issues ADD COLUMN claimed_at INTEGER;
+	UPDATE issues SET claimed_at = updated_at WHERE assignee IS NOT NULL;
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

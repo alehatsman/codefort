@@ -8,6 +8,10 @@ import (
 var (
 	ErrNotFound  = errors.New("not found")
 	ErrForbidden = errors.New("forbidden")
+	// ErrNotOwner is returned by Unclaim when the caller is not the current
+	// assignee. Distinct from ErrForbidden so the issue handler can map it
+	// to its own 403 message without coupling to comment semantics.
+	ErrNotOwner = errors.New("not the issue owner")
 )
 
 // EnsureUser returns the user id, creating the row if absent.
