@@ -10,3 +10,7 @@
 
 # Runtime data (SQLite db, bare repos)
 /data/
+
+# Agent worktrees + local Claude state (also keeps dex from indexing stale
+# worktree copies of the repo).
+.claude/
