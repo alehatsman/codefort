@@ -58,6 +58,41 @@ tasks:
       - log:
           msg: "installed moongitd + moongit to {{ home }}/.local/bin (aliases: mgitd, mgit)"
 
+  deploy:
+    # Fast dev-loop deploy of the CURRENT working tree — bypasses the
+    # HEAD-gated `mooncake apply -t moongit` in dotfiles. Rebuilds both
+    # binaries + the web UI (served from web/dist via MOONGIT_WEB_DIR),
+    # reinstalls to ~/.local/bin, and restarts the live service. Does not
+    # touch the .sha sidecar, so a later `apply` still reconciles to HEAD.
+    desc: Rebuild daemon + client + web UI, reinstall to ~/.local/bin, restart moongit.service
+    steps:
+      - file.write:
+          path: "{{ home }}/.local/bin"
+          state: directory
+      - cmd:
+          argv: ["go", "build", "-trimpath", "-ldflags", "-s -w", "-o", "{{ binary_path }}", "./cmd/moongitd"]
+      - cmd:
+          argv: ["go", "build", "-trimpath", "-ldflags", "-s -w", "-o", "{{ client_path }}", "./cmd/moongit"]
+      - file.write:
+          path: "{{ home }}/.local/bin/mgitd"
+          src: "{{ binary_path }}"
+          state: link
+      - file.write:
+          path: "{{ home }}/.local/bin/mgit"
+          src: "{{ client_path }}"
+          state: link
+      - shell:
+          cmd: "npm install"
+          creates: web/node_modules
+        cwd: web
+      - cmd:
+          argv: ["npm", "run", "build"]
+        cwd: web
+      - shell:
+          cmd: "systemctl --user restart moongit.service"
+      - log:
+          msg: "deployed: rebuilt + reinstalled binaries, rebuilt web UI, restarted moongit.service"
+
   test:
     desc: Run unit tests
     steps:
