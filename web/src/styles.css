@@ -23,6 +23,17 @@
 
   --shadow-sm: 0 1px 0 rgba(31, 35, 40, 0.04);
   --radius: 6px;
+
+  /* Syntax highlight tokens (GitHub light) */
+  --hl-comment: #6e7781;
+  --hl-keyword: #cf222e;
+  --hl-string: #0a3069;
+  --hl-number: #0550ae;
+  --hl-function: #8250df;
+  --hl-class: #953800;
+  --hl-attr: #0550ae;
+  --hl-tag: #116329;
+  --hl-meta: #6e7781;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -48,6 +59,17 @@
     --state-closed-bg: #4c1418;
 
     --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.3);
+
+    /* Syntax highlight tokens (GitHub dark) */
+    --hl-comment: #8b949e;
+    --hl-keyword: #ff7b72;
+    --hl-string: #a5d6ff;
+    --hl-number: #79c0ff;
+    --hl-function: #d2a8ff;
+    --hl-class: #ffa657;
+    --hl-attr: #79c0ff;
+    --hl-tag: #7ee787;
+    --hl-meta: #8b949e;
   }
 }
 
@@ -425,6 +447,73 @@ pre {
 .code-line:hover .code-line__num,
 .code-line:hover .code-line__text {
   background: var(--bg-canvas);
+}
+
+/* Syntax highlighting — highlight.js scopes mapped to the Primer palette.
+   Colour only; no backgrounds, so it inherits the blob's surface. */
+.hljs-comment,
+.hljs-quote {
+  color: var(--hl-comment);
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag,
+.hljs-type,
+.hljs-name,
+.hljs-strong {
+  color: var(--hl-keyword);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-meta .hljs-string {
+  color: var(--hl-string);
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+  color: var(--hl-number);
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-built_in {
+  color: var(--hl-function);
+}
+.hljs-title.class_,
+.hljs-class .hljs-title,
+.hljs-variable.constant_,
+.hljs-params .hljs-keyword {
+  color: var(--hl-class);
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: var(--hl-attr);
+}
+.hljs-tag,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--hl-tag);
+}
+.hljs-meta {
+  color: var(--hl-meta);
+}
+.hljs-addition {
+  color: var(--hl-keyword);
+  background: var(--state-todo-bg);
+}
+.hljs-deletion {
+  color: var(--hl-string);
+  background: var(--state-closed-bg);
+}
+.hljs-emphasis {
+  font-style: italic;
 }
 
 /* Issues list ---------------------------------------------------------- */
