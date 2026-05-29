@@ -12,8 +12,8 @@ func TestIssueStateValid(t *testing.T) {
 		{IssueDone, true},
 		{IssueClosed, true},
 		{"", false},
-		{"open", false},     // pre-cleanup legacy value
-		{"OPEN", false},     // case-sensitive
+		{"open", false}, // pre-cleanup legacy value
+		{"OPEN", false}, // case-sensitive
 		{"in-progress", false},
 		{"unknown", false},
 	}
