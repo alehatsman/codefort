@@ -1,9 +1,12 @@
+import { lazy, Suspense } from "react"
 import { useLocation, useParams } from "react-router-dom"
 import { useBlob, useRepo, useTree } from "../api/queries"
 import RepoHeader from "../components/RepoHeader"
 import FileTree from "../components/FileTree"
-import CodeView from "../components/CodeView"
 import PathBreadcrumb from "../components/PathBreadcrumb"
+
+// The highlighter grammars are heavy; load them only when a file is viewed.
+const CodeView = lazy(() => import("../components/CodeView"))
 
 /**
  * Code tab: a GitHub-style browser over the repo's default branch. Serves
@@ -91,7 +94,9 @@ function BlobView({ owner, repo, path }: ViewProps) {
       ) : b.binary ? (
         <div className="empty">Binary file not shown.</div>
       ) : (
-        <CodeView content={b.content} />
+        <Suspense fallback={<div className="loading">Loading…</div>}>
+          <CodeView content={b.content} path={path} />
+        </Suspense>
       )}
     </div>
   )
