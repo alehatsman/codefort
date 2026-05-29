@@ -6,6 +6,7 @@ import type {
   CreateIssueInput,
   CreateRepoInput,
   Intel,
+  IntelOverview,
   IntelSearchInput,
   IntelSearchResult,
   Issue,
@@ -115,6 +116,8 @@ export const api = {
     }),
 
   getIntel: (owner: string, repo: string) => request<Intel>(`/api/repos/${owner}/${repo}/intel`),
+  getIntelOverview: (owner: string, repo: string) =>
+    request<IntelOverview>(`/api/repos/${owner}/${repo}/intel/overview`),
   intelSearch: (owner: string, repo: string, body: IntelSearchInput) =>
     request<IntelSearchResult>(`/api/repos/${owner}/${repo}/intel/search`, {
       method: "POST",

@@ -131,8 +131,57 @@ export interface IntelHit {
   content?: string
 }
 
+export interface IntelSuggestedRead {
+  path: string
+  start_line: number
+  end_line: number
+  reason?: string
+  content?: string
+  truncated?: boolean
+}
+
+export interface IntelAnnotation {
+  nearest_doc?: string
+  tests?: string[]
+  package?: string
+}
+
+export interface IntelGraphNode {
+  id: string
+  qualified_name?: string
+  kind?: string
+}
+
+export interface IntelGraphEdge {
+  from: string
+  to: string
+  kind?: string
+}
+
+export interface IntelGraph {
+  nodes: IntelGraphNode[]
+  edges: IntelGraphEdge[]
+}
+
+export interface IntelPackageSummary {
+  path: string
+  summary: string
+}
+
+export interface IntelOverview {
+  repo_summary?: string
+  packages: IntelPackageSummary[]
+}
+
 export interface IntelSearchResult {
   status: string
   hint?: string
   hits: IntelHit[]
+  /** Only populated when kind="ask". The CLI prints these and they're more
+   *  actionable than the raw semantic_hits. */
+  next_action?: string
+  avoid?: string
+  suggested_reads?: IntelSuggestedRead[]
+  annotations?: Record<string, IntelAnnotation>
+  graph?: IntelGraph
 }
