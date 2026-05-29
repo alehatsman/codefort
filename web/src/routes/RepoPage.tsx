@@ -4,6 +4,7 @@ import { useBlob, useIntel, useIntelOverview, useRepo, useTree } from "../api/qu
 import RepoHeader from "../components/RepoHeader"
 import FileTree from "../components/FileTree"
 import ReadmeCard from "../components/ReadmeCard"
+import OverviewCard from "../components/OverviewCard"
 import PathBreadcrumb from "../components/PathBreadcrumb"
 import { findReadme } from "../lib/readme"
 
@@ -50,12 +51,13 @@ interface ViewProps {
 
 function TreeView({ owner, repo, path }: ViewProps) {
   const treeQ = useTree(owner, repo, path)
-  // Repo-level overview belongs on the root view only; gate the dex round
-  // trip on the repo being indexed so subdirectory listings stay cheap.
+  // The dex overview carries both the repo summary and one summary per
+  // package (keyed by directory path), so a single cached query per repo
+  // (staleTime 5m) serves every folder view — no extra round trip per dir.
   const isRoot = path === ""
   const intelQ = useIntel(owner, repo)
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
-  const overviewQ = useIntelOverview(owner, repo, isRoot && isIndexed)
+  const overviewQ = useIntelOverview(owner, repo, isIndexed)
 
   if (treeQ.isLoading) return <div className="loading">Loading…</div>
   if (treeQ.error) return <div className="error">{(treeQ.error as Error).message}</div>
@@ -80,18 +82,23 @@ function TreeView({ owner, repo, path }: ViewProps) {
 
   const readme = findReadme(treeQ.data.entries)
 
+  // At the root, show the repo-level summary; inside a directory, the
+  // matching package summary (dex keys those by directory path). Folders
+  // dex didn't summarize simply render no card.
+  const ov = overviewQ.data
+  const summary = isRoot
+    ? ov?.repo_summary ?? ""
+    : ov?.packages.find((p) => p.path === path)?.summary ?? ""
+
   return (
     <>
       <FileTree owner={owner} repo={repo} entries={treeQ.data.entries} />
+      <OverviewCard
+        title={isRoot ? "Repository overview" : "Folder overview"}
+        path={isRoot ? undefined : path}
+        summary={summary}
+      />
       {readme && <ReadmeCard owner={owner} repo={repo} dirPath={path} entry={readme} />}
-      {isRoot && overviewQ.data?.repo_summary && (
-        <section className="overview">
-          <div className="overview__repo">
-            <h3 className="ask__heading">Repository overview</h3>
-            <div className="overview__prose">{overviewQ.data.repo_summary}</div>
-          </div>
-        </section>
-      )}
     </>
   )
 }
