@@ -73,6 +73,7 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("DELETE /api/repos/{owner}/{repo}/issues/{number}/comments/{comment_id}", s.handleDeleteComment)
 
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel", s.handleIntel)
+	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/overview", s.handleIntelOverview)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/intel/search", s.handleIntelSearch)
 
 	return mux

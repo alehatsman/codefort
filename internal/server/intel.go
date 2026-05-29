@@ -91,6 +91,37 @@ type intelSearchRequest struct {
 	Kind  string `json:"kind"` // "semantic" (default) | "symbol"
 }
 
+// handleIntelOverview returns the at-a-glance repo + package summaries
+// dex composed at index time. Used by the Intel tab to render an overview
+// before the user has typed a query.
+func (s *Server) handleIntelOverview(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+		return
+	}
+	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
+	if !s.dex.Enabled() {
+		writeError(w, http.StatusServiceUnavailable, "dex integration not configured")
+		return
+	}
+	proj, err := s.dex.ResolveProject(r.Context(), repo)
+	if errors.Is(err, dex.ErrProjectNotFound) {
+		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
+		return
+	}
+	if err != nil {
+		s.logger.Error("dex resolve project", "err", err)
+		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+		return
+	}
+	ov, err := s.dex.Overview(r.Context(), proj.ID)
+	if err != nil {
+		s.logger.Error("dex overview", "err", err)
+		writeError(w, http.StatusBadGateway, "dex overview failed: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, ov)
+}
+
 // handleIntelSearch proxies a semantic or symbol search to dex, scoped to
 // the dex project that matches this repo.
 func (s *Server) handleIntelSearch(w http.ResponseWriter, r *http.Request) {

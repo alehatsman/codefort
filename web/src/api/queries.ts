@@ -16,6 +16,7 @@ export const keys = {
   issue: (owner: string, repo: string, n: number) => ["issue", owner, repo, n] as const,
   comments: (owner: string, repo: string, n: number) => ["comments", owner, repo, n] as const,
   intel: (owner: string, repo: string) => ["intel", owner, repo] as const,
+  intelOverview: (owner: string, repo: string) => ["intelOverview", owner, repo] as const,
 }
 
 export function useWhoami() {
@@ -107,5 +108,16 @@ export function useIntel(owner: string, repo: string) {
     queryKey: keys.intel(owner, repo),
     queryFn: () => api.getIntel(owner, repo),
     enabled: !!owner && !!repo,
+  })
+}
+
+export function useIntelOverview(owner: string, repo: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.intelOverview(owner, repo),
+    queryFn: () => api.getIntelOverview(owner, repo),
+    // Two dex round trips per fetch — only run when we know dex is up
+    // and this repo is indexed (gated on useIntel's found flag).
+    enabled: enabled && !!owner && !!repo,
+    staleTime: 5 * 60_000,
   })
 }

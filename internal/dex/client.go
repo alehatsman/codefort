@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -84,11 +85,60 @@ type Hit struct {
 }
 
 // SearchResult is the shared shape of dex's search/semantic and
-// search/symbol responses for the fields we care about.
+// search/symbol responses. For the `ask` kind it also carries the
+// richer fields dex's /ask returns — next_action, suggested_reads,
+// annotations — so the UI can render the same kind of summary the
+// `dex ask` CLI prints. Those fields are nil for non-ask kinds.
 type SearchResult struct {
-	Status string `json:"status"`
-	Hint   string `json:"hint,omitempty"`
-	Hits   []Hit  `json:"hits"`
+	Status         string                `json:"status"`
+	Hint           string                `json:"hint,omitempty"`
+	Hits           []Hit                 `json:"hits"`
+	NextAction     string                `json:"next_action,omitempty"`
+	Avoid          string                `json:"avoid,omitempty"`
+	SuggestedReads []SuggestedRead       `json:"suggested_reads,omitempty"`
+	Annotations    map[string]Annotation `json:"annotations,omitempty"`
+	Graph          *Graph                `json:"graph,omitempty"`
+}
+
+// Graph is the call-graph context dex returns alongside an /ask response.
+// Nodes are the relevant symbols (functions, packages, structs); edges are
+// the typed relationships between them (calls, declares, etc.).
+type Graph struct {
+	Nodes []GraphNode `json:"nodes"`
+	Edges []GraphEdge `json:"edges"`
+}
+
+type GraphNode struct {
+	ID            string `json:"id"`
+	QualifiedName string `json:"qualified_name,omitempty"`
+	Kind          string `json:"kind,omitempty"`
+}
+
+type GraphEdge struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+	Kind string `json:"kind,omitempty"`
+}
+
+// SuggestedRead is a curated file:start_line-end_line range dex picked
+// out for the question, with a one-liner reason and an optional content
+// snippet. These are the most actionable items in an /ask response.
+type SuggestedRead struct {
+	Path      string `json:"path"`
+	StartLine int    `json:"start_line"`
+	EndLine   int    `json:"end_line"`
+	Reason    string `json:"reason,omitempty"`
+	Content   string `json:"content,omitempty"`
+	Truncated bool   `json:"truncated,omitempty"`
+}
+
+// Annotation collects per-file extras dex pre-resolved for the answer:
+// the nearest README-style doc, corresponding _test.go files, and the
+// Go package name. Field names match dex's wire shape.
+type Annotation struct {
+	NearestDoc string   `json:"nearest_doc,omitempty"`
+	Tests      []string `json:"tests,omitempty"`
+	Package    string   `json:"package,omitempty"`
 }
 
 // Status fetches the daemon status, including all indexed projects.
@@ -154,6 +204,75 @@ func (c *Client) Ask(ctx context.Context, projectID, question string, k int) (*S
 // file:line so the UI can render and link to it uniformly.
 func (c *Client) Callers(ctx context.Context, projectID, name string, k int) (*SearchResult, error) {
 	return c.callEdge(ctx, projectID, "callers", name, k)
+}
+
+// Overview pulls the repo + package summary chunks dex generated at index
+// time. dex has no first-class "enumerate by kind" endpoint, so we use
+// two narrowly-targeted semantic queries (one each for repo vs package
+// summaries) — empirically more reliable than a single broad sweep, since
+// dex's ranking otherwise pushes the lone repo_summary chunk off the top
+// when most matches come from package_summary content.
+// Best-effort: very large repos may miss some packages if they fall
+// outside the top k for the package query.
+func (c *Client) Overview(ctx context.Context, projectID string) (*Overview, error) {
+	out := &Overview{Packages: []PackageSummary{}}
+
+	// Repo-level summary — typically a single chunk; k small.
+	if res, err := c.Search(ctx, projectID, "repository overview purpose", 20); err == nil {
+		for _, h := range res.Hits {
+			if h.Kind == "repo_summary" && h.Content != "" {
+				out.RepoSummary = h.Content
+				break
+			}
+		}
+	} else {
+		return nil, err
+	}
+
+	// Package summaries — one per package, can be many. The package_summary
+	// chunks all open with phrasing like "This package..." / "implements"
+	// / "provides", so a prose-y query targeting that diction recalls
+	// far more package_summary hits than a generic "summary" query
+	// (which dex's reranker pushes off the top in favor of code chunks).
+	// We union two complementary queries to maximize recall on small
+	// index spends; cost is one extra dex round trip.
+	queries := []string{
+		"package",
+		"this package contains implements provides functions",
+	}
+	seen := map[string]bool{}
+	for _, q := range queries {
+		res, err := c.Search(ctx, projectID, q, 1000)
+		if err != nil {
+			return nil, err
+		}
+		for _, h := range res.Hits {
+			if h.Kind != "package_summary" || h.Content == "" || seen[h.Path] || isFixturePath(h.Path) {
+				continue
+			}
+			seen[h.Path] = true
+			out.Packages = append(out.Packages, PackageSummary{
+				Path: h.Path, Summary: h.Content,
+			})
+		}
+	}
+	sort.Slice(out.Packages, func(i, j int) bool {
+		return out.Packages[i].Path < out.Packages[j].Path
+	})
+	return out, nil
+}
+
+// Overview is the at-a-glance index dump: repo-level summary plus one
+// summary per package dex was able to compose. Packages are sorted by
+// path so the rendering order is stable across calls.
+type Overview struct {
+	RepoSummary string           `json:"repo_summary,omitempty"`
+	Packages    []PackageSummary `json:"packages"`
+}
+
+type PackageSummary struct {
+	Path    string `json:"path"`
+	Summary string `json:"summary"`
 }
 
 // Callees returns call-graph successors of name (functions it invokes).
@@ -235,10 +354,15 @@ func (c *Client) do(ctx context.Context, method, path string, body any, out any)
 // tab surfaces are unmarshaled; graph + suggested_reads are dropped on the
 // floor for now (different UX, separate slice).
 type askEnvelope struct {
-	Status       string   `json:"status"`
-	Hint         string   `json:"hint,omitempty"`
-	Intent       string   `json:"intent,omitempty"`
-	SemanticHits []askHit `json:"semantic_hits"`
+	Status         string                `json:"status"`
+	Hint           string                `json:"hint,omitempty"`
+	Intent         string                `json:"intent,omitempty"`
+	SemanticHits   []askHit              `json:"semantic_hits"`
+	NextAction     string                `json:"next_action,omitempty"`
+	Avoid          string                `json:"avoid,omitempty"`
+	SuggestedReads []SuggestedRead       `json:"suggested_reads,omitempty"`
+	Annotations    map[string]Annotation `json:"annotations,omitempty"`
+	Graph          *Graph                `json:"graph,omitempty"`
 }
 
 type askHit struct {
@@ -252,7 +376,15 @@ type askHit struct {
 }
 
 func (a askEnvelope) toSearchResult() *SearchResult {
-	out := &SearchResult{Status: a.Status, Hits: make([]Hit, 0, len(a.SemanticHits))}
+	out := &SearchResult{
+		Status:         a.Status,
+		Hits:           make([]Hit, 0, len(a.SemanticHits)),
+		NextAction:     a.NextAction,
+		Avoid:          a.Avoid,
+		SuggestedReads: a.SuggestedReads,
+		Annotations:    a.Annotations,
+		Graph:          a.Graph,
+	}
 	if a.Hint != "" {
 		out.Hint = a.Hint
 	} else if a.Intent != "" {
@@ -338,4 +470,15 @@ func (e callEdgeEnvelope) toSearchResult() *SearchResult {
 		})
 	}
 	return out
+}
+
+// isFixturePath reports whether p sits under a `testdata/` segment.
+// Mirrors dex's own filter for LLM_GUIDE.md rendering — these test
+// fixtures aren't part of the project's shipped surface, surfacing
+// them as "packages" in the Intel overview just inflates the list.
+func isFixturePath(p string) bool {
+	if p == "testdata" || strings.HasPrefix(p, "testdata/") {
+		return true
+	}
+	return strings.Contains(p, "/testdata/") || strings.HasSuffix(p, "/testdata")
 }
