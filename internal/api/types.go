@@ -47,8 +47,14 @@ type CreateIssueRequest struct {
 	Author string `json:"-"` // populated server-side from token
 }
 
+// UpdateIssueRequest is a partial update: every field is optional, and only
+// the ones present (non-nil) are changed. An all-nil request is a no-op the
+// server rejects. State-only requests stay wire-compatible with older clients
+// that sent {"state": "..."}.
 type UpdateIssueRequest struct {
-	State IssueState `json:"state"`
+	State *IssueState `json:"state,omitempty"`
+	Title *string     `json:"title,omitempty"`
+	Body  *string     `json:"body,omitempty"`
 }
 
 // ClaimRequest atomically takes ownership of an issue. The server stamps

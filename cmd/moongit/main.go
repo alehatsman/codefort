@@ -51,6 +51,7 @@ USAGE:
     moongit issue create  --title <t> [--body <b>]
     moongit issue list    [--state s,s] [--assignee a|null] [--limit n]
     moongit issue show    <number>
+    moongit issue edit    <number> [--title <t>] [--body <b>] [--state <s>]
     moongit issue set-state <number> <todo|in_progress|done|closed>
     moongit issue claim   <number> [--state s]
     moongit issue unclaim <number>
@@ -67,7 +68,7 @@ server. The target repo is parsed from the remote URL.
 
 func runIssue(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit issue <create|list|show|set-state|claim|unclaim|comment>")
+		return errors.New("usage: moongit issue <create|list|show|edit|set-state|claim|unclaim|comment>")
 	}
 	switch args[0] {
 	case "create":
@@ -76,6 +77,8 @@ func runIssue(args []string) error {
 		return runIssueList(args[1:])
 	case "show":
 		return runIssueShow(args[1:])
+	case "edit":
+		return runIssueEdit(args[1:])
 	case "set-state":
 		return runIssueSetState(args[1:])
 	case "claim":
@@ -255,7 +258,7 @@ func runIssueSetState(args []string) error {
 		return err
 	}
 
-	payload, err := json.Marshal(api.UpdateIssueRequest{State: state})
+	payload, err := json.Marshal(api.UpdateIssueRequest{State: &state})
 	if err != nil {
 		return err
 	}
@@ -273,6 +276,75 @@ func runIssueSetState(args []string) error {
 		return fmt.Errorf("decode response: %w", err)
 	}
 	fmt.Printf("#%d  %s  → %s\n", iss.Number, iss.Title, iss.State)
+	return nil
+}
+
+// runIssueEdit applies a partial update to an issue's title, body, and/or
+// state. Only the flags actually passed are sent — fs.Visit distinguishes an
+// explicitly-empty --body from an omitted one, so editing the title never
+// clobbers the body and vice versa.
+func runIssueEdit(args []string) error {
+	if len(args) < 1 {
+		return errors.New("usage: moongit issue edit <number> [--title <t>] [--body <b>] [--state <s>]")
+	}
+	num, err := strconv.Atoi(args[0])
+	if err != nil || num <= 0 {
+		return fmt.Errorf("invalid issue number: %s", args[0])
+	}
+
+	fs := flag.NewFlagSet("issue edit", flag.ContinueOnError)
+	title := fs.String("title", "", "new title")
+	body := fs.String("body", "", "new body")
+	stateFlag := fs.String("state", "", "new state (todo|in_progress|done|closed)")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("unexpected extra args: %v", fs.Args())
+	}
+
+	// Build a partial request from only the flags the user actually set.
+	var req api.UpdateIssueRequest
+	seen := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { seen[f.Name] = true })
+	if seen["title"] {
+		req.Title = title
+	}
+	if seen["body"] {
+		req.Body = body
+	}
+	if seen["state"] {
+		state := api.IssueState(*stateFlag)
+		if !state.Valid() {
+			return fmt.Errorf("invalid state %q (want one of: %v)", *stateFlag, api.AllIssueStates)
+		}
+		req.State = &state
+	}
+	if req.Title == nil && req.Body == nil && req.State == nil {
+		return errors.New("nothing to edit: pass at least one of --title, --body, --state")
+	}
+
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d", target.server, target.owner, target.repo, num)
+	resp, raw, err := httpDo(http.MethodPatch, endpoint, bytes.NewReader(payload), "application/json")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	var iss api.Issue
+	if err := json.Unmarshal(raw, &iss); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	fmt.Printf("#%d  %s  [%s]\n", iss.Number, iss.Title, iss.State)
 	return nil
 }
 

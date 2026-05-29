@@ -55,15 +55,41 @@ func GetIssue(db *sql.DB, repoID int64, number int) (api.Issue, error) {
 	return iss, err
 }
 
-// UpdateIssue sets the issue's state and bumps updated_at. Returns the
-// updated row, or ErrNotFound if (repoID, number) doesn't exist.
-func UpdateIssue(db *sql.DB, repoID int64, number int, state api.IssueState) (api.Issue, error) {
+// ErrNoUpdateFields is returned by UpdateIssue when every field is nil —
+// there's nothing to change. The handler maps it to 400.
+var ErrNoUpdateFields = errors.New("no fields to update")
+
+// UpdateIssue applies a partial update: only the non-nil fields are written,
+// and updated_at is bumped. Returns the updated row, ErrNotFound if
+// (repoID, number) doesn't exist, or ErrNoUpdateFields if nothing was given.
+// Validation (state values, non-empty title) is the caller's responsibility.
+func UpdateIssue(db *sql.DB, repoID int64, number int, state *api.IssueState, title, body *string) (api.Issue, error) {
+	sets := []string{"updated_at = strftime('%s', 'now')"}
+	args := []any{}
+	if state != nil {
+		sets = append(sets, "state = ?")
+		args = append(args, string(*state))
+	}
+	if title != nil {
+		sets = append(sets, "title = ?")
+		args = append(args, *title)
+	}
+	if body != nil {
+		sets = append(sets, "body = ?")
+		args = append(args, *body)
+	}
+	// Only the bumped updated_at — caller passed no real fields.
+	if len(sets) == 1 {
+		return api.Issue{}, ErrNoUpdateFields
+	}
+	args = append(args, repoID, number)
+
 	row := db.QueryRow(`
 		UPDATE issues
-		   SET state = ?, updated_at = strftime('%s', 'now')
+		   SET `+strings.Join(sets, ", ")+`
 		 WHERE repo_id = ? AND number = ?
 		 RETURNING `+issueColumns+`
-	`, string(state), repoID, number)
+	`, args...)
 	iss, err := scanIssue(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return iss, ErrNotFound
