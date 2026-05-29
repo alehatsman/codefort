@@ -157,6 +157,29 @@ func RevokeToken(db *sql.DB, name string) error {
 	return nil
 }
 
+// RevokeStaleAgentTokens revokes per-agent session tokens — those named
+// "agent#<n>", minted one-per-spawn by the `ce` launcher — whose last
+// activity is older than ttl (measured from last_used_at, falling back to
+// created_at when never used). They accumulate and are never explicitly
+// revoked, so the token reaper sweeps idle ones. Already-revoked rows are
+// skipped. Returns the number revoked; no-op when ttl <= 0.
+func RevokeStaleAgentTokens(db *sql.DB, ttl time.Duration) (int64, error) {
+	if ttl <= 0 {
+		return 0, nil
+	}
+	res, err := db.Exec(`
+		UPDATE tokens
+		   SET revoked_at = strftime('%s','now')
+		 WHERE revoked_at IS NULL
+		   AND name LIKE 'agent#%'
+		   AND COALESCE(last_used_at, created_at) <= strftime('%s','now') - ?
+	`, int64(ttl.Seconds()))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // CountActiveTokens reports how many non-revoked tokens exist. Used at
 // server startup to warn when zero tokens are configured.
 func CountActiveTokens(db *sql.DB) (int, error) {
