@@ -112,6 +112,8 @@ export const api = {
     request<Issue>(`/api/repos/${owner}/${repo}/issues`, { method: "POST", body }),
   updateIssue: (owner: string, repo: string, n: number, body: UpdateIssueInput) =>
     request<Issue>(`/api/repos/${owner}/${repo}/issues/${n}`, { method: "PATCH", body }),
+  deleteIssue: (owner: string, repo: string, n: number) =>
+    request<void>(`/api/repos/${owner}/${repo}/issues/${n}`, { method: "DELETE" }),
   claimIssue: (owner: string, repo: string, n: number, body: ClaimIssueInput) =>
     request<Issue>(`/api/repos/${owner}/${repo}/issues/${n}/claim`, { method: "POST", body }),
   unclaimIssue: (owner: string, repo: string, n: number) =>

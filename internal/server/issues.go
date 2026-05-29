@@ -135,6 +135,33 @@ func (s *Server) handleUpdateIssue(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, iss)
 }
 
+func (s *Server) handleDeleteIssue(w http.ResponseWriter, r *http.Request) {
+	num, err := strconv.Atoi(r.PathValue("number"))
+	if err != nil || num <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid issue number")
+		return
+	}
+
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	// Data plane is intentionally open: any valid token may delete, matching
+	// the posture of create/update/claim. Auth (a valid token) is enforced by
+	// the /api withAuth middleware.
+	err = storage.DeleteIssue(s.db, repoID, num)
+	switch {
+	case errors.Is(err, storage.ErrNotFound):
+		writeError(w, http.StatusNotFound, "issue not found")
+	case err != nil:
+		s.logger.Error("delete issue", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 func (s *Server) handleClaimIssue(w http.ResponseWriter, r *http.Request) {
 	num, err := strconv.Atoi(r.PathValue("number"))
 	if err != nil || num <= 0 {

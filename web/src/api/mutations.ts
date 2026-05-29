@@ -50,6 +50,14 @@ export function useSetIssueState(owner: string, repo: string, n: number) {
   })
 }
 
+export function useDeleteIssue(owner: string, repo: string, n: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.deleteIssue(owner, repo, n),
+    onSuccess: () => invalidateIssueWrites(qc, owner, repo, n),
+  })
+}
+
 export function useClaimIssue(owner: string, repo: string, n: number) {
   const qc = useQueryClient()
   return useMutation({

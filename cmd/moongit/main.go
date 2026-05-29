@@ -55,6 +55,7 @@ USAGE:
     moongit issue set-state <number> <todo|in_progress|done|closed>
     moongit issue claim   <number> [--state s]
     moongit issue unclaim <number>
+    moongit issue delete  <number> [--yes]
     moongit issue comment <number> --body <b>
 
 Identity: the server stamps author/assignee from the name of the token
@@ -68,7 +69,7 @@ server. The target repo is parsed from the remote URL.
 
 func runIssue(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit issue <create|list|show|edit|set-state|claim|unclaim|comment>")
+		return errors.New("usage: moongit issue <create|list|show|edit|set-state|claim|unclaim|delete|comment>")
 	}
 	switch args[0] {
 	case "create":
@@ -85,6 +86,8 @@ func runIssue(args []string) error {
 		return runIssueClaim(args[1:])
 	case "unclaim":
 		return runIssueUnclaim(args[1:])
+	case "delete":
+		return runIssueDelete(args[1:])
 	case "comment":
 		return runIssueComment(args[1:])
 	default:
@@ -417,6 +420,52 @@ func runIssueUnclaim(args []string) error {
 		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
 	}
 	fmt.Printf("#%d  unclaimed\n", num)
+	return nil
+}
+
+func runIssueDelete(args []string) error {
+	if len(args) < 1 {
+		return errors.New("usage: moongit issue delete <number> [--yes]")
+	}
+	num, err := strconv.Atoi(args[0])
+	if err != nil || num <= 0 {
+		return fmt.Errorf("invalid issue number: %s", args[0])
+	}
+
+	fs := flag.NewFlagSet("issue delete", flag.ContinueOnError)
+	yes := fs.Bool("yes", false, "skip the confirmation prompt")
+	fs.BoolVar(yes, "y", false, "skip the confirmation prompt (shorthand)")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("unexpected extra args: %v", fs.Args())
+	}
+
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+
+	if !*yes {
+		fmt.Printf("Delete issue #%d and all its comments? This cannot be undone. [y/N]: ", num)
+		var answer string
+		fmt.Scanln(&answer)
+		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
+			fmt.Println("aborted")
+			return nil
+		}
+	}
+
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d", target.server, target.owner, target.repo, num)
+	resp, raw, err := httpDo(http.MethodDelete, endpoint, nil, "application/json")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	fmt.Printf("#%d  deleted\n", num)
 	return nil
 }
 
