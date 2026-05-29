@@ -44,16 +44,20 @@ func TestParseRemote(t *testing.T) {
 			wantRepo:   "hello",
 		},
 		{
-			name:      "ssh scp-style rejected",
-			remote:    "git@example.com:aleh/hello.git",
-			wantErr:   true,
-			errSubstr: "ssh remotes not supported",
+			// scp-style ssh resolves owner/repo; server is left empty for
+			// the caller to fill from MOONGIT_SERVER.
+			name:       "ssh scp-style resolves owner/repo",
+			remote:     "git@example.com:aleh/hello.git",
+			wantServer: "",
+			wantOwner:  "aleh",
+			wantRepo:   "hello",
 		},
 		{
-			name:      "ssh:// rejected",
-			remote:    "ssh://git@example.com/aleh/hello.git",
-			wantErr:   true,
-			errSubstr: "ssh remotes not supported",
+			name:       "ssh:// resolves owner/repo",
+			remote:     "ssh://git@example.com/aleh/hello.git",
+			wantServer: "",
+			wantOwner:  "aleh",
+			wantRepo:   "hello",
 		},
 		{
 			name:      "file scheme rejected",
