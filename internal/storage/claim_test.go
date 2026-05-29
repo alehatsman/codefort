@@ -217,7 +217,8 @@ func TestExpireClaimsSkipsTerminalStates(t *testing.T) {
 		t.Fatalf("Claim: %v", err)
 	}
 	// Mark it done — the assignee is now completion attribution, not a lease.
-	if _, err := UpdateIssue(db, repoID, num, api.IssueDone); err != nil {
+	done := api.IssueDone
+	if _, err := UpdateIssue(db, repoID, num, &done, nil, nil); err != nil {
 		t.Fatalf("UpdateIssue done: %v", err)
 	}
 	// Age the claim well past the lease so the reaper would otherwise sweep it.

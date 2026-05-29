@@ -98,9 +98,19 @@ func (s *Server) handleUpdateIssue(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
-	if !req.State.Valid() {
-		writeError(w, http.StatusBadRequest, "invalid state: "+string(req.State))
+	if req.State != nil && !req.State.Valid() {
+		writeError(w, http.StatusBadRequest, "invalid state: "+string(*req.State))
 		return
+	}
+	// Title is NOT NULL and meaningful — reject blanking it. Trim in place
+	// so the stored value matches create's behavior.
+	if req.Title != nil {
+		trimmed := strings.TrimSpace(*req.Title)
+		if trimmed == "" {
+			writeError(w, http.StatusBadRequest, "title cannot be empty")
+			return
+		}
+		req.Title = &trimmed
 	}
 
 	repoID, ok := s.lookupRepoOrFail(w, r)
@@ -108,7 +118,11 @@ func (s *Server) handleUpdateIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	iss, err := storage.UpdateIssue(s.db, repoID, num, req.State)
+	iss, err := storage.UpdateIssue(s.db, repoID, num, req.State, req.Title, req.Body)
+	if errors.Is(err, storage.ErrNoUpdateFields) {
+		writeError(w, http.StatusBadRequest, "no fields to update (provide state, title, and/or body)")
+		return
+	}
 	if errors.Is(err, storage.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "issue not found")
 		return
