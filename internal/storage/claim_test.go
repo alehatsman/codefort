@@ -174,3 +174,56 @@ func TestUnclaimNotFound(t *testing.T) {
 		t.Fatalf("Unclaim missing issue err = %v, want ErrNotFound", err)
 	}
 }
+
+func TestExpireClaimsReleasesOnlyExpired(t *testing.T) {
+	db, repoID, num := seedIssue(t)
+	// A second, freshly-claimed issue that must survive the sweep.
+	fresh, err := CreateIssue(db, repoID, api.CreateIssueRequest{Title: "fresh", Author: "alice"})
+	if err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	if _, err := Claim(db, repoID, num, "agent-a", "", testLease); err != nil {
+		t.Fatalf("Claim aged: %v", err)
+	}
+	if _, err := Claim(db, repoID, fresh.Number, "agent-b", "", testLease); err != nil {
+		t.Fatalf("Claim fresh: %v", err)
+	}
+	// Age only the first claim past the lease.
+	if _, err := db.Exec(`UPDATE issues SET claimed_at = claimed_at - 999999 WHERE repo_id = ? AND number = ?`, repoID, num); err != nil {
+		t.Fatalf("age claim: %v", err)
+	}
+
+	n, err := ExpireClaims(db, testLease)
+	if err != nil {
+		t.Fatalf("ExpireClaims: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("released %d claims, want 1", n)
+	}
+
+	aged, _ := GetIssue(db, repoID, num)
+	if aged.Assignee != nil || aged.ClaimedAt != nil {
+		t.Fatalf("expired claim not released: assignee=%v claimed_at=%v", aged.Assignee, aged.ClaimedAt)
+	}
+	live, _ := GetIssue(db, repoID, fresh.Number)
+	if live.Assignee == nil || *live.Assignee != "agent-b" {
+		t.Fatalf("fresh claim wrongly released: assignee=%v", live.Assignee)
+	}
+}
+
+func TestExpireClaimsZeroLeaseIsNoop(t *testing.T) {
+	db, repoID, num := seedIssue(t)
+	if _, err := Claim(db, repoID, num, "agent-a", "", testLease); err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+	if _, err := db.Exec(`UPDATE issues SET claimed_at = claimed_at - 999999 WHERE repo_id = ? AND number = ?`, repoID, num); err != nil {
+		t.Fatalf("age claim: %v", err)
+	}
+	n, err := ExpireClaims(db, 0)
+	if err != nil {
+		t.Fatalf("ExpireClaims: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("released %d with zero lease, want 0 (disabled)", n)
+	}
+}

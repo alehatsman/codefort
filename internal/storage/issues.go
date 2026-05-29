@@ -174,6 +174,28 @@ func Unclaim(db *sql.DB, repoID int64, number int, caller string) (api.Issue, er
 	return iss, tx.Commit()
 }
 
+// ExpireClaims releases every claim older than lease, clearing assignee and
+// claimed_at so orphaned work (a crashed agent) becomes discoverable as
+// unassigned rather than only stealable on the next competing claim. Returns
+// the number of claims released. A non-positive lease is a no-op — expiry is
+// disabled. State is intentionally left untouched; releasing ownership is the
+// reaper's only job.
+func ExpireClaims(db *sql.DB, lease time.Duration) (int64, error) {
+	if lease <= 0 {
+		return 0, nil
+	}
+	res, err := db.Exec(`
+		UPDATE issues
+		   SET assignee = NULL, claimed_at = NULL, updated_at = strftime('%s','now')
+		 WHERE assignee IS NOT NULL
+		   AND claimed_at <= strftime('%s','now') - ?
+	`, int64(lease.Seconds()))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // ListFilter narrows the result set for ListIssues. Empty fields are
 // ignored (no filter). Assignee == "null" matches unassigned issues
 // specifically; an empty Assignee means "any."
