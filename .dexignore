@@ -1,0 +1,5 @@
+# Paths dex should not index. Kept separate from .gitignore so these stay
+# tracked in git while staying out of the semantic index.
+
+# Dependency lockfile — huge, pure noise for code intel.
+web/package-lock.json
