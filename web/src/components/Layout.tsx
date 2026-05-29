@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import { clearToken } from "../api/client"
+import ThemeSelect from "./ThemeSelect"
 
 interface Props {
   children: React.ReactNode
@@ -18,9 +19,12 @@ export default function Layout({ children, onSignOut }: Props) {
         <Link to="/" className="brand">
           moongit
         </Link>
-        <button className="topbar__signout" onClick={signOut} title="Forget token">
-          sign out
-        </button>
+        <div className="topbar__actions">
+          <ThemeSelect />
+          <button className="topbar__signout" onClick={signOut} title="Forget token">
+            sign out
+          </button>
+        </div>
       </header>
       <main className="main">{children}</main>
     </div>

@@ -89,21 +89,22 @@
   --transition-fast: 80ms;
   --transition: 120ms;
 
-  /* Syntax highlight tokens (Monokai — light variant) */
-  --hl-comment: #a6acb1;
-  --hl-keyword: #d81e5b;
-  --hl-string: #a57906;
-  --hl-number: #7e4fcf;
-  --hl-function: #5b8c00;
-  --hl-class: #0686c2;
-  --hl-attr: #d2691e;
-  --hl-tag: #5b8c00;
-  --hl-meta: #a6acb1;
+  /* Syntax highlight tokens (GitHub light) — the default `github` scheme. */
+  --hl-comment: #6e7781;
+  --hl-keyword: #cf222e;
+  --hl-string: #0a3069;
+  --hl-number: #0550ae;
+  --hl-function: #8250df;
+  --hl-class: #953800;
+  --hl-attr: #0550ae;
+  --hl-tag: #116329;
+  --hl-meta: #6e7781;
 
-  /* Code blob surface (Monokai light bg/fg), scoped to code only. */
-  --code-bg: #fafaf5;
-  --code-fg: #272822;
-  --code-line-hl: #e0e0d8;
+  /* Code blob surface. Follows the chrome by default; themes override it.
+     var() refs resolve lazily, so these track --bg/--fg across light/dark. */
+  --code-bg: var(--bg);
+  --code-fg: var(--fg);
+  --code-line-hl: var(--bg-canvas);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -130,7 +131,46 @@
 
     --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.3);
 
-    /* Syntax highlight tokens (Monokai — Sublime ST2 dark) */
+    /* Syntax highlight tokens (GitHub dark) — default `github` scheme, dark. */
+    --hl-comment: #8b949e;
+    --hl-keyword: #ff7b72;
+    --hl-string: #a5d6ff;
+    --hl-number: #79c0ff;
+    --hl-function: #d2a8ff;
+    --hl-class: #ffa657;
+    --hl-attr: #79c0ff;
+    --hl-tag: #7ee787;
+    --hl-meta: #8b949e;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Color schemes. Selected via data-theme on <html> (see web/src/theme.ts);
+   localStorage-persisted, applied before first paint by the inline script in
+   index.html. The base blocks above are the default `github` scheme
+   (Primer chrome + GitHub syntax, light/dark auto). Each block below layers
+   variable overrides on top.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* monokai-code — GitHub chrome (auto light/dark), Monokai code view only.
+   Canonical Sublime ST2 Monokai for dark; a muted cream variant for light. */
+[data-theme="monokai-code"] {
+  --hl-comment: #a6acb1;
+  --hl-keyword: #d81e5b;
+  --hl-string: #a57906;
+  --hl-number: #7e4fcf;
+  --hl-function: #5b8c00;
+  --hl-class: #0686c2;
+  --hl-attr: #d2691e;
+  --hl-tag: #5b8c00;
+  --hl-meta: #a6acb1;
+
+  --code-bg: #fafaf5;
+  --code-fg: #272822;
+  --code-line-hl: #e0e0d8;
+}
+@media (prefers-color-scheme: dark) {
+  [data-theme="monokai-code"] {
     --hl-comment: #75715e;
     --hl-keyword: #f92672;
     --hl-string: #e6db74;
@@ -141,11 +181,60 @@
     --hl-tag: #a6e22e;
     --hl-meta: #75715e;
 
-    /* Code blob surface (Monokai dark bg/fg), scoped to code only. */
     --code-bg: #272822;
     --code-fg: #f8f8f2;
     --code-line-hl: #3e3d32;
   }
+}
+
+/* monokai-web — full Monokai chrome, always dark (ignores OS light/dark).
+   Surfaces follow the canonical Monokai bg #272822; accents/states map to the
+   Monokai palette (cyan, green, yellow, purple, pink). */
+[data-theme="monokai-web"] {
+  --bg: #272822;
+  --bg-canvas: #1e1f1c;
+  --bg-elev: #2e2f29;
+  --bg-card: #2e2f29;
+  --border: #49483e;
+  --border-muted: #3e3d32;
+  --fg: #f8f8f2;
+  --fg-muted: #a6a28c;
+  --accent: #66d9ef;
+  --accent-muted: #11343d;
+
+  --neutral-muted: rgba(117, 113, 94, 0.25);
+  --color-folder: #66d9ef;
+
+  --state-todo: #a6e22e;
+  --state-todo-hover: #8fce00;
+  --state-todo-bg: #2c3a14;
+  --state-in_progress: #e6db74;
+  --state-in_progress-bg: #3a3618;
+  --state-done: #ae81ff;
+  --state-done-bg: #2e2348;
+  --state-closed: #f92672;
+  --state-closed-bg: #44182b;
+
+  --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md:
+    0 8px 24px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 0, 0, 0.3);
+  --backdrop: rgba(0, 0, 0, 0.5);
+
+  /* Monokai syntax + code surface */
+  --hl-comment: #75715e;
+  --hl-keyword: #f92672;
+  --hl-string: #e6db74;
+  --hl-number: #ae81ff;
+  --hl-function: #a6e22e;
+  --hl-class: #66d9ef;
+  --hl-attr: #fd971f;
+  --hl-tag: #a6e22e;
+  --hl-meta: #75715e;
+
+  --code-bg: #1e1f1c;
+  --code-fg: #f8f8f2;
+  --code-line-hl: #3e3d32;
 }
 
 * {
@@ -263,6 +352,33 @@ pre {
 }
 .topbar__signout:hover {
   background: var(--bg-canvas);
+  border-color: var(--fg-muted);
+}
+.topbar__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.theme-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.theme-select__label {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+.theme-select__input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 5px var(--space-2);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-base);
+}
+.theme-select__input:hover {
   border-color: var(--fg-muted);
 }
 .main {
