@@ -1,13 +1,17 @@
 # Imperative operations. Run with `mooncake task <name>`.
 # List all tasks: `mooncake task`.
 #
-# Host setup is declarative — see mooncake.yml and run `mooncake apply`.
+# Host/server provisioning is NOT here — it lives in the dotfiles repo
+# (~/dotfiles/components/moongit), applied with `mooncake apply -c
+# ~/dotfiles/main_pc.yml -t moongit`. This file holds the dev loop plus
+# a few ops helpers that act on the installed location.
 
 version: "1.0"
 
 vars:
-  # Match the install paths in mooncake.yml so backup/restore/uninstall
-  # operate on the same locations the systemd service uses.
+  # Match the install paths the dotfiles moongit component uses so
+  # backup/restore/uninstall operate on the same locations the systemd
+  # service uses.
   binary_path: "{{ home }}/.local/bin/moongitd"
   client_path: "{{ home }}/.local/bin/moongit"
   data_dir:    "{{ home }}/.local/share/moongit"

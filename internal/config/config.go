@@ -18,6 +18,11 @@ type Config struct {
 	// dex runs token-less on loopback.
 	DexURL   string
 	DexToken string
+
+	// WebDir is the directory holding the built web UI (web/dist). When
+	// set, moongitd serves it as a single-page app with history-API
+	// fallback. Empty disables web serving (API + git only).
+	WebDir string
 }
 
 // Load reads MOONGIT_* environment variables and resolves the data directory
@@ -38,6 +43,7 @@ func Load() (*Config, error) {
 	cfg.ReposDir = envOr("MOONGIT_REPOS_DIR", filepath.Join(dataDir, "repos"))
 	cfg.DexURL = strings.TrimRight(envOr("MOONGIT_DEX_URL", ""), "/")
 	cfg.DexToken = envOr("MOONGIT_DEX_TOKEN", "")
+	cfg.WebDir = envOr("MOONGIT_WEB_DIR", "")
 
 	return cfg, nil
 }

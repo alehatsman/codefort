@@ -1,4 +1,0 @@
-# Optional overrides for mooncake.yml vars. Pass to `mooncake apply
-# --vars mooncake.vars.yml` to use these instead of the defaults baked
-# into mooncake.yml. Empty by default.
-{}

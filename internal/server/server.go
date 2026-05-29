@@ -34,6 +34,7 @@ func New(cfg *config.Config, db *sql.DB, logger *slog.Logger) *Server {
 func (s *Server) Handler() http.Handler {
 	apiAuth := s.withAuth(s.apiHandler())
 	gitMux := s.gitHandler()
+	web := s.webHandler() // nil when MOONGIT_WEB_DIR is unset
 
 	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -41,8 +42,15 @@ func (s *Server) Handler() http.Handler {
 			s.handleHealth(w, r)
 		case strings.HasPrefix(r.URL.Path, "/api/"):
 			apiAuth.ServeHTTP(w, r)
-		default:
+		case isGitRequest(r):
 			// Git smart-HTTP, no auth in this slice.
+			gitMux.ServeHTTP(w, r)
+		case web != nil:
+			// Anything left is a browser route — serve the SPA.
+			web.ServeHTTP(w, r)
+		default:
+			// Web disabled: keep the prior API+git-only behavior
+			// (gitMux 404s unmatched paths).
 			gitMux.ServeHTTP(w, r)
 		}
 	})
