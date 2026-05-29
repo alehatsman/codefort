@@ -89,6 +89,20 @@ export const api = {
     ),
   getBlob: (owner: string, repo: string, path: string) =>
     request<Blob>(`/api/repos/${owner}/${repo}/blob?path=${encodeURIComponent(path)}`),
+  // Raw bytes (e.g. images embedded in a rendered README). Fetched with the
+  // Bearer header, so it can't be a plain <img src>; the caller turns the
+  // returned Blob into an object URL.
+  getRawBlob: async (owner: string, repo: string, path: string): Promise<globalThis.Blob> => {
+    const token = getToken()
+    const headers = new Headers()
+    if (token) headers.set("Authorization", `Bearer ${token}`)
+    const resp = await fetch(
+      `/api/repos/${owner}/${repo}/raw?path=${encodeURIComponent(path)}`,
+      { headers }
+    )
+    if (!resp.ok) throw new ApiError(resp.status, resp.statusText)
+    return resp.blob()
+  },
 
   listIssues: (owner: string, repo: string, query = "") =>
     request<Issue[]>(`/api/repos/${owner}/${repo}/issues${query ? `?${query}` : ""}`),

@@ -687,6 +687,150 @@ pre {
   font-style: italic;
 }
 
+/* README card + rendered markdown -------------------------------------- */
+.readme-card {
+  margin-top: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.readme-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-muted);
+}
+.readme-card .markdown-body {
+  padding: var(--space-5) var(--space-6);
+}
+
+.markdown-body {
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--fg);
+  word-wrap: break-word;
+}
+.markdown-body > *:first-child {
+  margin-top: 0;
+}
+.markdown-body > *:last-child {
+  margin-bottom: 0;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin: var(--space-5) 0 var(--space-3);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+}
+.markdown-body h1 {
+  font-size: var(--text-xl);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-muted);
+}
+.markdown-body h2 {
+  font-size: var(--text-lg);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-muted);
+}
+.markdown-body h3 {
+  font-size: var(--text-md);
+}
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body blockquote,
+.markdown-body table,
+.markdown-body pre {
+  margin: 0 0 var(--space-4);
+}
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: var(--space-6);
+}
+.markdown-body li + li {
+  margin-top: var(--space-1);
+}
+.markdown-body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+.markdown-body img {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.markdown-body blockquote {
+  padding: 0 var(--space-4);
+  color: var(--fg-muted);
+  border-left: 3px solid var(--border);
+}
+.markdown-body table {
+  border-collapse: collapse;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+}
+.markdown-body th,
+.markdown-body td {
+  padding: 6px var(--space-3);
+  border: 1px solid var(--border-muted);
+}
+.markdown-body th {
+  background: var(--bg-canvas);
+  font-weight: var(--weight-semibold);
+}
+.markdown-body hr {
+  height: 1px;
+  margin: var(--space-5) 0;
+  border: 0;
+  background: var(--border-muted);
+}
+/* Inline code: subtle fill, like GitHub. Fenced blocks use .hljs below. */
+.markdown-body .md-code-inline {
+  padding: 0.2em 0.4em;
+  font: var(--text-sm) / 1 var(--font-mono);
+  background: var(--neutral-muted);
+  border-radius: var(--radius-sm);
+}
+.markdown-body pre {
+  padding: var(--space-4);
+  overflow: auto;
+  background: var(--bg-canvas);
+  border-radius: var(--radius);
+}
+.markdown-body pre code {
+  font: var(--text-sm) / 20px var(--font-mono);
+  white-space: pre;
+}
+.markdown-body input[type="checkbox"] {
+  margin: 0 var(--space-1) 0 0;
+}
+/* Authenticated images: a placeholder while the blob loads, alt on failure. */
+.md-img-loading {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: text-bottom;
+  background: var(--neutral-muted);
+  border-radius: var(--radius-sm);
+}
+.md-img-missing {
+  color: var(--fg-muted);
+  font-style: italic;
+}
+
 /* Issues list ---------------------------------------------------------- */
 .issues__header {
   display: flex;
