@@ -23,6 +23,12 @@ type Config struct {
 	// set, moongitd serves it as a single-page app with history-API
 	// fallback. Empty disables web serving (API + git only).
 	WebDir string
+
+	// BasicUser/BasicPass gate the web UI and git smart-HTTP behind HTTP
+	// Basic auth. Empty BasicUser disables it (open by default). The /api
+	// surface is unaffected — it keeps its Bearer-token auth.
+	BasicUser string
+	BasicPass string
 }
 
 // Load reads MOONGIT_* environment variables and resolves the data directory
@@ -44,6 +50,8 @@ func Load() (*Config, error) {
 	cfg.DexURL = strings.TrimRight(envOr("MOONGIT_DEX_URL", ""), "/")
 	cfg.DexToken = envOr("MOONGIT_DEX_TOKEN", "")
 	cfg.WebDir = envOr("MOONGIT_WEB_DIR", "")
+	cfg.BasicUser = envOr("MOONGIT_BASIC_USER", "")
+	cfg.BasicPass = envOr("MOONGIT_BASIC_PASS", "")
 
 	return cfg, nil
 }

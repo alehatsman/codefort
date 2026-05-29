@@ -74,6 +74,8 @@ Environment:
     MOONGIT_DB_PATH     SQLite path (default "$MOONGIT_DATA_DIR/moongit.db")
     MOONGIT_REPOS_DIR   bare repo root (default "$MOONGIT_DATA_DIR/repos")
     MOONGIT_WEB_DIR     built web UI dir (web/dist); empty serves API + git only
+    MOONGIT_BASIC_USER  HTTP Basic user gating the web UI + git; empty disables it
+    MOONGIT_BASIC_PASS  HTTP Basic password (paired with MOONGIT_BASIC_USER)
     MOONGIT_DEX_URL     dex serve base URL for the Intel tab (e.g. http://127.0.0.1:8080; empty disables it)
     MOONGIT_DEX_TOKEN   bearer token for dex (DEX_SERVE_TOKEN); empty for token-less loopback
 `)

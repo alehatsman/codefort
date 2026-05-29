@@ -33,8 +33,13 @@ func New(cfg *config.Config, db *sql.DB, logger *slog.Logger) *Server {
 // auth to the API mux.
 func (s *Server) Handler() http.Handler {
 	apiAuth := s.withAuth(s.apiHandler())
-	gitMux := s.gitHandler()
+	// Basic auth (when configured) gates the human/git-facing surfaces;
+	// /api keeps its Bearer-token auth and /healthz stays open.
+	gitMux := s.withBasicAuth(s.gitHandler())
 	web := s.webHandler() // nil when MOONGIT_WEB_DIR is unset
+	if web != nil {
+		web = s.withBasicAuth(web)
+	}
 
 	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
