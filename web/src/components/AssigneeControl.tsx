@@ -1,4 +1,5 @@
 import { useClaimIssue, useUnclaimIssue } from "../api/mutations"
+import type { IssueState } from "../api/types"
 import Avatar from "./Avatar"
 
 interface Props {
@@ -6,6 +7,8 @@ interface Props {
   repo: string
   number: number
   assignee: string | null
+  /** Issue lifecycle state — terminal states show attribution, not a live claim. */
+  state: IssueState
   /** Current user's name (from useWhoami), used to show "(you)". */
   me?: string
 }
@@ -13,13 +16,16 @@ interface Props {
 /**
  * Sidebar control for assignment. Shows the assignee + a contextual
  * action (Claim if unassigned, Release if assigned). Anyone with write
- * access can release in this slice.
+ * access can release in this slice. On terminal states (done/closed) the
+ * assignee is completion attribution, not a live lease, so the claim/release
+ * action is hidden — it reads "Completed by" instead.
  */
-export default function AssigneeControl({ owner, repo, number, assignee, me }: Props) {
+export default function AssigneeControl({ owner, repo, number, assignee, state, me }: Props) {
   const claim = useClaimIssue(owner, repo, number)
   const unclaim = useUnclaimIssue(owner, repo, number)
   const inFlight = claim.isPending || unclaim.isPending
   const error = claim.error || unclaim.error
+  const terminal = state === "done" || state === "closed"
 
   return (
     <div className="assignee">
@@ -34,17 +40,21 @@ export default function AssigneeControl({ owner, repo, number, assignee, me }: P
           </>
         )}
       </div>
-      <div className="assignee__row">
-        {assignee === null ? (
-          <button className="btn btn--small" disabled={inFlight} onClick={() => claim.mutate({})}>
-            {claim.isPending ? "Claiming…" : "Claim it"}
-          </button>
-        ) : (
-          <button className="btn btn--small" disabled={inFlight} onClick={() => unclaim.mutate()}>
-            {unclaim.isPending ? "Releasing…" : "Release"}
-          </button>
-        )}
-      </div>
+      {terminal ? (
+        assignee !== null && <div className="muted small">Completed by {assignee}</div>
+      ) : (
+        <div className="assignee__row">
+          {assignee === null ? (
+            <button className="btn btn--small" disabled={inFlight} onClick={() => claim.mutate({})}>
+              {claim.isPending ? "Claiming…" : "Claim it"}
+            </button>
+          ) : (
+            <button className="btn btn--small" disabled={inFlight} onClick={() => unclaim.mutate()}>
+              {unclaim.isPending ? "Releasing…" : "Release"}
+            </button>
+          )}
+        </div>
+      )}
       {error && <div className="error inline">{(error as Error).message}</div>}
     </div>
   )

@@ -83,6 +83,7 @@ export default function IssuePage() {
               repo={repo}
               number={iss.number}
               assignee={iss.assignee}
+              state={iss.state}
               me={me.data?.name}
             />
           </section>

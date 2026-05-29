@@ -180,6 +180,9 @@ func Unclaim(db *sql.DB, repoID int64, number int, caller string) (api.Issue, er
 // the number of claims released. A non-positive lease is a no-op — expiry is
 // disabled. State is intentionally left untouched; releasing ownership is the
 // reaper's only job.
+//
+// Terminal states (done/closed) are skipped: their assignee is completion
+// attribution ("who did it"), not a live lease, and must survive indefinitely.
 func ExpireClaims(db *sql.DB, lease time.Duration) (int64, error) {
 	if lease <= 0 {
 		return 0, nil
@@ -188,6 +191,7 @@ func ExpireClaims(db *sql.DB, lease time.Duration) (int64, error) {
 		UPDATE issues
 		   SET assignee = NULL, claimed_at = NULL, updated_at = strftime('%s','now')
 		 WHERE assignee IS NOT NULL
+		   AND state NOT IN ('done','closed')
 		   AND claimed_at <= strftime('%s','now') - ?
 	`, int64(lease.Seconds()))
 	if err != nil {

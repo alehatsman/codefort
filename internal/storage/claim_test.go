@@ -211,6 +211,34 @@ func TestExpireClaimsReleasesOnlyExpired(t *testing.T) {
 	}
 }
 
+func TestExpireClaimsSkipsTerminalStates(t *testing.T) {
+	db, repoID, num := seedIssue(t)
+	if _, err := Claim(db, repoID, num, "agent-a", "", testLease); err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+	// Mark it done — the assignee is now completion attribution, not a lease.
+	if _, err := UpdateIssue(db, repoID, num, api.IssueDone); err != nil {
+		t.Fatalf("UpdateIssue done: %v", err)
+	}
+	// Age the claim well past the lease so the reaper would otherwise sweep it.
+	if _, err := db.Exec(`UPDATE issues SET claimed_at = claimed_at - 999999 WHERE repo_id = ? AND number = ?`, repoID, num); err != nil {
+		t.Fatalf("age claim: %v", err)
+	}
+
+	n, err := ExpireClaims(db, testLease)
+	if err != nil {
+		t.Fatalf("ExpireClaims: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("released %d terminal-state claims, want 0", n)
+	}
+
+	got, _ := GetIssue(db, repoID, num)
+	if got.Assignee == nil || *got.Assignee != "agent-a" {
+		t.Fatalf("completion attribution wiped: assignee=%v, want agent-a", got.Assignee)
+	}
+}
+
 func TestExpireClaimsZeroLeaseIsNoop(t *testing.T) {
 	db, repoID, num := seedIssue(t)
 	if _, err := Claim(db, repoID, num, "agent-a", "", testLease); err != nil {
