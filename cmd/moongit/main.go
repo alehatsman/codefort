@@ -92,7 +92,6 @@ func runIssue(args []string) error {
 	}
 }
 
-
 func runIssueCreate(args []string) error {
 	fs := flag.NewFlagSet("issue create", flag.ContinueOnError)
 	title := fs.String("title", "", "issue title (required)")
@@ -563,7 +562,6 @@ func gitRemoteURL(name string) (string, error) {
 	}
 	return strings.TrimSpace(string(out)), nil
 }
-
 
 func httpDo(method, urlStr string, body io.Reader, contentType string) (*http.Response, []byte, error) {
 	req, err := http.NewRequest(method, urlStr, body)

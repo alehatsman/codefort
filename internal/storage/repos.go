@@ -46,11 +46,11 @@ func EnsureRepo(db *sql.DB, owner, name string) (int64, error) {
 // RepoSummary is the shape returned by ListRepos / GetRepo for UI views.
 // Counts are computed at query time; small N for personal use.
 type RepoSummary struct {
-	ID         int64
-	Owner      string
-	Name       string
-	CreatedAt  int64
-	OpenIssues int
+	ID          int64
+	Owner       string
+	Name        string
+	CreatedAt   int64
+	OpenIssues  int
 	TotalIssues int
 }
 
