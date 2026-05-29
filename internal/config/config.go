@@ -21,6 +21,14 @@ type Config struct {
 	// explicitly unclaimed. Set via MOONGIT_CLAIM_LEASE (default 60m).
 	ClaimLease time.Duration
 
+	// AgentTokenTTL is how long an idle per-agent session token (name
+	// "agent#<n>", minted one-per-spawn by the `ce` launcher) is kept before
+	// the token reaper revokes it. Measured from last use (or creation, if
+	// never used). These accumulate and are never explicitly revoked, so the
+	// reaper sweeps idle ones. Zero disables the sweep. Set via
+	// MOONGIT_AGENT_TOKEN_TTL (default 168h = 7d).
+	AgentTokenTTL time.Duration
+
 	// DexURL is the base URL of a dex `serve` daemon (e.g.
 	// http://127.0.0.1:8080). Empty disables the Intel tab. DexToken is
 	// the bearer token dex was started with (DEX_SERVE_TOKEN); empty when
@@ -67,6 +75,12 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("MOONGIT_CLAIM_LEASE: %w", err)
 	}
 	cfg.ClaimLease = lease
+
+	ttl, err := time.ParseDuration(envOr("MOONGIT_AGENT_TOKEN_TTL", "168h"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_AGENT_TOKEN_TTL: %w", err)
+	}
+	cfg.AgentTokenTTL = ttl
 
 	return cfg, nil
 }

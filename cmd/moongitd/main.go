@@ -128,6 +128,7 @@ func runServe(logger *slog.Logger) error {
 	defer stop()
 
 	go runClaimReaper(ctx, db, cfg.ClaimLease, logger)
+	go runTokenReaper(ctx, db, cfg.AgentTokenTTL, logger)
 
 	listenErr := make(chan error, 1)
 	go func() {
@@ -185,6 +186,41 @@ func runClaimReaper(ctx context.Context, db *sql.DB, lease time.Duration, logger
 			}
 			if n > 0 {
 				logger.Info("claim reaper released expired claims", "count", n)
+			}
+		}
+	}
+}
+
+// runTokenReaper periodically revokes idle per-agent session tokens
+// (agent#<n>) so they don't accumulate unbounded — the `ce` launcher mints
+// a fresh one per spawn and never cleans them up. No-op (returns
+// immediately) when ttl <= 0. Runs until ctx is cancelled, on the single
+// writer pool — same discipline as the claim reaper.
+func runTokenReaper(ctx context.Context, db *sql.DB, ttl time.Duration, logger *slog.Logger) {
+	if ttl <= 0 {
+		logger.Info("token reaper disabled (ttl <= 0)")
+		return
+	}
+	interval := ttl / 2
+	if interval < reaperFloor {
+		interval = reaperFloor
+	}
+	logger.Info("token reaper started", "ttl", ttl, "interval", interval)
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			n, err := storage.RevokeStaleAgentTokens(db, ttl)
+			if err != nil {
+				logger.Error("token reaper", "err", err)
+				continue
+			}
+			if n > 0 {
+				logger.Info("token reaper revoked stale agent tokens", "count", n)
 			}
 		}
 	}
