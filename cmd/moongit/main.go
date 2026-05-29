@@ -402,12 +402,18 @@ type target struct {
 }
 
 // discoverTarget derives the moongit server URL and owner/repo from the
-// current git checkout's `origin` remote. MOONGIT_SERVER overrides the
-// derived server URL (host part); owner and repo always come from the remote.
+// current git checkout's remotes. It prefers a dedicated `moongit` remote
+// (the code mirror) so the server URL + owner/repo come straight from it,
+// and falls back to `origin` for checkouts that only have their upstream
+// configured. MOONGIT_SERVER overrides the derived server host — required
+// when the chosen remote is SSH (no http base URL to derive).
 func discoverTarget() (target, error) {
-	remote, err := gitRemoteURL("origin")
+	remote, err := gitRemoteURL("moongit")
 	if err != nil {
-		return target{}, fmt.Errorf("read git remote 'origin': %w (run inside a checkout of the target repo)", err)
+		remote, err = gitRemoteURL("origin")
+		if err != nil {
+			return target{}, fmt.Errorf("read git remote 'moongit' or 'origin': %w (run inside a checkout of the target repo)", err)
+		}
 	}
 	t, err := parseRemote(remote)
 	if err != nil {
@@ -416,14 +422,42 @@ func discoverTarget() (target, error) {
 	if override := os.Getenv("MOONGIT_SERVER"); override != "" {
 		t.server = strings.TrimRight(override, "/")
 	}
+	if t.server == "" {
+		return target{}, fmt.Errorf("remote %q has no http(s) host; add a `moongit` http remote or set MOONGIT_SERVER", remote)
+	}
 	return t, nil
 }
 
+// parseRemote extracts owner/repo from any git remote form (http(s), ssh://,
+// or scp-like git@host:owner/repo). For http(s) it also derives the server
+// base URL; ssh/scp forms leave server empty so the caller supplies
+// MOONGIT_SERVER.
 func parseRemote(remote string) (target, error) {
 	remote = strings.TrimSpace(remote)
-	if strings.HasPrefix(remote, "git@") || strings.HasPrefix(remote, "ssh://") {
-		return target{}, fmt.Errorf("ssh remotes not supported yet; configure an http(s) remote to %s", remote)
+
+	// ssh://[user@]host[:port]/owner/repo(.git)
+	if strings.HasPrefix(remote, "ssh://") {
+		u, err := url.Parse(remote)
+		if err != nil {
+			return target{}, fmt.Errorf("parse remote URL %q: %w", remote, err)
+		}
+		owner, repo, err := splitOwnerRepo(u.Path)
+		if err != nil {
+			return target{}, err
+		}
+		return target{owner: owner, repo: repo}, nil
 	}
+
+	// scp-like: [user@]host:owner/repo(.git) — has a colon, no "://".
+	if !strings.Contains(remote, "://") && strings.Contains(remote, ":") {
+		_, path, _ := strings.Cut(remote, ":")
+		owner, repo, err := splitOwnerRepo(path)
+		if err != nil {
+			return target{}, err
+		}
+		return target{owner: owner, repo: repo}, nil
+	}
+
 	u, err := url.Parse(remote)
 	if err != nil {
 		return target{}, fmt.Errorf("parse remote URL %q: %w", remote, err)
@@ -431,12 +465,22 @@ func parseRemote(remote string) (target, error) {
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return target{}, fmt.Errorf("unsupported remote scheme %q", u.Scheme)
 	}
-	path := strings.TrimSuffix(strings.Trim(u.Path, "/"), ".git")
-	owner, repo, ok := strings.Cut(path, "/")
-	if !ok || owner == "" || repo == "" {
-		return target{}, fmt.Errorf("remote path %q is not <owner>/<repo>(.git)", u.Path)
+	owner, repo, err := splitOwnerRepo(u.Path)
+	if err != nil {
+		return target{}, err
 	}
 	return target{server: u.Scheme + "://" + u.Host, owner: owner, repo: repo}, nil
+}
+
+// splitOwnerRepo trims a leading slash and a trailing ".git" from a remote
+// path and splits it into <owner>/<repo>.
+func splitOwnerRepo(p string) (owner, repo string, err error) {
+	p = strings.TrimSuffix(strings.Trim(p, "/"), ".git")
+	owner, repo, ok := strings.Cut(p, "/")
+	if !ok || owner == "" || repo == "" {
+		return "", "", fmt.Errorf("remote path %q is not <owner>/<repo>(.git)", p)
+	}
+	return owner, repo, nil
 }
 
 func gitRemoteURL(name string) (string, error) {
