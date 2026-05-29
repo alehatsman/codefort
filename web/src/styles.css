@@ -152,45 +152,11 @@
    variable overrides on top.
    ────────────────────────────────────────────────────────────────────────── */
 
-/* monokai-code — GitHub chrome (auto light/dark), Monokai code view only.
-   Canonical Sublime ST2 Monokai for dark; a muted cream variant for light. */
-[data-theme="monokai-code"] {
-  --hl-comment: #a6acb1;
-  --hl-keyword: #d81e5b;
-  --hl-string: #a57906;
-  --hl-number: #7e4fcf;
-  --hl-function: #5b8c00;
-  --hl-class: #0686c2;
-  --hl-attr: #d2691e;
-  --hl-tag: #5b8c00;
-  --hl-meta: #a6acb1;
-
-  --code-bg: #fafaf5;
-  --code-fg: #272822;
-  --code-line-hl: #e0e0d8;
-}
-@media (prefers-color-scheme: dark) {
-  [data-theme="monokai-code"] {
-    --hl-comment: #75715e;
-    --hl-keyword: #f92672;
-    --hl-string: #e6db74;
-    --hl-number: #ae81ff;
-    --hl-function: #a6e22e;
-    --hl-class: #66d9ef;
-    --hl-attr: #fd971f;
-    --hl-tag: #a6e22e;
-    --hl-meta: #75715e;
-
-    --code-bg: #272822;
-    --code-fg: #f8f8f2;
-    --code-line-hl: #3e3d32;
-  }
-}
-
-/* monokai-web — full Monokai chrome, always dark (ignores OS light/dark).
-   Surfaces follow the canonical Monokai bg #272822; accents/states map to the
-   Monokai palette (cyan, green, yellow, purple, pink). */
-[data-theme="monokai-web"] {
+/* monokai — full Monokai theme: skins both the UI chrome and the code view.
+   Always dark (ignores OS light/dark). Surfaces follow the canonical Monokai
+   bg #272822; accents/states map to the Monokai palette (cyan, green, yellow,
+   purple, pink); code tokens use canonical Sublime ST2 Monokai. */
+[data-theme="monokai"] {
   --bg: #272822;
   --bg-canvas: #1e1f1c;
   --bg-elev: #2e2f29;

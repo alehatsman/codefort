@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>moongit</title>
     <script>
-      // Apply the saved color scheme before first paint (no flash of default
-      // theme). Mirror of theme.ts: github is the base, others set data-theme.
+      // Apply the saved theme before first paint (no flash of default theme).
+      // Mirror of theme.ts: github is the base; monokai sets data-theme.
+      // "monokai-web" is the legacy id from the earlier 3-scheme selector.
       try {
         var t = localStorage.getItem("moongit:theme")
-        if (t === "monokai-code" || t === "monokai-web") {
-          document.documentElement.setAttribute("data-theme", t)
+        if (t === "monokai" || t === "monokai-web") {
+          document.documentElement.setAttribute("data-theme", "monokai")
         }
       } catch (e) {}
     </script>

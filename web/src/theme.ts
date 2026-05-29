@@ -4,8 +4,7 @@
 
 export const THEMES = [
   { id: "github", label: "GitHub" },
-  { id: "monokai-code", label: "Monokai (code)" },
-  { id: "monokai-web", label: "Monokai (web)" },
+  { id: "monokai", label: "Monokai" },
 ] as const
 
 export type ThemeId = (typeof THEMES)[number]["id"]
@@ -21,6 +20,9 @@ function isThemeId(v: string | null): v is ThemeId {
 export function getTheme(): ThemeId {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
+    // Legacy values from the earlier 3-scheme selector.
+    if (stored === "monokai-web") return "monokai"
+    if (stored === "monokai-code") return "github"
     if (isThemeId(stored)) return stored
   } catch {
     // localStorage unavailable (private mode, etc.) — fall through to default.
