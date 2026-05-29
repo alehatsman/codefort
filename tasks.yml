@@ -185,6 +185,24 @@ tasks:
               -C "$tmp" moongit.db
             echo "wrote {{ backup_dir }}/moongit-$ts.tar.gz"
 
+  gc:
+    desc: Repack + prune every bare repo under the data dir (reclaims loose objects from a long-running fleet)
+    steps:
+      - shell:
+          cmd: |
+            set -eu
+            repos="{{ data_dir }}/repos"
+            test -d "$repos" || { echo "no repos dir at $repos"; exit 0; }
+            count=0
+            # Bare repos live at repos/<owner>/<name>.git
+            for d in "$repos"/*/*.git; do
+              [ -d "$d" ] || continue
+              echo "gc $d"
+              git --git-dir="$d" gc --prune=now --quiet
+              count=$((count + 1))
+            done
+            echo "gc complete: $count repo(s)"
+
   restore:
     desc: 'Restore from a backup tarball. Pass --vars with {tarball: /path/to/file.tar.gz}'
     steps:

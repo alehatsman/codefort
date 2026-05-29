@@ -100,6 +100,14 @@ func runServe(logger *slog.Logger) error {
 		return fmt.Errorf("migrate: %w", err)
 	}
 
+	// Read-only pool, opened after Migrate so the file is already in WAL.
+	// Lets concurrent reads (a polling fleet of agents) bypass the writer.
+	rdb, err := storage.OpenRead(cfg.DBPath)
+	if err != nil {
+		return fmt.Errorf("storage (read): %w", err)
+	}
+	defer rdb.Close()
+
 	n, err := storage.CountActiveTokens(db)
 	if err != nil {
 		return fmt.Errorf("count tokens: %w", err)
@@ -109,7 +117,7 @@ func runServe(logger *slog.Logger) error {
 			"Run `moongitd token create <name>` to bootstrap.")
 	}
 
-	srv := server.New(cfg, db, logger)
+	srv := server.New(cfg, db, rdb, logger)
 	httpSrv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           srv.Handler(),
@@ -118,6 +126,8 @@ func runServe(logger *slog.Logger) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	go runClaimReaper(ctx, db, cfg.ClaimLease, logger)
 
 	listenErr := make(chan error, 1)
 	go func() {
@@ -140,6 +150,44 @@ func runServe(logger *slog.Logger) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return httpSrv.Shutdown(shutdownCtx)
+}
+
+// reaperFloor bounds how often the claim reaper runs, so a small lease (or a
+// test) can't make it spin. The cadence is otherwise lease/2 — frequent
+// enough that an orphaned claim surfaces as unassigned well within one lease.
+const reaperFloor = time.Minute
+
+// runClaimReaper periodically releases expired claims so orphaned work becomes
+// discoverable, not just stealable. No-op (returns immediately) when expiry is
+// disabled. Runs until ctx is cancelled, on the single writer pool.
+func runClaimReaper(ctx context.Context, db *sql.DB, lease time.Duration, logger *slog.Logger) {
+	if lease <= 0 {
+		logger.Info("claim reaper disabled (lease <= 0)")
+		return
+	}
+	interval := lease / 2
+	if interval < reaperFloor {
+		interval = reaperFloor
+	}
+	logger.Info("claim reaper started", "lease", lease, "interval", interval)
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			n, err := storage.ExpireClaims(db, lease)
+			if err != nil {
+				logger.Error("claim reaper", "err", err)
+				continue
+			}
+			if n > 0 {
+				logger.Info("claim reaper released expired claims", "count", n)
+			}
+		}
+	}
 }
 
 func runRepo(args []string) error {

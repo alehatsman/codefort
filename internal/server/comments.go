@@ -16,7 +16,7 @@ func (s *Server) handleListComments(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	comments, err := storage.ListComments(s.db, issueID)
+	comments, err := storage.ListComments(s.rdb, issueID)
 	if err != nil {
 		s.logger.Error("list comments", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -86,7 +86,7 @@ func (s *Server) lookupIssueOrFail(w http.ResponseWriter, r *http.Request) (int6
 	if !ok {
 		return 0, false
 	}
-	iss, err := storage.GetIssue(s.db, repoID, num)
+	iss, err := storage.GetIssue(s.rdb, repoID, num)
 	if errors.Is(err, storage.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "issue not found")
 		return 0, false

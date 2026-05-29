@@ -18,7 +18,7 @@ import (
 )
 
 func (s *Server) handleListRepos(w http.ResponseWriter, _ *http.Request) {
-	rows, err := storage.ListRepos(s.db)
+	rows, err := storage.ListRepos(s.rdb)
 	if err != nil {
 		s.logger.Error("list repos", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -35,7 +35,7 @@ func (s *Server) handleGetRepo(w http.ResponseWriter, r *http.Request) {
 	owner := r.PathValue("owner")
 	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
 
-	row, err := storage.GetRepoSummary(s.db, owner, repo)
+	row, err := storage.GetRepoSummary(s.rdb, owner, repo)
 	if errors.Is(err, storage.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "repo not registered: "+owner+"/"+repo)
 		return
@@ -67,7 +67,7 @@ func (s *Server) handleCreateRepo(w http.ResponseWriter, r *http.Request) {
 
 	// Reject up front so the UI can surface a clean 409 instead of
 	// silently reusing an existing repo (CreateRepo is idempotent).
-	if _, err := storage.LookupRepo(s.db, owner, name); err == nil {
+	if _, err := storage.LookupRepo(s.rdb, owner, name); err == nil {
 		writeError(w, http.StatusConflict, "repo already exists: "+owner+"/"+name)
 		return
 	} else if !errors.Is(err, storage.ErrNotFound) {

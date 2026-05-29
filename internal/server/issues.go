@@ -52,7 +52,7 @@ func (s *Server) handleListIssues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	issues, err := storage.ListIssues(s.db, repoID, filter)
+	issues, err := storage.ListIssues(s.rdb, repoID, filter)
 	if err != nil {
 		s.logger.Error("list issues", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -73,7 +73,7 @@ func (s *Server) handleGetIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	iss, err := storage.GetIssue(s.db, repoID, num)
+	iss, err := storage.GetIssue(s.rdb, repoID, num)
 	if errors.Is(err, storage.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "issue not found")
 		return
@@ -146,7 +146,7 @@ func (s *Server) handleClaimIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	iss, err := storage.Claim(s.db, repoID, num, req.Assignee, req.State)
+	iss, err := storage.Claim(s.db, repoID, num, req.Assignee, req.State, s.cfg.ClaimLease)
 	switch {
 	case errors.Is(err, storage.ErrNotFound):
 		writeError(w, http.StatusNotFound, "issue not found")
@@ -174,12 +174,15 @@ func (s *Server) handleUnclaimIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	iss, err := storage.Unclaim(s.db, repoID, num)
-	if errors.Is(err, storage.ErrNotFound) {
+	iss, err := storage.Unclaim(s.db, repoID, num, identityFromContext(r))
+	switch {
+	case errors.Is(err, storage.ErrNotFound):
 		writeError(w, http.StatusNotFound, "issue not found")
 		return
-	}
-	if err != nil {
+	case errors.Is(err, storage.ErrNotOwner):
+		writeError(w, http.StatusForbidden, "issue claimed by another agent")
+		return
+	case err != nil:
 		s.logger.Error("unclaim issue", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -194,7 +197,7 @@ func (s *Server) lookupRepoOrFail(w http.ResponseWriter, r *http.Request) (int64
 	owner := r.PathValue("owner")
 	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
 
-	repoID, err := storage.LookupRepo(s.db, owner, repo)
+	repoID, err := storage.LookupRepo(s.rdb, owner, repo)
 	if errors.Is(err, storage.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "repo not registered: "+owner+"/"+repo)
 		return 0, false

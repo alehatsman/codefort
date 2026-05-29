@@ -65,10 +65,11 @@ func CreateToken(db *sql.DB, name, plaintext string) (api.Token, error) {
 }
 
 // LookupToken finds a token by its plaintext value and reports whether
-// it's still active (not revoked). last_used_at is bumped as a side
-// effect when the token is active. Returns ErrNotFound for unknown or
-// revoked tokens — the caller doesn't get to distinguish, so leaked
-// tokens can't be probed for liveness.
+// it's still active (not revoked). This is a pure read — callers that want
+// to record usage call TouchToken separately, so the auth read can run on a
+// read-only connection pool off the single writer. Returns ErrNotFound for
+// unknown or revoked tokens — the caller doesn't get to distinguish, so
+// leaked tokens can't be probed for liveness.
 func LookupToken(db *sql.DB, plaintext string) (api.Token, error) {
 	hashed := HashToken(plaintext)
 	var t api.Token
@@ -92,10 +93,14 @@ func LookupToken(db *sql.DB, plaintext string) (api.Token, error) {
 		ts := time.Unix(lastUsed.Int64, 0).UTC()
 		t.LastUsedAt = &ts
 	}
-	// Bump last_used_at; ignore error — a tracking miss isn't worth
-	// failing auth over.
-	_, _ = db.Exec(`UPDATE tokens SET last_used_at = strftime('%s','now') WHERE id = ?`, t.ID)
 	return t, nil
+}
+
+// TouchToken bumps last_used_at for a token. Best-effort — the error is
+// ignored, since a usage-tracking miss isn't worth failing auth over. Runs
+// on the writer pool.
+func TouchToken(db *sql.DB, id int64) {
+	_, _ = db.Exec(`UPDATE tokens SET last_used_at = strftime('%s','now') WHERE id = ?`, id)
 }
 
 // ListTokens returns active and revoked tokens with all metadata except
