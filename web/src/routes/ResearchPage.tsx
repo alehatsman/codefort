@@ -1,33 +1,26 @@
 import { useState } from "react"
 import { useParams } from "react-router-dom"
 import { useMutation } from "@tanstack/react-query"
-import { useIntel, useIntelOverview, useRepo } from "../api/queries"
+import { useIntel, useRepo } from "../api/queries"
 import { api } from "../api/client"
 import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
-import type {
-  IntelOverview,
-  IntelProject,
-  IntelSearchKind,
-  IntelSearchResult,
-} from "../api/types"
+import type { IntelProject, IntelSearchKind, IntelSearchResult } from "../api/types"
 
 /**
  * Research tab: surfaces code intelligence from a dex `serve` daemon for this
  * repo. The page leads with the thing people actually come here to do — ask
- * the codebase a question — so the ask box is the focal point at the top.
- * Package summaries fill the idle state below it, and the dry index numbers
- * (files / chunks / model / last indexed) sit small and muted at the very
- * bottom. The backend matches the repo to a dex project by name; when dex
- * isn't configured or the repo isn't indexed, we render a distinct empty
- * state rather than an error.
+ * the codebase a question — so the ask box is the focal point at the top, with
+ * the dry index numbers (files / chunks / model / last indexed) small and
+ * muted at the very bottom. Package summaries live on their own Summaries tab.
+ * The backend matches the repo to a dex project by name; when dex isn't
+ * configured or the repo isn't indexed, we render a distinct empty state
+ * rather than an error.
  */
 export default function ResearchPage() {
   const { owner = "", repo = "" } = useParams()
   const repoQ = useRepo(owner, repo)
   const intelQ = useIntel(owner, repo)
-  const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
-  const overviewQ = useIntelOverview(owner, repo, isIndexed)
 
   const [query, setQuery] = useState("")
   const [kind, setKind] = useState<IntelSearchKind>("ask")
@@ -123,53 +116,11 @@ export default function ResearchPage() {
           {search.error && <div className="error">{(search.error as Error).message}</div>}
           {search.data && <IntelResult owner={r.owner} repo={r.name} result={search.data} />}
 
-          {!search.data && !search.isPending && overviewQ.data && (
-            <OverviewSection overview={overviewQ.data} />
-          )}
-
           <IndexMeta project={intel.project} />
         </div>
       )}
     </div>
   )
-}
-
-/**
- * OverviewSection renders the per-package summaries dex composed at index
- * time. The repo-level summary now lives on the Code tab under the tree.
- */
-function OverviewSection({ overview }: { overview: IntelOverview }) {
-  if (overview.packages.length === 0) {
-    return null
-  }
-  return (
-    <section className="overview">
-      <h3 className="ask__heading">
-        Packages <span className="muted small">({overview.packages.length})</span>
-      </h3>
-      <ul className="overview__pkgs">
-        {overview.packages.map((p) => (
-          <li key={p.path} className="overview-pkg">
-            <details>
-              <summary>
-                <code className="overview-pkg__path">{p.path}</code>
-                <span className="overview-pkg__preview muted small">
-                  {firstLine(p.summary)}
-                </span>
-              </summary>
-              <div className="overview-pkg__body">{p.summary}</div>
-            </details>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
-
-function firstLine(s: string): string {
-  const i = s.indexOf("\n")
-  const head = i === -1 ? s : s.slice(0, i)
-  return head.length > 120 ? head.slice(0, 117) + "…" : head
 }
 
 function IntelResult({

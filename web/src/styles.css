@@ -2243,14 +2243,16 @@ h3 {
   padding-bottom: var(--space-4);
 }
 
-/* Intel overview (repo + package summaries) --------------------------- */
-.overview {
+/* Summaries tab (dex repo overview + package summaries) --------------- */
+.summaries__repo {
   margin: var(--space-4) 0 var(--space-5);
 }
-.overview__repo {
-  margin-bottom: var(--space-4);
+.summaries__heading {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 var(--space-3);
 }
-.overview__prose {
+.summaries__prose {
   background: var(--bg);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
@@ -2260,6 +2262,9 @@ h3 {
   line-height: var(--leading-relaxed);
 }
 
+.overview {
+  margin: var(--space-4) 0 var(--space-5);
+}
 .overview__pkgs {
   list-style: none;
   margin: 0;
@@ -2275,11 +2280,13 @@ h3 {
 .overview-pkg:first-child {
   border-top: none;
 }
+/* A flat row: marker · path · one-line preview. (Was a 2-col grid, but the
+   summary::before marker counted as the grid's first cell, pushing the path
+   into a 140px column and wrapping the preview onto a second row.) */
 .overview-pkg summary {
-  display: grid;
-  grid-template-columns: minmax(140px, max-content) 1fr;
-  gap: var(--space-3);
+  display: flex;
   align-items: baseline;
+  gap: var(--space-2);
   padding: 10px 14px;
   cursor: pointer;
   list-style: none;
@@ -2289,8 +2296,7 @@ h3 {
 }
 .overview-pkg summary::before {
   content: "▸";
-  display: inline-block;
-  margin-right: 6px;
+  flex: 0 0 auto;
   color: var(--fg-muted);
   font-size: var(--text-xs);
 }
@@ -2301,13 +2307,17 @@ h3 {
   background: var(--bg-canvas);
 }
 .overview-pkg__path {
+  flex: 0 0 auto;
   font-family: var(--font-mono);
   font-size: var(--text-base);
   color: var(--accent);
   background: none;
   padding: 0;
+  white-space: nowrap;
 }
 .overview-pkg__preview {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

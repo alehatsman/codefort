@@ -11,6 +11,7 @@ import IssuesPage from "./routes/IssuesPage"
 import IssuePage from "./routes/IssuePage"
 import BoardPage from "./routes/BoardPage"
 import ResearchPage from "./routes/ResearchPage"
+import SummariesPage from "./routes/SummariesPage"
 import PipelinesPage from "./routes/PipelinesPage"
 import SettingsPage from "./routes/SettingsPage"
 
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/:owner/:repo/issues/board" element={<BoardPage />} />
         <Route path="/:owner/:repo/issues/:number" element={<IssuePage />} />
         <Route path="/:owner/:repo/research" element={<ResearchPage />} />
+        <Route path="/:owner/:repo/summaries" element={<SummariesPage />} />
         <Route path="/:owner/:repo/pipelines" element={<PipelinesPage />} />
         <Route path="/:owner/:repo/pipelines/:number" element={<PipelinesPage />} />
         <Route path="/settings" element={<SettingsPage />} />

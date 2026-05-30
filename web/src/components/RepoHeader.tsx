@@ -30,6 +30,7 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
     location.pathname.startsWith(`${base}/commits`)
   const isIssues = location.pathname.startsWith(`${base}/issues`)
   const isResearch = location.pathname.startsWith(`${base}/research`)
+  const isSummaries = location.pathname.startsWith(`${base}/summaries`)
   const isPipelines = location.pathname.startsWith(`${base}/pipelines`)
 
   return (
@@ -44,6 +45,9 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
         </Link>
         <Link to={`${base}/research`} className={`tab ${isResearch ? "is-active" : ""}`}>
           Research
+        </Link>
+        <Link to={`${base}/summaries`} className={`tab ${isSummaries ? "is-active" : ""}`}>
+          Summaries
         </Link>
         <Link to={`${base}/pipelines`} className={`tab ${isPipelines ? "is-active" : ""}`}>
           Pipelines
