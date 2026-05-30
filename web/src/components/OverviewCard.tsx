@@ -1,27 +1,31 @@
+import PathBreadcrumb from "./PathBreadcrumb"
+
 /**
- * OverviewCard surfaces a dex-composed summary as a collapsible card on the
- * Code tab — the repo-level summary at the repo root, or a directory's
- * package summary when browsing inside one. Expanded by default so the prose
- * is visible at a glance; the user can fold it away to get the tree + README
- * higher on the page. Renders nothing when there's no summary to show, so
- * callers can pass an empty string without guarding.
+ * OverviewCard is the navigation + summary block atop the Code tab's tree
+ * view. Its header is the path breadcrumb — the top-bar navigation. When dex
+ * has a summary for the current location, that breadcrumb becomes the header
+ * of a collapsible card whose body is the summary (expanded by default), so
+ * the AI prose reads as part of the location it describes rather than a
+ * separate block. With no summary it falls back to a plain breadcrumb, so
+ * navigation is never lost.
  */
 export default function OverviewCard({
-  title,
+  owner,
+  repo,
   path,
   summary,
 }: {
-  title: string
-  path?: string
+  owner: string
+  repo: string
+  path: string
   summary: string
 }) {
-  if (!summary) return null
+  if (!summary) return <PathBreadcrumb owner={owner} repo={repo} path={path} />
   return (
     <section className="overview">
       <details className="overview-card" open>
         <summary className="overview-card__head">
-          <span className="overview-card__title">{title}</span>
-          {path && <code className="overview-card__path">{path}</code>}
+          <PathBreadcrumb owner={owner} repo={repo} path={path} />
         </summary>
         <div className="overview-card__prose">{summary}</div>
       </details>
