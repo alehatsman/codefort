@@ -129,6 +129,7 @@ func runServe(logger *slog.Logger) error {
 
 	go runClaimReaper(ctx, db, cfg.ClaimLease, logger)
 	go runTokenReaper(ctx, db, cfg.AgentTokenTTL, logger)
+	go runCIRunner(ctx, db, cfg, logger)
 
 	listenErr := make(chan error, 1)
 	go func() {

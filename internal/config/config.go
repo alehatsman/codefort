@@ -29,6 +29,17 @@ type Config struct {
 	// MOONGIT_AGENT_TOKEN_TTL (default 168h = 7d).
 	AgentTokenTTL time.Duration
 
+	// CIRunTimeout is the hard wall-clock limit for a single CI run. The
+	// runner executes the run under a context with this deadline; an
+	// overrunning run is killed and marked error. Set via
+	// MOONGIT_CI_RUN_TIMEOUT (default 15m). Zero or negative disables the
+	// timeout (not recommended — CI runs untrusted repo code).
+	CIRunTimeout time.Duration
+
+	// CIPollInterval is how often the CI runner polls for a queued run when
+	// idle. Set via MOONGIT_CI_POLL_INTERVAL (default 5s).
+	CIPollInterval time.Duration
+
 	// DexURL is the base URL of a dex `serve` daemon (e.g.
 	// http://127.0.0.1:8080). Empty disables the Intel tab. DexToken is
 	// the bearer token dex was started with (DEX_SERVE_TOKEN); empty when
@@ -81,6 +92,18 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("MOONGIT_AGENT_TOKEN_TTL: %w", err)
 	}
 	cfg.AgentTokenTTL = ttl
+
+	ciTimeout, err := time.ParseDuration(envOr("MOONGIT_CI_RUN_TIMEOUT", "15m"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_CI_RUN_TIMEOUT: %w", err)
+	}
+	cfg.CIRunTimeout = ciTimeout
+
+	ciPoll, err := time.ParseDuration(envOr("MOONGIT_CI_POLL_INTERVAL", "5s"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_CI_POLL_INTERVAL: %w", err)
+	}
+	cfg.CIPollInterval = ciPoll
 
 	return cfg, nil
 }
