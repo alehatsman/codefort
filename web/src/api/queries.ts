@@ -25,6 +25,8 @@ export const keys = {
   intelOverview: (owner: string, repo: string) => ["intelOverview", owner, repo] as const,
   intelFileSummary: (owner: string, repo: string, path: string) =>
     ["intelFileSummary", owner, repo, path] as const,
+  intelPathSummaries: (owner: string, repo: string, path: string, isFile: boolean) =>
+    ["intelPathSummaries", owner, repo, path, isFile] as const,
   ciRuns: (owner: string, repo: string) => ["ciRuns", owner, repo] as const,
   ciRun: (owner: string, repo: string, n: number) => ["ciRun", owner, repo, n] as const,
 }
@@ -186,6 +188,25 @@ export function useIntelFileSummary(owner: string, repo: string, path: string, e
     queryFn: () => api.getIntelFileSummary(owner, repo, path),
     // One dex round trip per file view — gate on dex up + repo indexed.
     enabled: enabled && !!owner && !!repo && !!path,
+    staleTime: 5 * 60_000,
+  })
+}
+
+// Per-segment breadcrumb summaries for a path (repo + ancestor dirs + leaf).
+// isFile marks a blob view, so the leaf is looked up as a file rather than a
+// directory. One request per location (a handful of dex round trips, server
+// -side); cached 5m like the other intel queries.
+export function useIntelPathSummaries(
+  owner: string,
+  repo: string,
+  path: string,
+  isFile: boolean,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: keys.intelPathSummaries(owner, repo, path, isFile),
+    queryFn: () => api.getIntelPathSummaries(owner, repo, path, isFile),
+    enabled: enabled && !!owner && !!repo,
     staleTime: 5 * 60_000,
   })
 }

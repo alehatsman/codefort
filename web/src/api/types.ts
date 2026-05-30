@@ -266,6 +266,13 @@ export interface IntelFileSummary {
   summary: string
 }
 
+// Per-segment breadcrumb summaries: keyed by sub-path ("" = repo root,
+// directory paths, the leaf file path), carrying only the segments dex has
+// prose for. Backs the Code tab's per-crumb hover tooltips.
+export interface IntelPathSummaries {
+  summaries: Record<string, string>
+}
+
 // --- CI (moongitci) ---
 
 // Mirrors storage.RunStatus. queued -> running -> a terminal state.

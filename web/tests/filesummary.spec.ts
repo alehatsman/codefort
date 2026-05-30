@@ -6,8 +6,8 @@ import { mockApi, seedToken } from "./mockApi"
 // — the repo, any directory, the current file — carries that summary as a
 // native title tooltip and is marked with the --info affordance (dotted
 // underline) so users know a hover is available. Segments dex didn't summarize
-// stay plain. On the blob view the file summary fills the leaf; the repo +
-// package overview makes the parent crumbs hoverable too.
+// stay plain. The summaries come from the intel/path-summaries endpoint, which
+// returns one entry per breadcrumb sub-path (repo, ancestor dirs, leaf file).
 
 const blobBody = JSON.stringify({
   ref: "main",
@@ -47,23 +47,16 @@ test("blob view: per-segment dex summaries ride the breadcrumb as hover tooltips
   await mockApi(page)
   await routeBlob(page)
   await routeIndexed(page)
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/file-summary(\?.*)?$/, (route) =>
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/path-summaries(\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        path: "src/app.ts",
-        summary: "This file is the application entry point.",
-      }),
-    })
-  )
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/overview$/, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        repo_summary: "Demo repository.",
-        packages: [{ path: "src", summary: "Application source." }],
+        summaries: {
+          "": "Demo repository.",
+          src: "Application source.",
+          "src/app.ts": "This file is the application entry point.",
+        },
       }),
     })
   )
@@ -92,18 +85,11 @@ test("blob view: segments stay plain when dex has no summary", async ({ page }) 
   await mockApi(page)
   await routeBlob(page)
   await routeIndexed(page)
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/file-summary(\?.*)?$/, (route) =>
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/path-summaries(\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ path: "src/app.ts", summary: "" }),
-    })
-  )
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/overview$/, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ packages: [] }),
+      body: JSON.stringify({ summaries: {} }),
     })
   )
 

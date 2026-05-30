@@ -4,8 +4,7 @@ import {
   useBlob,
   useCommits,
   useIntel,
-  useIntelFileSummary,
-  useIntelOverview,
+  useIntelPathSummaries,
   useRepo,
   useTree,
   useTreeCommits,
@@ -15,7 +14,7 @@ import FileTree from "../components/FileTree"
 import LatestCommitBar from "../components/LatestCommitBar"
 import CommitMeta from "../components/CommitMeta"
 import ReadmeCard from "../components/ReadmeCard"
-import OverviewCard, { breadcrumbSummaries } from "../components/OverviewCard"
+import OverviewCard from "../components/OverviewCard"
 import { findReadme } from "../lib/readme"
 import { useListNav } from "../lib/keyboardNav"
 
@@ -62,13 +61,13 @@ interface ViewProps {
 function TreeView({ owner, repo, path }: ViewProps) {
   const navigate = useNavigate()
   const treeQ = useTree(owner, repo, path)
-  // The dex overview carries both the repo summary and one summary per
-  // package (keyed by directory path), so a single cached query per repo
-  // (staleTime 5m) serves every folder view — no extra round trip per dir.
+  // Per-segment breadcrumb summaries for this directory path (repo + each
+  // ancestor dir). One cached request per location; reliably recalls every
+  // package summary, unlike the broad overview enumeration.
   const isRoot = path === ""
   const intelQ = useIntel(owner, repo)
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
-  const overviewQ = useIntelOverview(owner, repo, isIndexed)
+  const pathSummariesQ = useIntelPathSummaries(owner, repo, path, false, isIndexed)
   const treeCommitsQ = useTreeCommits(owner, repo, path)
 
   // j/k select a file/folder; Enter opens it. h/l are left to useTabNav.
@@ -106,10 +105,7 @@ function TreeView({ owner, repo, path }: ViewProps) {
 
   const readme = findReadme(treeQ.data.entries)
 
-  // The dex overview carries the repo summary and one entry per package, so a
-  // single map makes the repo crumb and every directory crumb up to here
-  // hoverable. Paths dex didn't summarize simply stay plain.
-  const summaries = breadcrumbSummaries(overviewQ.data)
+  const summaries = pathSummariesQ.data?.summaries ?? {}
 
   return (
     <>
@@ -137,17 +133,12 @@ function TreeView({ owner, repo, path }: ViewProps) {
 
 function BlobView({ owner, repo, path }: ViewProps) {
   const blobQ = useBlob(owner, repo, path)
-  // Per-file dex summary, surfaced in the same collapsible card as the tree
-  // view's folder/repo summaries. One dex round trip per file, gated on dex
-  // being up and this repo indexed; files dex didn't summarize render no
-  // card (OverviewCard falls back to a plain breadcrumb).
+  // Per-segment breadcrumb summaries for this file path: repo + each ancestor
+  // dir (as packages) + the leaf file. file=true so the leaf is looked up as
+  // a file. Crumbs dex has nothing for stay plain.
   const intelQ = useIntel(owner, repo)
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
-  const summaryQ = useIntelFileSummary(owner, repo, path, isIndexed)
-  // The repo + package overview (one cached query per repo) makes the parent
-  // dir and repo crumbs hoverable here too, with the file summary filling the
-  // leaf segment.
-  const overviewQ = useIntelOverview(owner, repo, isIndexed)
+  const pathSummariesQ = useIntelPathSummaries(owner, repo, path, true, isIndexed)
   // Latest commit touching this file, for the GitHub-style header.
   const commitsQ = useCommits(owner, repo, { path, perPage: 1 })
   const lastCommit = commitsQ.data?.commits?.[0]
@@ -157,7 +148,7 @@ function BlobView({ owner, repo, path }: ViewProps) {
   if (!blobQ.data) return null
 
   const b = blobQ.data
-  const summaries = breadcrumbSummaries(overviewQ.data, summaryQ.data)
+  const summaries = pathSummariesQ.data?.summaries ?? {}
 
   return (
     <>

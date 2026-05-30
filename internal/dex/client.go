@@ -218,16 +218,11 @@ func (c *Client) Overview(ctx context.Context, projectID string) (*Overview, err
 	out := &Overview{Packages: []PackageSummary{}}
 
 	// Repo-level summary — typically a single chunk; k small.
-	if res, err := c.Search(ctx, projectID, "repository overview purpose", 20); err == nil {
-		for _, h := range res.Hits {
-			if h.Kind == "repo_summary" && h.Content != "" {
-				out.RepoSummary = h.Content
-				break
-			}
-		}
-	} else {
+	repoSummary, err := c.RepoSummary(ctx, projectID)
+	if err != nil {
 		return nil, err
 	}
+	out.RepoSummary = repoSummary
 
 	// Package summaries — one per package, can be many. The package_summary
 	// chunks all open with phrasing like "This package..." / "implements"
@@ -275,23 +270,52 @@ type PackageSummary struct {
 	Summary string `json:"summary"`
 }
 
-// FileSummary returns the file_summary chunk dex composed for a single file
-// path, or "" when dex has no summary for it (the common case — only some
-// files get summarized). Like Overview, dex exposes no enumerate-by-kind
-// endpoint, so we run one targeted search keyed on the path — its tokens
-// dominate the lexical half of dex's hybrid ranking, so the file's own
-// chunks rank top — and filter to the exact Path + file_summary kind.
-func (c *Client) FileSummary(ctx context.Context, projectID, path string) (string, error) {
-	res, err := c.Search(ctx, projectID, path+" file summary overview purpose", 30)
+// RepoSummary returns the repo_summary chunk dex composed for the project,
+// or "" if none. dex exposes no enumerate-by-kind endpoint, so we recall it
+// with a small kind-targeted search and filter to the repo_summary kind.
+func (c *Client) RepoSummary(ctx context.Context, projectID string) (string, error) {
+	res, err := c.Search(ctx, projectID, "repository overview purpose", 20)
 	if err != nil {
 		return "", err
 	}
 	for _, h := range res.Hits {
-		if h.Kind == "file_summary" && h.Path == path && h.Content != "" {
+		if h.Kind == "repo_summary" && h.Content != "" {
 			return h.Content, nil
 		}
 	}
 	return "", nil
+}
+
+// PathSummary returns the summary chunk dex composed for an exact path of the
+// given kind — "file_summary" for a file, "package_summary" for a directory —
+// or "" when dex has none. dex exposes no enumerate-by-kind endpoint, so we
+// run one targeted search keyed on the path: its tokens dominate the lexical
+// half of dex's hybrid ranking, so the path's own chunks rank top regardless
+// of repo size. We then filter to the exact Path + kind. This path-keyed
+// recall is reliable where Overview()'s broad package enumeration is not —
+// it never has to win a top-k slot against the whole index.
+func (c *Client) PathSummary(ctx context.Context, projectID, path, kind string) (string, error) {
+	noun := "file"
+	if kind == "package_summary" {
+		noun = "package"
+	}
+	res, err := c.Search(ctx, projectID, path+" "+noun+" summary overview purpose", 30)
+	if err != nil {
+		return "", err
+	}
+	for _, h := range res.Hits {
+		if h.Kind == kind && h.Path == path && h.Content != "" {
+			return h.Content, nil
+		}
+	}
+	return "", nil
+}
+
+// FileSummary returns the file_summary chunk dex composed for a single file
+// path, or "" when dex has no summary for it (the common case — only some
+// files get summarized).
+func (c *Client) FileSummary(ctx context.Context, projectID, path string) (string, error) {
+	return c.PathSummary(ctx, projectID, path, "file_summary")
 }
 
 // Callees returns call-graph successors of name (functions it invokes).

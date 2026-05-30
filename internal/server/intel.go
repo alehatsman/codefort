@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/alehatsman/moongit/internal/dex"
 )
@@ -166,6 +167,92 @@ func (s *Server) handleIntelFileSummary(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusOK, fileSummaryResponse{Path: path, Summary: summary})
+}
+
+// pathSummariesResponse maps each breadcrumb sub-path to its dex summary:
+// "" → the repo summary, directory paths → package summaries, and the leaf
+// file path → its file summary. Only sub-paths dex actually has prose for
+// appear; the rest are omitted so the UI leaves those crumbs plain.
+type pathSummariesResponse struct {
+	Summaries map[string]string `json:"summaries"`
+}
+
+// handleIntelPathSummaries returns, for a repo path, the dex summary of every
+// breadcrumb segment up to it: the repo, each ancestor directory, and — when
+// ?file=1 (the caller is on a blob) — the leaf file. Each is recalled by a
+// path-keyed search (see dex.PathSummary), reliable where the broad Overview
+// enumeration drops package summaries. The work is bounded by path depth, not
+// repo size, and the lookups run concurrently. Backs the Code tab's
+// per-segment hover tooltips. A path dex has nothing for is omitted, not an
+// error — the common case for non-package directories.
+func (s *Server) handleIntelPathSummaries(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+		return
+	}
+	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
+	path := strings.Trim(strings.TrimSpace(r.URL.Query().Get("path")), "/")
+	leafIsFile := r.URL.Query().Get("file") == "1"
+
+	if !s.dex.Enabled() {
+		writeError(w, http.StatusServiceUnavailable, "dex integration not configured")
+		return
+	}
+	proj, err := s.dex.ResolveProject(r.Context(), repo)
+	if errors.Is(err, dex.ErrProjectNotFound) {
+		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
+		return
+	}
+	if err != nil {
+		s.logger.Error("dex resolve project", "err", err)
+		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+		return
+	}
+
+	// Assemble the lookups: repo root, then each ancestor directory as a
+	// package, with the leaf treated as a file when the caller is on a blob.
+	type lookup struct{ subPath, kind string }
+	lookups := []lookup{{subPath: "", kind: "repo_summary"}}
+	if path != "" {
+		segs := strings.Split(path, "/")
+		for i := range segs {
+			kind := "package_summary"
+			if leafIsFile && i == len(segs)-1 {
+				kind = "file_summary"
+			}
+			lookups = append(lookups, lookup{subPath: strings.Join(segs[:i+1], "/"), kind: kind})
+		}
+	}
+
+	// Each lookup is an independent dex round trip and the chain is short
+	// (path depth), so fan out a goroutine apiece to keep latency flat.
+	summaries := make([]string, len(lookups))
+	errs := make([]error, len(lookups))
+	var wg sync.WaitGroup
+	for i, lk := range lookups {
+		wg.Add(1)
+		go func(i int, lk lookup) {
+			defer wg.Done()
+			if lk.kind == "repo_summary" {
+				summaries[i], errs[i] = s.dex.RepoSummary(r.Context(), proj.ID)
+				return
+			}
+			summaries[i], errs[i] = s.dex.PathSummary(r.Context(), proj.ID, lk.subPath, lk.kind)
+		}(i, lk)
+	}
+	wg.Wait()
+
+	out := map[string]string{}
+	for i, lk := range lookups {
+		if errs[i] != nil {
+			s.logger.Error("dex path summary", "err", errs[i], "path", lk.subPath)
+			writeError(w, http.StatusBadGateway, "dex path summary failed: "+errs[i].Error())
+			return
+		}
+		if summaries[i] != "" {
+			out[lk.subPath] = summaries[i]
+		}
+	}
+	writeJSON(w, http.StatusOK, pathSummariesResponse{Summaries: out})
 }
 
 // handleIntelSearch proxies a semantic or symbol search to dex, scoped to
