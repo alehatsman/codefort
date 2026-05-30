@@ -161,6 +161,36 @@ type TreeCommits struct {
 	Entries map[string]Commit `json:"entries"` // child full path -> last commit touching it
 }
 
+// CIRun is the public view of a CI run. Number is the per-repo run number
+// (the address clients use); the internal DB id is not exposed.
+type CIRun struct {
+	Number     int        `json:"number"`
+	CommitSHA  string     `json:"commit_sha"`
+	Ref        string     `json:"ref"`
+	Event      string     `json:"event"`
+	Trigger    string     `json:"trigger,omitempty"`
+	Status     string     `json:"status"`
+	CreatedAt  time.Time  `json:"created_at"`
+	StartedAt  *time.Time `json:"started_at"`
+	FinishedAt *time.Time `json:"finished_at"`
+}
+
+// CIJob is one job within a run, addressed by Name (which is also the key in
+// the per-job event-stream path).
+type CIJob struct {
+	Name       string     `json:"name"`
+	Status     string     `json:"status"`
+	ExitCode   *int       `json:"exit_code"`
+	StartedAt  *time.Time `json:"started_at"`
+	FinishedAt *time.Time `json:"finished_at"`
+}
+
+// CIRunDetail is a run plus its jobs, for the run-detail view.
+type CIRunDetail struct {
+	CIRun
+	Jobs []CIJob `json:"jobs"`
+}
+
 // Token represents an API token's metadata. The plaintext token itself
 // is never returned over the API — it's only shown once at creation time
 // by the moongitd CLI.
