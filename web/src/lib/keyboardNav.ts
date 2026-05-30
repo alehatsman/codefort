@@ -19,10 +19,11 @@ function isEditableTarget(): boolean {
 interface ListNavOptions {
   count: number
   onActivate: (index: number) => void
-  // When true, h/l (and ←/→) also move the selection — used by the repos
-  // grid, which has no tabs to claim those keys. Otherwise h/l are left for
-  // `useTabNav`.
-  horizontal?: boolean
+  // Grid layouts pass a column-count getter (read live, since columns reflow
+  // with viewport width). When set, j/k move a whole row (±columns) and h/l
+  // move one cell; for a plain list (the default) j/k step by one and h/l are
+  // left for `useTabNav`.
+  getColumns?: () => number
   enabled?: boolean
 }
 
@@ -33,15 +34,12 @@ interface ListNavOptions {
  * caller marks the matching element `data-vim-selected="true"` so it can be
  * scrolled into view.
  */
-export function useListNav({
-  count,
-  onActivate,
-  horizontal = false,
-  enabled = true,
-}: ListNavOptions) {
+export function useListNav({ count, onActivate, getColumns, enabled = true }: ListNavOptions) {
   const [index, setIndex] = useState(-1)
   const activateRef = useRef(onActivate)
   activateRef.current = onActivate
+  const columnsRef = useRef(getColumns)
+  columnsRef.current = getColumns
   const indexRef = useRef(index)
   indexRef.current = index
 
@@ -54,31 +52,37 @@ export function useListNav({
     if (!enabled || count === 0) return
     function onKey(e: KeyboardEvent) {
       if (isEditableTarget() || e.metaKey || e.ctrlKey || e.altKey) return
-      const next =
-        e.key === "j" ||
-        e.key === "ArrowDown" ||
-        (horizontal && (e.key === "l" || e.key === "ArrowRight"))
-      const prev =
-        e.key === "k" ||
-        e.key === "ArrowUp" ||
-        (horizontal && (e.key === "h" || e.key === "ArrowLeft"))
-      if (next) {
-        e.preventDefault()
-        setIndex((i) => (i < 0 ? 0 : Math.min(i + 1, count - 1)))
-      } else if (prev) {
-        e.preventDefault()
-        setIndex((i) => (i < 0 ? 0 : Math.max(i - 1, 0)))
-      } else if (e.key === "Enter") {
+      // In grid mode j/k jump a row; in list mode they step by one. h/l only
+      // navigate in grid mode (a list leaves them to the tab switcher).
+      const grid = !!columnsRef.current
+      const cols = grid ? Math.max(1, Math.round(columnsRef.current!())) : 1
+      let delta: number | null = null
+      if (e.key === "j" || e.key === "ArrowDown") delta = grid ? cols : 1
+      else if (e.key === "k" || e.key === "ArrowUp") delta = grid ? -cols : -1
+      else if (grid && (e.key === "l" || e.key === "ArrowRight")) delta = 1
+      else if (grid && (e.key === "h" || e.key === "ArrowLeft")) delta = -1
+      else if (e.key === "Enter") {
         const i = indexRef.current
         if (i >= 0 && i < count) {
           e.preventDefault()
           activateRef.current(i)
         }
+        return
       }
+      if (delta === null) return
+      e.preventDefault()
+      const step = delta
+      // First key just selects the top item; afterwards move and clamp so a
+      // row/cell step never runs off either end of the list.
+      setIndex((i) => {
+        if (i < 0) return 0
+        const target = i + step
+        return target >= 0 && target < count ? target : i
+      })
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [count, horizontal, enabled])
+  }, [count, enabled])
 
   // Keep the selected row in view as it moves.
   useEffect(() => {

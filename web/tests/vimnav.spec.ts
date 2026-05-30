@@ -7,32 +7,54 @@ test.beforeEach(async ({ page }) => {
   await seedToken(page)
 })
 
-test("repos grid: hjkl roves cards, Enter opens the selected repo", async ({ page }) => {
+test("repos grid: hjkl moves spatially (j/k a row, h/l a cell), Enter opens", async ({ page }) => {
+  // Nine repos; a 1000px viewport renders three 300px columns → a 3×3 grid.
   await mockApi(page, {
-    repos: [
-      { id: 1, owner: "alice", name: "one", created_at: now, open_issues: 0, total_issues: 0 },
-      { id: 2, owner: "alice", name: "two", created_at: now, open_issues: 0, total_issues: 0 },
-      { id: 3, owner: "alice", name: "three", created_at: now, open_issues: 0, total_issues: 0 },
-    ],
+    repos: Array.from({ length: 9 }, (_, n) => ({
+      id: n + 1,
+      owner: "alice",
+      name: `r${n + 1}`,
+      created_at: now,
+      open_issues: 0,
+      total_issues: 0,
+    })),
   })
+  await page.setViewportSize({ width: 1000, height: 900 })
   await page.goto("/")
-  await expect(page.locator(".card")).toHaveCount(3)
+  await expect(page.locator(".card")).toHaveCount(9)
 
+  // Read the live column count rather than hard-coding the grid math.
+  const cols = await page.evaluate(
+    () =>
+      getComputedStyle(document.querySelector(".card-grid")!)
+        .gridTemplateColumns.split(" ")
+        .filter(Boolean).length
+  )
+  expect(cols).toBeGreaterThan(1)
+
+  const selected = page.locator(".card.is-vim-selected")
   // Nothing selected until the first nav key.
-  await expect(page.locator(".card.is-vim-selected")).toHaveCount(0)
+  await expect(selected).toHaveCount(0)
 
-  // l/j advance the selection; first press selects card 0.
-  await page.keyboard.press("l")
+  // First key selects card 0.
+  await page.keyboard.press("j")
   await expect(page.locator(".card").nth(0)).toHaveClass(/is-vim-selected/)
+  // j drops a whole row → first cell of the second row.
+  await page.keyboard.press("j")
+  await expect(page.locator(".card").nth(cols)).toHaveClass(/is-vim-selected/)
+  // l moves one cell right within that row.
   await page.keyboard.press("l")
-  await expect(page.locator(".card").nth(1)).toHaveClass(/is-vim-selected/)
-  // k steps back.
+  await expect(page.locator(".card").nth(cols + 1)).toHaveClass(/is-vim-selected/)
+  // k climbs a row back up.
   await page.keyboard.press("k")
+  await expect(page.locator(".card").nth(1)).toHaveClass(/is-vim-selected/)
+  // h moves one cell left.
+  await page.keyboard.press("h")
   await expect(page.locator(".card").nth(0)).toHaveClass(/is-vim-selected/)
 
   // Enter opens the selected repo.
   await page.keyboard.press("Enter")
-  await page.waitForURL("**/alice/one")
+  await page.waitForURL("**/alice/r1")
 })
 
 test("issues list: j/k select a row, Enter opens it; h/l switch tabs", async ({ page }) => {
@@ -74,18 +96,20 @@ test("issues list: j/k select a row, Enter opens it; h/l switch tabs", async ({ 
   await page.keyboard.press("Enter")
   await page.waitForURL("**/alice/demo/issues/1")
 
-  // Back on the list, l/h move across the repo tabs. Wait for the tab bar
-  // (which carries the h/l handler) to mount on each page before pressing.
+  // Back on the list, l/h move across the repo tabs. Between presses wait for
+  // the active tab to reflect the destination — that only flips once React
+  // has committed the new page (and useTabNav's listener/state with it), so
+  // the next keypress can't race an in-flight navigation.
+  const activeTab = page.locator(".tab.is-active")
   await page.goto("/alice/demo/issues")
-  await expect(page.locator(".tabs")).toBeVisible()
+  await expect(activeTab).toHaveText(/Issues/)
   await page.keyboard.press("l")
-  await page.waitForURL("**/alice/demo/intel")
-  await expect(page.locator(".tabs")).toBeVisible()
+  await expect(activeTab).toHaveText("Intel")
   await page.keyboard.press("h")
-  await page.waitForURL("**/alice/demo/issues")
-  await expect(page.locator(".tabs")).toBeVisible()
+  await expect(activeTab).toHaveText(/Issues/)
   await page.keyboard.press("h")
-  await page.waitForURL("**/alice/demo")
+  await expect(activeTab).toHaveText("Code")
+  await expect(page).toHaveURL(/\/alice\/demo$/)
 })
 
 test("code view: j/k select files, Enter opens, h/l switch tabs", async ({ page }) => {
