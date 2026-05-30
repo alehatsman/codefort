@@ -14,6 +14,9 @@ interface Props {
   commits?: Record<string, Commit>
   // True while the commit annotations are loading, to drive the placeholder.
   commitsLoading?: boolean
+  // dex summaries keyed by repo path. An entry whose path has one shows it as
+  // a hover tooltip with the dotted-underline affordance; the rest stay plain.
+  summaries?: Record<string, string>
 }
 
 /**
@@ -29,6 +32,7 @@ export default function FileTree({
   selectedIndex = -1,
   commits,
   commitsLoading = false,
+  summaries,
 }: Props) {
   const base = `/${owner}/${repo}`
 
@@ -42,17 +46,24 @@ export default function FileTree({
         const kind = e.type === "tree" ? "tree" : "blob"
         const selected = i === selectedIndex
         const c = commits?.[e.path]
+        const summary = summaries?.[e.path]
         return (
           <li
             key={e.path}
             className={`file-tree__row ${selected ? "is-vim-selected" : ""}`}
             data-vim-selected={selected ? "true" : undefined}
           >
-            <Link to={`${base}/${kind}/${e.path}`} className="file-tree__link">
+            <Link
+              to={`${base}/${kind}/${e.path}`}
+              className="file-tree__link"
+              title={summary || undefined}
+            >
               <span className="file-tree__icon">
                 <FileIcon type={e.type} />
               </span>
-              <span className="file-tree__name">{e.name}</span>
+              <span className={`file-tree__name ${summary ? "file-tree__name--info" : ""}`}>
+                {e.name}
+              </span>
             </Link>
 
             {c ? (

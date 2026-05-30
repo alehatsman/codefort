@@ -266,10 +266,11 @@ export interface IntelFileSummary {
   summary: string
 }
 
-// Per-segment breadcrumb summaries: keyed by sub-path ("" = repo root,
-// directory paths, the leaf file path), carrying only the segments dex has
-// prose for. Backs the Code tab's per-crumb hover tooltips.
-export interface IntelPathSummaries {
+// Every dex summary for a repo as a flat path→prose map: "" = repo root,
+// directory paths carry their package summary, file paths their file summary.
+// One map per repo powers both the breadcrumb (ancestor sub-paths) and the
+// file tree (each entry). Paths dex has no prose for are absent.
+export interface IntelSummaries {
   summaries: Record<string, string>
 }
 

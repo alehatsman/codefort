@@ -15,7 +15,7 @@ import type {
   Intel,
   IntelFileSummary,
   IntelOverview,
-  IntelPathSummaries,
+  IntelSummaries,
   IntelSearchInput,
   IntelSearchResult,
   Issue,
@@ -174,11 +174,8 @@ export const api = {
     request<IntelFileSummary>(
       `/api/repos/${owner}/${repo}/intel/file-summary?path=${encodeURIComponent(path)}`
     ),
-  getIntelPathSummaries: (owner: string, repo: string, path: string, isFile: boolean) =>
-    request<IntelPathSummaries>(
-      `/api/repos/${owner}/${repo}/intel/path-summaries?path=${encodeURIComponent(path)}` +
-        (isFile ? "&file=1" : "")
-    ),
+  getIntelSummaries: (owner: string, repo: string) =>
+    request<IntelSummaries>(`/api/repos/${owner}/${repo}/intel/summaries`),
   intelSearch: (owner: string, repo: string, body: IntelSearchInput) =>
     request<IntelSearchResult>(`/api/repos/${owner}/${repo}/intel/search`, {
       method: "POST",

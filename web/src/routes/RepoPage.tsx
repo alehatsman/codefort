@@ -4,7 +4,7 @@ import {
   useBlob,
   useCommits,
   useIntel,
-  useIntelPathSummaries,
+  useIntelSummaries,
   useRepo,
   useTree,
   useTreeCommits,
@@ -61,13 +61,12 @@ interface ViewProps {
 function TreeView({ owner, repo, path }: ViewProps) {
   const navigate = useNavigate()
   const treeQ = useTree(owner, repo, path)
-  // Per-segment breadcrumb summaries for this directory path (repo + each
-  // ancestor dir). One cached request per location; reliably recalls every
-  // package summary, unlike the broad overview enumeration.
+  // Every dex summary for the repo (one cached map): the breadcrumb reads the
+  // ancestor sub-paths, the file tree reads each entry.
   const isRoot = path === ""
   const intelQ = useIntel(owner, repo)
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
-  const pathSummariesQ = useIntelPathSummaries(owner, repo, path, false, isIndexed)
+  const summariesQ = useIntelSummaries(owner, repo, isIndexed)
   const treeCommitsQ = useTreeCommits(owner, repo, path)
 
   // j/k select a file/folder; Enter opens it. h/l are left to useTabNav.
@@ -105,7 +104,7 @@ function TreeView({ owner, repo, path }: ViewProps) {
 
   const readme = findReadme(treeQ.data.entries)
 
-  const summaries = pathSummariesQ.data?.summaries ?? {}
+  const summaries = summariesQ.data?.summaries ?? {}
 
   return (
     <>
@@ -125,6 +124,7 @@ function TreeView({ owner, repo, path }: ViewProps) {
         selectedIndex={index}
         commits={treeCommitsQ.data?.entries}
         commitsLoading={treeCommitsQ.isLoading}
+        summaries={summaries}
       />
       {readme && <ReadmeCard owner={owner} repo={repo} dirPath={path} entry={readme} />}
     </>
@@ -133,12 +133,12 @@ function TreeView({ owner, repo, path }: ViewProps) {
 
 function BlobView({ owner, repo, path }: ViewProps) {
   const blobQ = useBlob(owner, repo, path)
-  // Per-segment breadcrumb summaries for this file path: repo + each ancestor
-  // dir (as packages) + the leaf file. file=true so the leaf is looked up as
-  // a file. Crumbs dex has nothing for stay plain.
+  // The repo's full summary map (one cached query); the breadcrumb reads the
+  // repo + ancestor dirs + this file from it. Crumbs dex has nothing for stay
+  // plain.
   const intelQ = useIntel(owner, repo)
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
-  const pathSummariesQ = useIntelPathSummaries(owner, repo, path, true, isIndexed)
+  const summariesQ = useIntelSummaries(owner, repo, isIndexed)
   // Latest commit touching this file, for the GitHub-style header.
   const commitsQ = useCommits(owner, repo, { path, perPage: 1 })
   const lastCommit = commitsQ.data?.commits?.[0]
@@ -148,7 +148,7 @@ function BlobView({ owner, repo, path }: ViewProps) {
   if (!blobQ.data) return null
 
   const b = blobQ.data
-  const summaries = pathSummariesQ.data?.summaries ?? {}
+  const summaries = summariesQ.data?.summaries ?? {}
 
   return (
     <>

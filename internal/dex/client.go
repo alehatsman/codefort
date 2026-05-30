@@ -206,49 +206,57 @@ func (c *Client) Callers(ctx context.Context, projectID, name string, k int) (*S
 	return c.callEdge(ctx, projectID, "callers", name, k)
 }
 
+// SummaryChunk is one enumerated summary from dex: the path it describes, its
+// kind (file_summary | package_summary | repo_summary), and the prose. The
+// repo summary carries path "." (dex's repo-root convention).
+type SummaryChunk struct {
+	Path    string `json:"path"`
+	Kind    string `json:"kind"`
+	Content string `json:"content"`
+}
+
+type summariesResponse struct {
+	Status    string         `json:"status"`
+	Hint      string         `json:"hint"`
+	Summaries []SummaryChunk `json:"summaries"`
+}
+
+// AllSummaries enumerates every summary chunk dex composed for the project in
+// one direct call (GET /v1/projects/{id}/summaries) — no semantic search, so
+// the result is the complete, stable set regardless of index size. This is the
+// reliable source for the repo/package/file summaries behind the breadcrumb
+// and file-tree hover tooltips and the Research tab's package list.
+func (c *Client) AllSummaries(ctx context.Context, projectID string) ([]SummaryChunk, error) {
+	var out summariesResponse
+	if err := c.do(ctx, http.MethodGet, "/v1/projects/"+projectID+"/summaries", nil, &out); err != nil {
+		return nil, err
+	}
+	return out.Summaries, nil
+}
+
 // Overview pulls the repo + package summary chunks dex generated at index
-// time. dex has no first-class "enumerate by kind" endpoint, so we use
-// two narrowly-targeted semantic queries (one each for repo vs package
-// summaries) — empirically more reliable than a single broad sweep, since
-// dex's ranking otherwise pushes the lone repo_summary chunk off the top
-// when most matches come from package_summary content.
-// Best-effort: very large repos may miss some packages if they fall
-// outside the top k for the package query.
+// time, via the enumerate endpoint so every package is included (an earlier
+// semantic-search recall dropped packages the reranker buried under code
+// chunks). Packages are sorted by path for stable rendering.
 func (c *Client) Overview(ctx context.Context, projectID string) (*Overview, error) {
 	out := &Overview{Packages: []PackageSummary{}}
-
-	// Repo-level summary — typically a single chunk; k small.
-	repoSummary, err := c.RepoSummary(ctx, projectID)
+	chunks, err := c.AllSummaries(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
-	out.RepoSummary = repoSummary
-
-	// Package summaries — one per package, can be many. The package_summary
-	// chunks all open with phrasing like "This package..." / "implements"
-	// / "provides", so a prose-y query targeting that diction recalls
-	// far more package_summary hits than a generic "summary" query
-	// (which dex's reranker pushes off the top in favor of code chunks).
-	// We union two complementary queries to maximize recall on small
-	// index spends; cost is one extra dex round trip.
-	queries := []string{
-		"package",
-		"this package contains implements provides functions",
-	}
-	seen := map[string]bool{}
-	for _, q := range queries {
-		res, err := c.Search(ctx, projectID, q, 1000)
-		if err != nil {
-			return nil, err
-		}
-		for _, h := range res.Hits {
-			if h.Kind != "package_summary" || h.Content == "" || seen[h.Path] || isFixturePath(h.Path) {
+	for _, ch := range chunks {
+		switch ch.Kind {
+		case "repo_summary":
+			if ch.Content != "" {
+				out.RepoSummary = ch.Content
+			}
+		case "package_summary":
+			// "." is the repo-root package — represented by the repo summary
+			// above, so it isn't a standalone package row.
+			if ch.Content == "" || ch.Path == "." || isFixturePath(ch.Path) {
 				continue
 			}
-			seen[h.Path] = true
-			out.Packages = append(out.Packages, PackageSummary{
-				Path: h.Path, Summary: h.Content,
-			})
+			out.Packages = append(out.Packages, PackageSummary{Path: ch.Path, Summary: ch.Content})
 		}
 	}
 	sort.Slice(out.Packages, func(i, j int) bool {

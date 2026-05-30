@@ -6,8 +6,8 @@ import { mockApi, seedToken } from "./mockApi"
 // — the repo, any directory, the current file — carries that summary as a
 // native title tooltip and is marked with the --info affordance (dotted
 // underline) so users know a hover is available. Segments dex didn't summarize
-// stay plain. The summaries come from the intel/path-summaries endpoint, which
-// returns one entry per breadcrumb sub-path (repo, ancestor dirs, leaf file).
+// stay plain. The summaries come from the intel/summaries endpoint, one flat
+// path→prose map per repo (repo at "", dirs and files by path).
 
 const blobBody = JSON.stringify({
   ref: "main",
@@ -47,7 +47,7 @@ test("blob view: per-segment dex summaries ride the breadcrumb as hover tooltips
   await mockApi(page)
   await routeBlob(page)
   await routeIndexed(page)
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/path-summaries(\?.*)?$/, (route) =>
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/summaries$/, (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -85,7 +85,7 @@ test("blob view: segments stay plain when dex has no summary", async ({ page }) 
   await mockApi(page)
   await routeBlob(page)
   await routeIndexed(page)
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/path-summaries(\?.*)?$/, (route) =>
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/summaries$/, (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -99,4 +99,40 @@ test("blob view: segments stay plain when dex has no summary", async ({ page }) 
   const crumb = page.locator(".overview .path-breadcrumb")
   await expect(crumb).toBeVisible()
   await expect(crumb.locator(".path-breadcrumb__seg--info")).toHaveCount(0)
+})
+
+test("tree view: file-tree entries carry their dex summary on hover", async ({ page }) => {
+  await mockApi(page)
+  await routeIndexed(page)
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/tree(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ref: "main",
+        path: "",
+        entries: [
+          { name: "src", path: "src", type: "tree" },
+          { name: "README.md", path: "README.md", type: "blob", size: 10 },
+        ],
+      }),
+    })
+  )
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/summaries$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      // "src" has a package summary; README.md has none → stays plain.
+      body: JSON.stringify({ summaries: { src: "The source directory." } }),
+    })
+  )
+
+  await page.goto("/alice/demo")
+
+  const srcRow = page.locator(".file-tree__row", { hasText: "src" })
+  await expect(srcRow.locator(".file-tree__link")).toHaveAttribute("title", "The source directory.")
+  await expect(srcRow.locator(".file-tree__name")).toHaveClass(/file-tree__name--info/)
+
+  const readmeRow = page.locator(".file-tree__row", { hasText: "README.md" })
+  await expect(readmeRow.locator(".file-tree__name")).not.toHaveClass(/file-tree__name--info/)
 })

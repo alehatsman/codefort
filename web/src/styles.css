@@ -533,6 +533,15 @@ pre {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Affordance: this entry has a dex summary, shown on hover (native title).
+   The dotted underline signals it; the row's hover rule above promotes it to
+   a solid underline like any other entry. */
+.file-tree__name--info {
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--fg-muted);
+}
 /* Per-file last-commit columns. */
 .file-tree__commit {
   min-width: 0;
