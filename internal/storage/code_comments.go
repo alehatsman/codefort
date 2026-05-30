@@ -1,0 +1,113 @@
+package storage
+
+import (
+	"database/sql"
+	"errors"
+	"time"
+
+	"github.com/alehatsman/moongit/internal/api"
+)
+
+// CreateCodeComment anchors a new comment to a file line range on a branch.
+// repoID is the row id. Author and CommitSha are stamped by the caller.
+func CreateCodeComment(db *sql.DB, repoID int64, req api.CreateCodeCommentRequest) (api.CodeComment, error) {
+	row := db.QueryRow(`
+		INSERT INTO code_comments(repo_id, ref, path, start_line, end_line, commit_sha, author, body)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		RETURNING id, repo_id, ref, path, start_line, end_line, commit_sha, author, body, resolved, created_at
+	`, repoID, req.Ref, req.Path, req.StartLine, req.EndLine, req.CommitSha, req.Author, req.Body)
+	return scanCodeComment(row)
+}
+
+// ListCodeComments returns a repo's code comments on a branch, oldest first.
+// An empty path lists the whole branch; a non-empty path scopes to one file.
+// Resolved comments are included only when includeResolved is set.
+func ListCodeComments(db *sql.DB, repoID int64, ref, path string, includeResolved bool) ([]api.CodeComment, error) {
+	q := `
+		SELECT id, repo_id, ref, path, start_line, end_line, commit_sha, author, body, resolved, created_at
+		FROM code_comments
+		WHERE repo_id = ? AND ref = ?`
+	args := []any{repoID, ref}
+	if path != "" {
+		q += ` AND path = ?`
+		args = append(args, path)
+	}
+	if !includeResolved {
+		q += ` AND resolved = 0`
+	}
+	q += ` ORDER BY path ASC, start_line ASC, created_at ASC, id ASC`
+
+	rows, err := db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	comments := make([]api.CodeComment, 0)
+	for rows.Next() {
+		c, err := scanCodeComment(rows)
+		if err != nil {
+			return nil, err
+		}
+		comments = append(comments, c)
+	}
+	return comments, rows.Err()
+}
+
+// SetCodeCommentResolved flips a comment's resolved flag, but only if requester
+// matches the author. Returns ErrNotFound or ErrForbidden so the handler can
+// pick the right HTTP status.
+func SetCodeCommentResolved(db *sql.DB, id int64, resolved bool, requester string) (api.CodeComment, error) {
+	var author string
+	err := db.QueryRow(`SELECT author FROM code_comments WHERE id = ?`, id).Scan(&author)
+	if errors.Is(err, sql.ErrNoRows) {
+		return api.CodeComment{}, ErrNotFound
+	}
+	if err != nil {
+		return api.CodeComment{}, err
+	}
+	if author != requester {
+		return api.CodeComment{}, ErrForbidden
+	}
+	row := db.QueryRow(`
+		UPDATE code_comments SET resolved = ? WHERE id = ?
+		RETURNING id, repo_id, ref, path, start_line, end_line, commit_sha, author, body, resolved, created_at
+	`, resolved, id)
+	return scanCodeComment(row)
+}
+
+// DeleteCodeComment removes a comment by id, but only if requester matches the
+// author. Returns ErrNotFound or ErrForbidden, mirroring DeleteComment.
+func DeleteCodeComment(db *sql.DB, id int64, requester string) error {
+	var author string
+	err := db.QueryRow(`SELECT author FROM code_comments WHERE id = ?`, id).Scan(&author)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if author != requester {
+		return ErrForbidden
+	}
+	if _, err := db.Exec(`DELETE FROM code_comments WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return nil
+}
+
+func scanCodeComment(s scanner) (api.CodeComment, error) {
+	var c api.CodeComment
+	var created int64
+	if err := s.Scan(
+		&c.ID, &c.RepoID, &c.Ref, &c.Path, &c.StartLine, &c.EndLine,
+		&c.CommitSha, &c.Author, &c.Body, &c.Resolved, &created,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c, ErrNotFound
+		}
+		return c, err
+	}
+	c.CreatedAt = time.Unix(created, 0).UTC()
+	return c, nil
+}

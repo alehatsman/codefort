@@ -131,6 +131,29 @@ var migrations = []string{
 	ALTER TABLE ci_runs ADD COLUMN commit_author TEXT NOT NULL DEFAULT '';
 	ALTER TABLE ci_jobs ADD COLUMN needs         TEXT NOT NULL DEFAULT '';
 	`,
+
+	// 7: code review comments. A comment anchored to a line range of a file,
+	// bound to a branch (ref) so a review is scoped to the code as it stands
+	// on that branch. commit_sha freezes the ref's HEAD at comment time so a
+	// later reader can tell whether the lines have since drifted. resolved
+	// drives the open/done lifecycle. Author is the token name, as elsewhere.
+	`
+	CREATE TABLE IF NOT EXISTS code_comments (
+	    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	    repo_id     INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+	    ref         TEXT NOT NULL,
+	    path        TEXT NOT NULL,
+	    start_line  INTEGER NOT NULL,
+	    end_line    INTEGER NOT NULL,
+	    commit_sha  TEXT NOT NULL DEFAULT '',
+	    author      TEXT NOT NULL,
+	    body        TEXT NOT NULL,
+	    resolved    INTEGER NOT NULL DEFAULT 0,
+	    created_at  INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+	);
+	CREATE INDEX IF NOT EXISTS idx_code_comments_repo ON code_comments(repo_id, ref);
+	CREATE INDEX IF NOT EXISTS idx_code_comments_path ON code_comments(repo_id, ref, path);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

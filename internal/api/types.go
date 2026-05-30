@@ -79,6 +79,51 @@ type CreateCommentRequest struct {
 	Body   string `json:"body"`
 }
 
+// CodeComment is a comment anchored to a line range of a file on a branch.
+// StartLine/EndLine are 1-based and inclusive. Snippet is the referenced
+// source lines, populated server-side on list (empty on create) so reviewers
+// see the code without a separate fetch. CommitSha is the ref's HEAD when the
+// comment was made — context for whether the lines have since drifted.
+type CodeComment struct {
+	ID        int64     `json:"id"`
+	RepoID    int64     `json:"repo_id"`
+	Ref       string    `json:"ref"`
+	Path      string    `json:"path"`
+	StartLine int       `json:"start_line"`
+	EndLine   int       `json:"end_line"`
+	CommitSha string    `json:"commit_sha,omitempty"`
+	Author    string    `json:"author"`
+	Body      string    `json:"body"`
+	Resolved  bool      `json:"resolved"`
+	Snippet   string    `json:"snippet,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// CreateCodeCommentRequest anchors a new comment to Path's StartLine..EndLine
+// on Ref. Author and the ref's commit SHA are stamped server-side.
+type CreateCodeCommentRequest struct {
+	Ref       string `json:"ref"`
+	Path      string `json:"path"`
+	StartLine int    `json:"start_line"`
+	EndLine   int    `json:"end_line"`
+	Body      string `json:"body"`
+	Author    string `json:"-"` // populated server-side from token
+	CommitSha string `json:"-"` // populated server-side from the ref's HEAD
+}
+
+// UpdateCodeCommentRequest is a partial update of a code comment. Only the
+// resolved flag is mutable; body edits are out of scope (delete + recreate).
+type UpdateCodeCommentRequest struct {
+	Resolved *bool `json:"resolved,omitempty"`
+}
+
+// RefList is the branch listing for a repo: every local branch plus the name
+// of the default one, so a client can preselect it.
+type RefList struct {
+	Default  string   `json:"default"`
+	Branches []string `json:"branches"`
+}
+
 type ErrorResponse struct {
 	Error string `json:"error"`
 }

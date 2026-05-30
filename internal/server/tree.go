@@ -39,7 +39,10 @@ func (s *Server) handleTree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ref := headRef(r.Context(), repoDir)
+	ref, ok := s.resolveRef(w, r, repoDir)
+	if !ok {
+		return
+	}
 	out := api.Tree{Ref: ref, Path: p, Entries: []api.TreeEntry{}}
 
 	if !hasCommits(r.Context(), repoDir) {
@@ -47,9 +50,9 @@ func (s *Server) handleTree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// "HEAD:" addresses the root tree; "HEAD:dir" the tree at dir. ls-tree
+	// "<ref>:" addresses the root tree; "<ref>:dir" the tree at dir. ls-tree
 	// then lists that tree's immediate children (names are basenames).
-	treeish := "HEAD:" + p
+	treeish := ref + ":" + p
 	raw, err := gitOutput(r.Context(), repoDir, "ls-tree", "--long", "-z", treeish)
 	if err != nil {
 		// A bad path resolves to a missing tree object: 404, not 500.
@@ -94,8 +97,11 @@ func (s *Server) handleBlob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ref := headRef(r.Context(), repoDir)
-	treeish := "HEAD:" + p
+	ref, ok := s.resolveRef(w, r, repoDir)
+	if !ok {
+		return
+	}
+	treeish := ref + ":" + p
 
 	typ, err := gitOutput(r.Context(), repoDir, "cat-file", "-t", treeish)
 	if err != nil {
@@ -172,7 +178,11 @@ func (s *Server) handleRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	treeish := "HEAD:" + p
+	ref, ok := s.resolveRef(w, r, repoDir)
+	if !ok {
+		return
+	}
+	treeish := ref + ":" + p
 	typ, err := gitOutput(r.Context(), repoDir, "cat-file", "-t", treeish)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "path not found: "+p)
@@ -306,6 +316,67 @@ func headRef(ctx context.Context, repoDir string) string {
 		return "HEAD"
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// resolveRef picks which branch the read handlers should serve. An explicit
+// ?ref= must name an existing local branch — the value is interpolated into
+// git treeishes ("<ref>:path") and revision args below, so validating it
+// against refs/heads is the injection guard. An absent/empty ref falls back to
+// the default branch. On an unknown ref it writes a 404 and returns ok=false.
+func (s *Server) resolveRef(w http.ResponseWriter, r *http.Request, repoDir string) (string, bool) {
+	ref := strings.TrimSpace(r.URL.Query().Get("ref"))
+	if ref == "" {
+		return headRef(r.Context(), repoDir), true
+	}
+	if !branchExists(r.Context(), repoDir, ref) {
+		writeError(w, http.StatusNotFound, "branch not found: "+ref)
+		return "", false
+	}
+	return ref, true
+}
+
+// branchExists reports whether refs/heads/<name> resolves. The name is passed
+// as a single, fully-qualified argument so a leading dash can't be read as a
+// git option.
+func branchExists(ctx context.Context, repoDir, name string) bool {
+	cmd := exec.CommandContext(ctx, "git", "show-ref", "--verify", "--quiet", "refs/heads/"+name)
+	cmd.Dir = repoDir
+	return cmd.Run() == nil
+}
+
+// listBranches returns the repo's local branch short names, lexically sorted.
+func listBranches(ctx context.Context, repoDir string) ([]string, error) {
+	raw, err := gitOutput(ctx, repoDir, "for-each-ref", "--format=%(refname:short)", "--sort=refname", "refs/heads")
+	if err != nil {
+		return nil, err
+	}
+	branches := make([]string, 0)
+	for name := range strings.SplitSeq(strings.TrimSpace(string(raw)), "\n") {
+		if name = strings.TrimSpace(name); name != "" {
+			branches = append(branches, name)
+		}
+	}
+	return branches, nil
+}
+
+// handleListRefs returns the repo's local branches and which one is the
+// default, backing the web branch selector. An unborn repo yields an empty
+// branch list with the configured default branch name.
+func (s *Server) handleListRefs(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+		return
+	}
+	repoDir, ok := s.repoDirOrFail(w, r)
+	if !ok {
+		return
+	}
+	branches, err := listBranches(r.Context(), repoDir)
+	if err != nil {
+		s.logger.Error("list refs", "repo", repoDir, "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, api.RefList{Default: headRef(r.Context(), repoDir), Branches: branches})
 }
 
 // hasCommits reports whether HEAD resolves to a commit (false for a freshly

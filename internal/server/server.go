@@ -104,6 +104,7 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}", s.handleGetRepo)
 	mux.HandleFunc("PATCH /api/repos/{owner}/{repo}", s.handleUpdateRepo)
 
+	mux.HandleFunc("GET /api/repos/{owner}/{repo}/refs", s.handleListRefs)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/tree", s.handleTree)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/blob", s.handleBlob)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/raw", s.handleRaw)
@@ -121,6 +122,11 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleListComments)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleCreateComment)
 	mux.HandleFunc("DELETE /api/repos/{owner}/{repo}/issues/{number}/comments/{comment_id}", s.handleDeleteComment)
+
+	mux.HandleFunc("GET /api/repos/{owner}/{repo}/code-comments", s.handleListCodeComments)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/code-comments", s.handleCreateCodeComment)
+	mux.HandleFunc("PATCH /api/repos/{owner}/{repo}/code-comments/{id}", s.handlePatchCodeComment)
+	mux.HandleFunc("DELETE /api/repos/{owner}/{repo}/code-comments/{id}", s.handleDeleteCodeComment)
 
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/ci/runs", s.handleListCIRuns)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/ci/runs/{number}", s.handleGetCIRun)

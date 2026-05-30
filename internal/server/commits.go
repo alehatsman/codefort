@@ -53,7 +53,10 @@ func (s *Server) handleCommits(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 
-	ref := headRef(r.Context(), repoDir)
+	ref, ok := s.resolveRef(w, r, repoDir)
+	if !ok {
+		return
+	}
 	out := api.CommitList{Ref: ref, Path: p, Commits: []api.Commit{}}
 
 	if !hasCommits(r.Context(), repoDir) {
@@ -68,7 +71,7 @@ func (s *Server) handleCommits(w http.ResponseWriter, r *http.Request) {
 		"--format=" + commitFormat,
 		"--max-count=" + strconv.Itoa(perPage+1),
 		"--skip=" + strconv.Itoa(skip),
-		"HEAD",
+		ref,
 	}
 	if p != "" {
 		args = append(args, "--", p)
@@ -327,7 +330,10 @@ func (s *Server) handleTreeCommits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ref := headRef(r.Context(), repoDir)
+	ref, ok := s.resolveRef(w, r, repoDir)
+	if !ok {
+		return
+	}
 	out := api.TreeCommits{Ref: ref, Path: p, Entries: map[string]api.Commit{}}
 
 	if !hasCommits(r.Context(), repoDir) {
@@ -335,11 +341,11 @@ func (s *Server) handleTreeCommits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out.Total = countCommits(r.Context(), repoDir, p)
-	out.Latest = lastCommit(r.Context(), repoDir, p)
+	out.Total = countCommits(r.Context(), repoDir, ref, p)
+	out.Latest = lastCommit(r.Context(), repoDir, ref, p)
 
 	// Immediate children of the listed tree (basenames).
-	treeish := "HEAD:" + p
+	treeish := ref + ":" + p
 	raw, err := gitOutput(r.Context(), repoDir, "ls-tree", "--name-only", "-z", treeish)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "path not found: "+p)
@@ -370,7 +376,7 @@ func (s *Server) handleTreeCommits(w http.ResponseWriter, r *http.Request) {
 		go func(full string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if c := lastCommit(r.Context(), repoDir, full); c != nil {
+			if c := lastCommit(r.Context(), repoDir, ref, full); c != nil {
 				mu.Lock()
 				out.Entries[full] = *c
 				mu.Unlock()
@@ -382,10 +388,10 @@ func (s *Server) handleTreeCommits(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// lastCommit returns the most recent commit touching path (the whole repo when
-// path is empty), or nil if none / on error.
-func lastCommit(ctx context.Context, repoDir, path string) *api.Commit {
-	args := []string{"log", "-1", "--format=" + commitFormat, "HEAD"}
+// lastCommit returns the most recent commit on ref touching path (the whole
+// repo when path is empty), or nil if none / on error.
+func lastCommit(ctx context.Context, repoDir, ref, path string) *api.Commit {
+	args := []string{"log", "-1", "--format=" + commitFormat, ref}
 	if path != "" {
 		args = append(args, "--", path)
 	}
@@ -400,10 +406,10 @@ func lastCommit(ctx context.Context, repoDir, path string) *api.Commit {
 	return &commits[0]
 }
 
-// countCommits returns the number of commits reachable from HEAD, scoped to
+// countCommits returns the number of commits reachable from ref, scoped to
 // path when set. Returns 0 on error.
-func countCommits(ctx context.Context, repoDir, path string) int {
-	args := []string{"rev-list", "--count", "HEAD"}
+func countCommits(ctx context.Context, repoDir, ref, path string) int {
+	args := []string{"rev-list", "--count", ref}
 	if path != "" {
 		args = append(args, "--", path)
 	}
