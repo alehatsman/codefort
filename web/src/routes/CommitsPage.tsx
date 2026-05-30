@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom"
 import { useCommits, useRepo } from "../api/queries"
 import type { Commit } from "../api/types"
 import RepoHeader from "../components/RepoHeader"
-import PathBreadcrumb from "../components/PathBreadcrumb"
+import OverviewCard from "../components/OverviewCard"
 import Avatar from "../components/Avatar"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 
@@ -48,10 +48,10 @@ export default function CommitsPage() {
   return (
     <div className="commits-page">
       <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
+      <OverviewCard owner={owner} repo={repo} path={path} summary="" />
 
       <div className="commits-page__head">
         <h2>Commits</h2>
-        {path && <PathBreadcrumb owner={owner} repo={repo} path={path} />}
       </div>
 
       {commitsQ.isLoading && commits.length === 0 ? (

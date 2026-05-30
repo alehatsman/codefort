@@ -4,6 +4,7 @@ import { useIssues, useRepo } from "../api/queries"
 import { ISSUE_STATES, type IssueState } from "../api/types"
 import NewIssueForm from "../components/NewIssueForm"
 import RepoHeader from "../components/RepoHeader"
+import OverviewCard from "../components/OverviewCard"
 import StateIcon from "../components/StateIcon"
 import IssuesViewSwitch from "../components/IssuesViewSwitch"
 import { useListNav } from "../lib/keyboardNav"
@@ -38,6 +39,7 @@ export default function IssuesPage() {
   return (
     <div className="issues">
       <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
+      <OverviewCard owner={owner} repo={repo} path="" summary="" />
 
       <div className="issues__header">
         <div className="issues__header-left">

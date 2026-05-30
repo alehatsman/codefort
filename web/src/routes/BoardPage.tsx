@@ -15,6 +15,7 @@ import { ISSUE_STATES, type Issue, type IssueState } from "../api/types"
 import BoardColumn from "../components/BoardColumn"
 import NewIssueForm from "../components/NewIssueForm"
 import RepoHeader from "../components/RepoHeader"
+import OverviewCard from "../components/OverviewCard"
 import IssuesViewSwitch from "../components/IssuesViewSwitch"
 
 /**
@@ -72,6 +73,7 @@ export default function BoardPage() {
   return (
     <div>
       <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
+      <OverviewCard owner={owner} repo={repo} path="" summary="" />
 
       <div className="issues__header">
         <div className="issues__header-left">

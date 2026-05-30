@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query"
 import { useIntel, useIntelOverview, useRepo } from "../api/queries"
 import { api } from "../api/client"
 import RepoHeader from "../components/RepoHeader"
+import OverviewCard from "../components/OverviewCard"
 import type { IntelOverview, IntelSearchKind, IntelSearchResult } from "../api/types"
 
 /**
@@ -41,6 +42,7 @@ export default function IntelPage() {
   return (
     <div className="intel">
       <RepoHeader owner={r.owner} repo={r.name} openIssues={r.open_issues} />
+      <OverviewCard owner={r.owner} repo={r.name} path="" summary="" />
 
       {intelQ.isLoading && <div className="loading">Loading index status…</div>}
       {intelQ.error && <div className="error">{(intelQ.error as Error).message}</div>}

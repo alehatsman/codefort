@@ -8,10 +8,13 @@ interface Props {
 }
 
 /**
- * Title + tab bar shown across all repo-scoped routes. The active tab
- * is derived from the current URL. "Code" covers the repo root plus the
- * /tree/ and /blob/ browser routes. List/Board views both live under
- * Issues — the switch between them is rendered inside the Issues pages.
+ * Tab bar shown across all repo-scoped routes. The active tab is derived from
+ * the current URL. "Code" covers the repo root plus the /tree/ and /blob/
+ * browser routes. List/Board views both live under Issues — the switch between
+ * them is rendered inside the Issues pages.
+ *
+ * Repo identity (owner/repo) is not shown here: it leads the unified
+ * breadcrumb in the OverviewCard each page renders just below the tabs.
  *
  * Living on every repo route, this is also where h/l tab navigation is
  * wired (`useTabNav`), so the keys work consistently across all tabs.
@@ -30,16 +33,6 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
 
   return (
     <div className="repo-header">
-      <h1 className="page-title">
-        <Link to="/" className="page-title__owner">
-          {owner}
-        </Link>
-        <span className="page-title__sep">/</span>
-        <Link to={base} className="page-title__name">
-          {repo}
-        </Link>
-      </h1>
-
       <nav className="tabs" aria-label="Repository navigation">
         <Link to={base} className={`tab ${isCode ? "is-active" : ""}`}>
           Code

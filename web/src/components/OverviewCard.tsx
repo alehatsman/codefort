@@ -1,13 +1,14 @@
 import PathBreadcrumb from "./PathBreadcrumb"
 
 /**
- * OverviewCard is the navigation + summary block atop the Code tab's tree
- * view. Its header is the path breadcrumb — the top-bar navigation. When dex
- * has a summary for the current location, that breadcrumb becomes the header
- * of a collapsible card whose body is the summary (expanded by default), so
- * the AI prose reads as part of the location it describes rather than a
- * separate block. With no summary it falls back to a plain breadcrumb, so
- * navigation is never lost.
+ * OverviewCard is the single navigation header rendered just below the tabs on
+ * every repo route. Its header is the full-path breadcrumb (owner / repo /
+ * dir / file). When dex has a summary for the current location, that breadcrumb
+ * becomes the header of a collapsible card whose body is the summary (expanded
+ * by default), so the AI prose reads as part of the location it describes
+ * rather than a separate block. With no summary — every non-Code tab, plus
+ * files/dirs dex didn't summarize — it renders the plain breadcrumb alone, so
+ * navigation is consistent and never lost.
  */
 export default function OverviewCard({
   owner,

@@ -362,27 +362,8 @@ pre {
   color: var(--fg-muted);
 }
 
-/* Page heading ---------------------------------------------------------- */
-.page-title {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  font-size: var(--text-xl);
-  font-weight: var(--weight-normal);
-  margin: 0 0 var(--space-4);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--border-muted);
-}
-.page-title__owner {
-  color: var(--accent);
-}
-.page-title__sep {
-  color: var(--fg-muted);
-}
-.page-title__name {
-  color: var(--accent);
-  font-weight: var(--weight-semibold);
-}
+/* Repo identity (owner/repo) is no longer a standalone page heading; it leads
+   the unified breadcrumb in .overview-card__head / .path-breadcrumb below. */
 
 /* Tab bar -------------------------------------------------------------- */
 .tabs {

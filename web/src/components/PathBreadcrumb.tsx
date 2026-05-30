@@ -7,9 +7,11 @@ interface Props {
 }
 
 /**
- * Clickable path crumbs for the code browser, e.g. repo / internal / server
- * / tree.go. Every segment but the last links to its directory in the tree
- * view; the last is the current dir (tree) or file (blob) and stays plain.
+ * Clickable full-path crumbs, e.g. owner / repo / internal / server / tree.go.
+ * The owner links to the repos list and the repo to its root; every path
+ * segment but the last links to its directory in the tree view. The last
+ * segment — current dir (tree) or file (blob), or the repo itself at the root —
+ * stays plain. This is the single navigation header shown across repo routes.
  */
 export default function PathBreadcrumb({ owner, repo, path }: Props) {
   const base = `/${owner}/${repo}`
@@ -17,6 +19,10 @@ export default function PathBreadcrumb({ owner, repo, path }: Props) {
 
   return (
     <div className="path-breadcrumb">
+      <Link to="/" className="path-breadcrumb__seg">
+        {owner}
+      </Link>
+      <span className="path-breadcrumb__sep">/</span>
       {segments.length === 0 ? (
         <span className="path-breadcrumb__current">{repo}</span>
       ) : (

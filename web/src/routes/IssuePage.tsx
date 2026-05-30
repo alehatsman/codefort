@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react"
 import { useParams } from "react-router-dom"
 import { useComments, useIssue, useRepo, useWhoami } from "../api/queries"
 import RepoHeader from "../components/RepoHeader"
+import OverviewCard from "../components/OverviewCard"
 import StateButtons from "../components/StateButtons"
 import AssigneeControl from "../components/AssigneeControl"
 import CommentForm from "../components/CommentForm"
@@ -33,6 +34,7 @@ export default function IssuePage() {
   return (
     <div>
       <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
+      <OverviewCard owner={owner} repo={repo} path="" summary="" />
 
       <h2 className="issue-title">
         {iss.title} <span className="issue-title__num">#{iss.number}</span>
