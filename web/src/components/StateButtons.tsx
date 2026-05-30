@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { useSetIssueState } from "../api/mutations"
 import { ISSUE_STATES, type IssueState } from "../api/types"
 import StateIcon from "./StateIcon"
@@ -23,7 +24,7 @@ export default function StateButtons({ owner, repo, number, current }: Props) {
         <button
           key={s}
           type="button"
-          className={`segmented__btn segmented__btn--${s} ${s === current ? "is-active" : ""}`}
+          className={clsx("segmented__btn", `segmented__btn--${s}`, { "is-active": s === current })}
           aria-current={s === current ? "true" : undefined}
           disabled={s === current || mutation.isPending}
           onClick={() => mutation.mutate({ state: s })}
