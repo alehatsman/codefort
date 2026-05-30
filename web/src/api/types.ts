@@ -16,6 +16,11 @@ export interface Repo {
   created_at: string
   open_issues: number
   total_issues: number
+  ci_enabled: boolean
+}
+
+export interface UpdateRepoInput {
+  ci_enabled?: boolean
 }
 
 export interface Issue {
@@ -222,6 +227,54 @@ export interface IntelOverview {
 export interface IntelFileSummary {
   path: string
   summary: string
+}
+
+// --- CI (moongitci) ---
+
+// Mirrors storage.RunStatus. queued -> running -> a terminal state.
+export type CIRunStatus =
+  | "queued"
+  | "running"
+  | "success"
+  | "failed"
+  | "canceled"
+  | "error"
+
+// Mirrors storage.JobStatus.
+export type CIJobStatus = "queued" | "running" | "success" | "failed" | "skipped" | "error"
+
+export interface CIRun {
+  number: number
+  commit_sha: string
+  ref: string
+  event: string
+  trigger?: string
+  status: CIRunStatus
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
+}
+
+export interface CIJob {
+  name: string
+  status: CIJobStatus
+  exit_code: number | null
+  started_at: string | null
+  finished_at: string | null
+}
+
+export interface CIRunDetail extends CIRun {
+  jobs: CIJob[]
+}
+
+// CIEvent mirrors internal/ci.Event — one entry in a job's append-only event
+// stream. Seq is monotonic within a job; data shape varies by type (see the
+// CI_EVENT_* constants).
+export interface CIEvent {
+  seq: number
+  type: string
+  time: number
+  data?: Record<string, unknown>
 }
 
 export interface IntelSearchResult {

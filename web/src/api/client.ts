@@ -1,5 +1,7 @@
 import type {
   Blob,
+  CIRun,
+  CIRunDetail,
   ClaimIssueInput,
   Comment,
   CommitList,
@@ -19,6 +21,7 @@ import type {
   Token,
   Tree,
   UpdateIssueInput,
+  UpdateRepoInput,
   Whoami,
 } from "./types"
 
@@ -93,6 +96,8 @@ export const api = {
   listRepos: () => request<Repo[]>("/api/repos"),
   createRepo: (body: CreateRepoInput) => request<Repo>("/api/repos", { method: "POST", body }),
   getRepo: (owner: string, repo: string) => request<Repo>(`/api/repos/${owner}/${repo}`),
+  updateRepo: (owner: string, repo: string, body: UpdateRepoInput) =>
+    request<Repo>(`/api/repos/${owner}/${repo}`, { method: "PATCH", body }),
 
   getTree: (owner: string, repo: string, path = "") =>
     request<Tree>(
@@ -170,4 +175,13 @@ export const api = {
       method: "POST",
       body,
     }),
+
+  listCIRuns: (owner: string, repo: string, limit = 0) =>
+    request<CIRun[]>(
+      `/api/repos/${owner}/${repo}/ci/runs${limit ? `?limit=${limit}` : ""}`
+    ),
+  getCIRun: (owner: string, repo: string, n: number) =>
+    request<CIRunDetail>(`/api/repos/${owner}/${repo}/ci/runs/${n}`),
+  rerunCIRun: (owner: string, repo: string, n: number) =>
+    request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/rerun`, { method: "POST" }),
 }
