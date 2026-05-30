@@ -1,11 +1,17 @@
 import { lazy, Suspense } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
-import { useBlob, useIntel, useIntelOverview, useRepo, useTree } from "../api/queries"
+import {
+  useBlob,
+  useIntel,
+  useIntelFileSummary,
+  useIntelOverview,
+  useRepo,
+  useTree,
+} from "../api/queries"
 import RepoHeader from "../components/RepoHeader"
 import FileTree from "../components/FileTree"
 import ReadmeCard from "../components/ReadmeCard"
 import OverviewCard from "../components/OverviewCard"
-import PathBreadcrumb from "../components/PathBreadcrumb"
 import { findReadme } from "../lib/readme"
 import { useListNav } from "../lib/keyboardNav"
 
@@ -114,6 +120,13 @@ function TreeView({ owner, repo, path }: ViewProps) {
 
 function BlobView({ owner, repo, path }: ViewProps) {
   const blobQ = useBlob(owner, repo, path)
+  // Per-file dex summary, surfaced in the same collapsible card as the tree
+  // view's folder/repo summaries. One dex round trip per file, gated on dex
+  // being up and this repo indexed; files dex didn't summarize render no
+  // card (OverviewCard falls back to a plain breadcrumb).
+  const intelQ = useIntel(owner, repo)
+  const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
+  const summaryQ = useIntelFileSummary(owner, repo, path, isIndexed)
 
   if (blobQ.isLoading) return <div className="loading">Loading…</div>
   if (blobQ.error) return <div className="error">{(blobQ.error as Error).message}</div>
@@ -123,7 +136,7 @@ function BlobView({ owner, repo, path }: ViewProps) {
 
   return (
     <div className="blob">
-      <PathBreadcrumb owner={owner} repo={repo} path={path} />
+      <OverviewCard owner={owner} repo={repo} path={path} summary={summaryQ.data?.summary ?? ""} />
       <div className="blob__head">
         <span className="muted small">
           {lineCount(b.content)} lines · {formatSize(b.size)}

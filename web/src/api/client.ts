@@ -6,6 +6,7 @@ import type {
   CreateIssueInput,
   CreateRepoInput,
   Intel,
+  IntelFileSummary,
   IntelOverview,
   IntelSearchInput,
   IntelSearchResult,
@@ -134,6 +135,10 @@ export const api = {
   getIntel: (owner: string, repo: string) => request<Intel>(`/api/repos/${owner}/${repo}/intel`),
   getIntelOverview: (owner: string, repo: string) =>
     request<IntelOverview>(`/api/repos/${owner}/${repo}/intel/overview`),
+  getIntelFileSummary: (owner: string, repo: string, path: string) =>
+    request<IntelFileSummary>(
+      `/api/repos/${owner}/${repo}/intel/file-summary?path=${encodeURIComponent(path)}`,
+    ),
   intelSearch: (owner: string, repo: string, body: IntelSearchInput) =>
     request<IntelSearchResult>(`/api/repos/${owner}/${repo}/intel/search`, {
       method: "POST",
