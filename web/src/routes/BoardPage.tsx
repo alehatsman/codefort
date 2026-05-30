@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { useParams } from "react-router-dom"
 import {
   DndContext,
@@ -53,6 +53,25 @@ export default function BoardPage() {
   // 6px activation distance so quick clicks stay clicks. Trello convention.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
+  // After a drop the browser fires a synthetic click on the released card,
+  // which would navigate via its <Link>. A per-card guard can't catch it (the
+  // card remounts when it changes column, resetting any ref), and a React
+  // capture handler is unreliable because the click's target node is mid-
+  // remount. So swallow the next click with a native document-level capture
+  // listener — it runs before navigation and before React routes the event.
+  const justDraggedRef = useRef(false)
+  useEffect(() => {
+    function swallowPostDragClick(e: MouseEvent) {
+      if (justDraggedRef.current) {
+        justDraggedRef.current = false
+        e.preventDefault()
+        e.stopPropagation()
+      }
+    }
+    document.addEventListener("click", swallowPostDragClick, true)
+    return () => document.removeEventListener("click", swallowPostDragClick, true)
+  }, [])
+
   function onDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over) return
@@ -83,7 +102,14 @@ export default function BoardPage() {
         <NewIssueForm owner={owner} repo={repo} />
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={() => {
+          justDraggedRef.current = true
+        }}
+        onDragEnd={onDragEnd}
+      >
         <div className="board">
           {ISSUE_STATES.map((state) => (
             <BoardColumn
