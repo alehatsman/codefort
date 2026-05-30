@@ -21,6 +21,9 @@ export default function Layout({ children, onSignOut }: Props) {
         </Link>
         <div className="topbar__actions">
           <ThemeSelect />
+          <Link to="/settings" className="topbar__signout" title="Settings">
+            settings
+          </Link>
           <button className="topbar__signout" onClick={signOut} title="Forget token">
             sign out
           </button>

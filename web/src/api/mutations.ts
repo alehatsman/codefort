@@ -6,6 +6,7 @@ import type {
   CreateCommentInput,
   CreateIssueInput,
   CreateRepoInput,
+  CreateTokenInput,
   UpdateIssueInput,
 } from "./types"
 
@@ -14,6 +15,22 @@ export function useCreateRepo() {
   return useMutation({
     mutationFn: (input: CreateRepoInput) => api.createRepo(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.repos() }),
+  })
+}
+
+export function useCreateToken() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateTokenInput) => api.createToken(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.tokens() }),
+  })
+}
+
+export function useRevokeToken() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.revokeToken(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.tokens() }),
   })
 }
 

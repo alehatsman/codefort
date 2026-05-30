@@ -192,12 +192,27 @@ type CIRunDetail struct {
 }
 
 // Token represents an API token's metadata. The plaintext token itself
-// is never returned over the API — it's only shown once at creation time
-// by the moongitd CLI.
+// is never returned over the API except once, in CreatedToken at creation
+// time — list/lookup never expose it.
 type Token struct {
 	ID         int64      `json:"id"`
 	Name       string     `json:"name"`
 	CreatedAt  time.Time  `json:"created_at"`
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	RevokedAt  *time.Time `json:"revoked_at,omitempty"`
+}
+
+// CreateTokenRequest mints a new API token under the given name. Names are
+// unique; identity in every claim/comment is the token's name.
+type CreateTokenRequest struct {
+	Name string `json:"name"`
+}
+
+// CreatedToken is returned once, by POST /api/tokens. It carries the
+// plaintext Secret alongside the metadata — this is the only time the
+// plaintext is ever sent over the wire, mirroring the `moongitd token`
+// CLI. The caller must surface it immediately; it's unrecoverable after.
+type CreatedToken struct {
+	Token
+	Secret string `json:"secret"`
 }

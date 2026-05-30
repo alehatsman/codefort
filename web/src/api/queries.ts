@@ -7,6 +7,7 @@ import type { Issue, Repo } from "./types"
 // also covers `["issues", owner, repo, "filter-query"]` automatically.
 export const keys = {
   whoami: () => ["whoami"] as const,
+  tokens: () => ["tokens"] as const,
   repos: () => ["repos"] as const,
   repo: (owner: string, repo: string) => ["repo", owner, repo] as const,
   tree: (owner: string, repo: string, path: string) => ["tree", owner, repo, path] as const,
@@ -30,6 +31,13 @@ export function useWhoami() {
     queryKey: keys.whoami(),
     queryFn: () => api.whoami(),
     staleTime: 5 * 60_000, // identity doesn't change mid-session
+  })
+}
+
+export function useTokens() {
+  return useQuery({
+    queryKey: keys.tokens(),
+    queryFn: () => api.listTokens(),
   })
 }
 
@@ -152,12 +160,7 @@ export function useIntelOverview(owner: string, repo: string, enabled: boolean) 
   })
 }
 
-export function useIntelFileSummary(
-  owner: string,
-  repo: string,
-  path: string,
-  enabled: boolean,
-) {
+export function useIntelFileSummary(owner: string, repo: string, path: string, enabled: boolean) {
   return useQuery({
     queryKey: keys.intelFileSummary(owner, repo, path),
     queryFn: () => api.getIntelFileSummary(owner, repo, path),

@@ -10,6 +10,7 @@ import IssuesPage from "./routes/IssuesPage"
 import IssuePage from "./routes/IssuePage"
 import BoardPage from "./routes/BoardPage"
 import IntelPage from "./routes/IntelPage"
+import SettingsPage from "./routes/SettingsPage"
 
 export default function App() {
   const [hasToken, setHasToken] = useState<boolean>(() => getToken() !== null)
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/:owner/:repo/issues/board" element={<BoardPage />} />
         <Route path="/:owner/:repo/issues/:number" element={<IssuePage />} />
         <Route path="/:owner/:repo/intel" element={<IntelPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Routes>
     </Layout>
   )

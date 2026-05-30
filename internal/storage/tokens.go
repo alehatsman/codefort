@@ -157,6 +157,27 @@ func RevokeToken(db *sql.DB, name string) error {
 	return nil
 }
 
+// RevokeTokenByID sets revoked_at on the token with the given id. Returns
+// ErrNotFound when no such token exists. The HTTP surface revokes by id
+// (stable, URL-safe) rather than by name.
+func RevokeTokenByID(db *sql.DB, id int64) error {
+	res, err := db.Exec(
+		`UPDATE tokens SET revoked_at = strftime('%s','now') WHERE id = ?`,
+		id,
+	)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // RevokeStaleAgentTokens revokes per-agent session tokens — those named
 // "agent#<n>", minted one-per-spawn by the `ce` launcher — whose last
 // activity is older than ttl (measured from last_used_at, falling back to

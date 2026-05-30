@@ -5,8 +5,10 @@ import type {
   CommitList,
   TreeCommits,
   CreateCommentInput,
+  CreatedToken,
   CreateIssueInput,
   CreateRepoInput,
+  CreateTokenInput,
   Intel,
   IntelFileSummary,
   IntelOverview,
@@ -14,6 +16,7 @@ import type {
   IntelSearchResult,
   Issue,
   Repo,
+  Token,
   Tree,
   UpdateIssueInput,
   Whoami,
@@ -82,6 +85,11 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
 export const api = {
   whoami: () => request<Whoami>("/api/whoami"),
 
+  listTokens: () => request<Token[]>("/api/tokens"),
+  createToken: (body: CreateTokenInput) =>
+    request<CreatedToken>("/api/tokens", { method: "POST", body }),
+  revokeToken: (id: number) => request<void>(`/api/tokens/${id}`, { method: "DELETE" }),
+
   listRepos: () => request<Repo[]>("/api/repos"),
   createRepo: (body: CreateRepoInput) => request<Repo>("/api/repos", { method: "POST", body }),
   getRepo: (owner: string, repo: string) => request<Repo>(`/api/repos/${owner}/${repo}`),
@@ -99,10 +107,9 @@ export const api = {
     const token = getToken()
     const headers = new Headers()
     if (token) headers.set("Authorization", `Bearer ${token}`)
-    const resp = await fetch(
-      `/api/repos/${owner}/${repo}/raw?path=${encodeURIComponent(path)}`,
-      { headers }
-    )
+    const resp = await fetch(`/api/repos/${owner}/${repo}/raw?path=${encodeURIComponent(path)}`, {
+      headers,
+    })
     if (!resp.ok) throw new ApiError(resp.status, resp.statusText)
     return resp.blob()
   },
@@ -156,7 +163,7 @@ export const api = {
     request<IntelOverview>(`/api/repos/${owner}/${repo}/intel/overview`),
   getIntelFileSummary: (owner: string, repo: string, path: string) =>
     request<IntelFileSummary>(
-      `/api/repos/${owner}/${repo}/intel/file-summary?path=${encodeURIComponent(path)}`,
+      `/api/repos/${owner}/${repo}/intel/file-summary?path=${encodeURIComponent(path)}`
     ),
   intelSearch: (owner: string, repo: string, body: IntelSearchInput) =>
     request<IntelSearchResult>(`/api/repos/${owner}/${repo}/intel/search`, {

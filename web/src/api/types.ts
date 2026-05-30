@@ -64,6 +64,26 @@ export interface Whoami {
   name: string
 }
 
+// --- API tokens ---
+
+export interface Token {
+  id: number
+  name: string
+  created_at: string
+  last_used_at?: string
+  revoked_at?: string
+}
+
+export interface CreateTokenInput {
+  name: string
+}
+
+// CreatedToken is returned once, by POST /api/tokens — the only time the
+// plaintext `secret` is ever sent. Surface it immediately; it's gone after.
+export interface CreatedToken extends Token {
+  secret: string
+}
+
 // --- Code browser ---
 
 export interface TreeEntry {

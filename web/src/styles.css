@@ -2169,3 +2169,125 @@ h3 {
 .issue-row.is-vim-selected {
   background: var(--accent-muted);
 }
+
+/* Settings ------------------------------------------------------------- */
+.settings {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+.settings__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings__nav-item {
+  text-align: left;
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  color: var(--fg-muted);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-base);
+}
+.settings__nav-item:hover {
+  background: var(--bg-canvas);
+  color: var(--fg);
+}
+.settings__nav-item.is-active {
+  background: var(--accent-muted);
+  border-left-color: var(--accent);
+  color: var(--fg);
+  font-weight: var(--weight-bold);
+}
+.settings__section {
+  min-width: 0;
+}
+.settings__title {
+  margin: 0 0 var(--space-2);
+}
+.settings__lead {
+  margin: 0 0 var(--space-4);
+  max-width: 60ch;
+}
+.settings__create {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.settings__create .input {
+  flex: 1;
+  max-width: 320px;
+}
+
+.token-reveal {
+  border: 1px solid var(--accent);
+  background: var(--accent-muted);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.token-reveal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.token-reveal__head p,
+.token-reveal p {
+  margin: var(--space-1) 0 var(--space-2);
+}
+.token-reveal__secret {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.token-reveal__secret code {
+  flex: 1;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+}
+
+.token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-base);
+}
+.token-table th {
+  text-align: left;
+  color: var(--fg-muted);
+  font-weight: var(--weight-bold);
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+}
+.token-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-muted);
+}
+.token-table tr.is-revoked td {
+  opacity: 0.55;
+}
+.token-table td .badge {
+  margin-left: var(--space-2);
+}
+.token-table__actions {
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .settings {
+    grid-template-columns: 1fr;
+  }
+  .settings__nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}

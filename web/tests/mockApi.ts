@@ -33,11 +33,20 @@ export interface Repo {
   total_issues: number
 }
 
+export interface Token {
+  id: number
+  name: string
+  created_at: string
+  last_used_at?: string
+  revoked_at?: string
+}
+
 export interface State {
   identity: string
   repos: Repo[]
   issues: Issue[]
   comments: Comment[]
+  tokens: Token[]
 }
 
 const OPEN_STATES: IssueState[] = ["todo", "in_progress"]
@@ -61,6 +70,9 @@ function freshState(seed: Partial<State> = {}): State {
     ],
     issues: [],
     comments: [],
+    tokens: [
+      { id: 1, name: "test-user", created_at: nowIso(), last_used_at: nowIso() },
+    ],
     ...seed,
   }
 }
@@ -126,6 +138,38 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
 
   // Whoami
   await page.route(/\/api\/whoami$/, (route) => json(route, 200, { name: state.identity }))
+
+  // Tokens collection (GET list / POST create)
+  await page.route(/\/api\/tokens$/, async (route) => {
+    const req = route.request()
+    if (req.method() === "GET") return json(route, 200, state.tokens)
+    if (req.method() === "POST") {
+      const body = req.postDataJSON() as { name: string }
+      if (state.tokens.some((t) => t.name === body.name)) {
+        return json(route, 409, { error: "token name already exists: " + body.name })
+      }
+      const tok: Token = {
+        id: state.tokens.length + 1,
+        name: body.name,
+        created_at: nowIso(),
+      }
+      state.tokens.push(tok)
+      return json(route, 201, { ...tok, secret: "mgt_" + "a".repeat(64) })
+    }
+    return route.continue()
+  })
+
+  // Revoke a token by id
+  await page.route(/\/api\/tokens\/\d+$/, async (route) => {
+    const req = route.request()
+    if (req.method() !== "DELETE") return route.continue()
+    const url = new URL(req.url())
+    const id = Number(url.pathname.split("/").pop())
+    const tok = state.tokens.find((t) => t.id === id)
+    if (!tok) return json(route, 404, { error: "token not found" })
+    tok.revoked_at = nowIso()
+    return route.fulfill({ status: 204 })
+  })
 
   // Issues collection
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/issues(\?.*)?$/, async (route) => {
