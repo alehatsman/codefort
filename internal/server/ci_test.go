@@ -289,6 +289,45 @@ func TestJobEventsSkippedJobClosesEmpty(t *testing.T) {
 	}
 }
 
+func TestUpdateRepoCIEnabled(t *testing.T) {
+	s, repoID := newCIReadServer(t)
+
+	// GET reflects the default (disabled).
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo", "")
+	var repo api.Repo
+	json.Unmarshal(rr.Body.Bytes(), &repo)
+	if repo.CIEnabled {
+		t.Fatalf("ci_enabled = true, want false by default")
+	}
+
+	// PATCH enables it.
+	body := strings.NewReader(`{"ci_enabled":true}`)
+	req := httptest.NewRequest(http.MethodPatch, "/api/repos/alice/repo", body)
+	ctx := context.WithValue(req.Context(), tokenCtxKey{}, api.Token{Name: "agent#17"})
+	rr = httptest.NewRecorder()
+	s.apiHandler().ServeHTTP(rr, req.WithContext(ctx))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("PATCH code = %d, want 200; body=%s", rr.Code, rr.Body.String())
+	}
+	json.Unmarshal(rr.Body.Bytes(), &repo)
+	if !repo.CIEnabled {
+		t.Errorf("after PATCH ci_enabled = false, want true")
+	}
+	if enabled, _ := storage.RepoCIEnabled(s.db, repoID); !enabled {
+		t.Errorf("storage ci_enabled not persisted")
+	}
+}
+
+func TestUpdateRepoNoFields(t *testing.T) {
+	s, _ := newCIReadServer(t)
+	req := httptest.NewRequest(http.MethodPatch, "/api/repos/alice/repo", strings.NewReader(`{}`))
+	rr := httptest.NewRecorder()
+	s.apiHandler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d, want 400 (no fields)", rr.Code)
+	}
+}
+
 func TestJobEventsRunNotFound(t *testing.T) {
 	s, _ := newCIReadServer(t)
 	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/7/jobs/build/events", "")

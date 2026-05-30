@@ -91,6 +91,13 @@ type Repo struct {
 	CreatedAt   time.Time `json:"created_at"`
 	OpenIssues  int       `json:"open_issues"`
 	TotalIssues int       `json:"total_issues"`
+	CIEnabled   bool      `json:"ci_enabled"`
+}
+
+// UpdateRepoRequest is a partial update of a repo's settings. Only non-nil
+// fields are changed; an all-nil request is rejected.
+type UpdateRepoRequest struct {
+	CIEnabled *bool `json:"ci_enabled,omitempty"`
 }
 
 // CreateRepoRequest provisions a new repository: a bare git repo on disk

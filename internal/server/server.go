@@ -102,6 +102,7 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("GET /api/repos", s.handleListRepos)
 	mux.HandleFunc("POST /api/repos", s.handleCreateRepo)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}", s.handleGetRepo)
+	mux.HandleFunc("PATCH /api/repos/{owner}/{repo}", s.handleUpdateRepo)
 
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/tree", s.handleTree)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/blob", s.handleBlob)

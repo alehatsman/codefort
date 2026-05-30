@@ -144,5 +144,49 @@ func toAPIRepo(r storage.RepoSummary) api.Repo {
 		CreatedAt:   time.Unix(r.CreatedAt, 0).UTC(),
 		OpenIssues:  r.OpenIssues,
 		TotalIssues: r.TotalIssues,
+		CIEnabled:   r.CIEnabled,
 	}
+}
+
+// handleUpdateRepo applies a partial update to a repo's settings. Currently the
+// only mutable field is ci_enabled (the per-repo CI opt-in). Returns the
+// updated repo summary.
+func (s *Server) handleUpdateRepo(w http.ResponseWriter, r *http.Request) {
+	owner := r.PathValue("owner")
+	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
+
+	var req api.UpdateRepoRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if req.CIEnabled == nil {
+		writeError(w, http.StatusBadRequest, "no fields to update (provide ci_enabled)")
+		return
+	}
+
+	repoID, err := storage.LookupRepo(s.db, owner, repo)
+	if errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "repo not registered: "+owner+"/"+repo)
+		return
+	}
+	if err != nil {
+		s.logger.Error("update repo lookup", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if err := storage.SetRepoCIEnabled(s.db, repoID, *req.CIEnabled); err != nil {
+		s.logger.Error("update repo ci_enabled", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	row, err := storage.GetRepoSummary(s.db, owner, repo)
+	if err != nil {
+		s.logger.Error("get repo after update", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, toAPIRepo(row))
 }

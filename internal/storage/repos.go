@@ -52,6 +52,7 @@ type RepoSummary struct {
 	CreatedAt   int64
 	OpenIssues  int
 	TotalIssues int
+	CIEnabled   bool
 }
 
 // ListRepos returns every registered repo with issue counts, alphabetically
@@ -64,7 +65,8 @@ func ListRepos(db *sql.DB) ([]RepoSummary, error) {
 		  repos.name AS name,
 		  repos.created_at,
 		  COALESCE(SUM(CASE WHEN issues.state IN ('todo','in_progress') THEN 1 ELSE 0 END), 0) AS open_issues,
-		  COALESCE(COUNT(issues.id), 0) AS total_issues
+		  COALESCE(COUNT(issues.id), 0) AS total_issues,
+		  repos.ci_enabled
 		FROM repos
 		JOIN users ON users.id = repos.owner_id
 		LEFT JOIN issues ON issues.repo_id = repos.id
@@ -79,7 +81,7 @@ func ListRepos(db *sql.DB) ([]RepoSummary, error) {
 	out := make([]RepoSummary, 0)
 	for rows.Next() {
 		var r RepoSummary
-		if err := rows.Scan(&r.ID, &r.Owner, &r.Name, &r.CreatedAt, &r.OpenIssues, &r.TotalIssues); err != nil {
+		if err := rows.Scan(&r.ID, &r.Owner, &r.Name, &r.CreatedAt, &r.OpenIssues, &r.TotalIssues, &r.CIEnabled); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -97,13 +99,14 @@ func GetRepoSummary(db *sql.DB, owner, name string) (RepoSummary, error) {
 		  repos.name AS name,
 		  repos.created_at,
 		  COALESCE(SUM(CASE WHEN issues.state IN ('todo','in_progress') THEN 1 ELSE 0 END), 0) AS open_issues,
-		  COALESCE(COUNT(issues.id), 0) AS total_issues
+		  COALESCE(COUNT(issues.id), 0) AS total_issues,
+		  repos.ci_enabled
 		FROM repos
 		JOIN users ON users.id = repos.owner_id
 		LEFT JOIN issues ON issues.repo_id = repos.id
 		WHERE users.name = ? AND repos.name = ?
 		GROUP BY repos.id
-	`, owner, name).Scan(&r.ID, &r.Owner, &r.Name, &r.CreatedAt, &r.OpenIssues, &r.TotalIssues)
+	`, owner, name).Scan(&r.ID, &r.Owner, &r.Name, &r.CreatedAt, &r.OpenIssues, &r.TotalIssues, &r.CIEnabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return r, ErrNotFound
 	}
