@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -48,6 +49,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
+	case "ci":
+		if err := runCIAdmin(args[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
 	case "help", "-h", "--help":
 		printUsage(os.Stdout)
 	default:
@@ -66,6 +72,7 @@ USAGE:
     moongitd token create <name>           mint a new API token (shown once)
     moongitd token list                    list all tokens (no plaintext)
     moongitd token revoke <name>           disable a token
+    moongitd ci install-hooks              (re)install CI post-receive hooks
     moongitd help                          show this message
 
 Environment:
@@ -237,6 +244,51 @@ func runRepo(args []string) error {
 	default:
 		return fmt.Errorf("unknown repo subcommand: %s", args[0])
 	}
+}
+
+func runCIAdmin(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: moongitd ci install-hooks")
+	}
+	switch args[0] {
+	case "install-hooks":
+		return runCIInstallHooks(args[1:])
+	default:
+		return fmt.Errorf("unknown ci subcommand: %s", args[0])
+	}
+}
+
+// runCIInstallHooks backfills the CI post-receive hook into every registered
+// repo's bare directory — for repos created before the hook existed.
+func runCIInstallHooks(args []string) error {
+	if len(args) != 0 {
+		return errors.New("usage: moongitd ci install-hooks")
+	}
+	cfg, db, err := openDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	repos, err := storage.ListRepos(db)
+	if err != nil {
+		return err
+	}
+	installed := 0
+	for _, repo := range repos {
+		bare := filepath.Join(cfg.ReposDir, repo.Owner, repo.Name+".git")
+		if _, err := os.Stat(bare); err != nil {
+			fmt.Fprintf(os.Stderr, "skip %s/%s: %v\n", repo.Owner, repo.Name, err)
+			continue
+		}
+		if err := server.WritePostReceiveHook(bare); err != nil {
+			return fmt.Errorf("%s/%s: %w", repo.Owner, repo.Name, err)
+		}
+		fmt.Printf("installed hook: %s/%s\n", repo.Owner, repo.Name)
+		installed++
+	}
+	fmt.Printf("installed %d hook(s)\n", installed)
+	return nil
 }
 
 func runToken(args []string) error {

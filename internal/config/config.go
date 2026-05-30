@@ -40,6 +40,12 @@ type Config struct {
 	// idle. Set via MOONGIT_CI_POLL_INTERVAL (default 5s).
 	CIPollInterval time.Duration
 
+	// CISecret gates the loopback /internal/ci/events endpoint that the
+	// post-receive hook calls. Set via MOONGIT_CI_SECRET; empty means the
+	// server generates a fresh per-process secret at startup (sufficient,
+	// since it's injected into the hook env at push time and never persisted).
+	CISecret string
+
 	// DexURL is the base URL of a dex `serve` daemon (e.g.
 	// http://127.0.0.1:8080). Empty disables the Intel tab. DexToken is
 	// the bearer token dex was started with (DEX_SERVE_TOKEN); empty when
@@ -104,6 +110,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("MOONGIT_CI_POLL_INTERVAL: %w", err)
 	}
 	cfg.CIPollInterval = ciPoll
+	cfg.CISecret = envOr("MOONGIT_CI_SECRET", "")
 
 	return cfg, nil
 }

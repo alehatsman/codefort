@@ -118,6 +118,19 @@ func (s *Server) handleServiceRPC(service string) http.HandlerFunc {
 		cmd.Stdin = body
 		cmd.Stdout = w
 		cmd.Stderr = os.Stderr
+		// On push, hand the post-receive hook what it needs to notify the CI
+		// endpoint: the loopback URL, the per-process secret, the repo
+		// identity, and the pusher (the Basic-auth user, when present). The
+		// hook inherits this environment from receive-pack.
+		if service == "git-receive-pack" {
+			pusher, _, _ := r.BasicAuth()
+			cmd.Env = append(os.Environ(),
+				"MOONGIT_CI_URL="+s.ciURL,
+				"MOONGIT_CI_SECRET="+s.ciSecret,
+				"MOONGIT_CI_REPO="+r.PathValue("owner")+"/"+strings.TrimSuffix(r.PathValue("repo"), ".git"),
+				"MOONGIT_CI_PUSHER="+pusher,
+			)
+		}
 		if err := cmd.Run(); err != nil {
 			s.logger.Error("service rpc git failed", "service", service, "repo", repoDir, "err", err)
 		}
