@@ -108,3 +108,30 @@ test("delete own comment removes it; can't delete others'", async ({ page }) => 
   await expect(page.getByText("Mine to delete")).not.toBeVisible()
   await expect(page.getByText("Not mine")).toBeVisible()
 })
+
+test("issue body and comments render markdown", async ({ page }) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1, number: 1, title: "Rendered", body: "## Plan\n\nUse **bold** and `code`.",
+        author: "test-user", state: "todo", assignee: null,
+        created_at: now, updated_at: now,
+      },
+    ],
+    comments: [
+      { id: 1, issue_id: 1, author: "other-user", body: "A [link](https://example.com) here", created_at: now },
+    ],
+  })
+  await page.goto("/alice/demo/issues/1")
+
+  // Body markdown: heading, bold, inline code become real elements.
+  await expect(page.locator(".body__content h2")).toHaveText("Plan")
+  await expect(page.locator(".body__content strong")).toHaveText("bold")
+  await expect(page.locator(".body__content code")).toHaveText("code")
+
+  // Comment markdown: external link renders as an anchor opening in a new tab.
+  const link = page.locator(".comment__body a", { hasText: "link" })
+  await expect(link).toHaveAttribute("href", "https://example.com")
+  await expect(link).toHaveAttribute("target", "_blank")
+})
