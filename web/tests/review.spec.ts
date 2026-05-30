@@ -46,9 +46,12 @@ test("select a line range in the blob viewer and add an inline comment", async (
   // The code viewer renders the file.
   await expect(page.locator("#L2 .code-line__text")).toContainText("la2")
 
-  // Click line 2, shift-click line 4 → a 2–4 selection opens the compose form.
-  await page.locator("#L2 .code-line__num").click()
-  await page.locator("#L4 .code-line__num").click({ modifiers: ["Shift"] })
+  // Drag down the gutter from line 2 to line 4: press on L2, move onto L4,
+  // release → a 2–4 selection opens the compose form.
+  await page.locator("#L2 .code-line__num").hover()
+  await page.mouse.down()
+  await page.locator("#L4 .code-line__num").hover()
+  await page.mouse.up()
   await expect(page.getByText(/Commenting on lines 2.4/)).toBeVisible()
 
   await page.locator(".code-compose .textarea").fill("this block needs a guard")
@@ -64,6 +67,20 @@ test("select a line range in the blob viewer and add an inline comment", async (
     end_line: 4,
     author: "test-user",
   })
+})
+
+test("shift-click still extends a selection without dragging", async ({ page }) => {
+  await mockApi(page)
+  await routeBlob(page)
+  await routeIntelOff(page)
+
+  await page.goto("/alice/demo/blob/src/app.ts")
+  await expect(page.locator("#L1 .code-line__text")).toContainText("la1")
+
+  // Click line 1, shift-click line 3 → a 1–3 selection.
+  await page.locator("#L1 .code-line__num").click()
+  await page.locator("#L3 .code-line__num").click({ modifiers: ["Shift"] })
+  await expect(page.getByText(/Commenting on lines 1.3/)).toBeVisible()
 })
 
 test("review tab groups comments by file, deep-links, and filters by state", async ({ page }) => {

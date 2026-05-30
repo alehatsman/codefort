@@ -36,8 +36,9 @@ interface Props {
  * from the Primer palette in styles.css.
  *
  * On top of the viewer it carries review comments anchored to a line range:
- * click a line number to select a line, shift-click another to extend the
- * range, and an inline form opens beneath the selection. Existing comments
+ * press a line number and drag down the gutter to select a range (or click one
+ * line, shift-click another), and an inline form opens beneath the selection on
+ * release. Existing comments
  * render inline under the line they end on, each with author-only Resolve and
  * Delete. A `#L<n>`/`#L<start>-L<end>` URL hash still deep-links + highlights.
  */
@@ -62,8 +63,9 @@ export default function CodeView({
   const commentsEnabled = !!owner && !!repo && !!path
 
   // Active selection (anchor + head, both 1-based). The compose form opens
-  // beneath the selection's last line.
+  // beneath the selection's last line once the drag is released.
   const [sel, setSel] = useState<{ anchor: number; head: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
   const selStart = sel ? Math.min(sel.anchor, sel.head) : 0
   const selEnd = sel ? Math.max(sel.anchor, sel.head) : 0
 
@@ -71,6 +73,15 @@ export default function CodeView({
     if (from == null) return
     tableRef.current?.querySelector<HTMLElement>(`#L${from}`)?.scrollIntoView({ block: "center" })
   }, [from, lines])
+
+  // End the drag wherever the button is released — including off the gutter —
+  // so a release outside a line number still finalizes the range.
+  useEffect(() => {
+    if (!dragging) return
+    const stop = () => setDragging(false)
+    window.addEventListener("mouseup", stop)
+    return () => window.removeEventListener("mouseup", stop)
+  }, [dragging])
 
   // Existing comments grouped by the line they end on, so each renders right
   // under the block it annotates.
@@ -84,12 +95,28 @@ export default function CodeView({
     return m
   }, [comments])
 
-  function onNumClick(e: React.MouseEvent, n: number) {
-    if (!commentsEnabled) return
+  // Drag-to-select on the gutter (GitHub style): press a line number to anchor,
+  // drag over others to extend live, release to finalize. Shift-press extends
+  // an existing selection without a drag. preventDefault keeps the drag from
+  // starting a native text selection.
+  function onNumMouseDown(e: React.MouseEvent, n: number) {
+    if (!commentsEnabled || e.button !== 0) return
     e.preventDefault()
     setSel((prev) =>
       e.shiftKey && prev ? { anchor: prev.anchor, head: n } : { anchor: n, head: n }
     )
+    setDragging(true)
+  }
+
+  function onNumMouseEnter(n: number) {
+    if (!dragging) return
+    setSel((prev) => (prev ? { anchor: prev.anchor, head: n } : { anchor: n, head: n }))
+  }
+
+  // Releasing on a gutter cell ends the drag immediately; the window listener
+  // (above) is the fallback for a release anywhere else on the page.
+  function onNumMouseUp() {
+    setDragging(false)
   }
 
   // Build the row list flat: each code line, then any comment thread ending on
@@ -105,8 +132,10 @@ export default function CodeView({
         <td
           className={"code-line__num" + (commentsEnabled ? " is-clickable" : "")}
           data-line={n}
-          onClick={(e) => onNumClick(e, n)}
-          title={commentsEnabled ? "Click to select; shift-click to extend" : undefined}
+          onMouseDown={(e) => onNumMouseDown(e, n)}
+          onMouseEnter={() => onNumMouseEnter(n)}
+          onMouseUp={onNumMouseUp}
+          title={commentsEnabled ? "Click or drag down the gutter to select lines" : undefined}
         />
         <td className="code-line__text">{nodes.length ? nodes : "\n"}</td>
       </tr>
@@ -133,7 +162,7 @@ export default function CodeView({
       )
     }
 
-    if (commentsEnabled && sel && selEnd === n && owner && repo && path) {
+    if (commentsEnabled && sel && !dragging && selEnd === n && owner && repo && path) {
       rows.push(
         <tr key={`compose${n}`} className="code-comments-row">
           <td className="code-comments-cell" colSpan={2}>
@@ -153,7 +182,7 @@ export default function CodeView({
   })
 
   return (
-    <div className="code-view hljs">
+    <div className={"code-view hljs" + (dragging ? " is-selecting" : "")}>
       <table ref={tableRef} className="code-view__table">
         <tbody>{rows}</tbody>
       </table>
