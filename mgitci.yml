@@ -1,16 +1,42 @@
-# moongit CI — hello-world pipeline (dogfooding the moongitci stack).
-# Schema: version "1", jobs wired into a DAG via `needs`. `run:` is sugar for a
-# mooncake shell step; each job's steps run in order via `mooncake step`.
+# moongit CI — moongit's own pipeline (dogfooding the moongitci stack).
+#
+# Schema: version "1", jobs wired into a DAG via `needs`; `run:` is sugar for a
+# mooncake shell step. Every job runs in a throwaway container off `image:`
+# (see ci/Dockerfile.dev — the toolchain image carrying go + node + mooncake).
+#
+# DAG:  build ──▶ test
+#          └────▶ vet
+#        web            (independent root)
 version: "1"
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/*"]
 jobs:
-  hello:
+  build:
+    image: moongit-ci-dev:latest
     steps:
-      - run: echo "hello world from moongit CI"
-      - run: echo "commit built at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  goodbye:
-    needs: [hello]
+      - run: go build ./...
+
+  test:
+    needs: [build]
+    image: moongit-ci-dev:latest
     steps:
-      - run: echo "goodbye — pipeline complete"
+      - run: go test ./...
+
+  vet:
+    needs: [build]
+    image: moongit-ci-dev:latest
+    steps:
+      - run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt: these files need formatting:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - run: go vet ./...
+
+  web:
+    image: moongit-ci-dev:latest
+    steps:
+      - run: cd web && npm ci && npm run build

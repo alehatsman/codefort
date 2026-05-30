@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useCIRun, useCIRuns, useRepo } from "../api/queries"
 import { useRerunCIRun, useSetCIEnabled } from "../api/mutations"
@@ -95,8 +95,14 @@ function EnabledRunList({ owner, repo }: { owner: string; repo: string }) {
                 <td>
                   <CIStatusBadge status={run.status} />
                 </td>
-                <td className="ci-runs__sha" title={run.commit_sha}>
-                  {shortSHA(run.commit_sha)}
+                <td className="ci-runs__commit">
+                  <span className="ci-runs__msg" title={run.commit_msg || undefined}>
+                    {run.commit_msg || "(no commit message)"}
+                  </span>
+                  <span className="ci-runs__sha muted small" title={run.commit_sha}>
+                    {shortSHA(run.commit_sha)}
+                    {run.commit_author ? ` · ${run.commit_author}` : ""}
+                  </span>
                 </td>
                 <td className="muted">{shortRef(run.ref)}</td>
                 <td className="muted">{run.trigger || "—"}</td>
@@ -179,11 +185,14 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
       </div>
       {rerun.error && <div className="error inline">{(rerun.error as Error).message}</div>}
 
+      {run.commit_msg && <p className="ci-run-subject">{run.commit_msg}</p>}
+
       <dl className="ci-run-meta">
         <div>
           <dt>Commit</dt>
           <dd className="ci-runs__sha" title={run.commit_sha}>
             {shortSHA(run.commit_sha)}
+            {run.commit_author ? ` · ${run.commit_author}` : ""}
           </dd>
         </div>
         <div>
@@ -210,18 +219,7 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
         <div className="empty">No jobs — the run was gated or hasn't started.</div>
       ) : (
         <div className="ci-jobs">
-          <nav className="ci-jobs__nav" aria-label="Jobs">
-            {jobs.map((j) => (
-              <button
-                key={j.name}
-                className={`ci-jobs__tab ${activeJob === j.name ? "is-active" : ""}`}
-                onClick={() => setSelectedJob(j.name)}
-              >
-                <CIStatusBadge status={j.status} />
-                <span className="ci-jobs__name">{j.name}</span>
-              </button>
-            ))}
-          </nav>
+          <JobDag jobs={jobs} active={activeJob} onSelect={setSelectedJob} />
           {activeJob && (
             <JobLog
               key={activeJob}
@@ -235,6 +233,75 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
       )}
     </section>
   )
+}
+
+// JobDag renders the run's jobs as the dependency DAG `needs` describes:
+// columns by dependency depth, arrows between stages, each job a clickable pill
+// that also serves as the log selector. So the structure (build fans out to
+// test + vet; web is an independent root) is legible at a glance, not flattened
+// into an undifferentiated tab strip.
+function JobDag({
+  jobs,
+  active,
+  onSelect,
+}: {
+  jobs: CIJob[]
+  active?: string
+  onSelect: (name: string) => void
+}) {
+  const stages = useMemo(() => jobStages(jobs), [jobs])
+  return (
+    <nav className="ci-dag" aria-label="Jobs">
+      {stages.map((stage, si) => (
+        <Fragment key={si}>
+          {si > 0 && (
+            <div className="ci-dag__arrow" aria-hidden="true">
+              →
+            </div>
+          )}
+          <div className="ci-dag__stage">
+            {stage.map((j) => {
+              const needs = j.needs ?? []
+              return (
+                <button
+                  key={j.name}
+                  className={`ci-dag__job ${active === j.name ? "is-active" : ""}`}
+                  onClick={() => onSelect(j.name)}
+                  title={needs.length > 0 ? `needs: ${needs.join(", ")}` : "no dependencies"}
+                >
+                  <CIStatusBadge status={j.status} />
+                  <span className="ci-dag__name">{j.name}</span>
+                  {needs.length > 0 && <span className="ci-dag__needs">↳ {needs.join(", ")}</span>}
+                </button>
+              )
+            })}
+          </div>
+        </Fragment>
+      ))}
+    </nav>
+  )
+}
+
+// jobStages groups jobs into dependency-depth columns: a root job (no needs) is
+// depth 0; any other job sits one past its deepest dependency. The server
+// validates the DAG is acyclic, so the recursion terminates. Order within a
+// stage follows the jobs' creation (topo) order.
+function jobStages(jobs: CIJob[]): CIJob[][] {
+  const byName = new Map(jobs.map((j) => [j.name, j]))
+  const depth = new Map<string, number>()
+  const calc = (name: string): number => {
+    const cached = depth.get(name)
+    if (cached !== undefined) return cached
+    const needs = byName.get(name)?.needs ?? []
+    const d = needs.length === 0 ? 0 : 1 + Math.max(...needs.map(calc))
+    depth.set(name, d)
+    return d
+  }
+  jobs.forEach((j) => calc(j.name))
+  const maxDepth = jobs.reduce((m, j) => Math.max(m, depth.get(j.name) ?? 0), 0)
+  const stages: CIJob[][] = Array.from({ length: maxDepth + 1 }, () => [])
+  jobs.forEach((j) => stages[depth.get(j.name) ?? 0].push(j))
+  return stages
 }
 
 function JobLog({
@@ -265,9 +332,9 @@ function JobLog({
         <div className="ci-step" key={step.id}>
           <div className="ci-step__head">
             <span className={`ci-step__status ci-step__status--${step.status ?? "running"}`} />
-            <span className="ci-step__action">{step.action ?? step.id}</span>
+            <code className="ci-step__cmd">{step.label ?? step.action ?? step.id}</code>
             {step.durationMs !== undefined && (
-              <span className="muted small">{formatDuration(step.durationMs)}</span>
+              <span className="muted small ci-step__dur">{formatDuration(step.durationMs)}</span>
             )}
           </div>
           {step.lines.length > 0 && (
@@ -291,6 +358,7 @@ function JobLog({
 interface StepView {
   id: string
   action?: string
+  label?: string
   status?: string
   durationMs?: number
   lines: { stream: string; text: string }[]
@@ -321,6 +389,7 @@ function foldSteps(events: CIEvent[]): StepView[] {
       case "step.started": {
         const s = ensure(id)
         if (typeof d.action === "string") s.action = d.action
+        if (typeof d.name === "string") s.label = d.name
         break
       }
       case "step.stdout":

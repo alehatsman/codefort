@@ -228,7 +228,7 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	// Create job rows up front, in topo order.
 	jobIDs := make(map[string]int64, len(order))
 	for _, jn := range order {
-		job, err := storage.CreateJob(r.db, run.ID, jn)
+		job, err := storage.CreateJob(r.db, run.ID, jn, pipeline.Jobs[jn].Needs)
 		if err != nil {
 			log.Error("ci create job", "job", jn, "err", err)
 			r.finish(run.ID, storage.RunError)
@@ -320,7 +320,7 @@ func (r *ciRunner) runJob(ctx context.Context, owner, repo string, runNum int, j
 	for i, step := range steps {
 		stepID := fmt.Sprintf("step-%04d", i+1)
 		r.emit(elog, ci.EventStepStarted, map[string]any{
-			"step_id": stepID, "action": step.Action, "global_step": i + 1,
+			"step_id": stepID, "action": step.Action, "name": step.Label, "global_step": i + 1,
 		})
 
 		res, execErr := sess.Exec(ctx, step.YAML)

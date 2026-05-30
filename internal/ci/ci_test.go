@@ -197,6 +197,50 @@ func TestParseValidationErrors(t *testing.T) {
 	}
 }
 
+func TestToolchainHints(t *testing.T) {
+	p, err := Parse([]byte(`
+version: "1"
+jobs:
+  build:
+    steps:
+      - run: go build ./...
+  web:
+    steps:
+      - run: cd web && npm ci && npm run build
+  pinned:
+    image: my-go:latest
+    steps:
+      - run: go test ./...
+  shell-only:
+    steps:
+      - run: echo "hello"
+`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	hints := ToolchainHints(p)
+
+	got := map[string]string{}
+	for _, h := range hints {
+		got[h.Job] = h.Tool
+	}
+	// build (go) and web (npm, found past the leading `cd`) warn; pinned has an
+	// explicit image: so it's skipped despite using go; shell-only uses no
+	// toolchain.
+	if got["build"] != "go" {
+		t.Errorf("build hint = %q, want go", got["build"])
+	}
+	if got["web"] != "npm" {
+		t.Errorf("web hint = %q, want npm", got["web"])
+	}
+	if _, ok := got["pinned"]; ok {
+		t.Errorf("pinned should not warn (it sets image:), got %q", got["pinned"])
+	}
+	if _, ok := got["shell-only"]; ok {
+		t.Errorf("shell-only should not warn, got %q", got["shell-only"])
+	}
+}
+
 func TestParseSelfDependency(t *testing.T) {
 	_, err := Parse([]byte(`version: "1"` + "\n" + `jobs: {a: {needs: [a], steps: [{run: x}]}}`))
 	if err == nil || !strings.Contains(err.Error(), "itself") {

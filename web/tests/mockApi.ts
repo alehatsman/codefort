@@ -36,6 +36,7 @@ export interface Repo {
 
 export interface CIJob {
   name: string
+  needs?: string[]
   status: string
   exit_code: number | null
   started_at: string | null
@@ -45,6 +46,8 @@ export interface CIJob {
 export interface CIRun {
   number: number
   commit_sha: string
+  commit_msg?: string
+  commit_author?: string
   ref: string
   event: string
   trigger?: string

@@ -118,10 +118,12 @@ func (s *Server) handleRerunCIRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
-		CommitSHA: src.CommitSHA,
-		Ref:       src.Ref,
-		Event:     src.Event,
-		Trigger:   identityFromContext(r), // the agent that requested the rerun
+		CommitSHA:    src.CommitSHA,
+		CommitMsg:    src.CommitMsg,
+		CommitAuthor: src.CommitAuthor,
+		Ref:          src.Ref,
+		Event:        src.Event,
+		Trigger:      identityFromContext(r), // the agent that requested the rerun
 	})
 	if err != nil {
 		s.logger.Error("ci rerun enqueue", "err", err)
@@ -299,21 +301,24 @@ func runNumberOrFail(w http.ResponseWriter, r *http.Request) (int, bool) {
 
 func toAPIRun(run storage.CIRun) api.CIRun {
 	return api.CIRun{
-		Number:     run.Number,
-		CommitSHA:  run.CommitSHA,
-		Ref:        run.Ref,
-		Event:      run.Event,
-		Trigger:    run.Trigger,
-		Status:     string(run.Status),
-		CreatedAt:  run.CreatedAt,
-		StartedAt:  run.StartedAt,
-		FinishedAt: run.FinishedAt,
+		Number:       run.Number,
+		CommitSHA:    run.CommitSHA,
+		CommitMsg:    run.CommitMsg,
+		CommitAuthor: run.CommitAuthor,
+		Ref:          run.Ref,
+		Event:        run.Event,
+		Trigger:      run.Trigger,
+		Status:       string(run.Status),
+		CreatedAt:    run.CreatedAt,
+		StartedAt:    run.StartedAt,
+		FinishedAt:   run.FinishedAt,
 	}
 }
 
 func toAPIJob(j storage.CIJob) api.CIJob {
 	return api.CIJob{
 		Name:       j.Name,
+		Needs:      j.Needs,
 		Status:     string(j.Status),
 		ExitCode:   j.ExitCode,
 		StartedAt:  j.StartedAt,

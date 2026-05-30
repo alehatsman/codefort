@@ -277,6 +277,8 @@ export type CIJobStatus = "queued" | "running" | "success" | "failed" | "skipped
 export interface CIRun {
   number: number
   commit_sha: string
+  commit_msg?: string
+  commit_author?: string
   ref: string
   event: string
   trigger?: string
@@ -288,6 +290,7 @@ export interface CIRun {
 
 export interface CIJob {
   name: string
+  needs?: string[]
   status: CIJobStatus
   exit_code: number | null
   started_at: string | null

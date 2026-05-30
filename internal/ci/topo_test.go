@@ -74,4 +74,12 @@ jobs:
 	if steps[1].Action != "cmd" {
 		t.Errorf("step 1 action = %q, want cmd", steps[1].Action)
 	}
+	// Label is the human log caption: the command for a run: step, the action
+	// otherwise — so the UI shows "go test ./...", not a generic "shell".
+	if steps[0].Label != "go test ./..." {
+		t.Errorf("step 0 label = %q, want %q", steps[0].Label, "go test ./...")
+	}
+	if steps[1].Label != "cmd" {
+		t.Errorf("step 1 label = %q, want cmd", steps[1].Label)
+	}
 }

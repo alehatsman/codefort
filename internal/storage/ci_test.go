@@ -27,6 +27,56 @@ func seedRepo(t *testing.T) (db *sql.DB, repoID int64) {
 	return d, id
 }
 
+func TestEnqueueRunFreezesCommitContext(t *testing.T) {
+	db, repoID := seedRepo(t)
+	run, err := EnqueueRun(db, repoID, NewRun{
+		CommitSHA: "abc", CommitMsg: "fix: thing", CommitAuthor: "Alice",
+		Ref: "refs/heads/main", Event: "push",
+	})
+	if err != nil {
+		t.Fatalf("EnqueueRun: %v", err)
+	}
+	got, err := GetRun(db, repoID, run.Number)
+	if err != nil {
+		t.Fatalf("GetRun: %v", err)
+	}
+	if got.CommitMsg != "fix: thing" || got.CommitAuthor != "Alice" {
+		t.Errorf("commit context = (%q, %q), want (%q, %q)",
+			got.CommitMsg, got.CommitAuthor, "fix: thing", "Alice")
+	}
+}
+
+func TestCreateJobRoundTripsNeeds(t *testing.T) {
+	db, repoID := seedRepo(t)
+	run, err := EnqueueRun(db, repoID, NewRun{CommitSHA: "a", Ref: "r", Event: "push"})
+	if err != nil {
+		t.Fatalf("EnqueueRun: %v", err)
+	}
+	if _, err := CreateJob(db, run.ID, "build", nil); err != nil {
+		t.Fatalf("CreateJob build: %v", err)
+	}
+	if _, err := CreateJob(db, run.ID, "test", []string{"build"}); err != nil {
+		t.Fatalf("CreateJob test: %v", err)
+	}
+
+	jobs, err := ListJobs(db, run.ID)
+	if err != nil {
+		t.Fatalf("ListJobs: %v", err)
+	}
+	byName := map[string]CIJob{}
+	for _, j := range jobs {
+		byName[j.Name] = j
+	}
+	// A root job carries no needs (nil, not []string{}); a dependent one carries
+	// exactly its declared dependencies.
+	if byName["build"].Needs != nil {
+		t.Errorf("build needs = %v, want nil", byName["build"].Needs)
+	}
+	if got := byName["test"].Needs; len(got) != 1 || got[0] != "build" {
+		t.Errorf("test needs = %v, want [build]", got)
+	}
+}
+
 func TestEnqueueRunAllocatesPerRepoNumbers(t *testing.T) {
 	db, repoID := seedRepo(t)
 	for want := 1; want <= 3; want++ {
@@ -121,7 +171,7 @@ func TestJobLifecycle(t *testing.T) {
 	db, repoID := seedRepo(t)
 	run, _ := EnqueueRun(db, repoID, NewRun{CommitSHA: "a", Ref: "r", Event: "push"})
 
-	job, err := CreateJob(db, run.ID, "test")
+	job, err := CreateJob(db, run.ID, "test", nil)
 	if err != nil {
 		t.Fatalf("CreateJob: %v", err)
 	}
@@ -129,7 +179,7 @@ func TestJobLifecycle(t *testing.T) {
 		t.Errorf("new job = %q exit=%v, want queued + nil exit", job.Status, job.ExitCode)
 	}
 	// Duplicate job name in the same run is rejected by the UNIQUE constraint.
-	if _, err := CreateJob(db, run.ID, "test"); err == nil {
+	if _, err := CreateJob(db, run.ID, "test", nil); err == nil {
 		t.Error("duplicate job name should violate UNIQUE(run_id, name)")
 	}
 	if err := StartJob(db, job.ID); err != nil {

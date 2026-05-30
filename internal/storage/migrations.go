@@ -121,6 +121,16 @@ var migrations = []string{
 	);
 	CREATE INDEX IF NOT EXISTS idx_ci_jobs_run ON ci_jobs(run_id);
 	`,
+
+	// 6: humane CI IO. Freeze each run's commit subject + author at enqueue
+	// (a SHA alone has no human meaning in the UI), and record each job's
+	// `needs` so the run-detail view can draw the DAG instead of a flat tab
+	// list. needs is a JSON array of job names ('' for a root job).
+	`
+	ALTER TABLE ci_runs ADD COLUMN commit_msg    TEXT NOT NULL DEFAULT '';
+	ALTER TABLE ci_runs ADD COLUMN commit_author TEXT NOT NULL DEFAULT '';
+	ALTER TABLE ci_jobs ADD COLUMN needs         TEXT NOT NULL DEFAULT '';
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

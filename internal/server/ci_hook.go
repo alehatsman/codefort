@@ -8,11 +8,27 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/alehatsman/moongit/internal/storage"
 )
+
+// gitCommitMeta reads a commit's subject line and author name from a bare repo,
+// best-effort: any failure (unknown sha, git error) yields empty strings so a
+// run still enqueues with just its SHA. The subject + author are frozen onto
+// the run row at enqueue so the UI can show what a run was for, not just a SHA.
+func gitCommitMeta(bareRepo, sha string) (subject, author string) {
+	out, err := exec.Command(
+		"git", "--git-dir", bareRepo, "show", "-s", "--format=%s%n%an", sha,
+	).Output()
+	if err != nil {
+		return "", ""
+	}
+	subject, author, _ = strings.Cut(strings.TrimRight(string(out), "\n"), "\n")
+	return subject, author
+}
 
 // postReceiveHook is the generic hook installed into every bare repo. It
 // notifies the local moongitd of each pushed ref so the daemon can enqueue a
@@ -134,8 +150,11 @@ func (s *Server) handleCIEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	bareRepo := filepath.Join(s.cfg.ReposDir, owner, name+".git")
+	msg, author := gitCommitMeta(bareRepo, req.New)
 	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
-		CommitSHA: req.New, Ref: req.Ref, Event: "push", Trigger: req.Pusher,
+		CommitSHA: req.New, CommitMsg: msg, CommitAuthor: author,
+		Ref: req.Ref, Event: "push", Trigger: req.Pusher,
 	})
 	if err != nil {
 		s.logger.Error("ci events: enqueue", "err", err)

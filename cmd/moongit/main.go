@@ -566,6 +566,11 @@ func runCIValidate(args []string) error {
 		}
 		fmt.Printf("  %s — %d step(s)%s\n", name, len(job.Steps), needs)
 	}
+	for _, h := range ci.ToolchainHints(pipeline) {
+		fmt.Printf("  warning: job %q runs %q but pins no image: — the default CI image is toolchain-free, "+
+			"so this fails at run time with %q not found; set image: to one carrying %s (see ci/Dockerfile.dev)\n",
+			h.Job, h.Tool, h.Tool, h.Tool)
+	}
 	return nil
 }
 

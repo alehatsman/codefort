@@ -217,21 +217,24 @@ type CommitDetail struct {
 // CIRun is the public view of a CI run. Number is the per-repo run number
 // (the address clients use); the internal DB id is not exposed.
 type CIRun struct {
-	Number     int        `json:"number"`
-	CommitSHA  string     `json:"commit_sha"`
-	Ref        string     `json:"ref"`
-	Event      string     `json:"event"`
-	Trigger    string     `json:"trigger,omitempty"`
-	Status     string     `json:"status"`
-	CreatedAt  time.Time  `json:"created_at"`
-	StartedAt  *time.Time `json:"started_at"`
-	FinishedAt *time.Time `json:"finished_at"`
+	Number       int        `json:"number"`
+	CommitSHA    string     `json:"commit_sha"`
+	CommitMsg    string     `json:"commit_msg,omitempty"`
+	CommitAuthor string     `json:"commit_author,omitempty"`
+	Ref          string     `json:"ref"`
+	Event        string     `json:"event"`
+	Trigger      string     `json:"trigger,omitempty"`
+	Status       string     `json:"status"`
+	CreatedAt    time.Time  `json:"created_at"`
+	StartedAt    *time.Time `json:"started_at"`
+	FinishedAt   *time.Time `json:"finished_at"`
 }
 
 // CIJob is one job within a run, addressed by Name (which is also the key in
 // the per-job event-stream path).
 type CIJob struct {
 	Name       string     `json:"name"`
+	Needs      []string   `json:"needs,omitempty"`
 	Status     string     `json:"status"`
 	ExitCode   *int       `json:"exit_code"`
 	StartedAt  *time.Time `json:"started_at"`

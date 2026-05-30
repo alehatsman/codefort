@@ -2537,8 +2537,24 @@ h3 {
 .ci-runs__sha {
   font-family: var(--font-mono);
 }
+.ci-runs__commit {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 26rem;
+}
+.ci-runs__msg {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Run detail */
+.ci-run-subject {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
 .ci-run-head {
   display: flex;
   align-items: center;
@@ -2566,29 +2582,52 @@ h3 {
   margin: 2px 0 0;
 }
 
-/* Jobs */
-.ci-jobs__nav {
+/* Jobs — the `needs` DAG as depth-ordered columns with arrows between stages */
+.ci-dag {
   display: flex;
+  align-items: stretch;
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
+  overflow-x: auto;
 }
-.ci-jobs__tab {
-  display: inline-flex;
-  align-items: center;
+.ci-dag__stage {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
+  justify-content: center;
+}
+.ci-dag__arrow {
+  display: flex;
+  align-items: center;
+  color: var(--fg-muted);
+  font-size: var(--text-lg);
+  padding: 0 var(--space-1);
+}
+.ci-dag__job {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 140px;
   padding: var(--space-2) var(--space-3);
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
   color: var(--fg);
+  text-align: left;
 }
-.ci-jobs__tab.is-active {
+.ci-dag__job.is-active {
   border-color: var(--accent-muted);
 }
-.ci-jobs__name {
+.ci-dag__name {
   font-weight: var(--weight-medium);
+}
+.ci-dag__needs {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
 }
 
 /* Step timeline + log viewer */
@@ -2617,9 +2656,16 @@ h3 {
 .ci-step__status--running {
   background: var(--state-in_progress);
 }
-.ci-step__action {
+.ci-step__cmd {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ci-step__dur {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 .ci-log {
   margin: var(--space-1) 0 0;

@@ -2,9 +2,69 @@ package ci
 
 import (
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+// knownToolchains are the language/build tools the default CI base image
+// deliberately omits (see ci/Dockerfile — scope is isolation, not toolchains).
+// A run: step invoking one of these on the default image fails at run time with
+// "<tool>: not found"; ToolchainHints surfaces that at authoring time instead.
+var knownToolchains = map[string]bool{
+	"go": true, "gofmt": true, "node": true, "npm": true, "npx": true,
+	"yarn": true, "pnpm": true, "python": true, "python3": true, "pip": true,
+	"pip3": true, "cargo": true, "rustc": true, "java": true, "javac": true,
+	"mvn": true, "gradle": true, "ruby": true, "bundle": true, "dotnet": true,
+	"deno": true, "bun": true, "make": true, "cmake": true, "gcc": true,
+	"g++": true, "clang": true, "tsc": true,
+}
+
+// ToolchainHint flags a job whose run: steps invoke a toolchain the default CI
+// image lacks while the job pins no image: of its own. Tool is the first such
+// toolchain found, for the warning message.
+type ToolchainHint struct {
+	Job  string
+	Tool string
+}
+
+// ToolchainHints inspects a (validated) pipeline for a common authoring
+// footgun: a job that runs a language/build tool (go, npm, …) but relies on the
+// default CI image, which is toolchain-free by design — so it only fails once
+// running. A job that pins its own image: is assumed to carry what it needs and
+// is skipped (we can't probe an arbitrary image, and an explicit choice is
+// likely deliberate). Hints come back in job-name order.
+func ToolchainHints(p Pipeline) []ToolchainHint {
+	var hints []ToolchainHint
+	for _, name := range p.JobNames() {
+		job := p.Jobs[name]
+		if job.Image != "" {
+			continue
+		}
+		if tool := firstToolchainUsed(job); tool != "" {
+			hints = append(hints, ToolchainHint{Job: name, Tool: tool})
+		}
+	}
+	return hints
+}
+
+// firstToolchainUsed returns the first known-toolchain command word across a
+// job's run: steps, or "". It tokenizes on whitespace and matches whole words,
+// so `cd web && npm ci` finds "npm" but a quoted "go to it" does not match "go".
+func firstToolchainUsed(job Job) string {
+	for i := range job.Steps {
+		cmd, isRun, err := inspectStep(&job.Steps[i])
+		if err != nil || !isRun {
+			continue
+		}
+		for tok := range strings.FieldsSeq(cmd) {
+			if knownToolchains[tok] {
+				return tok
+			}
+		}
+	}
+	return ""
+}
 
 // TranslateJob converts a job's steps into a mooncake playbook: a top-level
 // YAML *sequence* of steps (mooncake rejects a `tasks:` map). `run: "<cmd>"`
@@ -30,11 +90,14 @@ func TranslateJob(job Job) ([]byte, error) {
 }
 
 // MooncakeStep is one translated step ready to hand to `mooncake step
-// '<YAML>'`, plus its action (the step's top-level key) for the step.started
-// event.
+// '<YAML>'`, plus its action (the step's top-level key) and a human Label for
+// the step.started event. Label is what the UI shows in the log timeline: the
+// command for a `run:` step, the action otherwise — so a reader sees
+// `go test ./...`, not a generic `shell`.
 type MooncakeStep struct {
 	YAML   string
 	Action string
+	Label  string
 }
 
 // MooncakeSteps renders a job's steps individually, applying the same
@@ -57,7 +120,12 @@ func MooncakeSteps(job Job) ([]MooncakeStep, error) {
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, MooncakeStep{YAML: string(b), Action: stepAction(n)})
+		action := stepAction(n)
+		label := action
+		if isRun {
+			label = runCmd
+		}
+		out = append(out, MooncakeStep{YAML: string(b), Action: action, Label: label})
 	}
 	return out, nil
 }

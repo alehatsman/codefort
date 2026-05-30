@@ -1,0 +1,33 @@
+# moongit CI *dev* image — the toolchain image moongit's own mgitci.yml runs on.
+#
+# The base image (ci/Dockerfile, moongit-ci:latest) is deliberately
+# toolchain-free; this derives from it and adds the Go + Node toolchains
+# moongit's pipeline needs (go build/test/vet/fmt, web build). It still carries
+# mooncake + git from the base, which the runner execs inside the container.
+#
+# Pin toolchains via official tarballs (apt's Go lags moongit's go.mod). Jobs
+# run as the moongitd uid:gid with no home dir, so HOME/GOCACHE/GOPATH point at
+# world-writable /tmp — otherwise go/npm can't write their caches.
+#
+# Build (from the moongit repo root, after moongit-ci:latest exists):
+#   docker build -t moongit-ci-dev:latest -f ci/Dockerfile.dev ci/
+FROM moongit-ci:latest
+
+ARG GO_VERSION=1.26.3
+ARG NODE_VERSION=22.21.0
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates \
+ && curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+      | tar -C /usr/local -xz \
+ && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz" \
+      | tar -C /usr/local --strip-components=1 -xz \
+ && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
+ENV PATH=/usr/local/go/bin:$PATH \
+    HOME=/tmp \
+    GOCACHE=/tmp/.cache/go-build \
+    GOPATH=/tmp/go \
+    GOTOOLCHAIN=local
+
+RUN go version && node --version && mooncake --version

@@ -60,6 +60,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
 Scope of the base image is isolation only — it deliberately bundles no language
 toolchains. Add what your jobs need in a derived image.
 
+`ci/Dockerfile.dev` builds one such image, `moongit-ci-dev:latest` (base + Go +
+Node), which moongit's own `mgitci.yml` runs on:
+
+```sh
+docker build -t moongit-ci-dev:latest -f ci/Dockerfile.dev ci/
+```
+
+Because forgetting `image:` on a toolchain job only fails at run time
+(`go: not found`), `mgit ci validate` warns up front when a job runs a known
+toolchain (go, npm, …) but pins no `image:`.
+
 ## Runtime notes
 
 - Containers are named `moongit-ci-<jobID>-<job>` and started detached

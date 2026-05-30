@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -47,18 +48,20 @@ var ErrNoRunQueued = errors.New("no run queued")
 
 // CIRun is one pipeline execution for a repo, identified per-repo by Number.
 type CIRun struct {
-	ID         int64
-	RepoID     int64
-	Number     int
-	CommitSHA  string
-	Ref        string
-	Event      string
-	Trigger    string
-	Status     RunStatus
-	ClaimedAt  *time.Time
-	CreatedAt  time.Time
-	StartedAt  *time.Time
-	FinishedAt *time.Time
+	ID           int64
+	RepoID       int64
+	Number       int
+	CommitSHA    string
+	CommitMsg    string // commit subject, frozen at enqueue (may be empty)
+	CommitAuthor string // commit author name, frozen at enqueue (may be empty)
+	Ref          string
+	Event        string
+	Trigger      string
+	Status       RunStatus
+	ClaimedAt    *time.Time
+	CreatedAt    time.Time
+	StartedAt    *time.Time
+	FinishedAt   *time.Time
 }
 
 // CIJob is one job within a run, identified within the run by Name.
@@ -66,6 +69,7 @@ type CIJob struct {
 	ID         int64
 	RunID      int64
 	Name       string
+	Needs      []string // jobs this one depends on; nil for a root job
 	Status     JobStatus
 	ExitCode   *int
 	CreatedAt  time.Time
@@ -76,10 +80,12 @@ type CIJob struct {
 // NewRun holds the fields needed to enqueue a run. Number, status, and
 // timestamps are assigned by EnqueueRun.
 type NewRun struct {
-	CommitSHA string
-	Ref       string
-	Event     string
-	Trigger   string
+	CommitSHA    string
+	CommitMsg    string
+	CommitAuthor string
+	Ref          string
+	Event        string
+	Trigger      string
 }
 
 // EnqueueRun allocates the next per-repo run number and inserts a queued run.
@@ -100,10 +106,10 @@ func EnqueueRun(db *sql.DB, repoID int64, r NewRun) (CIRun, error) {
 	}
 
 	run, err := scanRun(tx.QueryRow(`
-		INSERT INTO ci_runs(repo_id, number, commit_sha, ref, event, trigger, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO ci_runs(repo_id, number, commit_sha, commit_msg, commit_author, ref, event, trigger, status)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING `+runColumns+`
-	`, repoID, next, r.CommitSHA, r.Ref, r.Event, r.Trigger, string(RunQueued)))
+	`, repoID, next, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued)))
 	if err != nil {
 		return CIRun{}, err
 	}
@@ -217,14 +223,30 @@ func FinishRun(db *sql.DB, runID int64, status RunStatus) error {
 	return affected(res, err)
 }
 
-// CreateJob inserts a queued job for a run. Mirrors the per-run name UNIQUE
-// constraint so a job name can't be enqueued twice in one run.
-func CreateJob(db *sql.DB, runID int64, name string) (CIJob, error) {
+// CreateJob inserts a queued job for a run, recording the jobs it `needs` (the
+// DAG edges, stored as a JSON array) so the run-detail view can reconstruct
+// the dependency structure. Mirrors the per-run name UNIQUE constraint so a
+// job name can't be enqueued twice in one run.
+func CreateJob(db *sql.DB, runID int64, name string, needs []string) (CIJob, error) {
 	job, err := scanJob(db.QueryRow(`
-		INSERT INTO ci_jobs(run_id, name, status) VALUES (?, ?, ?)
+		INSERT INTO ci_jobs(run_id, name, needs, status) VALUES (?, ?, ?, ?)
 		RETURNING `+jobColumns+`
-	`, runID, name, string(JobQueued)))
+	`, runID, name, marshalNeeds(needs), string(JobQueued)))
 	return job, err
+}
+
+// marshalNeeds encodes a job's dependency list for storage. An empty list is
+// stored as "" (the column default) rather than "[]", so a root job's row
+// carries no JSON.
+func marshalNeeds(needs []string) string {
+	if len(needs) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(needs)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // StartJob marks a job running and stamps started_at.
@@ -299,7 +321,7 @@ func affected(res sql.Result, err error) error {
 	return nil
 }
 
-const runColumns = "id, repo_id, number, commit_sha, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at"
+const runColumns = "id, repo_id, number, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at"
 
 func scanRun(s scanner) (CIRun, error) {
 	var r CIRun
@@ -307,7 +329,8 @@ func scanRun(s scanner) (CIRun, error) {
 	var claimed, started, finished sql.NullInt64
 	var created int64
 	if err := s.Scan(
-		&r.ID, &r.RepoID, &r.Number, &r.CommitSHA, &r.Ref, &r.Event, &r.Trigger,
+		&r.ID, &r.RepoID, &r.Number, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
+		&r.Ref, &r.Event, &r.Trigger,
 		&status, &claimed, &created, &started, &finished,
 	); err != nil {
 		return r, err
@@ -320,17 +343,22 @@ func scanRun(s scanner) (CIRun, error) {
 	return r, nil
 }
 
-const jobColumns = "id, run_id, name, status, exit_code, created_at, started_at, finished_at"
+const jobColumns = "id, run_id, name, needs, status, exit_code, created_at, started_at, finished_at"
 
 func scanJob(s scanner) (CIJob, error) {
 	var j CIJob
-	var status string
+	var status, needs string
 	var exit, started, finished sql.NullInt64
 	var created int64
 	if err := s.Scan(
-		&j.ID, &j.RunID, &j.Name, &status, &exit, &created, &started, &finished,
+		&j.ID, &j.RunID, &j.Name, &needs, &status, &exit, &created, &started, &finished,
 	); err != nil {
 		return j, err
+	}
+	if needs != "" {
+		if err := json.Unmarshal([]byte(needs), &j.Needs); err != nil {
+			return j, err
+		}
 	}
 	j.Status = JobStatus(status)
 	j.CreatedAt = time.Unix(created, 0).UTC()

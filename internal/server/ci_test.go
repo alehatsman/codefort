@@ -104,7 +104,7 @@ func TestListCIRunsLimit(t *testing.T) {
 func TestGetCIRunDetail(t *testing.T) {
 	s, repoID := newCIReadServer(t)
 	run := enqueue(t, s, repoID, "deadbeef", "refs/heads/main")
-	build, err := storage.CreateJob(s.db, run.ID, "build")
+	build, err := storage.CreateJob(s.db, run.ID, "build", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestGetCIRunDetail(t *testing.T) {
 	if err := storage.FinishJob(s.db, build.ID, storage.JobSuccess, &zero); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := storage.CreateJob(s.db, run.ID, "lint"); err != nil {
+	if _, err := storage.CreateJob(s.db, run.ID, "lint", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -206,7 +206,7 @@ func TestRerunUnknownRun(t *testing.T) {
 // run terminal so the SSE handler replays and closes instead of tailing.
 func writeJobEvents(t *testing.T, s *Server, run storage.CIRun, job string, types ...string) {
 	t.Helper()
-	if _, err := storage.CreateJob(s.db, run.ID, job); err != nil {
+	if _, err := storage.CreateJob(s.db, run.ID, job, nil); err != nil {
 		t.Fatal(err)
 	}
 	elog, err := ci.OpenEventLog(s.cfg.DataDir, "alice", "repo", run.Number, job)
@@ -275,7 +275,7 @@ func TestJobEventsUnknownJob(t *testing.T) {
 func TestJobEventsSkippedJobClosesEmpty(t *testing.T) {
 	s, repoID := newCIReadServer(t)
 	run := enqueue(t, s, repoID, "sha", "refs/heads/main")
-	if _, err := storage.CreateJob(s.db, run.ID, "skipped"); err != nil {
+	if _, err := storage.CreateJob(s.db, run.ID, "skipped", nil); err != nil {
 		t.Fatal(err)
 	}
 	storage.FinishRun(s.db, run.ID, storage.RunSuccess)
