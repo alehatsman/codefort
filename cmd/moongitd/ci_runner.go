@@ -99,8 +99,9 @@ func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner 
 	return r
 }
 
-// runCIRunner launches the in-process CI runner beside the reapers. One worker;
-// concurrency caps are deferred (#26). Runs until ctx is cancelled.
+// runCIRunner launches the in-process CI runner beside the reapers. It claims
+// and dispatches up to CIRunConcurrency runs at a time (default 1). Runs until
+// ctx is cancelled.
 func runCIRunner(ctx context.Context, db *sql.DB, cfg *config.Config, logger *slog.Logger) {
 	newCIRunner(db, cfg, logger).run(ctx)
 }
@@ -110,7 +111,8 @@ func (r *ciRunner) run(ctx context.Context) {
 	if interval <= 0 {
 		interval = 5 * time.Second
 	}
-	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout, "isolation", r.cfg.CIIsolation)
+	runConc := max(r.cfg.CIRunConcurrency, 1)
+	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout, "isolation", r.cfg.CIIsolation, "run_concurrency", runConc)
 
 	// A restart can strand runs mid-flight: their status writes never committed,
 	// so they sit 'running' with no goroutine driving them. Nothing can be
@@ -128,23 +130,47 @@ func (r *ciRunner) run(ctx context.Context) {
 		sweepOrphanContainers(ctx, r.logger)
 	}
 
+	// At most runConc runs execute at once. We take a slot *before* claiming so
+	// we never hold a claimed run we can't yet execute (its lease would tick
+	// while it waited). wg tracks in-flight runs so shutdown drains them:
+	// run() returns only once every dispatched executeRun has finalized its run
+	// against the still-open DB (the restart-drain contract — see
+	// cmd/moongitd/main.go).
+	sem := make(chan struct{}, runConc)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
-		// Drain every claimable run before sleeping.
+		// Dispatch every claimable run before sleeping, bounded by the slots.
 		for {
-			run, err := storage.ClaimNextRun(r.db, r.runLease())
-			if errors.Is(err, storage.ErrNoRunQueued) {
-				break
-			}
-			if err != nil {
-				r.logger.Error("ci claim", "err", err)
-				break
-			}
-			r.executeRun(ctx, run)
+			// Once shutdown starts, stop claiming new work; in-flight runs
+			// drain via the deferred wg.Wait. Guarding here also keeps us from
+			// claiming a queued run only to immediately error it.
 			if ctx.Err() != nil {
 				return
 			}
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			run, err := storage.ClaimNextRun(r.db, r.runLease())
+			if err != nil {
+				<-sem // release the unused slot
+				if errors.Is(err, storage.ErrNoRunQueued) {
+					break
+				}
+				r.logger.Error("ci claim", "err", err)
+				break
+			}
+			wg.Add(1)
+			go func(run storage.CIRun) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				r.executeRun(ctx, run)
+			}(run)
 		}
 		select {
 		case <-ctx.Done():

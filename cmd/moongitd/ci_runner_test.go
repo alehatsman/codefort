@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"path/filepath"
@@ -82,6 +83,66 @@ func sentinelExec(_ context.Context, _ string, stepYAML string) (stepResult, err
 	return stepResult{RC: 0, Stdout: "ok\n"}, nil
 }
 
+// trackingExec returns a step executor that records the peak number of
+// concurrent in-flight executions, holding each for hold so any overlap is
+// observable. With one step per job, the peak doubles as the peak number of
+// concurrently executing runs.
+func trackingExec(hold time.Duration) (stepExecutor, *int64) {
+	var cur, maxSeen int64
+	exec := func(context.Context, string, string) (stepResult, error) {
+		n := atomic.AddInt64(&cur, 1)
+		for {
+			old := atomic.LoadInt64(&maxSeen)
+			if n <= old || atomic.CompareAndSwapInt64(&maxSeen, old, n) {
+				break
+			}
+		}
+		time.Sleep(hold)
+		atomic.AddInt64(&cur, -1)
+		return stepResult{RC: 0, Stdout: "ok\n"}, nil
+	}
+	return exec, &maxSeen
+}
+
+// enqueueExtraRuns queues n additional runs on repoID (beyond the one
+// newTestRunner already seeded), so the runner has a backlog to dispatch.
+func enqueueExtraRuns(t *testing.T, r *ciRunner, repoID int64, n int) {
+	t.Helper()
+	for i := range n {
+		if _, err := storage.EnqueueRun(r.db, repoID, storage.NewRun{
+			CommitSHA: fmt.Sprintf("deadbeef%04d", i), Ref: "refs/heads/main", Event: "push",
+		}); err != nil {
+			t.Fatalf("EnqueueRun: %v", err)
+		}
+	}
+}
+
+// waitRunsTerminal blocks until every numbered run on repoID reaches a terminal
+// status, or fails the test on timeout.
+func waitRunsTerminal(t *testing.T, r *ciRunner, repoID int64, numbers []int, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for {
+		done := 0
+		for _, num := range numbers {
+			got, err := storage.GetRun(r.db, repoID, num)
+			if err != nil {
+				t.Fatalf("GetRun %d: %v", num, err)
+			}
+			if got.Status != storage.RunQueued && got.Status != storage.RunRunning {
+				done++
+			}
+		}
+		if done == len(numbers) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("only %d/%d runs terminal before timeout", done, len(numbers))
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func TestExecuteRunSuccess(t *testing.T) {
 	pipeline := `
 version: "1"
@@ -149,19 +210,7 @@ jobs:
     needs: [a, b]
     steps: [{run: echo c}]
 `
-	var cur, maxSeen int64
-	trackExec := func(context.Context, string, string) (stepResult, error) {
-		n := atomic.AddInt64(&cur, 1)
-		for {
-			old := atomic.LoadInt64(&maxSeen)
-			if n <= old || atomic.CompareAndSwapInt64(&maxSeen, old, n) {
-				break
-			}
-		}
-		time.Sleep(40 * time.Millisecond) // widen the overlap window
-		atomic.AddInt64(&cur, -1)
-		return stepResult{RC: 0, Stdout: "ok\n"}, nil
-	}
+	trackExec, maxSeen := trackingExec(40 * time.Millisecond) // hold widens the overlap window
 
 	r, run := newTestRunner(t, pipeline, true, trackExec)
 	r.cfg.CIJobConcurrency = 4
@@ -180,8 +229,8 @@ jobs:
 			t.Errorf("job %q = %q, want success", j.Name, j.Status)
 		}
 	}
-	if maxSeen < 2 {
-		t.Errorf("max concurrent steps = %d, want >= 2 (roots a and b should overlap)", maxSeen)
+	if peak := atomic.LoadInt64(maxSeen); peak < 2 {
+		t.Errorf("max concurrent steps = %d, want >= 2 (roots a and b should overlap)", peak)
 	}
 }
 
@@ -294,6 +343,73 @@ jobs:
 	}
 	if got.FinishedAt == nil {
 		t.Error("run has no FinishedAt after shutdown drain")
+	}
+}
+
+// TestRunDispatchesConcurrentRunsWithinCap verifies CIRunConcurrency caps how
+// many runs execute at once: with a backlog of 5 runs and a cap of 3, the runs
+// must overlap (peak >= 2) yet never exceed the cap (peak <= 3).
+func TestRunDispatchesConcurrentRunsWithinCap(t *testing.T) {
+	pipeline := `
+version: "1"
+jobs:
+  build:
+    steps: [{run: echo build}]
+`
+	exec, maxSeen := trackingExec(40 * time.Millisecond)
+	r, run := newTestRunner(t, pipeline, true, exec)
+	r.cfg.CIRunConcurrency = 3
+	enqueueExtraRuns(t, r, run.RepoID, 4) // 5 runs total: numbers 1..5
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		r.run(ctx)
+		close(done)
+	}()
+
+	waitRunsTerminal(t, r, run.RepoID, []int{1, 2, 3, 4, 5}, 5*time.Second)
+	cancel()
+	<-done
+
+	peak := atomic.LoadInt64(maxSeen)
+	if peak > 3 {
+		t.Errorf("peak concurrent runs = %d, want <= 3 (cap not honored)", peak)
+	}
+	if peak < 2 {
+		t.Errorf("peak concurrent runs = %d, want >= 2 (runs should overlap)", peak)
+	}
+}
+
+// TestRunDefaultRunConcurrencyIsSequential pins the default: with
+// CIRunConcurrency unset (0 -> treated as 1), runs execute strictly one at a
+// time, preserving the historical single-worker behavior.
+func TestRunDefaultRunConcurrencyIsSequential(t *testing.T) {
+	pipeline := `
+version: "1"
+jobs:
+  build:
+    steps: [{run: echo build}]
+`
+	exec, maxSeen := trackingExec(20 * time.Millisecond)
+	r, run := newTestRunner(t, pipeline, true, exec) // CIRunConcurrency left 0
+	enqueueExtraRuns(t, r, run.RepoID, 3)            // 4 runs total: numbers 1..4
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		r.run(ctx)
+		close(done)
+	}()
+
+	waitRunsTerminal(t, r, run.RepoID, []int{1, 2, 3, 4}, 5*time.Second)
+	cancel()
+	<-done
+
+	if peak := atomic.LoadInt64(maxSeen); peak != 1 {
+		t.Errorf("peak concurrent runs = %d with default concurrency, want 1 (sequential)", peak)
 	}
 }
 

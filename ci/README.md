@@ -36,6 +36,7 @@ The runner reads these settings (see `internal/config/config.go`):
 | `MOONGIT_CI_ISOLATION` | `docker` | `docker` runs jobs in containers; `none` runs them on the host (legacy, untrusted). |
 | `MOONGIT_CI_DEFAULT_IMAGE` | `moongit-ci:latest` | image a job uses when its `mgitci.yml` doesn't set `image:`. |
 | `MOONGIT_CI_JOB_CONCURRENCY` | `4` | how many of a run's jobs run at once; the runner schedules jobs in dependency waves and runs every ready job concurrently up to this cap. |
+| `MOONGIT_CI_RUN_CONCURRENCY` | `1` | how many CI runs execute at once. The default runs them one at a time (the historical behavior); raise it to use spare capacity, remembering each running job is its own container. |
 
 ## Per-job image override
 

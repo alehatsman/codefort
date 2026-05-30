@@ -47,6 +47,14 @@ type Config struct {
 	// MOONGIT_CI_JOB_CONCURRENCY (default 4); values < 1 are treated as 1.
 	CIJobConcurrency int
 
+	// CIRunConcurrency caps how many CI runs execute at once. The runner
+	// claims and dispatches up to this many runs concurrently; each run still
+	// bounds its own jobs by CIJobConcurrency. Set via
+	// MOONGIT_CI_RUN_CONCURRENCY (default 1 — runs execute one at a time, the
+	// historical behavior); values < 1 are treated as 1. Raise it to use spare
+	// capacity, bearing in mind each running job is its own container.
+	CIRunConcurrency int
+
 	// CISecret gates the loopback /internal/ci/events endpoint that the
 	// post-receive hook calls. Set via MOONGIT_CI_SECRET; empty means the
 	// server generates a fresh per-process secret at startup (sufficient,
@@ -143,6 +151,12 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("MOONGIT_CI_JOB_CONCURRENCY: %w", err)
 	}
 	cfg.CIJobConcurrency = jobConc
+
+	runConc, err := strconv.Atoi(envOr("MOONGIT_CI_RUN_CONCURRENCY", "1"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_CI_RUN_CONCURRENCY: %w", err)
+	}
+	cfg.CIRunConcurrency = runConc
 
 	retainRuns, err := strconv.Atoi(envOr("MOONGIT_CI_RETAIN_RUNS", "50"))
 	if err != nil {
