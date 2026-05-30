@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useIssues, useRepo } from "../api/queries"
 import { ISSUE_STATES, type IssueState } from "../api/types"
 import NewIssueForm from "../components/NewIssueForm"
@@ -15,11 +15,36 @@ export default function IssuesPage() {
   const [activeStates, setActiveStates] = useState<IssueState[]>(["todo", "in_progress"])
   const [unassignedOnly, setUnassignedOnly] = useState(false)
 
+  // The committed search term lives in the URL (?q=…) so a filtered view is
+  // bookmarkable, matching the list/board convention. `search` is the live
+  // input value; it's debounced into the URL so we don't refetch per keystroke.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const committedQuery = searchParams.get("q") ?? ""
+  const [search, setSearch] = useState(committedQuery)
+
+  useEffect(() => {
+    const trimmed = search.trim()
+    if (trimmed === committedQuery) return
+    const t = setTimeout(() => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (trimmed) next.set("q", trimmed)
+          else next.delete("q")
+          return next
+        },
+        { replace: true }
+      )
+    }, 250)
+    return () => clearTimeout(t)
+  }, [search, committedQuery, setSearchParams])
+
   const repoQ = useRepo(owner, repo)
 
   const query = new URLSearchParams()
   if (activeStates.length > 0) query.set("state", activeStates.join(","))
   if (unassignedOnly) query.set("assignee", "null")
+  if (committedQuery) query.set("q", committedQuery)
 
   const { data, isLoading, error } = useIssues(owner, repo, query.toString())
 
@@ -34,6 +59,16 @@ export default function IssuesPage() {
 
   function toggleState(s: IssueState) {
     setActiveStates((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]))
+  }
+
+  // A bare "#42" (or "42") is a jump, not a search: Enter goes straight there.
+  function onSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return
+    const m = search.trim().match(/^#?(\d+)$/)
+    if (m) {
+      e.preventDefault()
+      navigate(`/${owner}/${repo}/issues/${m[1]}`)
+    }
   }
 
   return (
@@ -54,6 +89,15 @@ export default function IssuesPage() {
       </div>
 
       <div className="filters">
+        <input
+          type="search"
+          className="issues__search"
+          placeholder="Search title or body, or #number…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={onSearchKeyDown}
+          aria-label="Search issues"
+        />
         <div className="filter-row">
           <span className="filter-label">state:</span>
           {ISSUE_STATES.map((s) => (

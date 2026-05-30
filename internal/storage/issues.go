@@ -261,7 +261,15 @@ func ExpireClaims(db *sql.DB, lease time.Duration) (int64, error) {
 type ListFilter struct {
 	States   []api.IssueState // OR-match; nil/empty means any
 	Assignee string           // "" = any, "null" = unassigned, otherwise exact
+	Query    string           // "" = any; case-insensitive substring of title or body
 	Limit    int              // 0 = default (100), capped at 1000
+}
+
+// likeEscape neutralizes the LIKE wildcards (% and _) and the escape char
+// itself so a user's query matches literally as a substring rather than as a
+// pattern. Paired with `ESCAPE '\'` in the query.
+func likeEscape(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
 func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error) {
@@ -285,6 +293,14 @@ func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error
 	} else if filter.Assignee != "" {
 		q.WriteString(" AND assignee = ?")
 		args = append(args, filter.Assignee)
+	}
+	if filter.Query != "" {
+		// LIKE is case-insensitive for ASCII in SQLite by default, which is
+		// fine for a keyword search. Match the same %term% against title and
+		// body; wildcards in the term are escaped so they're taken literally.
+		pat := "%" + likeEscape(filter.Query) + "%"
+		q.WriteString(` AND (title LIKE ? ESCAPE '\' OR body LIKE ? ESCAPE '\')`)
+		args = append(args, pat, pat)
 	}
 
 	limit := filter.Limit

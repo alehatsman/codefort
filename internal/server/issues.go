@@ -271,6 +271,9 @@ func parseListFilter(q map[string][]string) (storage.ListFilter, error) {
 	if v := q["assignee"]; len(v) > 0 {
 		f.Assignee = v[0]
 	}
+	if v := q["q"]; len(v) > 0 {
+		f.Query = strings.TrimSpace(v[0])
+	}
 	if v := q["limit"]; len(v) > 0 {
 		n, err := strconv.Atoi(v[0])
 		if err != nil || n < 0 {

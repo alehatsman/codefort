@@ -52,7 +52,7 @@ func printUsage(w io.Writer) {
 
 USAGE:
     moongit issue create  --title <t> [--body <b>]
-    moongit issue list    [--state s,s] [--assignee a|null] [--limit n]
+    moongit issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--limit n]
     moongit issue show    <number>
     moongit issue edit    <number> [--title <t>] [--body <b>] [--state <s>]
     moongit issue set-state <number> <todo|in_progress|done|closed>
@@ -146,6 +146,9 @@ func runIssueList(args []string) error {
 	state := fs.String("state", "", "filter by state(s), comma-separated (todo,in_progress,done,closed)")
 	assignee := fs.String("assignee", "", "filter by assignee; 'null' for unassigned")
 	limit := fs.Int("limit", 0, "max results (default 100, max 1000)")
+	var query string
+	fs.StringVar(&query, "query", "", "filter by keyword in title or body")
+	fs.StringVar(&query, "q", "", "shorthand for --query")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -160,6 +163,9 @@ func runIssueList(args []string) error {
 	}
 	if *assignee != "" {
 		q.Set("assignee", *assignee)
+	}
+	if query != "" {
+		q.Set("q", query)
 	}
 	if *limit > 0 {
 		q.Set("limit", strconv.Itoa(*limit))

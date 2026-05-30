@@ -164,14 +164,21 @@ function recountRepos(state: State) {
   }
 }
 
-function parseQuery(url: URL): { states?: IssueState[]; assignee?: string; limit?: number } {
+function parseQuery(url: URL): {
+  states?: IssueState[]
+  assignee?: string
+  query?: string
+  limit?: number
+} {
   const stateRaw = url.searchParams.getAll("state").flatMap((s) => s.split(","))
   const states = stateRaw.filter(Boolean) as IssueState[]
   const assignee = url.searchParams.get("assignee") ?? undefined
+  const query = url.searchParams.get("q")?.trim() || undefined
   const limitRaw = url.searchParams.get("limit")
   return {
     states: states.length ? states : undefined,
     assignee: assignee ?? undefined,
+    query,
     limit: limitRaw ? Number(limitRaw) : undefined,
   }
 }
@@ -181,6 +188,12 @@ function applyIssueFilters(issues: Issue[], q: ReturnType<typeof parseQuery>): I
   if (q.states) out = out.filter((i) => q.states!.includes(i.state))
   if (q.assignee === "null") out = out.filter((i) => i.assignee === null)
   else if (q.assignee) out = out.filter((i) => i.assignee === q.assignee)
+  if (q.query) {
+    const needle = q.query.toLowerCase()
+    out = out.filter(
+      (i) => i.title.toLowerCase().includes(needle) || (i.body ?? "").toLowerCase().includes(needle)
+    )
+  }
   out = [...out].sort((a, b) => b.number - a.number)
   if (q.limit && q.limit > 0) out = out.slice(0, q.limit)
   return out
