@@ -466,6 +466,18 @@ pre {
   color: var(--fg-muted);
   margin: 0 6px;
 }
+/* Affordance: a crumb dex has prose for carries it as a hover tooltip. The
+   dotted underline signals "hover me", the help cursor confirms it on the
+   current (non-link) segment; links keep their pointer. */
+.path-breadcrumb__seg--info {
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--fg-muted);
+}
+.path-breadcrumb__current.path-breadcrumb__seg--info {
+  cursor: help;
+}
 
 .file-icon {
   vertical-align: text-bottom;

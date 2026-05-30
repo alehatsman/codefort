@@ -34,7 +34,7 @@ export default function IssuePage() {
   return (
     <div>
       <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
-      <OverviewCard owner={owner} repo={repo} path="" summary="" />
+      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       <h2 className="issue-title">
         {iss.title} <span className="issue-title__num">#{iss.number}</span>

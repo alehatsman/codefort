@@ -15,7 +15,7 @@ import FileTree from "../components/FileTree"
 import LatestCommitBar from "../components/LatestCommitBar"
 import CommitMeta from "../components/CommitMeta"
 import ReadmeCard from "../components/ReadmeCard"
-import OverviewCard from "../components/OverviewCard"
+import OverviewCard, { breadcrumbSummaries } from "../components/OverviewCard"
 import { findReadme } from "../lib/readme"
 import { useListNav } from "../lib/keyboardNav"
 
@@ -106,17 +106,14 @@ function TreeView({ owner, repo, path }: ViewProps) {
 
   const readme = findReadme(treeQ.data.entries)
 
-  // At the root, show the repo-level summary; inside a directory, the
-  // matching package summary (dex keys those by directory path). Folders
-  // dex didn't summarize simply render no card.
-  const ov = overviewQ.data
-  const summary = isRoot
-    ? (ov?.repo_summary ?? "")
-    : (ov?.packages.find((p) => p.path === path)?.summary ?? "")
+  // The dex overview carries the repo summary and one entry per package, so a
+  // single map makes the repo crumb and every directory crumb up to here
+  // hoverable. Paths dex didn't summarize simply stay plain.
+  const summaries = breadcrumbSummaries(overviewQ.data)
 
   return (
     <>
-      <OverviewCard owner={owner} repo={repo} path={path} summary={summary} />
+      <OverviewCard owner={owner} repo={repo} path={path} summaries={summaries} />
       <LatestCommitBar
         owner={owner}
         repo={repo}
@@ -147,6 +144,10 @@ function BlobView({ owner, repo, path }: ViewProps) {
   const intelQ = useIntel(owner, repo)
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
   const summaryQ = useIntelFileSummary(owner, repo, path, isIndexed)
+  // The repo + package overview (one cached query per repo) makes the parent
+  // dir and repo crumbs hoverable here too, with the file summary filling the
+  // leaf segment.
+  const overviewQ = useIntelOverview(owner, repo, isIndexed)
   // Latest commit touching this file, for the GitHub-style header.
   const commitsQ = useCommits(owner, repo, { path, perPage: 1 })
   const lastCommit = commitsQ.data?.commits?.[0]
@@ -156,10 +157,11 @@ function BlobView({ owner, repo, path }: ViewProps) {
   if (!blobQ.data) return null
 
   const b = blobQ.data
+  const summaries = breadcrumbSummaries(overviewQ.data, summaryQ.data)
 
   return (
     <>
-      <OverviewCard owner={owner} repo={repo} path={path} summary={summaryQ.data?.summary ?? ""} />
+      <OverviewCard owner={owner} repo={repo} path={path} summaries={summaries} />
       <div className="blob">
         {lastCommit && (
           <CommitMeta owner={owner} repo={repo} commit={lastCommit} className="blob__commit" />

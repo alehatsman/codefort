@@ -51,7 +51,7 @@ export default function ResearchPage() {
   return (
     <div className="research-page">
       <RepoHeader owner={r.owner} repo={r.name} openIssues={r.open_issues} />
-      <OverviewCard owner={r.owner} repo={r.name} path="" summary="" />
+      <OverviewCard owner={r.owner} repo={r.name} path="" summaries={{}} />
 
       {intelQ.isLoading && <div className="loading">Loading index status…</div>}
       {intelQ.error && <div className="error">{(intelQ.error as Error).message}</div>}

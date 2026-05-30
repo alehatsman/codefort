@@ -37,7 +37,7 @@ export default function CommitPage() {
   return (
     <div className="commit-page">
       <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
-      <OverviewCard owner={owner} repo={repo} path="" summary="" />
+      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       {commitQ.isLoading ? (
         <div className="loading">Loading…</div>

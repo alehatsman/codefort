@@ -92,7 +92,7 @@ export default function BoardPage() {
   return (
     <div>
       <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
-      <OverviewCard owner={owner} repo={repo} path="" summary="" />
+      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       <div className="issues__header">
         <div className="issues__header-left">
