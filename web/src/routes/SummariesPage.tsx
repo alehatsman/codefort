@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom"
 import { useIntel, useIntelOverview, useRepo } from "../api/queries"
 import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
+import IndexMeta from "../components/IndexMeta"
 import type { IntelOverview } from "../api/types"
 
 /**
@@ -63,6 +64,8 @@ export default function SummariesPage() {
         <div className="error">{(overviewQ.error as Error).message}</div>
       )}
       {isIndexed && overviewQ.data && <Summaries overview={overviewQ.data} />}
+
+      {isIndexed && intel?.project && <IndexMeta project={intel.project} showPending />}
     </div>
   )
 }
