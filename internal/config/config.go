@@ -46,6 +46,19 @@ type Config struct {
 	// since it's injected into the hook env at push time and never persisted).
 	CISecret string
 
+	// CIIsolation selects how the runner executes a job's steps. "docker"
+	// (default) runs each job in a throwaway container so repo-authored
+	// commands never touch the host; "none" runs them on the host as the
+	// moongitd user (the legacy path — RCE by design, use only when you trust
+	// every CI-enabled repo). Set via MOONGIT_CI_ISOLATION.
+	CIIsolation string
+
+	// CIDefaultImage is the container image a job runs in when its mgitci.yml
+	// doesn't set `image:`. It must be glibc-based and carry `mooncake` (and
+	// `git`) on PATH — see ci/Dockerfile. Only used when CIIsolation="docker".
+	// Set via MOONGIT_CI_DEFAULT_IMAGE.
+	CIDefaultImage string
+
 	// DexURL is the base URL of a dex `serve` daemon (e.g.
 	// http://127.0.0.1:8080). Empty disables the Intel tab. DexToken is
 	// the bearer token dex was started with (DEX_SERVE_TOKEN); empty when
@@ -111,6 +124,14 @@ func Load() (*Config, error) {
 	}
 	cfg.CIPollInterval = ciPoll
 	cfg.CISecret = envOr("MOONGIT_CI_SECRET", "")
+
+	cfg.CIIsolation = envOr("MOONGIT_CI_ISOLATION", "docker")
+	switch cfg.CIIsolation {
+	case "docker", "none":
+	default:
+		return nil, fmt.Errorf("MOONGIT_CI_ISOLATION: want \"docker\" or \"none\", got %q", cfg.CIIsolation)
+	}
+	cfg.CIDefaultImage = envOr("MOONGIT_CI_DEFAULT_IMAGE", "moongit-ci:latest")
 
 	return cfg, nil
 }

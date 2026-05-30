@@ -34,16 +34,32 @@ type stepResult struct {
 	Error      string `json:"error"`
 }
 
-// The runner's three external boundaries, injected so the orchestration is
-// testable without the real git / mooncake binaries.
+// The runner's external boundaries, injected so the orchestration is testable
+// without the real git / mooncake / docker binaries.
 type (
-	// stepExecutor runs one mooncake step (YAML) in workDir.
+	// stepExecutor runs one mooncake step (YAML) in workDir. It backs the host
+	// session and is the unit tests' injection point.
 	stepExecutor func(ctx context.Context, workDir, stepYAML string) (stepResult, error)
 	// checkoutFunc materializes the repo tree at commitSHA into workDir.
 	checkoutFunc func(ctx context.Context, bareRepo, commitSHA, workDir string) error
 	// pipelineReader reads mgitci.yml at commitSHA; ok=false means absent.
 	pipelineReader func(bareRepo, commitSHA string) (raw []byte, ok bool, err error)
 )
+
+// jobSession executes one job's steps in some environment and is closed when
+// the job finishes. It is the runner's isolation seam: runJob emits the same
+// event stream regardless of whether the session runs steps on the host or in
+// a per-job container.
+type jobSession interface {
+	Exec(ctx context.Context, stepYAML string) (stepResult, error)
+	Close() error
+}
+
+// sessionFactory opens a jobSession for one job. name is a stable
+// docker-safe container name; workDir is the checked-out (bind-mountable)
+// workspace; image is the resolved container image (ignored by the host
+// session).
+type sessionFactory func(ctx context.Context, name, workDir, image string) (jobSession, error)
 
 // ciRunner executes queued CI runs in-process, emitting the mooncake-shaped
 // event stream per job. Everything downstream (storage status, API, UI)
@@ -54,20 +70,31 @@ type ciRunner struct {
 	cfg    *config.Config
 	logger *slog.Logger
 
-	exec         stepExecutor
+	newSession   sessionFactory
 	checkout     checkoutFunc
 	readPipeline pipelineReader
 }
 
 func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner {
-	return &ciRunner{
+	r := &ciRunner{
 		db:           db,
 		cfg:          cfg,
 		logger:       logger,
-		exec:         runMooncakeStep,
 		checkout:     gitCheckout,
 		readPipeline: gitReadPipeline,
 	}
+	if cfg.CIIsolation == "none" {
+		// Legacy path: steps run on the host as the moongitd user.
+		r.newSession = func(_ context.Context, _, workDir, _ string) (jobSession, error) {
+			return &hostSession{workDir: workDir, exec: runMooncakeStep}, nil
+		}
+	} else {
+		// Default: one throwaway container per job, steps run via docker exec.
+		r.newSession = func(ctx context.Context, name, workDir, image string) (jobSession, error) {
+			return openDockerSession(ctx, logger, name, workDir, image)
+		}
+	}
+	return r
 }
 
 // runCIRunner launches the in-process CI runner beside the reapers. One worker;
@@ -81,7 +108,13 @@ func (r *ciRunner) run(ctx context.Context) {
 	if interval <= 0 {
 		interval = 5 * time.Second
 	}
-	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout)
+	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout, "isolation", r.cfg.CIIsolation)
+
+	// A crashed runner can leave job containers behind; reap them before
+	// taking new work so they don't accumulate.
+	if r.cfg.CIIsolation == "docker" {
+		sweepOrphanContainers(ctx, r.logger)
+	}
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -264,13 +297,33 @@ func (r *ciRunner) runJob(ctx context.Context, owner, repo string, runNum int, j
 	r.emit(elog, ci.EventRunStarted, map[string]any{"total_steps": len(steps)})
 	r.emit(elog, ci.EventPlanLoaded, map[string]any{"total_steps": len(steps)})
 
+	// Open the job's execution environment (a per-job container under docker
+	// isolation, or the host otherwise). A failure here — e.g. the image is
+	// missing or docker is down — fails the job loudly rather than silently
+	// falling back to the host.
+	image := job.Image
+	if image == "" {
+		image = r.cfg.CIDefaultImage
+	}
+	sess, err := r.newSession(ctx, containerName(jobID, jobName), workDir, image)
+	if err != nil {
+		r.emit(elog, ci.EventStepStderr, map[string]any{
+			"step_id": "session", "stream": "stderr", "line": err.Error(), "line_number": 1,
+		})
+		r.emit(elog, ci.EventRunFailed, map[string]any{"error": err.Error()})
+		r.finishJob(jobID, storage.JobError, nil)
+		log.Error("ci open session", "image", image, "err", err)
+		return storage.JobError
+	}
+	defer sess.Close()
+
 	for i, step := range steps {
 		stepID := fmt.Sprintf("step-%04d", i+1)
 		r.emit(elog, ci.EventStepStarted, map[string]any{
 			"step_id": stepID, "action": step.Action, "global_step": i + 1,
 		})
 
-		res, execErr := r.exec(ctx, workDir, step.YAML)
+		res, execErr := sess.Exec(ctx, step.YAML)
 		if execErr != nil {
 			// Couldn't run the step (mooncake missing, or ctx timeout/cancel).
 			r.emit(elog, ci.EventStepStderr, map[string]any{
@@ -363,11 +416,115 @@ func (r *ciRunner) finishJob(jobID int64, status storage.JobStatus, exitCode *in
 	}
 }
 
+// hostSession runs a job's steps on the host via the injected stepExecutor (the
+// legacy, non-isolated path; also the unit tests' seam). It owns no resources,
+// so Close is a no-op.
+type hostSession struct {
+	workDir string
+	exec    stepExecutor
+}
+
+func (h *hostSession) Exec(ctx context.Context, stepYAML string) (stepResult, error) {
+	return h.exec(ctx, h.workDir, stepYAML)
+}
+
+func (h *hostSession) Close() error { return nil }
+
+// dockerSession runs a job's steps inside a single throwaway container, keeping
+// repo-authored commands off the host. The container is started detached
+// (`sleep infinity`) at Open and torn down at Close; each step is a
+// `docker exec mooncake step` into it, so steps share the bind-mounted
+// workspace and the per-step JSON contract is identical to the host path.
+type dockerSession struct {
+	name   string
+	logger *slog.Logger
+}
+
+// openDockerSession starts the per-job container. The workspace is bind-mounted
+// at /work and the container runs as the moongitd uid:gid so files it writes
+// stay owned by moongitd (root-owned files would break workspace cleanup). The
+// image must be glibc-based and carry `mooncake` on PATH (see ci/Dockerfile).
+func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, image string) (jobSession, error) {
+	args := []string{
+		"run", "-d", "--rm",
+		"--name", name,
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+		"-v", workDir + ":/work",
+		"-w", "/work",
+		"--entrypoint", "sleep",
+		image, "infinity",
+	}
+	out, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("docker run %s: %v (%s)", image, err, strings.TrimSpace(string(out)))
+	}
+	return &dockerSession{name: name, logger: logger}, nil
+}
+
+func (d *dockerSession) Exec(ctx context.Context, stepYAML string) (stepResult, error) {
+	cmd := exec.CommandContext(ctx, "docker", "exec", d.name, "mooncake", "step", stepYAML)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	runErr := cmd.Run()
+	return parseStepResult(ctx, stdout.Bytes(), stderr.Bytes(), runErr)
+}
+
+// Close removes the container. It uses a fresh background context with a short
+// timeout so teardown still runs after a run-timeout has cancelled the parent
+// context — otherwise the detached container would leak.
+func (d *dockerSession) Close() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "docker", "rm", "-f", d.name).CombinedOutput(); err != nil {
+		d.logger.Error("ci container cleanup", "name", d.name, "err", err, "out", strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// sweepOrphanContainers removes any moongit-ci-* containers left behind by a
+// crashed runner. Best-effort: failures are logged, not fatal.
+func sweepOrphanContainers(ctx context.Context, logger *slog.Logger) {
+	out, err := exec.CommandContext(ctx, "docker", "ps", "-aq", "--filter", "name=moongit-ci-").Output()
+	if err != nil {
+		logger.Warn("ci orphan container scan", "err", err)
+		return
+	}
+	ids := strings.Fields(string(out))
+	if len(ids) == 0 {
+		return
+	}
+	if out, err := exec.CommandContext(ctx, "docker", append([]string{"rm", "-f"}, ids...)...).CombinedOutput(); err != nil {
+		logger.Warn("ci orphan container sweep", "err", err, "out", strings.TrimSpace(string(out)))
+		return
+	}
+	logger.Info("ci swept orphan containers", "count", len(ids))
+}
+
+// containerName builds a docker-safe, collision-free name for a job's
+// container. jobID (a unique PK) guarantees uniqueness; the sanitized job name
+// is appended for readability in `docker ps`.
+func containerName(jobID int64, jobName string) string {
+	return fmt.Sprintf("moongit-ci-%d-%s", jobID, sanitizeContainerName(jobName))
+}
+
+// sanitizeContainerName maps any character outside docker's name charset
+// ([a-zA-Z0-9_.-]) to '-'.
+func sanitizeContainerName(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '_', r == '.', r == '-':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('-')
+		}
+	}
+	return b.String()
+}
+
 // runMooncakeStep executes one translated step via `mooncake step '<YAML>'` in
-// workDir. mooncake prints its JSON result to stdout even when the step fails
-// and the process exits non-zero, so we parse stdout regardless of exit code
-// and only treat an unparseable result (or a cancelled context) as an
-// executor error.
+// workDir. It backs the host session.
 func runMooncakeStep(ctx context.Context, workDir, stepYAML string) (stepResult, error) {
 	cmd := exec.CommandContext(ctx, "mooncake", "step", stepYAML)
 	cmd.Dir = workDir
@@ -375,12 +532,20 @@ func runMooncakeStep(ctx context.Context, workDir, stepYAML string) (stepResult,
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	runErr := cmd.Run()
+	return parseStepResult(ctx, stdout.Bytes(), stderr.Bytes(), runErr)
+}
+
+// parseStepResult turns a `mooncake step` invocation's output into a stepResult.
+// mooncake prints its JSON result to stdout even when the step fails and the
+// process exits non-zero, so we parse stdout regardless of exit code and only
+// treat an unparseable result (or a cancelled context) as an executor error.
+func parseStepResult(ctx context.Context, stdout, stderr []byte, runErr error) (stepResult, error) {
 	if ctx.Err() != nil {
 		return stepResult{}, fmt.Errorf("step cancelled: %w", ctx.Err())
 	}
 	var res stepResult
-	if jerr := json.Unmarshal(stdout.Bytes(), &res); jerr != nil {
-		return stepResult{}, fmt.Errorf("mooncake step: %v (stderr: %s)", runErr, strings.TrimSpace(stderr.String()))
+	if jerr := json.Unmarshal(stdout, &res); jerr != nil {
+		return stepResult{}, fmt.Errorf("mooncake step: %v (stderr: %s)", runErr, strings.TrimSpace(string(stderr)))
 	}
 	return res, nil
 }

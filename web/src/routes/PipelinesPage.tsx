@@ -124,8 +124,8 @@ function CIDisabledCard({ owner, repo }: { owner: string; repo: string }) {
         </p>
         <p className="muted small">
           When enabled, pushing a commit that contains an <code>mgitci.yml</code> runs its pipeline.
-          CI executes repo-authored commands as the moongitd user — only enable it for repos you
-          trust.
+          Each job runs in a throwaway container off the configured CI image, so repo-authored
+          commands stay isolated from the host.
         </p>
         <button
           className="btn btn--primary"

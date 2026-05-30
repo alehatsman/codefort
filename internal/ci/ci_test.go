@@ -50,6 +50,31 @@ func TestParseExample(t *testing.T) {
 	}
 }
 
+func TestParseJobImage(t *testing.T) {
+	const withImage = `
+version: "1"
+jobs:
+  build:
+    image: golang:1.24
+    steps:
+      - run: go build ./...
+  test:
+    steps:
+      - run: go test ./...
+`
+	p, err := Parse([]byte(withImage))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := p.Jobs["build"].Image; got != "golang:1.24" {
+		t.Errorf("build job image = %q, want %q", got, "golang:1.24")
+	}
+	// An omitted image stays empty so the runner falls back to the server default.
+	if got := p.Jobs["test"].Image; got != "" {
+		t.Errorf("test job image = %q, want empty", got)
+	}
+}
+
 func TestTranslateRunSugar(t *testing.T) {
 	p, err := Parse([]byte(exampleYAML))
 	if err != nil {

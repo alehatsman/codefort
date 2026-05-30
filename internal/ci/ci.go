@@ -42,6 +42,11 @@ type Push struct {
 // Needs means the job has no dependencies and may run first / in parallel.
 type Job struct {
 	Needs []string `yaml:"needs"`
+	// Image overrides the server default CI image for this job (honored only
+	// under docker isolation). It must be glibc-based and carry `mooncake` on
+	// PATH — the runner execs `mooncake step` inside it. Empty means "use the
+	// server default image".
+	Image string `yaml:"image"`
 	// Steps stay as raw YAML nodes so raw mooncake steps survive translation
 	// untouched and `run:` sugar can be rewritten precisely.
 	Steps []yaml.Node `yaml:"steps"`

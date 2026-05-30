@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"path/filepath"
@@ -52,8 +53,10 @@ func newTestRunner(t *testing.T, pipeline string, enabled bool, exec stepExecuto
 			CIRunTimeout:   time.Minute,
 			CIPollInterval: time.Second,
 		},
-		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
-		exec:     exec,
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		newSession: func(_ context.Context, _, workDir, _ string) (jobSession, error) {
+			return &hostSession{workDir: workDir, exec: exec}, nil
+		},
 		checkout: func(context.Context, string, string, string) error { return nil },
 		readPipeline: func(string, string) ([]byte, bool, error) {
 			if pipeline == "" {
@@ -219,5 +222,42 @@ func TestExecuteRunGatedWhenNoPipeline(t *testing.T) {
 	got, _ := storage.GetRun(r.db, run.RepoID, run.Number)
 	if got.Status != storage.RunCanceled {
 		t.Errorf("run status = %q, want canceled (no pipeline)", got.Status)
+	}
+}
+
+func TestContainerName(t *testing.T) {
+	// jobID makes the name collision-free; the job name is sanitized to
+	// docker's [a-zA-Z0-9_.-] charset and the prefix stays a valid leading char.
+	got := containerName(42, "build/test step")
+	if want := "moongit-ci-42-build-test-step"; got != want {
+		t.Errorf("containerName = %q, want %q", got, want)
+	}
+	if got := sanitizeContainerName("ok_.-9AZ"); got != "ok_.-9AZ" {
+		t.Errorf("sanitizeContainerName mangled a valid name: %q", got)
+	}
+}
+
+func TestParseStepResult(t *testing.T) {
+	// mooncake prints JSON to stdout even when the step fails and exits
+	// non-zero; parseStepResult must trust stdout, not the process error.
+	stdout := []byte(`{"rc":3,"failed":true,"stdout":"boom\n"}`)
+	res, err := parseStepResult(context.Background(), stdout, nil, errors.New("exit status 3"))
+	if err != nil {
+		t.Fatalf("parseStepResult: %v", err)
+	}
+	if res.RC != 3 || !res.Failed || res.Stdout != "boom\n" {
+		t.Errorf("got %+v, want rc=3 failed=true stdout=boom", res)
+	}
+
+	// Unparseable stdout surfaces as an executor error (with stderr context).
+	if _, err := parseStepResult(context.Background(), []byte("not json"), []byte("kaboom"), errors.New("x")); err == nil {
+		t.Error("parseStepResult accepted non-JSON stdout, want error")
+	}
+
+	// A cancelled context is an executor error regardless of output.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := parseStepResult(ctx, stdout, nil, nil); err == nil {
+		t.Error("parseStepResult ignored a cancelled context, want error")
 	}
 }
