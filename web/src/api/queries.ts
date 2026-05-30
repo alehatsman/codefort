@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "./client"
 import type { CIRun, CodeCommentState, Issue, Repo } from "./types"
 
@@ -125,6 +125,30 @@ export function useCommits(
         perPage: perPage || undefined,
         ref: ref || undefined,
       }),
+    enabled: !!owner && !!repo,
+  })
+}
+
+// Paginated commit history for the commits page. TanStack owns the page
+// accumulation and per-filter cache: changing owner/repo/path swaps to a fresh
+// query (no manual reset), and pages flatten out of `data.pages`.
+export function useInfiniteCommits(
+  owner: string,
+  repo: string,
+  opts: { path?: string; perPage?: number; ref?: string } = {}
+) {
+  const { path = "", perPage = 0, ref = "" } = opts
+  return useInfiniteQuery({
+    queryKey: ["commits", "infinite", owner, repo, path, perPage, ref] as const,
+    queryFn: ({ pageParam }) =>
+      api.getCommits(owner, repo, {
+        path,
+        page: pageParam,
+        perPage: perPage || undefined,
+        ref: ref || undefined,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => (lastPage.has_more ? allPages.length + 1 : undefined),
     enabled: !!owner && !!repo,
   })
 }

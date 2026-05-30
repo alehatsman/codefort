@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { useCommits, useRepo } from "../api/queries"
+import { useInfiniteCommits, useRepo } from "../api/queries"
 import type { Commit } from "../api/types"
 import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
@@ -19,33 +18,11 @@ export default function CommitsPage() {
   const path = useParams()["*"] ?? ""
 
   const repoQ = useRepo(owner, repo)
+  const commitsQ = useInfiniteCommits(owner, repo, { path, perPage: PER_PAGE })
 
-  // Accumulate pages client-side. Each `page` is a separate cached query;
-  // we concatenate them (deduping by SHA) into one growing list.
-  const [page, setPage] = useState(1)
-  const [commits, setCommits] = useState<Commit[]>([])
-  const commitsQ = useCommits(owner, repo, { path, page, perPage: PER_PAGE })
-
-  // Reset accumulation when the repo or path filter changes. owner/repo/path
-  // are the reset *triggers*, not read in the body — Biome can't see that.
-  // TODO(#61): replace this effect with a render key or derived reset.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deps are the reset triggers, not used in the body
-  useEffect(() => {
-    setPage(1)
-    setCommits([])
-  }, [owner, repo, path])
-
-  useEffect(() => {
-    const data = commitsQ.data
-    if (!data) return
-    setCommits((prev) => {
-      if (page === 1) return data.commits
-      const seen = new Set(prev.map((c) => c.sha))
-      return [...prev, ...data.commits.filter((c) => !seen.has(c.sha))]
-    })
-  }, [commitsQ.data, page])
-
-  const hasMore = commitsQ.data?.has_more ?? false
+  // Flatten the loaded pages into one list, deduped by SHA — page boundaries
+  // can shift if new commits land between fetches.
+  const commits = dedupeBySha(commitsQ.data?.pages.flatMap((p) => p.commits) ?? [])
   const groups = groupByDay(commits)
 
   return (
@@ -76,14 +53,14 @@ export default function CommitsPage() {
             </section>
           ))}
 
-          {hasMore && (
+          {commitsQ.hasNextPage && (
             <button
               type="button"
               className="commits-page__more"
-              disabled={commitsQ.isFetching}
-              onClick={() => setPage((p) => p + 1)}
+              disabled={commitsQ.isFetchingNextPage}
+              onClick={() => commitsQ.fetchNextPage()}
             >
-              {commitsQ.isFetching ? "Loading…" : "Load more"}
+              {commitsQ.isFetchingNextPage ? "Loading…" : "Load more"}
             </button>
           )}
         </>
@@ -112,6 +89,15 @@ function CommitRow({ owner, repo, commit }: { owner: string; repo: string; commi
       </Link>
     </li>
   )
+}
+
+function dedupeBySha(commits: Commit[]): Commit[] {
+  const seen = new Set<string>()
+  return commits.filter((c) => {
+    if (seen.has(c.sha)) return false
+    seen.add(c.sha)
+    return true
+  })
 }
 
 interface DayGroup {
