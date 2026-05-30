@@ -185,3 +185,13 @@ func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
 }
+
+// Flush promotes the underlying writer's http.Flusher so SSE endpoints (e.g.
+// the CI job-events stream) still detect streaming support through the
+// logging wrapper. Embedding http.ResponseWriter does not surface Flush,
+// since it isn't part of that interface.
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}

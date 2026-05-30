@@ -335,3 +335,38 @@ func TestJobEventsRunNotFound(t *testing.T) {
 		t.Fatalf("code = %d, want 404", rr.Code)
 	}
 }
+
+// TestJobEventsThroughFullHandler exercises the SSE endpoint through the
+// complete Handler() chain — crucially including withLogging, whose
+// statusRecorder wraps the ResponseWriter. The other JobEvents tests drive
+// apiHandler() directly, where the bare httptest.ResponseRecorder already
+// satisfies http.Flusher, so they never caught statusRecorder dropping that
+// interface (issue #40: every request returned 500 "streaming unsupported").
+func TestJobEventsThroughFullHandler(t *testing.T) {
+	s, repoID := newCIReadServer(t)
+	run := enqueue(t, s, repoID, "sha", "refs/heads/main")
+	writeJobEvents(t, s, run, "build", ci.EventRunStarted, ci.EventRunCompleted)
+
+	raw, err := storage.GenerateTokenString()
+	if err != nil {
+		t.Fatalf("GenerateTokenString: %v", err)
+	}
+	if _, err := storage.CreateToken(s.db, "agent#17", raw); err != nil {
+		t.Fatalf("CreateToken: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/build/events", nil)
+	req.Header.Set("Authorization", "Bearer "+raw)
+	rr := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200; body=%s", rr.Code, rr.Body.String())
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "text/event-stream" {
+		t.Errorf("content-type = %q, want text/event-stream", ct)
+	}
+	if body := rr.Body.String(); !strings.Contains(body, "event: "+ci.EventRunCompleted) {
+		t.Errorf("stream missing events through full chain:\n%s", body)
+	}
+}
