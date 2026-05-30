@@ -3,6 +3,7 @@ import { api } from "./client"
 import { keys } from "./queries"
 import type {
   ClaimIssueInput,
+  CreateCodeCommentInput,
   CreateCommentInput,
   CreateIssueInput,
   CreateRepoInput,
@@ -109,6 +110,43 @@ export function useDeleteComment(owner: string, repo: string, n: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.comments(owner, repo, n) })
     },
+  })
+}
+
+// Code review comments. The codeComments key is hierarchical
+// (["codeComments", owner, repo, ref, path, state]), so invalidating the
+// owner/repo prefix refreshes every ref/path/state variant at once — a write
+// on one branch's file view also updates the Review tab's aggregate list.
+function invalidateCodeComments(
+  qc: ReturnType<typeof useQueryClient>,
+  owner: string,
+  repo: string
+) {
+  qc.invalidateQueries({ queryKey: ["codeComments", owner, repo] })
+}
+
+export function useCreateCodeComment(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateCodeCommentInput) => api.createCodeComment(owner, repo, input),
+    onSuccess: () => invalidateCodeComments(qc, owner, repo),
+  })
+}
+
+export function useSetCodeCommentResolved(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, resolved }: { id: number; resolved: boolean }) =>
+      api.updateCodeComment(owner, repo, id, { resolved }),
+    onSuccess: () => invalidateCodeComments(qc, owner, repo),
+  })
+}
+
+export function useDeleteCodeComment(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.deleteCodeComment(owner, repo, id),
+    onSuccess: () => invalidateCodeComments(qc, owner, repo),
   })
 }
 

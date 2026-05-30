@@ -1,27 +1,55 @@
-import { useEffect, useMemo, useRef } from "react"
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
+import type { ReactNode } from "react"
 import { useLocation } from "react-router-dom"
 import { highlight, langFromPath, splitLines } from "../lib/highlight"
+import {
+  useCreateCodeComment,
+  useDeleteCodeComment,
+  useSetCodeCommentResolved,
+} from "../api/mutations"
+import type { CodeComment } from "../api/types"
+import Avatar from "./Avatar"
+
+// The markdown renderer pulls in remark/rehype; load it lazily.
+const Markdown = lazy(() => import("./Markdown"))
 
 interface Props {
   content: string
-  /** Repo-relative path of the file; used only to pick a highlight grammar. */
+  /** Repo-relative path of the file; picks a highlight grammar and anchors
+   *  comments. */
   path?: string
+  /** Commenting turns on only when owner+repo+path are all present. */
+  owner?: string
+  repo?: string
+  /** Branch the comments are bound to ("" => the repo default). */
+  codeRef?: string
+  /** Existing comments for this file on this ref. */
+  comments?: CodeComment[]
+  /** Authenticated user's name, for author-only resolve/delete affordances. */
+  currentUser?: string
 }
 
 /**
- * Line-numbered source viewer in GitHub's blob style with lightweight syntax
- * highlighting. The whole file is tokenised once (so multi-line tokens such as
- * block comments stay correct), then the token tree is sliced into per-line
- * fragments to keep the sticky line-number gutter. Token colours come from the
- * Primer palette in styles.css — no extra theme stylesheet is loaded.
+ * Line-numbered source viewer in GitHub's blob style. The whole file is
+ * tokenised once (so multi-line tokens such as block comments stay correct),
+ * then the token tree is sliced into per-line fragments. Token colours come
+ * from the Primer palette in styles.css.
  *
- * A trailing newline is dropped so we don't show a phantom last line.
- *
- * Each row carries an `Ln` id so a `#L<n>` (or `#L<start>-L<end>`) URL hash —
- * e.g. a deep link from a Research suggested-read — scrolls the block into view
- * and highlights it, the way a code browser opens a file at a line.
+ * On top of the viewer it carries review comments anchored to a line range:
+ * click a line number to select a line, shift-click another to extend the
+ * range, and an inline form opens beneath the selection. Existing comments
+ * render inline under the line they end on, each with author-only Resolve and
+ * Delete. A `#L<n>`/`#L<start>-L<end>` URL hash still deep-links + highlights.
  */
-export default function CodeView({ content, path }: Props) {
+export default function CodeView({
+  content,
+  path,
+  owner,
+  repo,
+  codeRef = "",
+  comments = [],
+  currentUser,
+}: Props) {
   const lines = useMemo(() => {
     const body = content.endsWith("\n") ? content.slice(0, -1) : content
     return splitLines(highlight(body, path ? langFromPath(path) : undefined))
@@ -31,33 +59,237 @@ export default function CodeView({ content, path }: Props) {
   const [from, to] = parseLineRange(hash)
   const tableRef = useRef<HTMLTableElement>(null)
 
-  // Center the target line once the highlighted file has rendered. Depends on
-  // `lines` too so it re-runs after a fresh file (e.g. opened in a new tab)
-  // finishes tokenising.
+  const commentsEnabled = !!owner && !!repo && !!path
+
+  // Active selection (anchor + head, both 1-based). The compose form opens
+  // beneath the selection's last line.
+  const [sel, setSel] = useState<{ anchor: number; head: number } | null>(null)
+  const selStart = sel ? Math.min(sel.anchor, sel.head) : 0
+  const selEnd = sel ? Math.max(sel.anchor, sel.head) : 0
+
   useEffect(() => {
     if (from == null) return
-    tableRef.current
-      ?.querySelector<HTMLElement>(`#L${from}`)
-      ?.scrollIntoView({ block: "center" })
+    tableRef.current?.querySelector<HTMLElement>(`#L${from}`)?.scrollIntoView({ block: "center" })
   }, [from, lines])
+
+  // Existing comments grouped by the line they end on, so each renders right
+  // under the block it annotates.
+  const byEndLine = useMemo(() => {
+    const m = new Map<number, CodeComment[]>()
+    for (const c of comments) {
+      const arr = m.get(c.end_line) ?? []
+      arr.push(c)
+      m.set(c.end_line, arr)
+    }
+    return m
+  }, [comments])
+
+  function onNumClick(e: React.MouseEvent, n: number) {
+    if (!commentsEnabled) return
+    e.preventDefault()
+    setSel((prev) =>
+      e.shiftKey && prev ? { anchor: prev.anchor, head: n } : { anchor: n, head: n }
+    )
+  }
+
+  // Build the row list flat: each code line, then any comment thread ending on
+  // it, then the compose form if the selection ends there.
+  const rows: ReactNode[] = []
+  lines.forEach((nodes, i) => {
+    const n = i + 1
+    const lit = from != null && n >= from && n <= (to ?? from)
+    const selected = sel != null && n >= selStart && n <= selEnd
+    const cls = "code-line" + (lit ? " is-highlighted" : "") + (selected ? " is-selected" : "")
+    rows.push(
+      <tr key={`L${n}`} id={`L${n}`} className={cls}>
+        <td
+          className={"code-line__num" + (commentsEnabled ? " is-clickable" : "")}
+          data-line={n}
+          onClick={(e) => onNumClick(e, n)}
+          title={commentsEnabled ? "Click to select; shift-click to extend" : undefined}
+        />
+        <td className="code-line__text">{nodes.length ? nodes : "\n"}</td>
+      </tr>
+    )
+
+    const thread = byEndLine.get(n)
+    if (thread && owner && repo) {
+      rows.push(
+        <tr key={`thread${n}`} className="code-comments-row">
+          <td className="code-comments-cell" colSpan={2}>
+            <ul className="code-comments">
+              {thread.map((c) => (
+                <CodeCommentCard
+                  key={c.id}
+                  owner={owner}
+                  repo={repo}
+                  comment={c}
+                  canManage={!!currentUser && currentUser === c.author}
+                />
+              ))}
+            </ul>
+          </td>
+        </tr>
+      )
+    }
+
+    if (commentsEnabled && sel && selEnd === n && owner && repo && path) {
+      rows.push(
+        <tr key={`compose${n}`} className="code-comments-row">
+          <td className="code-comments-cell" colSpan={2}>
+            <ComposeForm
+              owner={owner}
+              repo={repo}
+              codeRef={codeRef}
+              path={path}
+              startLine={selStart}
+              endLine={selEnd}
+              onDone={() => setSel(null)}
+            />
+          </td>
+        </tr>
+      )
+    }
+  })
 
   return (
     <div className="code-view hljs">
       <table ref={tableRef} className="code-view__table">
-        <tbody>
-          {lines.map((nodes, i) => {
-            const n = i + 1
-            const lit = from != null && n >= from && n <= (to ?? from)
-            return (
-              <tr key={i} id={`L${n}`} className={`code-line${lit ? " is-highlighted" : ""}`}>
-                <td className="code-line__num" data-line={n} />
-                <td className="code-line__text">{nodes.length ? nodes : "\n"}</td>
-              </tr>
-            )
-          })}
-        </tbody>
+        <tbody>{rows}</tbody>
       </table>
     </div>
+  )
+}
+
+function CodeCommentCard({
+  owner,
+  repo,
+  comment,
+  canManage,
+}: {
+  owner: string
+  repo: string
+  comment: CodeComment
+  canManage: boolean
+}) {
+  const resolve = useSetCodeCommentResolved(owner, repo)
+  const del = useDeleteCodeComment(owner, repo)
+  const span =
+    comment.end_line > comment.start_line
+      ? `${comment.start_line}–${comment.end_line}`
+      : `${comment.start_line}`
+
+  return (
+    <li className={"comment" + (comment.resolved ? " is-resolved" : "")}>
+      <span className="comment__avatar">
+        <Avatar name={comment.author} />
+      </span>
+      <div className="comment__card">
+        <div className="comment__head">
+          <strong>{comment.author}</strong>
+          <span className="muted">
+            on lines {span} · {new Date(comment.created_at).toLocaleString()}
+          </span>
+          {comment.resolved && <span className="badge badge--done">resolved</span>}
+          {canManage && (
+            <span className="comment__actions">
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={resolve.isPending}
+                onClick={() => resolve.mutate({ id: comment.id, resolved: !comment.resolved })}
+              >
+                {comment.resolved ? "Reopen" : "Resolve"}
+              </button>
+              <button
+                type="button"
+                className="comment__delete"
+                disabled={del.isPending}
+                onClick={() => {
+                  if (confirm("Delete this comment? This cannot be undone.")) del.mutate(comment.id)
+                }}
+                title="Delete comment"
+                aria-label="Delete comment"
+              >
+                {del.isPending ? "…" : "×"}
+              </button>
+            </span>
+          )}
+        </div>
+        <div className="comment__body">
+          <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
+            <Markdown content={comment.body} owner={owner} repo={repo} basePath="" />
+          </Suspense>
+        </div>
+        {(resolve.error || del.error) && (
+          <div className="error inline">{((resolve.error || del.error) as Error).message}</div>
+        )}
+      </div>
+    </li>
+  )
+}
+
+function ComposeForm({
+  owner,
+  repo,
+  codeRef,
+  path,
+  startLine,
+  endLine,
+  onDone,
+}: {
+  owner: string
+  repo: string
+  codeRef: string
+  path: string
+  startLine: number
+  endLine: number
+  onDone: () => void
+}) {
+  const [body, setBody] = useState("")
+  const create = useCreateCodeComment(owner, repo)
+  const range = endLine > startLine ? `lines ${startLine}–${endLine}` : `line ${startLine}`
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    const trimmed = body.trim()
+    if (!trimmed || create.isPending) return
+    create.mutate(
+      { ref: codeRef, path, start_line: startLine, end_line: endLine, body: trimmed },
+      {
+        onSuccess: () => {
+          setBody("")
+          onDone()
+        },
+      }
+    )
+  }
+
+  return (
+    <form className="comment-form code-compose" onSubmit={submit}>
+      <div className="code-compose__head muted small">Commenting on {range}</div>
+      <textarea
+        className="textarea"
+        placeholder="Leave a comment on this code"
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        rows={3}
+        autoFocus
+      />
+      {create.error && <div className="error">{(create.error as Error).message}</div>}
+      <div className="row">
+        <button
+          type="submit"
+          className="btn btn--primary"
+          disabled={!body.trim() || create.isPending}
+        >
+          {create.isPending ? "Adding…" : "Add comment"}
+        </button>
+        <button type="button" className="btn btn--ghost" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    </form>
   )
 }
 

@@ -1,15 +1,18 @@
 import { lazy, Suspense } from "react"
-import { useLocation, useNavigate, useParams } from "react-router-dom"
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   useBlob,
+  useCodeComments,
   useCommits,
   useIntel,
   useIntelSummaries,
   useRepo,
   useTree,
   useTreeCommits,
+  useWhoami,
 } from "../api/queries"
 import RepoHeader from "../components/RepoHeader"
+import BranchSelector from "../components/BranchSelector"
 import FileTree from "../components/FileTree"
 import LatestCommitBar from "../components/LatestCommitBar"
 import CommitMeta from "../components/CommitMeta"
@@ -31,6 +34,8 @@ export default function RepoPage() {
   const { owner = "", repo = "" } = useParams()
   const path = useParams()["*"] ?? ""
   const isBlob = useLocation().pathname.includes(`/${owner}/${repo}/blob/`)
+  const [params] = useSearchParams()
+  const gitRef = params.get("ref") ?? ""
 
   const repoQ = useRepo(owner, repo)
 
@@ -43,10 +48,13 @@ export default function RepoPage() {
   return (
     <div className="repo">
       <RepoHeader owner={r.owner} repo={r.name} openIssues={r.open_issues} />
+      <div className="repo-toolbar">
+        <BranchSelector owner={r.owner} repo={r.name} />
+      </div>
       {isBlob ? (
-        <BlobView owner={r.owner} repo={r.name} path={path} />
+        <BlobView owner={r.owner} repo={r.name} path={path} gitRef={gitRef} />
       ) : (
-        <TreeView owner={r.owner} repo={r.name} path={path} />
+        <TreeView owner={r.owner} repo={r.name} path={path} gitRef={gitRef} />
       )}
     </div>
   )
@@ -56,18 +64,19 @@ interface ViewProps {
   owner: string
   repo: string
   path: string
+  gitRef: string
 }
 
-function TreeView({ owner, repo, path }: ViewProps) {
+function TreeView({ owner, repo, path, gitRef }: ViewProps) {
   const navigate = useNavigate()
-  const treeQ = useTree(owner, repo, path)
+  const treeQ = useTree(owner, repo, path, gitRef)
   // Every dex summary for the repo (one cached map): the breadcrumb reads the
   // ancestor sub-paths, the file tree reads each entry.
   const isRoot = path === ""
   const intelQ = useIntel(owner, repo)
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
   const summariesQ = useIntelSummaries(owner, repo, isIndexed)
-  const treeCommitsQ = useTreeCommits(owner, repo, path)
+  const treeCommitsQ = useTreeCommits(owner, repo, path, gitRef)
 
   // j/k select a file/folder; Enter opens it. h/l are left to useTabNav.
   const entries = treeQ.data?.entries ?? []
@@ -131,8 +140,8 @@ function TreeView({ owner, repo, path }: ViewProps) {
   )
 }
 
-function BlobView({ owner, repo, path }: ViewProps) {
-  const blobQ = useBlob(owner, repo, path)
+function BlobView({ owner, repo, path, gitRef }: ViewProps) {
+  const blobQ = useBlob(owner, repo, path, gitRef)
   // The repo's full summary map (one cached query); the breadcrumb reads the
   // repo + ancestor dirs + this file from it. Crumbs dex has nothing for stay
   // plain.
@@ -140,8 +149,12 @@ function BlobView({ owner, repo, path }: ViewProps) {
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
   const summariesQ = useIntelSummaries(owner, repo, isIndexed)
   // Latest commit touching this file, for the GitHub-style header.
-  const commitsQ = useCommits(owner, repo, { path, perPage: 1 })
+  const commitsQ = useCommits(owner, repo, { path, perPage: 1, ref: gitRef })
   const lastCommit = commitsQ.data?.commits?.[0]
+  // Review comments anchored to this file on this branch, plus the viewer's
+  // identity for author-only resolve/delete.
+  const commentsQ = useCodeComments(owner, repo, { ref: gitRef, path, state: "all" })
+  const whoamiQ = useWhoami()
 
   if (blobQ.isLoading) return <div className="loading">Loading…</div>
   if (blobQ.error) return <div className="error">{(blobQ.error as Error).message}</div>
@@ -168,7 +181,15 @@ function BlobView({ owner, repo, path }: ViewProps) {
           <div className="empty">Binary file not shown.</div>
         ) : (
           <Suspense fallback={<div className="loading">Loading…</div>}>
-            <CodeView content={b.content} path={path} />
+            <CodeView
+              content={b.content}
+              path={path}
+              owner={owner}
+              repo={repo}
+              codeRef={b.ref}
+              comments={commentsQ.data ?? []}
+              currentUser={whoamiQ.data?.name}
+            />
           </Suspense>
         )}
       </div>

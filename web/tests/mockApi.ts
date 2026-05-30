@@ -34,6 +34,21 @@ export interface Repo {
   ci_enabled: boolean
 }
 
+export interface CodeComment {
+  id: number
+  repo_id: number
+  ref: string
+  path: string
+  start_line: number
+  end_line: number
+  commit_sha?: string
+  author: string
+  body: string
+  resolved: boolean
+  snippet?: string
+  created_at: string
+}
+
 export interface CIJob {
   name: string
   needs?: string[]
@@ -117,6 +132,9 @@ export interface State {
   repos: Repo[]
   issues: Issue[]
   comments: Comment[]
+  codeComments: CodeComment[]
+  // Local branches for the /refs endpoint; defaults to ["main"].
+  branches: string[]
   tokens: Token[]
   ciRuns: CIRun[]
   // Commit history (newest first) and per-sha diff detail, for the commit
@@ -147,6 +165,8 @@ function freshState(seed: Partial<State> = {}): State {
     ],
     issues: [],
     comments: [],
+    codeComments: [],
+    branches: ["main"],
     tokens: [{ id: 1, name: "test-user", created_at: nowIso(), last_used_at: nowIso() }],
     ciRuns: [],
     commits: [],
@@ -442,6 +462,79 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     }
     state.comments.splice(idx, 1)
     return route.fulfill({ status: 204 })
+  })
+
+  // Branch list for the selector.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/refs$/, (route) =>
+    json(route, 200, { default: "main", branches: state.branches })
+  )
+
+  // Code review comments collection (GET list / POST create). An absent ?ref=
+  // means the default branch ("main"), matching the server.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/code-comments(\?.*)?$/, async (route) => {
+    const req = route.request()
+    const url = new URL(req.url())
+    if (req.method() === "GET") {
+      const ref = url.searchParams.get("ref") || "main"
+      const path = url.searchParams.get("path") || ""
+      const reqState = url.searchParams.get("state") || "open"
+      let out = state.codeComments.filter((c) => c.ref === ref)
+      if (path) out = out.filter((c) => c.path === path)
+      if (reqState === "open") out = out.filter((c) => !c.resolved)
+      else if (reqState === "resolved") out = out.filter((c) => c.resolved)
+      out = [...out].sort((a, b) =>
+        a.path === b.path ? a.start_line - b.start_line : a.path < b.path ? -1 : 1
+      )
+      return json(route, 200, out)
+    }
+    if (req.method() === "POST") {
+      const body = req.postDataJSON() as {
+        ref: string
+        path: string
+        start_line: number
+        end_line: number
+        body: string
+      }
+      const c: CodeComment = {
+        id: state.codeComments.length + 1,
+        repo_id: 1,
+        ref: body.ref || "main",
+        path: body.path,
+        start_line: body.start_line,
+        end_line: body.end_line,
+        commit_sha: "deadbeef",
+        author: state.identity,
+        body: body.body,
+        resolved: false,
+        snippet: "",
+        created_at: nowIso(),
+      }
+      state.codeComments.push(c)
+      return json(route, 201, c)
+    }
+    return route.continue()
+  })
+
+  // One code comment (PATCH resolve / DELETE). Author-only, like the server.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/code-comments\/\d+$/, async (route) => {
+    const req = route.request()
+    const url = new URL(req.url())
+    const id = Number(url.pathname.split("/").pop())
+    const c = state.codeComments.find((x) => x.id === id)
+    if (!c) return json(route, 404, { error: "comment not found" })
+    if (c.author !== state.identity) {
+      return json(route, 403, { error: "only the author can manage this comment" })
+    }
+    if (req.method() === "PATCH") {
+      const body = req.postDataJSON() as { resolved?: boolean }
+      if (typeof body.resolved === "boolean") c.resolved = body.resolved
+      return json(route, 200, c)
+    }
+    if (req.method() === "DELETE") {
+      state.codeComments.splice(state.codeComments.indexOf(c), 1)
+      return route.fulfill({ status: 204 })
+    }
+    return route.continue()
   })
 
   return state

@@ -1054,6 +1054,170 @@ a.file-tree__commit:hover {
   box-shadow: inset 2px 0 0 var(--state-in_progress);
 }
 
+/* Review comments: a clickable gutter selects lines to comment on. The active
+   selection reuses the deep-link tint with an accent gutter bar. */
+.code-line__num.is-clickable {
+  cursor: pointer;
+}
+.code-line__num.is-clickable:hover {
+  color: var(--fg-default);
+}
+.code-line.is-selected .code-line__num,
+.code-line.is-selected .code-line__text {
+  background: color-mix(in srgb, var(--accent-fg, var(--state-in_progress)) 20%, transparent);
+}
+.code-line.is-selected .code-line__num {
+  box-shadow: inset 2px 0 0 var(--accent-fg, var(--state-in_progress));
+}
+
+/* Inline comment threads + compose form, rendered as full-width rows beneath
+   the code line they annotate. */
+.code-comments-row .code-comments-cell {
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-canvas);
+  border-top: 1px solid var(--border-muted);
+  border-bottom: 1px solid var(--border-muted);
+}
+.code-comments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.comment.is-resolved {
+  opacity: 0.6;
+}
+.comment__actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.btn--sm {
+  padding: 1px var(--space-2);
+  font-size: var(--text-sm);
+}
+.code-compose {
+  max-width: 720px;
+}
+.code-compose__head {
+  margin-bottom: var(--space-2);
+}
+
+/* Branch selector + state segmented control on the repo toolbar. */
+.repo-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-2) 0;
+}
+.branch-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-canvas);
+  color: var(--fg-muted);
+}
+.branch-select select {
+  border: none;
+  background: transparent;
+  color: var(--fg-default);
+  font: inherit;
+  cursor: pointer;
+  outline: none;
+}
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.seg__btn {
+  border: none;
+  background: var(--bg-canvas);
+  color: var(--fg-muted);
+  font: inherit;
+  padding: 3px var(--space-3);
+  cursor: pointer;
+  text-transform: capitalize;
+}
+.seg__btn + .seg__btn {
+  border-left: 1px solid var(--border);
+}
+.seg__btn.is-active {
+  background: var(--accent-fg, var(--state-in_progress));
+  color: #fff;
+}
+
+/* Review tab: comments grouped by file. */
+.review-file {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+}
+.review-file__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-muted);
+}
+.review-file__path {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.review-row {
+  padding: var(--space-2) var(--space-4);
+}
+.review-row + .review-row {
+  border-top: 1px solid var(--border-muted);
+}
+.review-row.is-resolved {
+  opacity: 0.6;
+}
+.review-row__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.review-row__lines {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.review-row__actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.review-row__body {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+.review-row__snippet {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--code-bg);
+  color: var(--code-fg);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
 /* Syntax highlighting — highlight.js scopes mapped to the Primer palette.
    Colour only; no backgrounds, so it inherits the blob's surface. */
 .hljs-comment,

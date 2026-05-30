@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "./client"
-import type { CIRun, Issue, Repo } from "./types"
+import type { CIRun, CodeCommentState, Issue, Repo } from "./types"
 
 // Query keys live in one place so mutations can invalidate consistently.
 // Pattern: hierarchical arrays so `["issues", owner, repo]` invalidation
@@ -10,13 +10,23 @@ export const keys = {
   tokens: () => ["tokens"] as const,
   repos: () => ["repos"] as const,
   repo: (owner: string, repo: string) => ["repo", owner, repo] as const,
-  tree: (owner: string, repo: string, path: string) => ["tree", owner, repo, path] as const,
-  blob: (owner: string, repo: string, path: string) => ["blob", owner, repo, path] as const,
-  commits: (owner: string, repo: string, path = "", page = 1, perPage = 0) =>
-    ["commits", owner, repo, path, page, perPage] as const,
+  refs: (owner: string, repo: string) => ["refs", owner, repo] as const,
+  tree: (owner: string, repo: string, path: string, ref = "") =>
+    ["tree", owner, repo, path, ref] as const,
+  blob: (owner: string, repo: string, path: string, ref = "") =>
+    ["blob", owner, repo, path, ref] as const,
+  commits: (owner: string, repo: string, path = "", page = 1, perPage = 0, ref = "") =>
+    ["commits", owner, repo, path, page, perPage, ref] as const,
   commit: (owner: string, repo: string, sha: string) => ["commit", owner, repo, sha] as const,
-  treeCommits: (owner: string, repo: string, path: string) =>
-    ["treeCommits", owner, repo, path] as const,
+  treeCommits: (owner: string, repo: string, path: string, ref = "") =>
+    ["treeCommits", owner, repo, path, ref] as const,
+  codeComments: (
+    owner: string,
+    repo: string,
+    ref = "",
+    path = "",
+    state: CodeCommentState = "open"
+  ) => ["codeComments", owner, repo, ref, path, state] as const,
   issues: (owner: string, repo: string, query = "") =>
     query ? (["issues", owner, repo, query] as const) : (["issues", owner, repo] as const),
   issue: (owner: string, repo: string, n: number) => ["issue", owner, repo, n] as const,
@@ -75,18 +85,27 @@ export function useRepo(owner: string, repo: string) {
   })
 }
 
-export function useTree(owner: string, repo: string, path: string) {
+export function useRefs(owner: string, repo: string) {
   return useQuery({
-    queryKey: keys.tree(owner, repo, path),
-    queryFn: () => api.getTree(owner, repo, path),
+    queryKey: keys.refs(owner, repo),
+    queryFn: () => api.listRefs(owner, repo),
+    enabled: !!owner && !!repo,
+    staleTime: 60_000,
+  })
+}
+
+export function useTree(owner: string, repo: string, path: string, ref = "") {
+  return useQuery({
+    queryKey: keys.tree(owner, repo, path, ref),
+    queryFn: () => api.getTree(owner, repo, path, ref),
     enabled: !!owner && !!repo,
   })
 }
 
-export function useBlob(owner: string, repo: string, path: string) {
+export function useBlob(owner: string, repo: string, path: string, ref = "") {
   return useQuery({
-    queryKey: keys.blob(owner, repo, path),
-    queryFn: () => api.getBlob(owner, repo, path),
+    queryKey: keys.blob(owner, repo, path, ref),
+    queryFn: () => api.getBlob(owner, repo, path, ref),
     enabled: !!owner && !!repo && !!path,
   })
 }
@@ -94,12 +113,31 @@ export function useBlob(owner: string, repo: string, path: string) {
 export function useCommits(
   owner: string,
   repo: string,
-  opts: { path?: string; page?: number; perPage?: number } = {}
+  opts: { path?: string; page?: number; perPage?: number; ref?: string } = {}
 ) {
-  const { path = "", page = 1, perPage = 0 } = opts
+  const { path = "", page = 1, perPage = 0, ref = "" } = opts
   return useQuery({
-    queryKey: keys.commits(owner, repo, path, page, perPage),
-    queryFn: () => api.getCommits(owner, repo, { path, page, perPage: perPage || undefined }),
+    queryKey: keys.commits(owner, repo, path, page, perPage, ref),
+    queryFn: () =>
+      api.getCommits(owner, repo, {
+        path,
+        page,
+        perPage: perPage || undefined,
+        ref: ref || undefined,
+      }),
+    enabled: !!owner && !!repo,
+  })
+}
+
+export function useCodeComments(
+  owner: string,
+  repo: string,
+  opts: { ref?: string; path?: string; state?: CodeCommentState } = {}
+) {
+  const { ref = "", path = "", state = "open" } = opts
+  return useQuery({
+    queryKey: keys.codeComments(owner, repo, ref, path, state),
+    queryFn: () => api.listCodeComments(owner, repo, { ref, path, state }),
     enabled: !!owner && !!repo,
   })
 }
@@ -114,10 +152,10 @@ export function useCommit(owner: string, repo: string, sha: string) {
   })
 }
 
-export function useTreeCommits(owner: string, repo: string, path: string) {
+export function useTreeCommits(owner: string, repo: string, path: string, ref = "") {
   return useQuery({
-    queryKey: keys.treeCommits(owner, repo, path),
-    queryFn: () => api.getTreeCommits(owner, repo, path),
+    queryKey: keys.treeCommits(owner, repo, path, ref),
+    queryFn: () => api.getTreeCommits(owner, repo, path, ref),
     enabled: !!owner && !!repo,
     // Commit annotations change less often than the tree itself; a short
     // stale window avoids refetching per-file history on every navigation.

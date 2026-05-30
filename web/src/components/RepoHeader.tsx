@@ -29,6 +29,7 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
     location.pathname.startsWith(`${base}/blob/`) ||
     location.pathname.startsWith(`${base}/commits`)
   const isIssues = location.pathname.startsWith(`${base}/issues`)
+  const isReview = location.pathname.startsWith(`${base}/review`)
   const isResearch = location.pathname.startsWith(`${base}/research`)
   const isSummaries = location.pathname.startsWith(`${base}/summaries`)
   const isPipelines = location.pathname.startsWith(`${base}/pipelines`)
@@ -42,6 +43,9 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
         <Link to={`${base}/issues`} className={`tab ${isIssues ? "is-active" : ""}`}>
           Issues
           {openIssues !== undefined && <span className="tab__count">{openIssues}</span>}
+        </Link>
+        <Link to={`${base}/review`} className={`tab ${isReview ? "is-active" : ""}`}>
+          Review
         </Link>
         <Link to={`${base}/research`} className={`tab ${isResearch ? "is-active" : ""}`}>
           Research

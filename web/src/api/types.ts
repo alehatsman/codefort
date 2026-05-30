@@ -176,6 +176,46 @@ export interface TreeCommits {
   entries: Record<string, Commit>
 }
 
+// RefList is a repo's local branches plus the name of the default one.
+export interface RefList {
+  default: string
+  branches: string[]
+}
+
+// --- Code review comments ---
+
+// A comment anchored to a line range of a file on a branch. start_line/end_line
+// are 1-based and inclusive. snippet is the referenced source lines, filled in
+// by the server on list.
+export interface CodeComment {
+  id: number
+  repo_id: number
+  ref: string
+  path: string
+  start_line: number
+  end_line: number
+  commit_sha?: string
+  author: string
+  body: string
+  resolved: boolean
+  snippet?: string
+  created_at: string
+}
+
+export interface CreateCodeCommentInput {
+  ref: string
+  path: string
+  start_line: number
+  end_line: number
+  body: string
+}
+
+export interface UpdateCodeCommentInput {
+  resolved: boolean
+}
+
+export type CodeCommentState = "open" | "resolved" | "all"
+
 // --- Intel (dex integration) ---
 
 export interface IntelService {

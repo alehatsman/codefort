@@ -3,15 +3,20 @@ import type {
   CIRun,
   CIRunDetail,
   ClaimIssueInput,
+  CodeComment,
+  CodeCommentState,
   Comment,
   CommitDetail,
   CommitList,
   TreeCommits,
+  CreateCodeCommentInput,
   CreateCommentInput,
   CreatedToken,
   CreateIssueInput,
   CreateRepoInput,
   CreateTokenInput,
+  RefList,
+  UpdateCodeCommentInput,
   Intel,
   IntelFileSummary,
   IntelOverview,
@@ -101,12 +106,20 @@ export const api = {
   updateRepo: (owner: string, repo: string, body: UpdateRepoInput) =>
     request<Repo>(`/api/repos/${owner}/${repo}`, { method: "PATCH", body }),
 
-  getTree: (owner: string, repo: string, path = "") =>
-    request<Tree>(
-      `/api/repos/${owner}/${repo}/tree${path ? `?path=${encodeURIComponent(path)}` : ""}`
-    ),
-  getBlob: (owner: string, repo: string, path: string) =>
-    request<Blob>(`/api/repos/${owner}/${repo}/blob?path=${encodeURIComponent(path)}`),
+  listRefs: (owner: string, repo: string) => request<RefList>(`/api/repos/${owner}/${repo}/refs`),
+
+  getTree: (owner: string, repo: string, path = "", ref = "") => {
+    const q = new URLSearchParams()
+    if (path) q.set("path", path)
+    if (ref) q.set("ref", ref)
+    const qs = q.toString()
+    return request<Tree>(`/api/repos/${owner}/${repo}/tree${qs ? `?${qs}` : ""}`)
+  },
+  getBlob: (owner: string, repo: string, path: string, ref = "") => {
+    const q = new URLSearchParams({ path })
+    if (ref) q.set("ref", ref)
+    return request<Blob>(`/api/repos/${owner}/${repo}/blob?${q.toString()}`)
+  },
   // Raw bytes (e.g. images embedded in a rendered README). Fetched with the
   // Bearer header, so it can't be a plain <img src>; the caller turns the
   // returned Blob into an object URL.
@@ -124,21 +137,25 @@ export const api = {
   getCommits: (
     owner: string,
     repo: string,
-    opts: { path?: string; page?: number; perPage?: number } = {}
+    opts: { path?: string; page?: number; perPage?: number; ref?: string } = {}
   ) => {
     const q = new URLSearchParams()
     if (opts.path) q.set("path", opts.path)
     if (opts.page) q.set("page", String(opts.page))
     if (opts.perPage) q.set("per_page", String(opts.perPage))
+    if (opts.ref) q.set("ref", opts.ref)
     const qs = q.toString()
     return request<CommitList>(`/api/repos/${owner}/${repo}/commits${qs ? `?${qs}` : ""}`)
   },
   getCommit: (owner: string, repo: string, sha: string) =>
     request<CommitDetail>(`/api/repos/${owner}/${repo}/commit/${sha}`),
-  getTreeCommits: (owner: string, repo: string, path = "") =>
-    request<TreeCommits>(
-      `/api/repos/${owner}/${repo}/tree-commits${path ? `?path=${encodeURIComponent(path)}` : ""}`
-    ),
+  getTreeCommits: (owner: string, repo: string, path = "", ref = "") => {
+    const q = new URLSearchParams()
+    if (path) q.set("path", path)
+    if (ref) q.set("ref", ref)
+    const qs = q.toString()
+    return request<TreeCommits>(`/api/repos/${owner}/${repo}/tree-commits${qs ? `?${qs}` : ""}`)
+  },
 
   listIssues: (owner: string, repo: string, query = "") =>
     request<Issue[]>(`/api/repos/${owner}/${repo}/issues${query ? `?${query}` : ""}`),
@@ -181,6 +198,28 @@ export const api = {
       method: "POST",
       body,
     }),
+
+  listCodeComments: (
+    owner: string,
+    repo: string,
+    opts: { ref?: string; path?: string; state?: CodeCommentState } = {}
+  ) => {
+    const q = new URLSearchParams()
+    if (opts.ref) q.set("ref", opts.ref)
+    if (opts.path) q.set("path", opts.path)
+    if (opts.state) q.set("state", opts.state)
+    const qs = q.toString()
+    return request<CodeComment[]>(`/api/repos/${owner}/${repo}/code-comments${qs ? `?${qs}` : ""}`)
+  },
+  createCodeComment: (owner: string, repo: string, body: CreateCodeCommentInput) =>
+    request<CodeComment>(`/api/repos/${owner}/${repo}/code-comments`, { method: "POST", body }),
+  updateCodeComment: (owner: string, repo: string, id: number, body: UpdateCodeCommentInput) =>
+    request<CodeComment>(`/api/repos/${owner}/${repo}/code-comments/${id}`, {
+      method: "PATCH",
+      body,
+    }),
+  deleteCodeComment: (owner: string, repo: string, id: number) =>
+    request<void>(`/api/repos/${owner}/${repo}/code-comments/${id}`, { method: "DELETE" }),
 
   listCIRuns: (owner: string, repo: string, limit = 0) =>
     request<CIRun[]>(`/api/repos/${owner}/${repo}/ci/runs${limit ? `?limit=${limit}` : ""}`),
