@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useIssues, useRepo } from "../api/queries"
@@ -204,7 +205,7 @@ export default function IssuesPage() {
           {data.map((iss, i) => (
             <li
               key={iss.id}
-              className={`issue-row ${i === index ? "is-vim-selected" : ""}`}
+              className={clsx("issue-row", { "is-vim-selected": i === index })}
               data-vim-selected={i === index ? "true" : undefined}
             >
               <Link to={`/${owner}/${repo}/issues/${iss.number}`} className="issue-row__link">

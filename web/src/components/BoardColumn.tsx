@@ -1,4 +1,5 @@
 import { useDroppable } from "@dnd-kit/core"
+import clsx from "clsx"
 import type { Issue, IssueState } from "../api/types"
 import BoardCard from "./BoardCard"
 import StateIcon from "./StateIcon"
@@ -24,7 +25,7 @@ export default function BoardColumn({ owner, repo, state, issues }: Props) {
   return (
     <div
       ref={setNodeRef}
-      className={`board-col ${isOver ? "is-over" : ""}`}
+      className={clsx("board-col", { "is-over": isOver })}
       data-testid={`board-column-${state}`}
     >
       <div className={`board-col__head board-col__head--${state}`}>

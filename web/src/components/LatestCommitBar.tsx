@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { Link } from "react-router-dom"
 import type { Commit } from "../api/types"
 import Avatar from "./Avatar"
@@ -39,7 +40,7 @@ export default function LatestCommitBar({ owner, repo, path, latest, total, load
         </div>
       ) : (
         <div className="latest-commit-bar__commit">
-          <span className={`latest-commit-bar__ph ${loading ? "is-loading" : ""}`}>
+          <span className={clsx("latest-commit-bar__ph", { "is-loading": loading })}>
             {loading ? "" : "No commit history"}
           </span>
         </div>

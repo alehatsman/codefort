@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { Link, useLocation, useParams } from "react-router-dom"
 
 /**
@@ -19,7 +20,7 @@ export default function IssuesViewSwitch() {
         to={listPath}
         role="tab"
         aria-selected={!isBoard}
-        className={`view-switch__btn ${!isBoard ? "is-active" : ""}`}
+        className={clsx("view-switch__btn", { "is-active": !isBoard })}
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M2 4h12v1.5H2V4Zm0 3.25h12v1.5H2v-1.5Zm0 3.25h12V12H2v-1.5Z" />
@@ -30,7 +31,7 @@ export default function IssuesViewSwitch() {
         to={boardPath}
         role="tab"
         aria-selected={isBoard}
-        className={`view-switch__btn ${isBoard ? "is-active" : ""}`}
+        className={clsx("view-switch__btn", { "is-active": isBoard })}
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M2 3h3.5v10H2V3Zm4.5 0h3v6h-3V3Zm4 0H14v8h-3.5V3Z" />

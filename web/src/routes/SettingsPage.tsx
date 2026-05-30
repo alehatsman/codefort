@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { useState } from "react"
 import { useTokens, useWhoami } from "../api/queries"
 import { useCreateToken, useRevokeToken } from "../api/mutations"
@@ -25,7 +26,7 @@ export default function SettingsPage() {
           <button
             type="button"
             key={s.id}
-            className={`settings__nav-item ${section === s.id ? "is-active" : ""}`}
+            className={clsx("settings__nav-item", { "is-active": section === s.id })}
             onClick={() => setSection(s.id)}
           >
             {s.label}

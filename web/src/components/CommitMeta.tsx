@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { Link } from "react-router-dom"
 import type { Commit } from "../api/types"
 import Avatar from "./Avatar"
@@ -17,7 +18,7 @@ interface Props {
  */
 export default function CommitMeta({ owner, repo, commit, className }: Props) {
   return (
-    <div className={`commit-meta ${className ?? ""}`}>
+    <div className={clsx("commit-meta", className)}>
       <Avatar name={commit.author} />
       <span className="commit-meta__author">{commit.author}</span>
       <Link

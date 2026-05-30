@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { useRef } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useRepos } from "../api/queries"
@@ -42,7 +43,7 @@ export default function ReposPage() {
           {data.map((r, i) => (
             <div
               key={r.id}
-              className={`card ${i === index ? "is-vim-selected" : ""}`}
+              className={clsx("card", { "is-vim-selected": i === index })}
               data-vim-selected={i === index ? "true" : undefined}
             >
               <div className="card__title">

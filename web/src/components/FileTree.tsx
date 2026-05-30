@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { Link } from "react-router-dom"
 import type { Commit, TreeEntry } from "../api/types"
 import FileIcon from "./FileIcon"
@@ -50,7 +51,7 @@ export default function FileTree({
         return (
           <li
             key={e.path}
-            className={`file-tree__row ${selected ? "is-vim-selected" : ""}`}
+            className={clsx("file-tree__row", { "is-vim-selected": selected })}
             data-vim-selected={selected ? "true" : undefined}
           >
             <Link
@@ -61,7 +62,7 @@ export default function FileTree({
               <span className="file-tree__icon">
                 <FileIcon type={e.type} />
               </span>
-              <span className={`file-tree__name ${summary ? "file-tree__name--info" : ""}`}>
+              <span className={clsx("file-tree__name", { "file-tree__name--info": summary })}>
                 {e.name}
               </span>
             </Link>
@@ -76,7 +77,9 @@ export default function FileTree({
               </Link>
             ) : (
               <span
-                className={`file-tree__commit file-tree__ph ${commitsLoading ? "is-loading" : ""}`}
+                className={clsx("file-tree__commit file-tree__ph", {
+                  "is-loading": commitsLoading,
+                })}
               />
             )}
 
@@ -86,7 +89,7 @@ export default function FileTree({
               </span>
             ) : (
               <span
-                className={`file-tree__age file-tree__ph ${commitsLoading ? "is-loading" : ""}`}
+                className={clsx("file-tree__age file-tree__ph", { "is-loading": commitsLoading })}
               />
             )}
           </li>

@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { Fragment, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useCIRun, useCIRuns, useRepo } from "../api/queries"
@@ -273,7 +274,7 @@ function JobDag({
                 <button
                   type="button"
                   key={j.name}
-                  className={`ci-dag__job ${active === j.name ? "is-active" : ""}`}
+                  className={clsx("ci-dag__job", { "is-active": active === j.name })}
                   onClick={() => onSelect(j.name)}
                   title={needs.length > 0 ? `needs: ${needs.join(", ")}` : "no dependencies"}
                 >

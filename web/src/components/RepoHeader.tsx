@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { Link, useLocation } from "react-router-dom"
 import { useTabNav } from "../lib/keyboardNav"
 
@@ -37,23 +38,23 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
   return (
     <div className="repo-header">
       <nav className="tabs" aria-label="Repository navigation">
-        <Link to={base} className={`tab ${isCode ? "is-active" : ""}`}>
+        <Link to={base} className={clsx("tab", { "is-active": isCode })}>
           Code
         </Link>
-        <Link to={`${base}/issues`} className={`tab ${isIssues ? "is-active" : ""}`}>
+        <Link to={`${base}/issues`} className={clsx("tab", { "is-active": isIssues })}>
           Issues
           {openIssues !== undefined && <span className="tab__count">{openIssues}</span>}
         </Link>
-        <Link to={`${base}/review`} className={`tab ${isReview ? "is-active" : ""}`}>
+        <Link to={`${base}/review`} className={clsx("tab", { "is-active": isReview })}>
           Review
         </Link>
-        <Link to={`${base}/research`} className={`tab ${isResearch ? "is-active" : ""}`}>
+        <Link to={`${base}/research`} className={clsx("tab", { "is-active": isResearch })}>
           Research
         </Link>
-        <Link to={`${base}/summaries`} className={`tab ${isSummaries ? "is-active" : ""}`}>
+        <Link to={`${base}/summaries`} className={clsx("tab", { "is-active": isSummaries })}>
           Summaries
         </Link>
-        <Link to={`${base}/pipelines`} className={`tab ${isPipelines ? "is-active" : ""}`}>
+        <Link to={`${base}/pipelines`} className={clsx("tab", { "is-active": isPipelines })}>
           Pipelines
         </Link>
       </nav>
