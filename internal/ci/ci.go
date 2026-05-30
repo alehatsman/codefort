@@ -111,6 +111,43 @@ func (p Pipeline) JobNames() []string {
 	return names
 }
 
+// TopoOrder returns job names in dependency order: a job appears only after
+// every job in its `needs`. Ties are broken by sorted name so the order is
+// deterministic. The pipeline must be acyclic (Parse guarantees this); a cycle
+// yields an error defensively. The runner executes jobs in this order.
+func (p Pipeline) TopoOrder() ([]string, error) {
+	// Kahn's algorithm over the needs edges, processing ready jobs in sorted
+	// name order for determinism.
+	indegree := make(map[string]int, len(p.Jobs))
+	for _, name := range p.JobNames() {
+		indegree[name] = len(p.Jobs[name].Needs)
+	}
+	order := make([]string, 0, len(p.Jobs))
+	for len(order) < len(p.Jobs) {
+		progressed := false
+		for _, name := range p.JobNames() {
+			if indegree[name] != 0 {
+				continue
+			}
+			order = append(order, name)
+			indegree[name] = -1 // mark emitted
+			// Decrement dependents that need this job.
+			for _, other := range p.JobNames() {
+				for _, dep := range p.Jobs[other].Needs {
+					if dep == name {
+						indegree[other]--
+					}
+				}
+			}
+			progressed = true
+		}
+		if !progressed {
+			return nil, fmt.Errorf("jobs: dependency cycle prevents ordering")
+		}
+	}
+	return order, nil
+}
+
 // findCycle returns a job sequence forming a `needs` cycle, or nil if the DAG
 // is acyclic. moongit's runner relies on topo-ordering, so a cycle is fatal.
 func (p Pipeline) findCycle() []string {

@@ -110,6 +110,21 @@ func GetRepoSummary(db *sql.DB, owner, name string) (RepoSummary, error) {
 	return r, err
 }
 
+// RepoIdent returns a repo's owner and name by id, or ErrNotFound. The CI
+// runner needs it to resolve the bare repo path and the on-disk event-log
+// path from a run's repo_id.
+func RepoIdent(db *sql.DB, repoID int64) (owner, name string, err error) {
+	err = db.QueryRow(`
+		SELECT users.name, repos.name FROM repos
+		JOIN users ON users.id = repos.owner_id
+		WHERE repos.id = ?
+	`, repoID).Scan(&owner, &name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", ErrNotFound
+	}
+	return owner, name, err
+}
+
 // LookupRepo returns the repo id or ErrNotFound when the owner/name pair is
 // unknown.
 func LookupRepo(db *sql.DB, owner, name string) (int64, error) {
