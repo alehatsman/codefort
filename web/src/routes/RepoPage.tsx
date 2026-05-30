@@ -34,7 +34,6 @@ export default function RepoPage() {
   return (
     <div className="repo">
       <RepoHeader owner={r.owner} repo={r.name} openIssues={r.open_issues} />
-      <PathBreadcrumb owner={r.owner} repo={r.name} path={path} />
       {isBlob ? (
         <BlobView owner={r.owner} repo={r.name} path={path} />
       ) : (
@@ -106,12 +105,8 @@ function TreeView({ owner, repo, path }: ViewProps) {
 
   return (
     <>
+      <OverviewCard owner={owner} repo={repo} path={path} summary={summary} />
       <FileTree owner={owner} repo={repo} entries={treeQ.data.entries} selectedIndex={index} />
-      <OverviewCard
-        title={isRoot ? "Repository overview" : "Folder overview"}
-        path={isRoot ? undefined : path}
-        summary={summary}
-      />
       {readme && <ReadmeCard owner={owner} repo={repo} dirPath={path} entry={readme} />}
     </>
   )
@@ -128,6 +123,7 @@ function BlobView({ owner, repo, path }: ViewProps) {
 
   return (
     <div className="blob">
+      <PathBreadcrumb owner={owner} repo={repo} path={path} />
       <div className="blob__head">
         <span className="muted small">
           {lineCount(b.content)} lines · {formatSize(b.size)}

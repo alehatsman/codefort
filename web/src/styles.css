@@ -1849,16 +1849,10 @@ h3 {
 .overview-card__head:hover {
   background: var(--bg-canvas);
 }
-.overview-card__title {
-  color: var(--fg);
-}
-.overview-card__path {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  font-weight: 400;
-  color: var(--accent);
-  background: none;
-  padding: 0;
+/* The head IS the breadcrumb; drop its standalone bottom margin so it sits
+   flush inside the card head, alongside the collapse marker. */
+.overview-card__head .path-breadcrumb {
+  margin-bottom: 0;
 }
 .overview-card__prose {
   padding: 0 var(--space-4) 14px;
