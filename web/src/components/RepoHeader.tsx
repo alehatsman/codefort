@@ -23,7 +23,8 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
   const isCode =
     location.pathname === base ||
     location.pathname.startsWith(`${base}/tree/`) ||
-    location.pathname.startsWith(`${base}/blob/`)
+    location.pathname.startsWith(`${base}/blob/`) ||
+    location.pathname.startsWith(`${base}/commits`)
   const isIssues = location.pathname.startsWith(`${base}/issues`)
   const isIntel = location.pathname.startsWith(`${base}/intel`)
 

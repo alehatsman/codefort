@@ -1,0 +1,53 @@
+import { Link } from "react-router-dom"
+import type { Commit } from "../api/types"
+import Avatar from "./Avatar"
+import { absoluteTime, timeAgo } from "../lib/timeAgo"
+
+interface Props {
+  owner: string
+  repo: string
+  path: string
+  latest: Commit | null | undefined
+  total: number
+  loading: boolean
+}
+
+/**
+ * GitHub-style bar above the file listing: the latest commit touching the
+ * current directory on the left, a link to the full commit history on the
+ * right. While the commit annotation query is in flight it shows a dim
+ * placeholder so the file tree doesn't jump when the data arrives.
+ */
+export default function LatestCommitBar({ owner, repo, path, latest, total, loading }: Props) {
+  const commitsHref = `/${owner}/${repo}/commits${path ? `/${path}` : ""}`
+
+  return (
+    <div className="latest-commit-bar">
+      {latest ? (
+        <div className="latest-commit-bar__commit">
+          <Avatar name={latest.author} />
+          <span className="latest-commit-bar__author">{latest.author}</span>
+          <Link to={commitsHref} className="latest-commit-bar__subject" title={latest.subject}>
+            {latest.subject}
+          </Link>
+          <code className="latest-commit-bar__sha" title={latest.sha}>
+            {latest.short_sha}
+          </code>
+          <span className="muted small" title={absoluteTime(latest.date)}>
+            {timeAgo(latest.date)}
+          </span>
+        </div>
+      ) : (
+        <div className="latest-commit-bar__commit">
+          <span className={`latest-commit-bar__ph ${loading ? "is-loading" : ""}`}>
+            {loading ? "" : "No commit history"}
+          </span>
+        </div>
+      )}
+
+      <Link to={commitsHref} className="latest-commit-bar__count">
+        <strong>{total}</strong> {total === 1 ? "commit" : "commits"}
+      </Link>
+    </div>
+  )
+}

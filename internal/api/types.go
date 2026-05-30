@@ -128,6 +128,39 @@ type Blob struct {
 	Content  string `json:"content"` // text; empty when Binary or TooLarge
 }
 
+// Commit is a single commit's metadata. Subject is the first line of the
+// message; Body is the rest (empty for single-line messages).
+type Commit struct {
+	SHA      string    `json:"sha"`
+	ShortSHA string    `json:"short_sha"`
+	Subject  string    `json:"subject"`
+	Body     string    `json:"body,omitempty"`
+	Author   string    `json:"author"`
+	Email    string    `json:"email"`
+	Date     time.Time `json:"date"`
+}
+
+// CommitList is a page of commit history on a ref, newest first, optionally
+// filtered to those touching Path. HasMore is true when another page exists.
+type CommitList struct {
+	Ref     string   `json:"ref"`            // branch name, e.g. "main"
+	Path    string   `json:"path,omitempty"` // "" for whole-repo history
+	Commits []Commit `json:"commits"`        // empty for an unborn repo
+	HasMore bool     `json:"has_more"`
+}
+
+// TreeCommits annotates a directory listing with commit context: the last
+// commit touching each immediate child (keyed by full path), the dir's own
+// latest commit, and the total commit count on the branch. Powers the
+// GitHub-style latest-commit bar and per-file "last changed" columns.
+type TreeCommits struct {
+	Ref     string            `json:"ref"`
+	Path    string            `json:"path,omitempty"`
+	Total   int               `json:"total"`   // total commits on the branch (scoped to Path when set)
+	Latest  *Commit           `json:"latest"`  // last commit touching Path; nil for an unborn repo
+	Entries map[string]Commit `json:"entries"` // child full path -> last commit touching it
+}
+
 // Token represents an API token's metadata. The plaintext token itself
 // is never returned over the API — it's only shown once at creation time
 // by the moongitd CLI.

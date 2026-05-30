@@ -510,10 +510,16 @@ pre {
   overflow: hidden;
 }
 .file-tree__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) max-content;
+  align-items: center;
   border-top: 1px solid var(--border-muted);
 }
 .file-tree__row:first-child {
   border-top: none;
+}
+.file-tree__row:hover {
+  background: var(--bg-canvas);
 }
 .file-tree__link {
   display: flex;
@@ -521,9 +527,9 @@ pre {
   gap: var(--space-2);
   padding: 7px var(--space-4);
   color: var(--fg);
+  min-width: 0;
 }
 .file-tree__link:hover {
-  background: var(--bg-canvas);
   text-decoration: none;
 }
 .file-tree__link:hover .file-tree__name {
@@ -539,6 +545,236 @@ pre {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Per-file last-commit columns. */
+.file-tree__commit {
+  min-width: 0;
+  padding: 7px var(--space-2);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+a.file-tree__commit:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.file-tree__age {
+  padding: 7px var(--space-4);
+  text-align: right;
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
+/* Dim bar shown in the commit/age cells while tree-commits is loading. */
+.file-tree__ph {
+  display: inline-block;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--border-muted);
+  opacity: 0.5;
+}
+.file-tree__commit.file-tree__ph {
+  width: 45%;
+  margin: 7px var(--space-2);
+}
+.file-tree__age.file-tree__ph {
+  width: 48px;
+  justify-self: end;
+  margin: 7px var(--space-4);
+}
+.file-tree__ph.is-loading {
+  animation: commit-ph-pulse 1.2s ease-in-out infinite;
+}
+@keyframes commit-ph-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Latest-commit bar above the file tree. */
+.latest-commit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-canvas);
+  margin-bottom: var(--space-3);
+}
+.latest-commit-bar__commit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.latest-commit-bar__author {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.latest-commit-bar__subject {
+  color: var(--fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.latest-commit-bar__subject:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.latest-commit-bar__sha {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+.latest-commit-bar__count {
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
+.latest-commit-bar__count:hover {
+  color: var(--accent);
+}
+.latest-commit-bar__ph {
+  display: inline-block;
+  width: 280px;
+  max-width: 60vw;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--border-muted);
+  opacity: 0.5;
+}
+.latest-commit-bar__ph.is-loading {
+  animation: commit-ph-pulse 1.2s ease-in-out infinite;
+}
+
+/* Compact commit line in the blob header. */
+.commit-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.blob__commit {
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-muted);
+  font-size: var(--text-sm);
+}
+.commit-meta__author {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.commit-meta__subject {
+  color: var(--fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-meta__subject:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.commit-meta__sha {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+/* Commits list page. */
+.commits-page__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+.commits-page__head h2 {
+  margin: 0;
+}
+.commit-group {
+  margin-bottom: var(--space-4);
+}
+.commit-group__day {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-2);
+}
+.commit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+}
+.commit-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border-muted);
+}
+.commit-row:first-child {
+  border-top: none;
+}
+.commit-row__main {
+  flex: 1;
+  min-width: 0;
+}
+.commit-row__subject {
+  color: var(--fg);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-row__meta {
+  margin-top: 2px;
+}
+.commit-row__author {
+  font-weight: 600;
+  color: var(--fg);
+}
+.commit-row__sha {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px var(--space-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.commit-row__sha:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.commits-page__more {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--accent);
+  cursor: pointer;
+}
+.commits-page__more:hover {
+  background: var(--bg-canvas);
+}
+.commits-page__more:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .blob {

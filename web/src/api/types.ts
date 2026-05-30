@@ -88,6 +88,32 @@ export interface Blob {
   content: string
 }
 
+export interface Commit {
+  sha: string
+  short_sha: string
+  subject: string
+  body?: string
+  author: string
+  email: string
+  date: string
+}
+
+export interface CommitList {
+  ref: string
+  path?: string
+  commits: Commit[]
+  has_more: boolean
+}
+
+export interface TreeCommits {
+  ref: string
+  path?: string
+  total: number
+  latest: Commit | null
+  // child full path -> last commit touching it
+  entries: Record<string, Commit>
+}
+
 // --- Intel (dex integration) ---
 
 export interface IntelService {

@@ -2,6 +2,8 @@ import type {
   Blob,
   ClaimIssueInput,
   Comment,
+  CommitList,
+  TreeCommits,
   CreateCommentInput,
   CreateIssueInput,
   CreateRepoInput,
@@ -104,6 +106,23 @@ export const api = {
     if (!resp.ok) throw new ApiError(resp.status, resp.statusText)
     return resp.blob()
   },
+
+  getCommits: (
+    owner: string,
+    repo: string,
+    opts: { path?: string; page?: number; perPage?: number } = {}
+  ) => {
+    const q = new URLSearchParams()
+    if (opts.path) q.set("path", opts.path)
+    if (opts.page) q.set("page", String(opts.page))
+    if (opts.perPage) q.set("per_page", String(opts.perPage))
+    const qs = q.toString()
+    return request<CommitList>(`/api/repos/${owner}/${repo}/commits${qs ? `?${qs}` : ""}`)
+  },
+  getTreeCommits: (owner: string, repo: string, path = "") =>
+    request<TreeCommits>(
+      `/api/repos/${owner}/${repo}/tree-commits${path ? `?path=${encodeURIComponent(path)}` : ""}`
+    ),
 
   listIssues: (owner: string, repo: string, query = "") =>
     request<Issue[]>(`/api/repos/${owner}/${repo}/issues${query ? `?${query}` : ""}`),

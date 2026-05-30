@@ -5,6 +5,7 @@ import TokenGate from "./components/TokenGate"
 import { getToken } from "./api/client"
 import ReposPage from "./routes/ReposPage"
 import RepoPage from "./routes/RepoPage"
+import CommitsPage from "./routes/CommitsPage"
 import IssuesPage from "./routes/IssuesPage"
 import IssuePage from "./routes/IssuePage"
 import BoardPage from "./routes/BoardPage"
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/:owner/:repo" element={<RepoPage />} />
         <Route path="/:owner/:repo/tree/*" element={<RepoPage />} />
         <Route path="/:owner/:repo/blob/*" element={<RepoPage />} />
+        <Route path="/:owner/:repo/commits/*" element={<CommitsPage />} />
         <Route path="/:owner/:repo/issues" element={<IssuesPage />} />
         <Route path="/:owner/:repo/issues/board" element={<BoardPage />} />
         <Route path="/:owner/:repo/issues/:number" element={<IssuePage />} />

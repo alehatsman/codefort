@@ -2,14 +2,18 @@ import { lazy, Suspense } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import {
   useBlob,
+  useCommits,
   useIntel,
   useIntelFileSummary,
   useIntelOverview,
   useRepo,
   useTree,
+  useTreeCommits,
 } from "../api/queries"
 import RepoHeader from "../components/RepoHeader"
 import FileTree from "../components/FileTree"
+import LatestCommitBar from "../components/LatestCommitBar"
+import CommitMeta from "../components/CommitMeta"
 import ReadmeCard from "../components/ReadmeCard"
 import OverviewCard from "../components/OverviewCard"
 import { findReadme } from "../lib/readme"
@@ -65,6 +69,7 @@ function TreeView({ owner, repo, path }: ViewProps) {
   const intelQ = useIntel(owner, repo)
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
   const overviewQ = useIntelOverview(owner, repo, isIndexed)
+  const treeCommitsQ = useTreeCommits(owner, repo, path)
 
   // j/k select a file/folder; Enter opens it. h/l are left to useTabNav.
   const entries = treeQ.data?.entries ?? []
@@ -112,7 +117,22 @@ function TreeView({ owner, repo, path }: ViewProps) {
   return (
     <>
       <OverviewCard owner={owner} repo={repo} path={path} summary={summary} />
-      <FileTree owner={owner} repo={repo} entries={treeQ.data.entries} selectedIndex={index} />
+      <LatestCommitBar
+        owner={owner}
+        repo={repo}
+        path={path}
+        latest={treeCommitsQ.data?.latest}
+        total={treeCommitsQ.data?.total ?? 0}
+        loading={treeCommitsQ.isLoading}
+      />
+      <FileTree
+        owner={owner}
+        repo={repo}
+        entries={treeQ.data.entries}
+        selectedIndex={index}
+        commits={treeCommitsQ.data?.entries}
+        commitsLoading={treeCommitsQ.isLoading}
+      />
       {readme && <ReadmeCard owner={owner} repo={repo} dirPath={path} entry={readme} />}
     </>
   )
@@ -127,6 +147,9 @@ function BlobView({ owner, repo, path }: ViewProps) {
   const intelQ = useIntel(owner, repo)
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
   const summaryQ = useIntelFileSummary(owner, repo, path, isIndexed)
+  // Latest commit touching this file, for the GitHub-style header.
+  const commitsQ = useCommits(owner, repo, { path, perPage: 1 })
+  const lastCommit = commitsQ.data?.commits?.[0]
 
   if (blobQ.isLoading) return <div className="loading">Loading…</div>
   if (blobQ.error) return <div className="error">{(blobQ.error as Error).message}</div>
@@ -137,6 +160,9 @@ function BlobView({ owner, repo, path }: ViewProps) {
   return (
     <div className="blob">
       <OverviewCard owner={owner} repo={repo} path={path} summary={summaryQ.data?.summary ?? ""} />
+      {lastCommit && (
+        <CommitMeta owner={owner} repo={repo} commit={lastCommit} className="blob__commit" />
+      )}
       <div className="blob__head">
         <span className="muted small">
           {lineCount(b.content)} lines · {formatSize(b.size)}
