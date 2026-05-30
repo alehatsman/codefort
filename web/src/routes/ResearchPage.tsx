@@ -5,7 +5,8 @@ import { useIntel, useRepo } from "../api/queries"
 import { api } from "../api/client"
 import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
-import type { IntelProject, IntelSearchKind, IntelSearchResult } from "../api/types"
+import IndexMeta from "../components/IndexMeta"
+import type { IntelSearchKind, IntelSearchResult } from "../api/types"
 
 /**
  * Research tab: surfaces code intelligence from a dex `serve` daemon for this
@@ -408,38 +409,4 @@ function verbFor(kind: IntelSearchKind): string {
     case "callees":
       return "Trace"
   }
-}
-
-/**
- * IndexMeta is the de-emphasized footer: the index's dry numbers and provenance
- * (files / chunks / dimensions / pending summaries, the embedding model, when
- * it was last indexed, the on-disk root). It used to dominate the top of the
- * tab; here it's one small muted strip at the bottom, there when you want it
- * and out of the way when you don't.
- */
-function IndexMeta({ project }: { project: IntelProject }) {
-  const stats = [
-    `${project.files.toLocaleString()} files`,
-    `${project.chunks.toLocaleString()} chunks`,
-    `${project.dim} dimensions`,
-  ]
-  if (project.pending_summaries > 0) {
-    stats.push(`${project.pending_summaries} pending summaries`)
-  }
-  return (
-    <footer className="research-index muted small">
-      <span className="research-index__stats">{stats.join(" · ")}</span>
-      <span className="research-index__provenance">
-        {project.embed_model || "—"} · indexed {formatTime(project.last_indexed)}
-        {" · "}
-        <code className="research-index__root">{project.root}</code>
-      </span>
-    </footer>
-  )
-}
-
-function formatTime(s: string): string {
-  if (!s) return "—"
-  const d = new Date(s)
-  return Number.isNaN(d.getTime()) ? s : d.toLocaleString()
 }
