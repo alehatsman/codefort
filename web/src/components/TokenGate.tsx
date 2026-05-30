@@ -34,7 +34,6 @@ export default function TokenGate({ onSet }: Props) {
             placeholder="mgt_..."
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            autoFocus
           />
           {error && <div className="error">{error}</div>}
           <button type="submit">Continue</button>

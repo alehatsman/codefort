@@ -33,11 +33,7 @@
         "noDescendingSpecificity": "off"
       },
       "a11y": {
-        "useButtonType": "warn",
-        "noSvgWithoutTitle": "warn",
-        "noAutofocus": "warn",
         "useKeyWithClickEvents": "warn",
-        "useAriaPropsSupportedByRole": "warn",
         "useSemanticElements": "warn"
       }
     }

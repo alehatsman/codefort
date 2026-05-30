@@ -21,7 +21,7 @@ export default function IssuesViewSwitch() {
         aria-selected={!isBoard}
         className={`view-switch__btn ${!isBoard ? "is-active" : ""}`}
       >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M2 4h12v1.5H2V4Zm0 3.25h12v1.5H2v-1.5Zm0 3.25h12V12H2v-1.5Z" />
         </svg>
         List
@@ -32,7 +32,7 @@ export default function IssuesViewSwitch() {
         aria-selected={isBoard}
         className={`view-switch__btn ${isBoard ? "is-active" : ""}`}
       >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M2 3h3.5v10H2V3Zm4.5 0h3v6h-3V3Zm4 0H14v8h-3.5V3Z" />
         </svg>
         Board

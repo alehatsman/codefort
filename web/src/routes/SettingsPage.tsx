@@ -23,6 +23,7 @@ export default function SettingsPage() {
       <nav className="settings__nav" aria-label="Settings sections">
         {SECTIONS.map((s) => (
           <button
+            type="button"
             key={s.id}
             className={`settings__nav-item ${section === s.id ? "is-active" : ""}`}
             onClick={() => setSection(s.id)}
@@ -147,6 +148,7 @@ function TokensSection() {
           <div className="token-reveal__head">
             <strong>New token “{revealed.name}”</strong>
             <button
+              type="button"
               className="modal__close"
               onClick={() => setRevealed(null)}
               aria-label="Dismiss"
@@ -160,7 +162,7 @@ function TokensSection() {
           </p>
           <div className="token-reveal__secret">
             <code>{revealed.secret}</code>
-            <button className="btn btn--small" onClick={copySecret}>
+            <button type="button" className="btn btn--small" onClick={copySecret}>
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
@@ -207,6 +209,7 @@ function TokensSection() {
                 <td className="token-table__actions">
                   {!t.revoked_at && (
                     <button
+                      type="button"
                       className="btn btn--small btn--danger"
                       onClick={() => onRevoke(t)}
                       disabled={revoke.isPending}

@@ -73,7 +73,7 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
 
   return (
     <>
-      <button className="btn btn--primary" onClick={open}>
+      <button type="button" className="btn btn--primary" onClick={open}>
         + New issue
       </button>
 

@@ -12,7 +12,7 @@ export default function Avatar({ name, size = "sm" }: Props) {
   const initial = name.trim().charAt(0).toUpperCase() || "?"
   const cls = size === "lg" ? "avatar avatar--lg" : "avatar"
   return (
-    <span className={cls} title={name} aria-label={name}>
+    <span className={cls} title={name} role="img" aria-label={name}>
       {initial}
     </span>
   )

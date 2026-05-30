@@ -102,7 +102,6 @@ export default function ResearchPage() {
                 placeholder={placeholderFor(kind)}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                autoFocus
               />
               <button
                 type="submit"
@@ -293,7 +292,7 @@ function GraphSection({ graph }: { graph: NonNullable<IntelSearchResult["graph"]
           <div key={kind} className="ask-graph-row">
             <span className="ask-graph-kind">{kind}</span>
             <div className="ask-graph-nodes">
-              {groups.get(kind)!.map((n) => (
+              {groups.get(kind)?.map((n) => (
                 <span key={n.id} className="ask-chip" title={n.qualified_name || n.id}>
                   {shortName(n)}
                 </span>

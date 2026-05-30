@@ -55,6 +55,7 @@ export function useListNav({ count, onActivate, getColumns, enabled = true }: Li
       // In grid mode j/k jump a row; in list mode they step by one. h/l only
       // navigate in grid mode (a list leaves them to the tab switcher).
       const grid = !!columnsRef.current
+      // biome-ignore lint/style/noNonNullAssertion: guarded by `grid` above — current is non-null here
       const cols = grid ? Math.max(1, Math.round(columnsRef.current!())) : 1
       let delta: number | null = null
       if (e.key === "j" || e.key === "ArrowDown") delta = grid ? cols : 1

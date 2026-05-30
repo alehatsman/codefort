@@ -306,7 +306,6 @@ function ComposeForm({
         value={body}
         onChange={(e) => setBody(e.target.value)}
         rows={3}
-        autoFocus
       />
       {create.error && <div className="error">{(create.error as Error).message}</div>}
       <div className="row">

@@ -51,6 +51,7 @@ function EnabledRunList({ owner, repo }: { owner: string; repo: string }) {
       <div className="pipelines__head">
         <h2 className="pipelines__title">Pipelines</h2>
         <button
+          type="button"
           className="btn btn--small"
           onClick={() => setEnabled.mutate(false)}
           disabled={setEnabled.isPending}
@@ -134,6 +135,7 @@ function CIDisabledCard({ owner, repo }: { owner: string; repo: string }) {
           commands stay isolated from the host.
         </p>
         <button
+          type="button"
           className="btn btn--primary"
           onClick={() => setEnabled.mutate(true)}
           disabled={setEnabled.isPending}
@@ -179,7 +181,12 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
         <h2 className="pipelines__title">
           Run #{run.number} <CIStatusBadge status={run.status} />
         </h2>
-        <button className="btn btn--small" onClick={doRerun} disabled={rerun.isPending}>
+        <button
+          type="button"
+          className="btn btn--small"
+          onClick={doRerun}
+          disabled={rerun.isPending}
+        >
           {rerun.isPending ? "Re-running…" : "Re-run"}
         </button>
       </div>
@@ -264,6 +271,7 @@ function JobDag({
               const needs = j.needs ?? []
               return (
                 <button
+                  type="button"
                   key={j.name}
                   className={`ci-dag__job ${active === j.name ? "is-active" : ""}`}
                   onClick={() => onSelect(j.name)}

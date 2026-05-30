@@ -112,6 +112,6 @@ function RawImage({ owner, repo, path, alt }: RawImageProps) {
   }, [owner, repo, path])
 
   if (failed) return <span className="md-img-missing">{alt || path}</span>
-  if (!url) return <span className="md-img-loading" aria-label={alt} />
+  if (!url) return <span className="md-img-loading" role="img" aria-label={alt} />
   return <img src={url} alt={alt} />
 }

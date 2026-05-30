@@ -45,11 +45,21 @@ export default function AssigneeControl({ owner, repo, number, assignee, state, 
       ) : (
         <div className="assignee__row">
           {assignee === null ? (
-            <button className="btn btn--small" disabled={inFlight} onClick={() => claim.mutate({})}>
+            <button
+              type="button"
+              className="btn btn--small"
+              disabled={inFlight}
+              onClick={() => claim.mutate({})}
+            >
               {claim.isPending ? "Claiming…" : "Claim it"}
             </button>
           ) : (
-            <button className="btn btn--small" disabled={inFlight} onClick={() => unclaim.mutate()}>
+            <button
+              type="button"
+              className="btn btn--small"
+              disabled={inFlight}
+              onClick={() => unclaim.mutate()}
+            >
               {unclaim.isPending ? "Releasing…" : "Release"}
             </button>
           )}
