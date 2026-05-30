@@ -66,6 +66,13 @@ type Config struct {
 	// Set via MOONGIT_CI_DEFAULT_IMAGE.
 	CIDefaultImage string
 
+	// CIRetainRuns caps how many of a repo's most recent CI runs are kept: a
+	// periodic reaper prunes terminal runs beyond this many (and their on-disk
+	// event logs), keeping disk + DB bounded. queued/running runs are never
+	// pruned. Set via MOONGIT_CI_RETAIN_RUNS (default 50); zero or negative
+	// disables retention.
+	CIRetainRuns int
+
 	// DexURL is the base URL of a dex `serve` daemon (e.g.
 	// http://127.0.0.1:8080). Empty disables the Intel tab. DexToken is
 	// the bearer token dex was started with (DEX_SERVE_TOKEN); empty when
@@ -136,6 +143,12 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("MOONGIT_CI_JOB_CONCURRENCY: %w", err)
 	}
 	cfg.CIJobConcurrency = jobConc
+
+	retainRuns, err := strconv.Atoi(envOr("MOONGIT_CI_RETAIN_RUNS", "50"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_CI_RETAIN_RUNS: %w", err)
+	}
+	cfg.CIRetainRuns = retainRuns
 
 	cfg.CISecret = envOr("MOONGIT_CI_SECRET", "")
 

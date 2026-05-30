@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alehatsman/moongit/internal/ci"
 	"github.com/alehatsman/moongit/internal/config"
 	"github.com/alehatsman/moongit/internal/server"
 	"github.com/alehatsman/moongit/internal/storage"
@@ -136,6 +137,7 @@ func runServe(logger *slog.Logger) error {
 
 	go runClaimReaper(ctx, db, cfg.ClaimLease, logger)
 	go runTokenReaper(ctx, db, cfg.AgentTokenTTL, logger)
+	go runCIRetentionReaper(ctx, db, cfg, logger)
 
 	// The CI runner can be mid-run when shutdown fires. Cancelling its context
 	// aborts the in-flight steps and it finalizes the run to a terminal status —
@@ -257,6 +259,61 @@ func runTokenReaper(ctx context.Context, db *sql.DB, ttl time.Duration, logger *
 				logger.Info("token reaper revoked stale agent tokens", "count", n)
 			}
 		}
+	}
+}
+
+// ciRetentionInterval is how often the CI retention reaper sweeps. GC isn't
+// time-critical — a fixed, unhurried cadence keeps disk + DB bounded without
+// another tuning knob.
+const ciRetentionInterval = 10 * time.Minute
+
+// runCIRetentionReaper periodically enforces per-repo CI run retention: it
+// prunes terminal runs beyond the newest cfg.CIRetainRuns (rows via
+// storage.PruneRuns) and deletes their on-disk event logs, so neither the DB
+// nor data/ci grows without bound. It sweeps once at startup, then on a fixed
+// interval. No-op (returns immediately) when retention is disabled. Runs until
+// ctx is cancelled, on the single writer pool — same discipline as the claim
+// and token reapers.
+func runCIRetentionReaper(ctx context.Context, db *sql.DB, cfg *config.Config, logger *slog.Logger) {
+	if cfg.CIRetainRuns <= 0 {
+		logger.Info("ci retention reaper disabled (retain <= 0)")
+		return
+	}
+	logger.Info("ci retention reaper started", "retain", cfg.CIRetainRuns, "interval", ciRetentionInterval)
+
+	sweepCIRetention(db, cfg, logger) // initial pass so a restart promptly clears any backlog
+
+	ticker := time.NewTicker(ciRetentionInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sweepCIRetention(db, cfg, logger)
+		}
+	}
+}
+
+// sweepCIRetention runs one retention pass: prune terminal runs beyond the
+// retain window (rows) and delete each pruned run's on-disk event-log dir.
+// Disk errors are logged, not fatal — the rows are already gone, so a leftover
+// dir is harmless and retried implicitly (it won't be re-listed once the row
+// is deleted, but RemoveAll on an absent path is a no-op anyway).
+func sweepCIRetention(db *sql.DB, cfg *config.Config, logger *slog.Logger) {
+	pruned, err := storage.PruneRuns(db, cfg.CIRetainRuns)
+	if err != nil {
+		logger.Error("ci retention prune", "err", err)
+		return
+	}
+	for _, p := range pruned {
+		dir := ci.RunLogDir(cfg.DataDir, p.Owner, p.Repo, p.Number)
+		if err := os.RemoveAll(dir); err != nil {
+			logger.Error("ci retention rm logs", "dir", dir, "err", err)
+		}
+	}
+	if len(pruned) > 0 {
+		logger.Info("ci retention pruned runs", "count", len(pruned))
 	}
 }
 

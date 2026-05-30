@@ -262,6 +262,84 @@ func ReconcileOrphanRuns(db *sql.DB) (int, error) {
 	return int(n), tx.Commit()
 }
 
+// PrunableRun identifies a pruned run so the caller can drop its on-disk
+// event-log directory after the rows are gone.
+type PrunableRun struct {
+	Owner  string
+	Repo   string
+	Number int
+}
+
+// PruneRuns enforces per-repo run retention: it deletes terminal runs that
+// have at least `keep` newer runs in the same repo (i.e. those beyond the
+// newest `keep`), removing their ci_jobs and ci_runs rows in one writer
+// transaction. queued/running runs are never deleted — and since they carry
+// the highest numbers they always fall within the kept window anyway. A
+// non-positive `keep` disables retention (no-op, nil result). Returns the
+// pruned runs so the caller can delete their on-disk event logs.
+func PruneRuns(db *sql.DB, keep int) ([]PrunableRun, error) {
+	if keep <= 0 {
+		return nil, nil
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// A run is prunable when it is terminal and at least `keep` runs in its repo
+	// have a higher number (so it sits beyond the newest `keep`). The newer
+	// count includes queued/running runs, which is what we want: they occupy the
+	// most-recent slots.
+	rows, err := tx.Query(`
+		SELECT r.id, u.name, rep.name, r.number
+		  FROM ci_runs r
+		  JOIN repos rep ON rep.id = r.repo_id
+		  JOIN users u   ON u.id   = rep.owner_id
+		 WHERE r.status IN ('success','failed','canceled','error')
+		   AND (SELECT COUNT(*) FROM ci_runs n
+		         WHERE n.repo_id = r.repo_id AND n.number > r.number) >= ?
+	`, keep)
+	if err != nil {
+		return nil, err
+	}
+	var ids []int64
+	var pruned []PrunableRun
+	for rows.Next() {
+		var id int64
+		var p PrunableRun
+		if err := rows.Scan(&id, &p.Owner, &p.Repo, &p.Number); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+		pruned = append(pruned, p)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close() // release the cursor before issuing writes on the same tx
+
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	// Delete children explicitly rather than leaning on the FK cascade, matching
+	// DeleteIssue — the behavior holds even if the foreign_keys pragma is off.
+	for _, id := range ids {
+		if _, err := tx.Exec(`DELETE FROM ci_jobs WHERE run_id = ?`, id); err != nil {
+			return nil, err
+		}
+		if _, err := tx.Exec(`DELETE FROM ci_runs WHERE id = ?`, id); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return pruned, nil
+}
+
 // CreateJob inserts a queued job for a run, recording the jobs it `needs` (the
 // DAG edges, stored as a JSON array) so the run-detail view can reconstruct
 // the dependency structure. It is idempotent on the per-run name UNIQUE

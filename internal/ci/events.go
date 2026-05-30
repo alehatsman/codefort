@@ -47,7 +47,14 @@ const (
 // Logs live on disk rather than in the DB to keep the write-hot database lean;
 // the file is durable and the API replays/tails it.
 func EventLogPath(root, owner, repo string, runNumber int, job string) string {
-	return filepath.Join(root, "ci", owner, repo, strconv.Itoa(runNumber), job+".events.jsonl")
+	return filepath.Join(RunLogDir(root, owner, repo, runNumber), job+".events.jsonl")
+}
+
+// RunLogDir is the directory holding a run's per-job event logs — the parent of
+// every job's EventLogPath. Retention drops a pruned run's logs by removing
+// this directory wholesale.
+func RunLogDir(root, owner, repo string, runNumber int) string {
+	return filepath.Join(root, "ci", owner, repo, strconv.Itoa(runNumber))
 }
 
 // EventLog is an append-only writer for one job's event stream. It is safe for
