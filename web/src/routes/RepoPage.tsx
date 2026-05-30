@@ -158,26 +158,28 @@ function BlobView({ owner, repo, path }: ViewProps) {
   const b = blobQ.data
 
   return (
-    <div className="blob">
+    <>
       <OverviewCard owner={owner} repo={repo} path={path} summary={summaryQ.data?.summary ?? ""} />
-      {lastCommit && (
-        <CommitMeta owner={owner} repo={repo} commit={lastCommit} className="blob__commit" />
-      )}
-      <div className="blob__head">
-        <span className="muted small">
-          {lineCount(b.content)} lines · {formatSize(b.size)}
-        </span>
+      <div className="blob">
+        {lastCommit && (
+          <CommitMeta owner={owner} repo={repo} commit={lastCommit} className="blob__commit" />
+        )}
+        <div className="blob__head">
+          <span className="muted small">
+            {lineCount(b.content)} lines · {formatSize(b.size)}
+          </span>
+        </div>
+        {b.too_large ? (
+          <div className="empty">File too large to display ({formatSize(b.size)}).</div>
+        ) : b.binary ? (
+          <div className="empty">Binary file not shown.</div>
+        ) : (
+          <Suspense fallback={<div className="loading">Loading…</div>}>
+            <CodeView content={b.content} path={path} />
+          </Suspense>
+        )}
       </div>
-      {b.too_large ? (
-        <div className="empty">File too large to display ({formatSize(b.size)}).</div>
-      ) : b.binary ? (
-        <div className="empty">Binary file not shown.</div>
-      ) : (
-        <Suspense fallback={<div className="loading">Loading…</div>}>
-          <CodeView content={b.content} path={path} />
-        </Suspense>
-      )}
-    </div>
+    </>
   )
 }
 

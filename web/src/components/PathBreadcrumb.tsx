@@ -4,6 +4,9 @@ interface Props {
   owner: string
   repo: string
   path: string
+  /** dex summary for the current location, surfaced as a hover tooltip on the
+   *  current (last) segment. Omitted when dex has nothing for this path. */
+  title?: string
 }
 
 /**
@@ -11,9 +14,11 @@ interface Props {
  * The owner links to the repos list and the repo to its root; every path
  * segment but the last links to its directory in the tree view. The last
  * segment — current dir (tree) or file (blob), or the repo itself at the root —
- * stays plain. This is the single navigation header shown across repo routes.
+ * stays plain, and carries the dex summary (when present) as a native title
+ * tooltip so the AI prose is available on hover without taking any space. This
+ * is the single navigation header shown across repo routes.
  */
-export default function PathBreadcrumb({ owner, repo, path }: Props) {
+export default function PathBreadcrumb({ owner, repo, path, title }: Props) {
   const base = `/${owner}/${repo}`
   const segments = path === "" ? [] : path.split("/")
 
@@ -24,7 +29,9 @@ export default function PathBreadcrumb({ owner, repo, path }: Props) {
       </Link>
       <span className="path-breadcrumb__sep">/</span>
       {segments.length === 0 ? (
-        <span className="path-breadcrumb__current">{repo}</span>
+        <span className="path-breadcrumb__current" title={title || undefined}>
+          {repo}
+        </span>
       ) : (
         <Link to={base} className="path-breadcrumb__seg">
           {repo}
@@ -37,7 +44,9 @@ export default function PathBreadcrumb({ owner, repo, path }: Props) {
           <span key={sub}>
             <span className="path-breadcrumb__sep">/</span>
             {last ? (
-              <span className="path-breadcrumb__current">{seg}</span>
+              <span className="path-breadcrumb__current" title={title || undefined}>
+                {seg}
+              </span>
             ) : (
               <Link to={`${base}/tree/${sub}`} className="path-breadcrumb__seg">
                 {seg}
