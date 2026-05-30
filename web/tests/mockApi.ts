@@ -31,6 +31,33 @@ export interface Repo {
   created_at: string
   open_issues: number
   total_issues: number
+  ci_enabled: boolean
+}
+
+export interface CIJob {
+  name: string
+  status: string
+  exit_code: number | null
+  started_at: string | null
+  finished_at: string | null
+}
+
+export interface CIRun {
+  number: number
+  commit_sha: string
+  ref: string
+  event: string
+  trigger?: string
+  status: string
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
+  jobs: CIJob[]
+  // events keyed by job name — served (SSE-framed) by the events route.
+  events?: Record<
+    string,
+    { seq: number; type: string; time: number; data?: Record<string, unknown> }[]
+  >
 }
 
 export interface Token {
@@ -47,6 +74,7 @@ export interface State {
   issues: Issue[]
   comments: Comment[]
   tokens: Token[]
+  ciRuns: CIRun[]
 }
 
 const OPEN_STATES: IssueState[] = ["todo", "in_progress"]
@@ -66,13 +94,13 @@ function freshState(seed: Partial<State> = {}): State {
         created_at: nowIso(),
         open_issues: 0,
         total_issues: 0,
+        ci_enabled: false,
       },
     ],
     issues: [],
     comments: [],
-    tokens: [
-      { id: 1, name: "test-user", created_at: nowIso(), last_used_at: nowIso() },
-    ],
+    tokens: [{ id: 1, name: "test-user", created_at: nowIso(), last_used_at: nowIso() }],
+    ciRuns: [],
     ...seed,
   }
 }
@@ -128,12 +156,63 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
   // Repos
   await page.route(/\/api\/repos$/, (route) => json(route, 200, state.repos))
   await page.route(/\/api\/repos\/[^/]+\/[^/]+$/, (route) => {
-    const url = new URL(route.request().url())
+    const req = route.request()
+    const url = new URL(req.url())
     const [, , , owner, name] = url.pathname.split("/")
     const repo = state.repos.find((r) => r.owner === owner && r.name === name)
-    return repo
-      ? json(route, 200, repo)
-      : json(route, 404, { error: "repo not registered: " + owner + "/" + name })
+    if (!repo) return json(route, 404, { error: "repo not registered: " + owner + "/" + name })
+    if (req.method() === "PATCH") {
+      const body = req.postDataJSON() as { ci_enabled?: boolean }
+      if (typeof body.ci_enabled === "boolean") repo.ci_enabled = body.ci_enabled
+    }
+    return json(route, 200, repo)
+  })
+
+  // CI: runs list / detail / rerun / events (SSE)
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs(\?.*)?$/, (route) => {
+    // Strip jobs from the list view, matching the server's list shape.
+    return json(
+      route,
+      200,
+      state.ciRuns.map(({ jobs: _jobs, events: _events, ...run }) => run)
+    )
+  })
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+$/, (route) => {
+    const n = Number(new URL(route.request().url()).pathname.split("/").pop())
+    const run = state.ciRuns.find((r) => r.number === n)
+    if (!run) return json(route, 404, { error: "run not found" })
+    const { events: _events, ...detail } = run
+    return json(route, 200, detail)
+  })
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/rerun$/, (route) => {
+    const parts = new URL(route.request().url()).pathname.split("/")
+    const n = Number(parts[parts.length - 2])
+    const src = state.ciRuns.find((r) => r.number === n)
+    if (!src) return json(route, 404, { error: "run not found" })
+    const next: CIRun = {
+      ...src,
+      number: Math.max(...state.ciRuns.map((r) => r.number)) + 1,
+      status: "queued",
+      trigger: state.identity,
+      started_at: null,
+      finished_at: null,
+      jobs: [],
+    }
+    state.ciRuns.push(next)
+    const { jobs: _j, events: _e, ...run } = next
+    return json(route, 202, run)
+  })
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/jobs\/[^/]+\/events$/, (route) => {
+    const parts = new URL(route.request().url()).pathname.split("/")
+    const job = parts[parts.length - 2]
+    const n = Number(parts[parts.length - 4])
+    const run = state.ciRuns.find((r) => r.number === n)
+    const events = run?.events?.[job] ?? []
+    // Frame as SSE: the client reads the full body, then the stream closes.
+    const body = events
+      .map((ev) => `id: ${ev.seq}\nevent: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`)
+      .join("")
+    return route.fulfill({ status: 200, contentType: "text/event-stream", body })
   })
 
   // Whoami
@@ -181,7 +260,8 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     }
     if (req.method() === "POST") {
       const body = req.postDataJSON() as { title: string; body?: string }
-      const nextNumber = state.issues.length === 0 ? 1 : Math.max(...state.issues.map((i) => i.number)) + 1
+      const nextNumber =
+        state.issues.length === 0 ? 1 : Math.max(...state.issues.map((i) => i.number)) + 1
       const iss: Issue = {
         id: state.issues.length + 1,
         number: nextNumber,
