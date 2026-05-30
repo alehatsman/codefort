@@ -246,6 +246,57 @@ jobs:
 	}
 }
 
+// TestRunFinalizesInFlightOnCancel guards the runner-side half of the shutdown
+// drain (#57): when ctx is cancelled while a run is mid-step, run() must let
+// executeRun finalize the run to a terminal status and then return — never
+// leave it stranded 'running'. The other half — runServe ordering db.Close()
+// after this drain — lives in main.go and isn't exercised here.
+func TestRunFinalizesInFlightOnCancel(t *testing.T) {
+	pipeline := `
+version: "1"
+jobs:
+  build:
+    steps: [{run: echo build}]
+`
+	started := make(chan struct{})
+	// Mimic a real step that honors ctx: it blocks until shutdown cancels the
+	// run, then reports the cancellation like parseStepResult does.
+	blockingExec := func(ctx context.Context, _, _ string) (stepResult, error) {
+		close(started)
+		<-ctx.Done()
+		return stepResult{}, ctx.Err()
+	}
+	r, run := newTestRunner(t, pipeline, true, blockingExec)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		r.run(ctx)
+		close(done)
+	}()
+
+	<-started // runner has claimed the run and is mid-step
+	cancel()  // simulate the shutdown signal
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("run() did not return after ctx cancel — shutdown would hang")
+	}
+
+	// The drain must have finalized the run against the open DB.
+	got, err := storage.GetRun(r.db, run.RepoID, run.Number)
+	if err != nil {
+		t.Fatalf("GetRun: %v", err)
+	}
+	if got.Status == storage.RunQueued || got.Status == storage.RunRunning {
+		t.Errorf("run left non-terminal (%q) after shutdown — should be finalized", got.Status)
+	}
+	if got.FinishedAt == nil {
+		t.Error("run has no FinishedAt after shutdown drain")
+	}
+}
+
 func TestExecuteRunGatedWhenDisabled(t *testing.T) {
 	pipeline := `
 version: "1"

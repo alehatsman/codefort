@@ -136,7 +136,22 @@ func runServe(logger *slog.Logger) error {
 
 	go runClaimReaper(ctx, db, cfg.ClaimLease, logger)
 	go runTokenReaper(ctx, db, cfg.AgentTokenTTL, logger)
-	go runCIRunner(ctx, db, cfg, logger)
+
+	// The CI runner can be mid-run when shutdown fires. Cancelling its context
+	// aborts the in-flight steps and it finalizes the run to a terminal status —
+	// but those status writes need the DB still open, so we drain it (below)
+	// before the deferred db.Close(). Otherwise a clean restart strands the run
+	// 'running' (its terminal write hits a closed DB). ciCtx has its own cancel
+	// (not just the signal's) so the runner also stops on the serve-error path,
+	// where ctx is never cancelled. ReconcileOrphanRuns remains the crash safety
+	// net for SIGKILL / power loss, where no drain runs.
+	ciCtx, cancelCI := context.WithCancel(ctx)
+	defer cancelCI()
+	ciDone := make(chan struct{})
+	go func() {
+		defer close(ciDone)
+		runCIRunner(ciCtx, db, cfg, logger)
+	}()
 
 	listenErr := make(chan error, 1)
 	go func() {
@@ -149,16 +164,27 @@ func runServe(logger *slog.Logger) error {
 		listenErr <- nil
 	}()
 
+	var serveErr error
 	select {
-	case err := <-listenErr:
-		return err
+	case serveErr = <-listenErr:
 	case <-ctx.Done():
 	}
 
 	logger.Info("shutting down")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return httpSrv.Shutdown(shutdownCtx)
+	if err := httpSrv.Shutdown(shutdownCtx); err != nil && serveErr == nil {
+		serveErr = err
+	}
+	// Cancel + drain the CI runner before the deferred db.Close() so an in-flight
+	// run finalizes its status against an open DB. This runs on both exit paths,
+	// including the serve-error path where ctx (signal-bound) is never cancelled.
+	// The drain is intentionally unbounded: a wedged step hangs here rather than
+	// racing db.Close() under a timeout — systemd's TimeoutStopSec then SIGKILLs
+	// us, and ReconcileOrphanRuns cleans up on the next boot.
+	cancelCI()
+	<-ciDone
+	return serveErr
 }
 
 // reaperFloor bounds how often the claim reaper runs, so a small lease (or a
