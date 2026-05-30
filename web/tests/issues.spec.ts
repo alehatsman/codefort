@@ -89,9 +89,50 @@ test("state filter narrows the list", async ({ page }) => {
   await page.getByRole("checkbox", { name: "closed" }).check()
   await expect(page.locator(".issue-row")).toHaveCount(2)
 
-  // Unassigned-only is a no-op here (all three are unassigned).
-  await page.getByRole("checkbox", { name: "unassigned only" }).check()
+  // Assignee = unassigned is a no-op here (all three are unassigned).
+  await page.getByLabel("Filter by assignee").selectOption("null")
   await expect(page.locator(".issue-row")).toHaveCount(2)
+})
+
+test("author filter and sort control narrow and reorder the list", async ({ page }) => {
+  const mk = (n: number, author: string, updated: string) => ({
+    id: n,
+    number: n,
+    title: `Issue ${n}`,
+    author,
+    state: "todo" as const,
+    assignee: null,
+    created_at: new Date("2026-01-01").toISOString(),
+    updated_at: updated,
+  })
+  await mockApi(page, {
+    issues: [
+      mk(1, "alice", "2026-05-03T00:00:00Z"),
+      mk(2, "bob", "2026-05-01T00:00:00Z"),
+      mk(3, "alice", "2026-05-02T00:00:00Z"),
+    ],
+  })
+  await page.goto("/alice/demo/issues")
+
+  // Default sort is newest (number desc): 3, 1, 2... all three present.
+  await expect(page.locator(".issue-row")).toHaveCount(3)
+  await expect(page.locator(".issue-row__title")).toHaveText(["Issue 3", "Issue 2", "Issue 1"])
+
+  // Author = bob narrows to just #2 (and persists to the URL).
+  await page.getByLabel("Filter by author").selectOption("bob")
+  await expect(page.locator(".issue-row")).toHaveCount(1)
+  await expect(page.getByText("Issue 2")).toBeVisible()
+  await expect(page).toHaveURL(/author=bob/)
+
+  // Back to any; sort oldest reverses to number-ascending order.
+  await page.getByLabel("Filter by author").selectOption("")
+  await page.getByLabel("Sort issues").selectOption("oldest")
+  await expect(page.locator(".issue-row__title")).toHaveText(["Issue 1", "Issue 2", "Issue 3"])
+
+  // Recently-updated orders by updated_at desc: #1 (May 3), #3 (May 2), #2 (May 1).
+  await page.getByLabel("Sort issues").selectOption("recently-updated")
+  await expect(page.locator(".issue-row__title")).toHaveText(["Issue 1", "Issue 3", "Issue 2"])
+  await expect(page).toHaveURL(/sort=recently-updated/)
 })
 
 test("search narrows the list by title/body, and #number jumps to the issue", async ({ page }) => {

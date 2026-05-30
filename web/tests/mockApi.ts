@@ -187,18 +187,24 @@ function recountRepos(state: State) {
 function parseQuery(url: URL): {
   states?: IssueState[]
   assignee?: string
+  author?: string
   query?: string
+  sort?: string
   limit?: number
 } {
   const stateRaw = url.searchParams.getAll("state").flatMap((s) => s.split(","))
   const states = stateRaw.filter(Boolean) as IssueState[]
   const assignee = url.searchParams.get("assignee") ?? undefined
+  const author = url.searchParams.get("author") ?? undefined
   const query = url.searchParams.get("q")?.trim() || undefined
+  const sort = url.searchParams.get("sort") ?? undefined
   const limitRaw = url.searchParams.get("limit")
   return {
     states: states.length ? states : undefined,
     assignee: assignee ?? undefined,
+    author: author ?? undefined,
     query,
+    sort: sort ?? undefined,
     limit: limitRaw ? Number(limitRaw) : undefined,
   }
 }
@@ -208,13 +214,18 @@ function applyIssueFilters(issues: Issue[], q: ReturnType<typeof parseQuery>): I
   if (q.states) out = out.filter((i) => q.states!.includes(i.state))
   if (q.assignee === "null") out = out.filter((i) => i.assignee === null)
   else if (q.assignee) out = out.filter((i) => i.assignee === q.assignee)
+  if (q.author) out = out.filter((i) => i.author === q.author)
   if (q.query) {
     const needle = q.query.toLowerCase()
     out = out.filter(
       (i) => i.title.toLowerCase().includes(needle) || (i.body ?? "").toLowerCase().includes(needle)
     )
   }
-  out = [...out].sort((a, b) => b.number - a.number)
+  out = [...out]
+  if (q.sort === "oldest") out.sort((a, b) => a.number - b.number)
+  else if (q.sort === "recently-updated")
+    out.sort((a, b) => b.updated_at.localeCompare(a.updated_at) || b.number - a.number)
+  else out.sort((a, b) => b.number - a.number) // newest (default)
   if (q.limit && q.limit > 0) out = out.slice(0, q.limit)
   return out
 }

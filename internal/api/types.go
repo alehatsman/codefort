@@ -28,6 +28,30 @@ func (s IssueState) Valid() bool {
 // that want to enumerate without hardcoding.
 var AllIssueStates = []IssueState{IssueTodo, IssueInProgress, IssueDone, IssueClosed}
 
+// IssueSort selects the ordering of a ListIssues result. The set is closed —
+// see Valid. The zero value ("") means the default, IssueSortNewest.
+type IssueSort string
+
+const (
+	IssueSortNewest          IssueSort = "newest"           // by issue number, descending (default)
+	IssueSortOldest          IssueSort = "oldest"           // by issue number, ascending
+	IssueSortRecentlyUpdated IssueSort = "recently-updated" // by last-updated time, descending
+)
+
+// Valid reports whether s is one of the known sort orders. The empty string is
+// not Valid — callers treat "" as "unset, use the default" before validating.
+func (s IssueSort) Valid() bool {
+	switch s {
+	case IssueSortNewest, IssueSortOldest, IssueSortRecentlyUpdated:
+		return true
+	}
+	return false
+}
+
+// AllIssueSorts is the canonical list, suitable for clients enumerating the
+// sort options without hardcoding.
+var AllIssueSorts = []IssueSort{IssueSortNewest, IssueSortOldest, IssueSortRecentlyUpdated}
+
 type Issue struct {
 	ID        int64      `json:"id"`
 	Number    int        `json:"number"`

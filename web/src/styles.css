@@ -1539,6 +1539,26 @@ a.file-tree__commit:hover {
 .chip input {
   margin: 0;
 }
+.filter-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.filter-select select {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.filter-select select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
 
 .issue-list {
   list-style: none;

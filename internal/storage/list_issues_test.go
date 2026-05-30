@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"slices"
 	"testing"
 
 	"github.com/alehatsman/moongit/internal/api"
@@ -18,12 +19,32 @@ func mustCreate(t *testing.T, db *sql.DB, repoID int64, title, body string) {
 	}
 }
 
+func mustCreateAs(t *testing.T, db *sql.DB, repoID int64, title, author string) {
+	t.Helper()
+	if _, err := CreateIssue(db, repoID, api.CreateIssueRequest{
+		Title: title, Author: author,
+	}); err != nil {
+		t.Fatalf("CreateIssue %q: %v", title, err)
+	}
+}
+
 func numbers(issues []api.Issue) map[int]bool {
 	m := make(map[int]bool, len(issues))
 	for _, iss := range issues {
 		m[iss.Number] = true
 	}
 	return m
+}
+
+// order lists the result's issue numbers in result order — for asserting
+// ListIssues' ORDER BY, where order is the thing under test (unlike numbers,
+// which compares as a set).
+func order(issues []api.Issue) []int {
+	out := make([]int, len(issues))
+	for i, iss := range issues {
+		out[i] = iss.Number
+	}
+	return out
 }
 
 func TestListIssuesQueryMatchesTitleAndBody(t *testing.T) {
@@ -92,5 +113,58 @@ func TestListIssuesQueryEscapesWildcards(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Number != 2 {
 		t.Fatalf("query '%%' = %v, want only the issue literally containing '%%'", numbers(got))
+	}
+}
+
+func TestListIssuesFiltersByAuthor(t *testing.T) {
+	db, repoID := seedRepo(t)
+	mustCreateAs(t, db, repoID, "alice one", "alice") // #1
+	mustCreateAs(t, db, repoID, "bob one", "bob")     // #2
+	mustCreateAs(t, db, repoID, "alice two", "alice") // #3
+
+	got, err := ListIssues(db, repoID, ListFilter{Author: "alice"})
+	if err != nil {
+		t.Fatalf("ListIssues: %v", err)
+	}
+	have := numbers(got)
+	if len(got) != 2 || !have[1] || !have[3] {
+		t.Fatalf("author 'alice' = %v, want #1 and #3", have)
+	}
+}
+
+func TestListIssuesSort(t *testing.T) {
+	db, repoID := seedRepo(t)
+	mustCreate(t, db, repoID, "first", "")  // #1
+	mustCreate(t, db, repoID, "second", "") // #2
+	mustCreate(t, db, repoID, "third", "")  // #3
+	// updated_at is unix-seconds, so same-second creation would tie. Set
+	// explicit, distinct timestamps to make the recency order deterministic:
+	// #1 newest, then #3, then #2.
+	for num, ts := range map[int]int64{1: 3000, 3: 2000, 2: 1000} {
+		if _, err := db.Exec("UPDATE issues SET updated_at = ? WHERE repo_id = ? AND number = ?", ts, repoID, num); err != nil {
+			t.Fatalf("set updated_at: %v", err)
+		}
+	}
+
+	cases := []struct {
+		name string
+		sort api.IssueSort
+		want []int
+	}{
+		{"default is newest (number desc)", "", []int{3, 2, 1}},
+		{"newest", api.IssueSortNewest, []int{3, 2, 1}},
+		{"oldest", api.IssueSortOldest, []int{1, 2, 3}},
+		{"recently-updated", api.IssueSortRecentlyUpdated, []int{1, 3, 2}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ListIssues(db, repoID, ListFilter{Sort: tc.sort})
+			if err != nil {
+				t.Fatalf("ListIssues: %v", err)
+			}
+			if g := order(got); !slices.Equal(g, tc.want) {
+				t.Errorf("sort %q = %v, want %v", tc.sort, g, tc.want)
+			}
+		})
 	}
 }

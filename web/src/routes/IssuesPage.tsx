@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useIssues, useRepo } from "../api/queries"
 import { ISSUE_STATES, type IssueState } from "../api/types"
@@ -13,14 +13,30 @@ export default function IssuesPage() {
   const { owner = "", repo = "" } = useParams()
   const navigate = useNavigate()
   const [activeStates, setActiveStates] = useState<IssueState[]>(["todo", "in_progress"])
-  const [unassignedOnly, setUnassignedOnly] = useState(false)
 
-  // The committed search term lives in the URL (?q=…) so a filtered view is
-  // bookmarkable, matching the list/board convention. `search` is the live
-  // input value; it's debounced into the URL so we don't refetch per keystroke.
+  // Assignee / author / sort live in the URL so a filtered view is bookmarkable
+  // (matching ?q=…). assignee: "" = any, "null" = unassigned, else an identity.
+  // author: "" = any, else an identity. sort: "" defaults to newest.
   const [searchParams, setSearchParams] = useSearchParams()
   const committedQuery = searchParams.get("q") ?? ""
+  const assignee = searchParams.get("assignee") ?? ""
+  const author = searchParams.get("author") ?? ""
+  const sort = searchParams.get("sort") ?? "newest"
   const [search, setSearch] = useState(committedQuery)
+
+  // Set or clear a single URL param without disturbing the others. An empty
+  // value drops the param so the default view stays at a bare URL.
+  function setParam(key: string, value: string) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (value) next.set(key, value)
+        else next.delete(key)
+        return next
+      },
+      { replace: true }
+    )
+  }
 
   useEffect(() => {
     const trimmed = search.trim()
@@ -43,10 +59,29 @@ export default function IssuesPage() {
 
   const query = new URLSearchParams()
   if (activeStates.length > 0) query.set("state", activeStates.join(","))
-  if (unassignedOnly) query.set("assignee", "null")
+  if (assignee) query.set("assignee", assignee)
+  if (author) query.set("author", author)
   if (committedQuery) query.set("q", committedQuery)
+  if (sort !== "newest") query.set("sort", sort)
 
   const { data, isLoading, error } = useIssues(owner, repo, query.toString())
+
+  // Option lists are derived from the issues currently returned (no separate
+  // endpoint — v1). The active selection is always included so it stays
+  // visible even when the current filter excludes every row carrying it.
+  const authorOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const iss of data ?? []) set.add(iss.author)
+    if (author) set.add(author)
+    return [...set].sort()
+  }, [data, author])
+
+  const assigneeOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const iss of data ?? []) if (iss.assignee) set.add(iss.assignee)
+    if (assignee && assignee !== "null") set.add(assignee)
+    return [...set].sort()
+  }, [data, assignee])
 
   // j/k select an issue row and Enter opens it. (h/l tab nav lives in RepoHeader.)
   const { index } = useListNav({
@@ -112,14 +147,51 @@ export default function IssuesPage() {
             </label>
           ))}
         </div>
-        <label className="chip">
-          <input
-            type="checkbox"
-            checked={unassignedOnly}
-            onChange={(e) => setUnassignedOnly(e.target.checked)}
-          />
-          unassigned only
-        </label>
+        <div className="filter-row">
+          <label className="filter-select">
+            <span className="filter-label">assignee:</span>
+            <select
+              value={assignee}
+              onChange={(e) => setParam("assignee", e.target.value)}
+              aria-label="Filter by assignee"
+            >
+              <option value="">any</option>
+              <option value="null">unassigned</option>
+              {assigneeOptions.map((a) => (
+                <option key={a} value={a}>
+                  @{a}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-select">
+            <span className="filter-label">author:</span>
+            <select
+              value={author}
+              onChange={(e) => setParam("author", e.target.value)}
+              aria-label="Filter by author"
+            >
+              <option value="">any</option>
+              {authorOptions.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-select">
+            <span className="filter-label">sort:</span>
+            <select
+              value={sort}
+              onChange={(e) => setParam("sort", e.target.value === "newest" ? "" : e.target.value)}
+              aria-label="Sort issues"
+            >
+              <option value="newest">newest</option>
+              <option value="oldest">oldest</option>
+              <option value="recently-updated">recently updated</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       {isLoading && <div className="loading">Loading…</div>}

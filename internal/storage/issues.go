@@ -261,7 +261,9 @@ func ExpireClaims(db *sql.DB, lease time.Duration) (int64, error) {
 type ListFilter struct {
 	States   []api.IssueState // OR-match; nil/empty means any
 	Assignee string           // "" = any, "null" = unassigned, otherwise exact
+	Author   string           // "" = any, otherwise exact
 	Query    string           // "" = any; case-insensitive substring of title or body
+	Sort     api.IssueSort    // "" = default (newest); see api.IssueSort
 	Limit    int              // 0 = default (100), capped at 1000
 }
 
@@ -294,6 +296,10 @@ func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error
 		q.WriteString(" AND assignee = ?")
 		args = append(args, filter.Assignee)
 	}
+	if filter.Author != "" {
+		q.WriteString(" AND author = ?")
+		args = append(args, filter.Author)
+	}
 	if filter.Query != "" {
 		// LIKE is case-insensitive for ASCII in SQLite by default, which is
 		// fine for a keyword search. Match the same %term% against title and
@@ -310,7 +316,17 @@ func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error
 	if limit > 1000 {
 		limit = 1000
 	}
-	q.WriteString(" ORDER BY number DESC LIMIT ?")
+	switch filter.Sort {
+	case api.IssueSortOldest:
+		q.WriteString(" ORDER BY number ASC")
+	case api.IssueSortRecentlyUpdated:
+		// number DESC tie-breaks issues sharing an updated_at (e.g. created in
+		// the same instant) so the order is stable.
+		q.WriteString(" ORDER BY updated_at DESC, number DESC")
+	default: // IssueSortNewest and the unset zero value
+		q.WriteString(" ORDER BY number DESC")
+	}
+	q.WriteString(" LIMIT ?")
 	args = append(args, limit)
 
 	rows, err := db.Query(q.String(), args...)

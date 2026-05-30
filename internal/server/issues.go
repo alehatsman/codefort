@@ -271,8 +271,18 @@ func parseListFilter(q map[string][]string) (storage.ListFilter, error) {
 	if v := q["assignee"]; len(v) > 0 {
 		f.Assignee = v[0]
 	}
+	if v := q["author"]; len(v) > 0 {
+		f.Author = v[0]
+	}
 	if v := q["q"]; len(v) > 0 {
 		f.Query = strings.TrimSpace(v[0])
+	}
+	if v := q["sort"]; len(v) > 0 && v[0] != "" {
+		s := api.IssueSort(v[0])
+		if !s.Valid() {
+			return f, errors.New("invalid sort: " + v[0])
+		}
+		f.Sort = s
 	}
 	if v := q["limit"]; len(v) > 0 {
 		n, err := strconv.Atoi(v[0])

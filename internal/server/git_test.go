@@ -140,11 +140,39 @@ func TestParseListFilter(t *testing.T) {
 			errSubstr: "invalid limit",
 		},
 		{
+			name: "author plain",
+			raw:  "author=alice",
+			want: storage.ListFilter{Author: "alice"},
+		},
+		{
+			name: "sort oldest",
+			raw:  "sort=oldest",
+			want: storage.ListFilter{Sort: api.IssueSortOldest},
+		},
+		{
+			name: "sort recently-updated",
+			raw:  "sort=recently-updated",
+			want: storage.ListFilter{Sort: api.IssueSortRecentlyUpdated},
+		},
+		{
+			name: "empty sort is the unset default",
+			raw:  "sort=",
+			want: storage.ListFilter{},
+		},
+		{
+			name:      "invalid sort rejected",
+			raw:       "sort=bogus",
+			wantErr:   true,
+			errSubstr: "invalid sort",
+		},
+		{
 			name: "combined",
-			raw:  "state=todo,in_progress&assignee=null&limit=10",
+			raw:  "state=todo,in_progress&assignee=null&author=alice&sort=oldest&limit=10",
 			want: storage.ListFilter{
 				States:   []api.IssueState{api.IssueTodo, api.IssueInProgress},
 				Assignee: "null",
+				Author:   "alice",
+				Sort:     api.IssueSortOldest,
 				Limit:    10,
 			},
 		},
