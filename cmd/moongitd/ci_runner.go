@@ -112,6 +112,16 @@ func (r *ciRunner) run(ctx context.Context) {
 	}
 	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout, "isolation", r.cfg.CIIsolation)
 
+	// A restart can strand runs mid-flight: their status writes never committed,
+	// so they sit 'running' with no goroutine driving them. Nothing can be
+	// legitimately in flight before we take our first run, so finalize any such
+	// orphans now rather than leaving the UI with a job stuck forever.
+	if n, err := storage.ReconcileOrphanRuns(r.db); err != nil {
+		r.logger.Error("ci reconcile orphan runs", "err", err)
+	} else if n > 0 {
+		r.logger.Info("ci reconciled orphaned runs", "count", n)
+	}
+
 	// A crashed runner can leave job containers behind; reap them before
 	// taking new work so they don't accumulate.
 	if r.cfg.CIIsolation == "docker" {

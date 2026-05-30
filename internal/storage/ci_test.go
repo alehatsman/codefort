@@ -178,14 +178,36 @@ func TestJobLifecycle(t *testing.T) {
 	if job.Status != JobQueued || job.ExitCode != nil {
 		t.Errorf("new job = %q exit=%v, want queued + nil exit", job.Status, job.ExitCode)
 	}
-	// Duplicate job name in the same run is rejected by the UNIQUE constraint.
-	if _, err := CreateJob(db, run.ID, "test", nil); err == nil {
-		t.Error("duplicate job name should violate UNIQUE(run_id, name)")
-	}
 	if err := StartJob(db, job.ID); err != nil {
 		t.Fatalf("StartJob: %v", err)
 	}
 	code := 0
+	if err := FinishJob(db, job.ID, JobSuccess, &code); err != nil {
+		t.Fatalf("FinishJob: %v", err)
+	}
+
+	// Re-creating the same job (the lease-reclaim path for an orphaned run)
+	// is idempotent: it resets the existing row to queued and clears the prior
+	// run's start/finish/exit instead of colliding on UNIQUE(run_id, name).
+	reset, err := CreateJob(db, run.ID, "test", nil)
+	if err != nil {
+		t.Fatalf("CreateJob (re-create): %v", err)
+	}
+	if reset.ID != job.ID {
+		t.Errorf("re-create made a new row id=%d, want reuse of %d", reset.ID, job.ID)
+	}
+	if reset.Status != JobQueued || reset.ExitCode != nil || reset.StartedAt != nil || reset.FinishedAt != nil {
+		t.Errorf("re-created job = %q exit=%v started=%v finished=%v, want queued + cleared",
+			reset.Status, reset.ExitCode, reset.StartedAt, reset.FinishedAt)
+	}
+	if jobs, _ := ListJobs(db, run.ID); len(jobs) != 1 {
+		t.Fatalf("after re-create jobs = %d, want 1", len(jobs))
+	}
+
+	// Re-run it so the assertions below still see a terminal, fully-stamped job.
+	if err := StartJob(db, job.ID); err != nil {
+		t.Fatalf("StartJob: %v", err)
+	}
 	if err := FinishJob(db, job.ID, JobSuccess, &code); err != nil {
 		t.Fatalf("FinishJob: %v", err)
 	}
@@ -203,6 +225,58 @@ func TestJobLifecycle(t *testing.T) {
 	}
 	if j.StartedAt == nil || j.FinishedAt == nil {
 		t.Error("finished job should have started_at and finished_at")
+	}
+}
+
+func TestReconcileOrphanRuns(t *testing.T) {
+	db, repoID := seedRepo(t)
+
+	// An orphaned run: stuck 'running' with a running job and two queued jobs,
+	// the state a moongitd restart strands mid-run.
+	orphan, _ := EnqueueRun(db, repoID, NewRun{CommitSHA: "a", Ref: "r", Event: "push"})
+	if _, err := ClaimNextRun(db, time.Hour); err != nil {
+		t.Fatalf("ClaimNextRun: %v", err)
+	}
+	building, _ := CreateJob(db, orphan.ID, "build", nil)
+	CreateJob(db, orphan.ID, "test", []string{"build"})
+	CreateJob(db, orphan.ID, "vet", []string{"build"})
+	if err := StartJob(db, building.ID); err != nil {
+		t.Fatalf("StartJob: %v", err)
+	}
+
+	// A separately queued run must be left untouched.
+	queued, _ := EnqueueRun(db, repoID, NewRun{CommitSHA: "b", Ref: "r", Event: "push"})
+
+	n, err := ReconcileOrphanRuns(db)
+	if err != nil {
+		t.Fatalf("ReconcileOrphanRuns: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("reconciled = %d, want 1", n)
+	}
+
+	got, _ := GetRun(db, repoID, orphan.Number)
+	if got.Status != RunError || got.FinishedAt == nil {
+		t.Errorf("orphan run = %q finished=%v, want error + finished_at", got.Status, got.FinishedAt)
+	}
+	jobs, _ := ListJobs(db, orphan.ID)
+	want := map[string]JobStatus{"build": JobError, "test": JobSkipped, "vet": JobSkipped}
+	for _, j := range jobs {
+		if j.Status != want[j.Name] {
+			t.Errorf("job %q = %q, want %q", j.Name, j.Status, want[j.Name])
+		}
+		if j.FinishedAt == nil {
+			t.Errorf("job %q should have finished_at set", j.Name)
+		}
+	}
+
+	if q, _ := GetRun(db, repoID, queued.Number); q.Status != RunQueued {
+		t.Errorf("queued run = %q, want left queued", q.Status)
+	}
+
+	// Idempotent: a second pass finds nothing to reconcile.
+	if n, _ := ReconcileOrphanRuns(db); n != 0 {
+		t.Errorf("second pass reconciled = %d, want 0", n)
 	}
 }
 

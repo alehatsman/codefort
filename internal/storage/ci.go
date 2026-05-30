@@ -223,13 +223,61 @@ func FinishRun(db *sql.DB, runID int64, status RunStatus) error {
 	return affected(res, err)
 }
 
+// ReconcileOrphanRuns finalizes runs left 'running' with no live runner — the
+// classic orphan a moongitd restart strands mid-run (the in-flight goroutine
+// dies before its status writes commit). It must be called at startup, before
+// the runner takes new work, when no run can legitimately be in flight: every
+// 'running' run is therefore an orphan. Each is marked error, its running job
+// errored and its queued jobs skipped, so the UI shows a terminal result
+// instead of a job stuck forever. Returns the number of runs reconciled.
+func ReconcileOrphanRuns(db *sql.DB) (int, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`
+		UPDATE ci_jobs SET status = ?, finished_at = strftime('%s','now')
+		 WHERE status = ? AND run_id IN (SELECT id FROM ci_runs WHERE status = ?)
+	`, string(JobError), string(JobRunning), string(RunRunning)); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(`
+		UPDATE ci_jobs SET status = ?, finished_at = strftime('%s','now')
+		 WHERE status = ? AND run_id IN (SELECT id FROM ci_runs WHERE status = ?)
+	`, string(JobSkipped), string(JobQueued), string(RunRunning)); err != nil {
+		return 0, err
+	}
+	res, err := tx.Exec(`
+		UPDATE ci_runs SET status = ?, finished_at = strftime('%s','now') WHERE status = ?
+	`, string(RunError), string(RunRunning))
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(n), tx.Commit()
+}
+
 // CreateJob inserts a queued job for a run, recording the jobs it `needs` (the
 // DAG edges, stored as a JSON array) so the run-detail view can reconstruct
-// the dependency structure. Mirrors the per-run name UNIQUE constraint so a
-// job name can't be enqueued twice in one run.
+// the dependency structure. It is idempotent on the per-run name UNIQUE
+// constraint: re-creating a job (e.g. when an orphaned run is re-claimed via
+// the lease steal) resets the existing row back to queued — clearing the prior
+// run's start/finish/exit — rather than colliding, so the run re-executes
+// cleanly from scratch.
 func CreateJob(db *sql.DB, runID int64, name string, needs []string) (CIJob, error) {
 	job, err := scanJob(db.QueryRow(`
 		INSERT INTO ci_jobs(run_id, name, needs, status) VALUES (?, ?, ?, ?)
+		ON CONFLICT(run_id, name) DO UPDATE SET
+			needs       = excluded.needs,
+			status      = excluded.status,
+			exit_code   = NULL,
+			started_at  = NULL,
+			finished_at = NULL
 		RETURNING `+jobColumns+`
 	`, runID, name, marshalNeeds(needs), string(JobQueued)))
 	return job, err
