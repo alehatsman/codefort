@@ -1023,6 +1023,15 @@ a.file-tree__commit:hover {
 .code-line:hover .code-line__text {
   background: var(--code-line-hl);
 }
+/* Deep-link target: a Research suggested-read opened the file at this block,
+   so the #L<n> / #L<start>-L<end> range is tinted and barred down the gutter. */
+.code-line.is-highlighted .code-line__num,
+.code-line.is-highlighted .code-line__text {
+  background: color-mix(in srgb, var(--state-in_progress) 16%, transparent);
+}
+.code-line.is-highlighted .code-line__num {
+  box-shadow: inset 2px 0 0 var(--state-in_progress);
+}
 
 /* Syntax highlighting — highlight.js scopes mapped to the Primer palette.
    Colour only; no backgrounds, so it inherits the blob's surface. */
@@ -1979,62 +1988,49 @@ h3 {
   font-size: var(--text-md);
 }
 
-/* --- Intel tab (dex integration) --- */
-.intel__stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-3);
-  margin: var(--space-4) 0;
+/* --- Research tab (dex code intelligence) --- */
+/* Keep the ask box and its results focused, not stretched edge-to-edge. */
+.research {
+  max-width: 860px;
 }
-@media (max-width: 700px) {
-  .intel__stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
+
+/* The ask box leads the tab: a plain prompt, then one control row where the
+   question input is the dominant element. */
+.research-ask {
+  margin: var(--space-4) 0 var(--space-5);
 }
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3) var(--space-4);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.stat__num {
-  font-size: var(--text-2xl);
+.research-ask__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
-  line-height: var(--leading-none);
 }
-.stat__label {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-}
-
-.intel__meta {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-1) var(--space-4);
-  margin: 0 0 20px;
-  font-size: var(--text-base);
-}
-.intel__meta dt {
-  color: var(--fg-muted);
-}
-.intel__meta dd {
-  margin: 0;
-}
-
-.intel__search {
+.research-ask__bar {
   display: flex;
   gap: var(--space-2);
-  margin-bottom: var(--space-4);
 }
-.intel__search .input {
-  flex: 1;
-}
-.intel__kind {
+.research-ask__kind {
   flex: 0 0 auto;
   width: auto;
+}
+.research-ask__input {
+  flex: 1;
+}
+.research-ask__go {
+  flex: 0 0 auto;
+}
+
+/* Index provenance — the dry numbers that used to dominate the top of the tab,
+   now a small muted strip pinned at the very bottom. */
+.research-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-muted);
+}
+.research-index__root {
+  font-family: var(--font-mono);
 }
 
 .intel__hits {

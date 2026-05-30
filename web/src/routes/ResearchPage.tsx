@@ -5,15 +5,24 @@ import { useIntel, useIntelOverview, useRepo } from "../api/queries"
 import { api } from "../api/client"
 import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
-import type { IntelOverview, IntelSearchKind, IntelSearchResult } from "../api/types"
+import type {
+  IntelOverview,
+  IntelProject,
+  IntelSearchKind,
+  IntelSearchResult,
+} from "../api/types"
 
 /**
- * Intel tab: surfaces code intelligence from a dex `serve` daemon for this
- * repo — index status plus semantic and symbol search. The backend matches
- * the repo to a dex project by name; when dex isn't configured or the repo
- * isn't indexed, we render a distinct empty state rather than an error.
+ * Research tab: surfaces code intelligence from a dex `serve` daemon for this
+ * repo. The page leads with the thing people actually come here to do — ask
+ * the codebase a question — so the ask box is the focal point at the top.
+ * Package summaries fill the idle state below it, and the dry index numbers
+ * (files / chunks / model / last indexed) sit small and muted at the very
+ * bottom. The backend matches the repo to a dex project by name; when dex
+ * isn't configured or the repo isn't indexed, we render a distinct empty
+ * state rather than an error.
  */
-export default function IntelPage() {
+export default function ResearchPage() {
   const { owner = "", repo = "" } = useParams()
   const repoQ = useRepo(owner, repo)
   const intelQ = useIntel(owner, repo)
@@ -40,7 +49,7 @@ export default function IntelPage() {
   }
 
   return (
-    <div className="intel">
+    <div className="research-page">
       <RepoHeader owner={r.owner} repo={r.name} openIssues={r.open_issues} />
       <OverviewCard owner={r.owner} repo={r.name} path="" summary="" />
 
@@ -78,72 +87,48 @@ export default function IntelPage() {
       )}
 
       {intel && intel.enabled && intel.found && intel.project && (
-        <>
-          <div className="intel__stats">
-            <div className="stat">
-              <span className="stat__num">{intel.project.files.toLocaleString()}</span>
-              <span className="stat__label">files</span>
+        <div className="research">
+          <form className="research-ask" onSubmit={submit}>
+            <h2 className="research-ask__title">Ask {r.name}</h2>
+            <div className="research-ask__bar">
+              <select
+                className="input research-ask__kind"
+                value={kind}
+                onChange={(e) => setKind(e.target.value as IntelSearchKind)}
+                aria-label="Search kind"
+              >
+                <option value="ask">Ask</option>
+                <option value="semantic">Semantic</option>
+                <option value="symbol">Symbol</option>
+                <option value="callers">Callers</option>
+                <option value="callees">Callees</option>
+              </select>
+              <input
+                className="input research-ask__input"
+                placeholder={placeholderFor(kind)}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="btn btn--primary research-ask__go"
+                disabled={!query.trim() || search.isPending}
+              >
+                {search.isPending ? "Working…" : verbFor(kind)}
+              </button>
             </div>
-            <div className="stat">
-              <span className="stat__num">{intel.project.chunks.toLocaleString()}</span>
-              <span className="stat__label">chunks</span>
-            </div>
-            <div className="stat">
-              <span className="stat__num">{intel.project.dim}</span>
-              <span className="stat__label">dimensions</span>
-            </div>
-            <div className="stat">
-              <span className="stat__num">{intel.project.pending_summaries}</span>
-              <span className="stat__label">pending summaries</span>
-            </div>
-          </div>
-
-          <dl className="intel__meta">
-            <dt>Model</dt>
-            <dd>{intel.project.embed_model || "—"}</dd>
-            <dt>Last indexed</dt>
-            <dd>{formatTime(intel.project.last_indexed)}</dd>
-            <dt>Root</dt>
-            <dd>
-              <code>{intel.project.root}</code>
-            </dd>
-          </dl>
-
-          {overviewQ.data && <OverviewSection overview={overviewQ.data} />}
-
-          <form className="intel__search" onSubmit={submit}>
-            <select
-              className="input intel__kind"
-              value={kind}
-              onChange={(e) => setKind(e.target.value as IntelSearchKind)}
-              aria-label="Search kind"
-            >
-              <option value="ask">Ask</option>
-              <option value="semantic">Semantic</option>
-              <option value="symbol">Symbol</option>
-              <option value="callers">Callers</option>
-              <option value="callees">Callees</option>
-            </select>
-            <input
-              className="input"
-              placeholder={placeholderFor(kind)}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={!query.trim() || search.isPending}
-            >
-              {search.isPending ? "Searching…" : "Search"}
-            </button>
           </form>
 
           {search.error && <div className="error">{(search.error as Error).message}</div>}
-          {search.data && (
-            <IntelResult owner={r.owner} repo={r.name} result={search.data} />
+          {search.data && <IntelResult owner={r.owner} repo={r.name} result={search.data} />}
+
+          {!search.data && !search.isPending && overviewQ.data && (
+            <OverviewSection overview={overviewQ.data} />
           )}
-        </>
+
+          <IndexMeta project={intel.project} />
+        </div>
       )}
     </div>
   )
@@ -252,9 +237,9 @@ function AskView({
                   <div className="ask-read__head">
                     <a
                       className="hit__path"
-                      href={`/${owner}/${repo}/blob/HEAD/${rd.path}#L${rd.start_line}`}
-                      onClick={(e) => e.preventDefault()}
-                      title="Code browser is on the roadmap"
+                      href={blobHref(owner, repo, rd.path, rd.start_line, rd.end_line)}
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
                       {rd.path}
                       <span className="hit__lines">
@@ -301,8 +286,9 @@ function AskView({
                 <div className="hit__head">
                   <a
                     className="hit__path"
-                    href={`/${owner}/${repo}/blob/HEAD/${h.path}#L${h.start_line}`}
-                    onClick={(e) => e.preventDefault()}
+                    href={blobHref(owner, repo, h.path, h.start_line, h.end_line)}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
                     {h.path}
                     <span className="hit__lines">
@@ -404,9 +390,9 @@ function SearchHits({
           <div className="hit__head">
             <a
               className="hit__path"
-              href={`/${owner}/${repo}/blob/HEAD/${h.path}#L${h.start_line}`}
-              onClick={(e) => e.preventDefault()}
-              title="Code browser is on the roadmap"
+              href={blobHref(owner, repo, h.path, h.start_line, h.end_line)}
+              target="_blank"
+              rel="noopener noreferrer"
             >
               {h.path}
               <span className="hit__lines">
@@ -426,6 +412,22 @@ function SearchHits({
   )
 }
 
+// Deep link into the blob viewer at the hit's lines. The blob route reads the
+// repo-relative path straight from its `*` splat (no ref segment — it resolves
+// the default branch), matching how the file tree links files. A multi-line
+// span gets a `#L<start>-L<end>` range so CodeView highlights the whole block;
+// a single line uses the plain `#L<n>` anchor. Opened in a new tab.
+function blobHref(
+  owner: string,
+  repo: string,
+  path: string,
+  start: number,
+  end: number,
+): string {
+  const anchor = end > start ? `#L${start}-L${end}` : `#L${start}`
+  return `/${owner}/${repo}/blob/${path}${anchor}`
+}
+
 function placeholderFor(kind: IntelSearchKind): string {
   switch (kind) {
     case "semantic":
@@ -439,6 +441,50 @@ function placeholderFor(kind: IntelSearchKind): string {
     case "callees":
       return "Symbol whose callees you want — e.g. Run, ResolveProject"
   }
+}
+
+// The submit button speaks the verb that fits the selected mode, so the
+// control reads like an action ("Ask", "Trace") rather than a generic Search.
+function verbFor(kind: IntelSearchKind): string {
+  switch (kind) {
+    case "ask":
+      return "Ask"
+    case "semantic":
+      return "Search"
+    case "symbol":
+      return "Find"
+    case "callers":
+    case "callees":
+      return "Trace"
+  }
+}
+
+/**
+ * IndexMeta is the de-emphasized footer: the index's dry numbers and provenance
+ * (files / chunks / dimensions / pending summaries, the embedding model, when
+ * it was last indexed, the on-disk root). It used to dominate the top of the
+ * tab; here it's one small muted strip at the bottom, there when you want it
+ * and out of the way when you don't.
+ */
+function IndexMeta({ project }: { project: IntelProject }) {
+  const stats = [
+    `${project.files.toLocaleString()} files`,
+    `${project.chunks.toLocaleString()} chunks`,
+    `${project.dim} dimensions`,
+  ]
+  if (project.pending_summaries > 0) {
+    stats.push(`${project.pending_summaries} pending summaries`)
+  }
+  return (
+    <footer className="research-index muted small">
+      <span className="research-index__stats">{stats.join(" · ")}</span>
+      <span className="research-index__provenance">
+        {project.embed_model || "—"} · indexed {formatTime(project.last_indexed)}
+        {" · "}
+        <code className="research-index__root">{project.root}</code>
+      </span>
+    </footer>
+  )
 }
 
 function formatTime(s: string): string {
