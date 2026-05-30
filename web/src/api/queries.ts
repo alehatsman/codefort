@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "./client"
-import type { Issue, Repo } from "./types"
+import type { CIRun, Issue, Repo } from "./types"
 
 // Query keys live in one place so mutations can invalidate consistently.
 // Pattern: hierarchical arrays so `["issues", owner, repo]` invalidation
@@ -24,6 +24,15 @@ export const keys = {
   intelOverview: (owner: string, repo: string) => ["intelOverview", owner, repo] as const,
   intelFileSummary: (owner: string, repo: string, path: string) =>
     ["intelFileSummary", owner, repo, path] as const,
+  ciRuns: (owner: string, repo: string) => ["ciRuns", owner, repo] as const,
+  ciRun: (owner: string, repo: string, n: number) => ["ciRun", owner, repo, n] as const,
+}
+
+// A run is "live" (queued or running) until it reaches a terminal state. Lists
+// and detail views poll while anything is live so status/duration tick without
+// a manual refresh; once everything settles, polling stops.
+function isLiveStatus(status: CIRun["status"]): boolean {
+  return status === "queued" || status === "running"
 }
 
 export function useWhoami() {
@@ -167,5 +176,28 @@ export function useIntelFileSummary(owner: string, repo: string, path: string, e
     // One dex round trip per file view — gate on dex up + repo indexed.
     enabled: enabled && !!owner && !!repo && !!path,
     staleTime: 5 * 60_000,
+  })
+}
+
+export function useCIRuns(owner: string, repo: string) {
+  return useQuery({
+    queryKey: keys.ciRuns(owner, repo),
+    queryFn: () => api.listCIRuns(owner, repo),
+    enabled: !!owner && !!repo,
+    // Poll the list while any run is still live, so a freshly pushed run shows
+    // progress without a refresh; stop once everything is terminal.
+    refetchInterval: (q) =>
+      q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false,
+  })
+}
+
+export function useCIRun(owner: string, repo: string, n: number) {
+  return useQuery({
+    queryKey: keys.ciRun(owner, repo, n),
+    queryFn: () => api.getCIRun(owner, repo, n),
+    enabled: !!owner && !!repo && Number.isFinite(n),
+    // Poll run + job statuses while the run is live (the SSE stream carries the
+    // log lines; this keeps the run/job status badges current).
+    refetchInterval: (q) => (q.state.data && isLiveStatus(q.state.data.status) ? 2000 : false),
   })
 }

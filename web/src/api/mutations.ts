@@ -8,6 +8,7 @@ import type {
   CreateRepoInput,
   CreateTokenInput,
   UpdateIssueInput,
+  UpdateRepoInput,
 } from "./types"
 
 export function useCreateRepo() {
@@ -107,6 +108,30 @@ export function useDeleteComment(owner: string, repo: string, n: number) {
     mutationFn: (commentID: number) => api.deleteComment(owner, repo, n, commentID),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.comments(owner, repo, n) })
+    },
+  })
+}
+
+// useRerunCIRun re-enqueues a run; the new run lands at the top of the list, so
+// refresh the runs list once it's accepted.
+export function useRerunCIRun(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (n: number) => api.rerunCIRun(owner, repo, n),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) }),
+  })
+}
+
+// useSetCIEnabled flips a repo's CI opt-in and refreshes repo views (the
+// Pipelines tab gates its UI on this flag).
+export function useSetCIEnabled(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      api.updateRepo(owner, repo, { ci_enabled: enabled } as UpdateRepoInput),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.repo(owner, repo) })
+      qc.invalidateQueries({ queryKey: keys.repos() })
     },
   })
 }
