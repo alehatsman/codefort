@@ -123,6 +123,12 @@ func CreateRepo(db *sql.DB, reposDir, owner, name string) (int64, string, error)
 		}
 	}
 
+	// Install (or refresh) the CI post-receive hook on every call so existing
+	// repos pick it up too. Cheap and idempotent.
+	if err := WritePostReceiveHook(repoDir); err != nil {
+		return 0, "", fmt.Errorf("write post-receive hook: %w", err)
+	}
+
 	id, err := storage.EnsureRepo(db, owner, name)
 	if err != nil {
 		return 0, "", fmt.Errorf("ensure repo: %w", err)

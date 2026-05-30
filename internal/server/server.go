@@ -21,15 +21,32 @@ type Server struct {
 	rdb    *sql.DB
 	logger *slog.Logger
 	dex    *dex.Client // nil when MOONGIT_DEX_URL is unset (Intel disabled)
+
+	// ciSecret gates the loopback /internal/ci/events endpoint and is
+	// injected into the push hook's environment. ciURL is the loopback base
+	// URL the hook POSTs to. An empty ciSecret disables CI notifications (the
+	// endpoint rejects and the hook short-circuits on the empty env var).
+	ciSecret string
+	ciURL    string
 }
 
 func New(cfg *config.Config, db, rdb *sql.DB, logger *slog.Logger) *Server {
+	secret := cfg.CISecret
+	if secret == "" {
+		gen, err := generateCISecret()
+		if err != nil {
+			logger.Error("ci: generate secret failed; CI notifications disabled", "err", err)
+		}
+		secret = gen
+	}
 	return &Server{
-		cfg:    cfg,
-		db:     db,
-		rdb:    rdb,
-		logger: logger,
-		dex:    dex.New(cfg.DexURL, cfg.DexToken),
+		cfg:      cfg,
+		db:       db,
+		rdb:      rdb,
+		logger:   logger,
+		dex:      dex.New(cfg.DexURL, cfg.DexToken),
+		ciSecret: secret,
+		ciURL:    loopbackURL(cfg.Addr),
 	}
 }
 
@@ -52,6 +69,9 @@ func (s *Server) Handler() http.Handler {
 		switch {
 		case r.URL.Path == "/healthz":
 			s.handleHealth(w, r)
+		case r.URL.Path == "/internal/ci/events":
+			// Loopback-only, CI-secret-gated; off the Bearer /api surface.
+			s.handleCIEvents(w, r)
 		case strings.HasPrefix(r.URL.Path, "/api/"):
 			apiAuth.ServeHTTP(w, r)
 		case isGitRequest(r):
