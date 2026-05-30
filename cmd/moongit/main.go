@@ -64,6 +64,7 @@ USAGE:
     moongit issue comment <number> --body <b>
 
     moongit review list    [--ref <branch>] [--path <p>] [--state open|resolved|all] [--json]
+    moongit review create  --path <p> --lines <n|a-b> --body <b> [--ref <branch>]
     moongit review resolve <id>
     moongit review reopen  <id>
     moongit review delete  <id>
@@ -537,11 +538,13 @@ func runIssueComment(args []string) error {
 // the code-review comments anchored to file blocks on a branch.
 func runReview(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit review <list|resolve|reopen|delete>")
+		return errors.New("usage: moongit review <list|create|resolve|reopen|delete>")
 	}
 	switch args[0] {
 	case "list":
 		return runReviewList(args[1:])
+	case "create":
+		return runReviewCreate(args[1:])
 	case "resolve":
 		return runReviewSetResolved(args[1:], true)
 	case "reopen":
@@ -551,6 +554,82 @@ func runReview(args []string) error {
 	default:
 		return fmt.Errorf("unknown review subcommand: %s", args[0])
 	}
+}
+
+// parseLineSpec parses a review line spec — a single 1-based line ("5") or an
+// inclusive range ("5-12") — into start/end. It mirrors the L5 / L5-L12 form
+// `review list` prints. Lines are 1-based; a range must be non-decreasing.
+func parseLineSpec(spec string) (start, end int, err error) {
+	lo, hi, isRange := strings.Cut(spec, "-")
+	start, err = strconv.Atoi(strings.TrimSpace(lo))
+	if err != nil || start < 1 {
+		return 0, 0, fmt.Errorf("invalid --lines %q (want N or A-B, 1-based)", spec)
+	}
+	if !isRange {
+		return start, start, nil
+	}
+	end, err = strconv.Atoi(strings.TrimSpace(hi))
+	if err != nil || end < start {
+		return 0, 0, fmt.Errorf("invalid --lines %q (want N or A-B, 1-based)", spec)
+	}
+	return start, end, nil
+}
+
+// runReviewCreate anchors a new code-review comment to a file's line range on a
+// branch. The server validates the path/ref and stamps author + commit SHA; we
+// only marshal the request and report the created id. Mirrors runCITrigger.
+func runReviewCreate(args []string) error {
+	fs := flag.NewFlagSet("review create", flag.ContinueOnError)
+	path := fs.String("path", "", "file path to anchor the comment to (required)")
+	lines := fs.String("lines", "", "line or inclusive range: N or A-B (required)")
+	body := fs.String("body", "", "comment text (required)")
+	ref := fs.String("ref", "", "branch to anchor on (defaults to the repo's default branch)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *path == "" || *lines == "" || strings.TrimSpace(*body) == "" {
+		return errors.New("usage: moongit review create --path <p> --lines <n|a-b> --body <b> [--ref <branch>]")
+	}
+	start, end, err := parseLineSpec(*lines)
+	if err != nil {
+		return err
+	}
+
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(api.CreateCodeCommentRequest{
+		Ref:       *ref,
+		Path:      *path,
+		StartLine: start,
+		EndLine:   end,
+		Body:      *body,
+	})
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/code-comments", target.server, target.owner, target.repo)
+	resp, raw, err := httpDo(http.MethodPost, endpoint, bytes.NewReader(payload), "application/json")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("branch or path not found: %s", decodeError(raw))
+	}
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	var c api.CodeComment
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	anchor := fmt.Sprintf("L%d", c.StartLine)
+	if c.EndLine > c.StartLine {
+		anchor = fmt.Sprintf("L%d-L%d", c.StartLine, c.EndLine)
+	}
+	fmt.Printf("comment #%d created — %s:%s (%s)\n", c.ID, c.Path, anchor, c.Ref)
+	return nil
 }
 
 func runReviewList(args []string) error {

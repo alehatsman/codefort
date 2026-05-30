@@ -105,3 +105,41 @@ func TestParseRemote(t *testing.T) {
 		})
 	}
 }
+
+func TestParseLineSpec(t *testing.T) {
+	tests := []struct {
+		spec      string
+		wantStart int
+		wantEnd   int
+		wantErr   bool
+	}{
+		{spec: "5", wantStart: 5, wantEnd: 5},
+		{spec: "5-12", wantStart: 5, wantEnd: 12},
+		{spec: "7-7", wantStart: 7, wantEnd: 7},
+		{spec: " 5 - 12 ", wantStart: 5, wantEnd: 12}, // tolerate surrounding spaces
+		{spec: "0", wantErr: true},                    // lines are 1-based
+		{spec: "8-3", wantErr: true},                  // reversed range
+		{spec: "5-0", wantErr: true},                  // end below start
+		{spec: "abc", wantErr: true},
+		{spec: "5-x", wantErr: true},
+		{spec: "", wantErr: true},
+		{spec: "-5", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.spec, func(t *testing.T) {
+			start, end, err := parseLineSpec(tt.spec)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("parseLineSpec(%q) = (%d, %d, nil), want error", tt.spec, start, end)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseLineSpec(%q): unexpected error: %v", tt.spec, err)
+			}
+			if start != tt.wantStart || end != tt.wantEnd {
+				t.Errorf("parseLineSpec(%q) = (%d, %d), want (%d, %d)", tt.spec, start, end, tt.wantStart, tt.wantEnd)
+			}
+		})
+	}
+}
