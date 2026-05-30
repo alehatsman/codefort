@@ -1926,3 +1926,18 @@ h3 {
   line-height: var(--leading-relaxed);
   color: var(--fg);
 }
+
+/* Vim keyboard navigation ---------------------------------------------- */
+/* Selection ring for the hjkl-selected card / file row / issue row. Kept
+   visually distinct from :hover so the keyboard focus is unmistakable. */
+.is-vim-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.card.is-vim-selected {
+  border-color: var(--accent);
+}
+.file-tree__row.is-vim-selected,
+.issue-row.is-vim-selected {
+  background: var(--accent-muted);
+}

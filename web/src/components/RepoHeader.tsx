@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
+import { useTabNav } from "../lib/keyboardNav"
 
 interface Props {
   owner: string
@@ -11,9 +12,13 @@ interface Props {
  * is derived from the current URL. "Code" covers the repo root plus the
  * /tree/ and /blob/ browser routes. List/Board views both live under
  * Issues — the switch between them is rendered inside the Issues pages.
+ *
+ * Living on every repo route, this is also where h/l tab navigation is
+ * wired (`useTabNav`), so the keys work consistently across all tabs.
  */
 export default function RepoHeader({ owner, repo, openIssues }: Props) {
   const location = useLocation()
+  useTabNav(owner, repo)
   const base = `/${owner}/${repo}`
   const isCode =
     location.pathname === base ||

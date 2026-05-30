@@ -6,6 +6,7 @@ import NewIssueForm from "../components/NewIssueForm"
 import RepoHeader from "../components/RepoHeader"
 import StateIcon from "../components/StateIcon"
 import IssuesViewSwitch from "../components/IssuesViewSwitch"
+import { useListNav } from "../lib/keyboardNav"
 
 export default function IssuesPage() {
   const { owner = "", repo = "" } = useParams()
@@ -20,6 +21,15 @@ export default function IssuesPage() {
   if (unassignedOnly) query.set("assignee", "null")
 
   const { data, isLoading, error } = useIssues(owner, repo, query.toString())
+
+  // j/k select an issue row and Enter opens it. (h/l tab nav lives in RepoHeader.)
+  const { index } = useListNav({
+    count: data?.length ?? 0,
+    onActivate: (i) => {
+      const iss = data?.[i]
+      if (iss) navigate(`/${owner}/${repo}/issues/${iss.number}`)
+    },
+  })
 
   function toggleState(s: IssueState) {
     setActiveStates((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]))
@@ -73,8 +83,12 @@ export default function IssuesPage() {
 
       {data && data.length > 0 && (
         <ul className="issue-list">
-          {data.map((iss) => (
-            <li key={iss.id} className="issue-row">
+          {data.map((iss, i) => (
+            <li
+              key={iss.id}
+              className={`issue-row ${i === index ? "is-vim-selected" : ""}`}
+              data-vim-selected={i === index ? "true" : undefined}
+            >
               <Link to={`/${owner}/${repo}/issues/${iss.number}`} className="issue-row__link">
                 <span className="issue-row__icon">
                   <StateIcon state={iss.state} />
