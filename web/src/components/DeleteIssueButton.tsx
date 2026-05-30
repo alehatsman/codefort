@@ -26,12 +26,7 @@ export default function DeleteIssueButton({ owner, repo, number }: Props) {
 
   return (
     <>
-      <button
-        type="button"
-        className="btn btn--danger"
-        disabled={del.isPending}
-        onClick={onDelete}
-      >
+      <button type="button" className="btn btn--danger" disabled={del.isPending} onClick={onDelete}>
         {del.isPending ? "Deleting…" : "Delete issue"}
       </button>
       {del.error && <div className="error inline">{(del.error as Error).message}</div>}

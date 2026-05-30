@@ -72,8 +72,8 @@ export function useJobEventStream(
             if (streamDone) break
             buf += decoder.decode(value, { stream: true })
             // SSE frames are separated by a blank line.
-            let sep
-            while ((sep = buf.indexOf("\n\n")) !== -1) {
+            let sep = buf.indexOf("\n\n")
+            while (sep !== -1) {
               const frame = buf.slice(0, sep)
               buf = buf.slice(sep + 2)
               const ev = parseFrame(frame)
@@ -81,13 +81,14 @@ export function useJobEventStream(
                 lastSeq.current = Math.max(lastSeq.current, ev.seq)
                 setEvents((prev) => [...prev, ev])
               }
+              sep = buf.indexOf("\n\n")
             }
           }
           // Stream closed by the server: the run is terminal (or this job is
           // done). Mark done and stop reconnecting.
           if (!cancelled) setDone(true)
           return
-        } catch (e) {
+        } catch {
           if (cancelled || ctrl.signal.aborted) return
           // Transient network drop on a live run — back off and resume.
           await sleep(1000)

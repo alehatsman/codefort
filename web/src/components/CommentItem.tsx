@@ -7,7 +7,6 @@ import Avatar from "./Avatar"
 // so the comment list doesn't drag it into the main bundle.
 const Markdown = lazy(() => import("./Markdown"))
 
-
 interface Props {
   owner: string
   repo: string

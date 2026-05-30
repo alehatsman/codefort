@@ -45,7 +45,7 @@ export default function ReviewPage() {
             <button
               key={s}
               type="button"
-              className={"seg__btn" + (state === s ? " is-active" : "")}
+              className={`seg__btn${state === s ? " is-active" : ""}`}
               onClick={() => setState(s)}
             >
               {s}
@@ -59,7 +59,7 @@ export default function ReviewPage() {
       {commentsQ.isLoading && <div className="loading">Loading…</div>}
       {commentsQ.error && <div className="error">{(commentsQ.error as Error).message}</div>}
       {commentsQ.data && comments.length === 0 && (
-        <div className="empty">No {state === "all" ? "" : state + " "}comments on this branch.</div>
+        <div className="empty">No {state === "all" ? "" : `${state} `}comments on this branch.</div>
       )}
 
       {byPath.map(([path, list]) => (
@@ -109,7 +109,7 @@ function ReviewRow({
       : `L${comment.start_line}`
 
   return (
-    <li className={"review-row" + (comment.resolved ? " is-resolved" : "")}>
+    <li className={`review-row${comment.resolved ? " is-resolved" : ""}`}>
       <div className="review-row__head">
         <Avatar name={comment.author} />
         <strong>{comment.author}</strong>

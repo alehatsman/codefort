@@ -46,7 +46,7 @@ export default function SummariesPage() {
         </div>
       )}
 
-      {intel && intel.enabled && !intel.found && (
+      {intel?.enabled && !intel.found && (
         <div className="empty" style={{ border: "1px solid var(--border)", borderRadius: 6 }}>
           <p>
             <strong>This repo is not indexed by dex.</strong>
@@ -57,9 +57,7 @@ export default function SummariesPage() {
         </div>
       )}
 
-      {isIndexed && overviewQ.isLoading && (
-        <div className="loading">Loading summaries…</div>
-      )}
+      {isIndexed && overviewQ.isLoading && <div className="loading">Loading summaries…</div>}
       {isIndexed && overviewQ.error && (
         <div className="error">{(overviewQ.error as Error).message}</div>
       )}
@@ -113,5 +111,5 @@ function Summaries({ overview }: { overview: IntelOverview }) {
 function firstLine(s: string): string {
   const i = s.indexOf("\n")
   const head = i === -1 ? s : s.slice(0, i)
-  return head.length > 120 ? head.slice(0, 117) + "…" : head
+  return head.length > 120 ? `${head.slice(0, 117)}…` : head
 }

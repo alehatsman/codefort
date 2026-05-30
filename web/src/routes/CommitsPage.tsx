@@ -26,7 +26,10 @@ export default function CommitsPage() {
   const [commits, setCommits] = useState<Commit[]>([])
   const commitsQ = useCommits(owner, repo, { path, page, perPage: PER_PAGE })
 
-  // Reset accumulation when the repo or path filter changes.
+  // Reset accumulation when the repo or path filter changes. owner/repo/path
+  // are the reset *triggers*, not read in the body — Biome can't see that.
+  // TODO(#61): replace this effect with a render key or derived reset.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deps are the reset triggers, not used in the body
   useEffect(() => {
     setPage(1)
     setCommits([])

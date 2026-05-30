@@ -62,7 +62,7 @@ export default function ResearchPage() {
         </div>
       )}
 
-      {intel && intel.enabled && !intel.found && (
+      {intel?.enabled && !intel.found && (
         <div className="empty" style={{ border: "1px solid var(--border)", borderRadius: 6 }}>
           <p>
             <strong>This repo is not indexed by dex.</strong>
@@ -80,7 +80,7 @@ export default function ResearchPage() {
         </div>
       )}
 
-      {intel && intel.enabled && intel.found && intel.project && (
+      {intel?.enabled && intel.found && intel.project && (
         <div className="research">
           <form className="research-ask" onSubmit={submit}>
             <h2 className="research-ask__title">Ask {r.name}</h2>
@@ -135,7 +135,7 @@ function IntelResult({
 }) {
   // dex's /ask returns extra structure (next_action, suggested_reads,
   // annotations). Render that CLI-style. Other kinds keep the flat list.
-  const isAsk = !!(result.next_action || (result.suggested_reads && result.suggested_reads.length))
+  const isAsk = !!(result.next_action || result.suggested_reads?.length)
   if (isAsk) {
     return <AskView owner={owner} repo={repo} result={result} />
   }
@@ -222,15 +222,12 @@ function AskView({
         </>
       )}
 
-      {result.graph && result.graph.nodes.length > 0 && (
-        <GraphSection graph={result.graph} />
-      )}
+      {result.graph && result.graph.nodes.length > 0 && <GraphSection graph={result.graph} />}
 
       {result.hits.length > 0 && (
         <details className="ask__raw">
           <summary>
-            All semantic matches{" "}
-            <span className="muted small">({result.hits.length})</span>
+            All semantic matches <span className="muted small">({result.hits.length})</span>
           </summary>
           <ul className="intel__hits" style={{ marginTop: 8 }}>
             {result.hits.map((h, i) => (
@@ -259,9 +256,11 @@ function AskView({
         </details>
       )}
 
-      {reads.length === 0 && result.hits.length === 0 && (!result.graph || result.graph.nodes.length === 0) && (
-        <div className="empty">No matches.</div>
-      )}
+      {reads.length === 0 &&
+        result.hits.length === 0 &&
+        (!result.graph || result.graph.nodes.length === 0) && (
+          <div className="empty">No matches.</div>
+        )}
     </div>
   )
 }
@@ -277,8 +276,9 @@ function GraphSection({ graph }: { graph: NonNullable<IntelSearchResult["graph"]
   }
   const kindOrder = ["package", "struct", "interface", "function", "method", "field", "node"]
   const sortedKinds = [...groups.keys()].sort(
-    (a, b) => (kindOrder.indexOf(a) === -1 ? 99 : kindOrder.indexOf(a)) -
-              (kindOrder.indexOf(b) === -1 ? 99 : kindOrder.indexOf(b))
+    (a, b) =>
+      (kindOrder.indexOf(a) === -1 ? 99 : kindOrder.indexOf(a)) -
+      (kindOrder.indexOf(b) === -1 ? 99 : kindOrder.indexOf(b))
   )
   return (
     <>
@@ -308,7 +308,7 @@ function GraphSection({ graph }: { graph: NonNullable<IntelSearchResult["graph"]
 
 function shortName(n: { id: string; qualified_name?: string }): string {
   // For packages dex returns the full module path; show the basename so chips fit.
-  if (n.qualified_name && n.qualified_name.includes("/")) {
+  if (n.qualified_name?.includes("/")) {
     return n.qualified_name.split("/").pop() || n.id
   }
   return n.qualified_name || n.id
@@ -337,28 +337,28 @@ function SearchHits({
     <>
       {result.hint && <div className="intel__hint muted small">{result.hint}</div>}
       <ul className="intel__hits">
-      {result.hits.map((h, i) => (
-        <li key={`${h.path}:${h.start_line}:${i}`} className="hit">
-          <div className="hit__head">
-            <a
-              className="hit__path"
-              href={blobHref(owner, repo, h.path, h.start_line, h.end_line)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {h.path}
-              <span className="hit__lines">
-                :{h.start_line}-{h.end_line}
+        {result.hits.map((h, i) => (
+          <li key={`${h.path}:${h.start_line}:${i}`} className="hit">
+            <div className="hit__head">
+              <a
+                className="hit__path"
+                href={blobHref(owner, repo, h.path, h.start_line, h.end_line)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {h.path}
+                <span className="hit__lines">
+                  :{h.start_line}-{h.end_line}
+                </span>
+              </a>
+              <span className="hit__meta">
+                {h.kind}
+                {h.role ? ` · ${h.role}` : ""} · {h.score.toFixed(3)}
               </span>
-            </a>
-            <span className="hit__meta">
-              {h.kind}
-              {h.role ? ` · ${h.role}` : ""} · {h.score.toFixed(3)}
-            </span>
-          </div>
-          {h.content && <pre className="hit__code">{h.content}</pre>}
-        </li>
-      ))}
+            </div>
+            {h.content && <pre className="hit__code">{h.content}</pre>}
+          </li>
+        ))}
       </ul>
     </>
   )
@@ -369,13 +369,7 @@ function SearchHits({
 // the default branch), matching how the file tree links files. A multi-line
 // span gets a `#L<start>-L<end>` range so CodeView highlights the whole block;
 // a single line uses the plain `#L<n>` anchor. Opened in a new tab.
-function blobHref(
-  owner: string,
-  repo: string,
-  path: string,
-  start: number,
-  end: number,
-): string {
+function blobHref(owner: string, repo: string, path: string, start: number, end: number): string {
   const anchor = end > start ? `#L${start}-L${end}` : `#L${start}`
   return `/${owner}/${repo}/blob/${path}${anchor}`
 }

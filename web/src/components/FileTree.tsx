@@ -75,7 +75,9 @@ export default function FileTree({
                 {c.subject}
               </Link>
             ) : (
-              <span className={`file-tree__commit file-tree__ph ${commitsLoading ? "is-loading" : ""}`} />
+              <span
+                className={`file-tree__commit file-tree__ph ${commitsLoading ? "is-loading" : ""}`}
+              />
             )}
 
             {c ? (
@@ -83,7 +85,9 @@ export default function FileTree({
                 {timeAgo(c.date)}
               </span>
             ) : (
-              <span className={`file-tree__age file-tree__ph ${commitsLoading ? "is-loading" : ""}`} />
+              <span
+                className={`file-tree__age file-tree__ph ${commitsLoading ? "is-loading" : ""}`}
+              />
             )}
           </li>
         )

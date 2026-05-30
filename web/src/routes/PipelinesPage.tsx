@@ -297,10 +297,10 @@ function jobStages(jobs: CIJob[]): CIJob[][] {
     depth.set(name, d)
     return d
   }
-  jobs.forEach((j) => calc(j.name))
+  for (const j of jobs) calc(j.name)
   const maxDepth = jobs.reduce((m, j) => Math.max(m, depth.get(j.name) ?? 0), 0)
   const stages: CIJob[][] = Array.from({ length: maxDepth + 1 }, () => [])
-  jobs.forEach((j) => stages[depth.get(j.name) ?? 0].push(j))
+  for (const j of jobs) stages[depth.get(j.name) ?? 0].push(j)
   return stages
 }
 

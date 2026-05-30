@@ -20,7 +20,11 @@ export default function CommitMeta({ owner, repo, commit, className }: Props) {
     <div className={`commit-meta ${className ?? ""}`}>
       <Avatar name={commit.author} />
       <span className="commit-meta__author">{commit.author}</span>
-      <Link to={`/${owner}/${repo}/commits`} className="commit-meta__subject" title={commit.subject}>
+      <Link
+        to={`/${owner}/${repo}/commits`}
+        className="commit-meta__subject"
+        title={commit.subject}
+      >
         {commit.subject}
       </Link>
       <code className="commit-meta__sha" title={commit.sha}>

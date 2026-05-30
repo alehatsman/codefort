@@ -69,6 +69,9 @@ export default function CodeView({
   const selStart = sel ? Math.min(sel.anchor, sel.head) : 0
   const selEnd = sel ? Math.max(sel.anchor, sel.head) : 0
 
+  // `lines` is a re-scroll trigger, not read here: once async content renders
+  // the rows, we re-run so #L<from> exists to scroll into view.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: lines drives the rows this effect queries
   useEffect(() => {
     if (from == null) return
     tableRef.current?.querySelector<HTMLElement>(`#L${from}`)?.scrollIntoView({ block: "center" })
@@ -126,11 +129,11 @@ export default function CodeView({
     const n = i + 1
     const lit = from != null && n >= from && n <= (to ?? from)
     const selected = sel != null && n >= selStart && n <= selEnd
-    const cls = "code-line" + (lit ? " is-highlighted" : "") + (selected ? " is-selected" : "")
+    const cls = `code-line${lit ? " is-highlighted" : ""}${selected ? " is-selected" : ""}`
     rows.push(
       <tr key={`L${n}`} id={`L${n}`} className={cls}>
         <td
-          className={"code-line__num" + (commentsEnabled ? " is-clickable" : "")}
+          className={`code-line__num${commentsEnabled ? " is-clickable" : ""}`}
           data-line={n}
           onMouseDown={(e) => onNumMouseDown(e, n)}
           onMouseEnter={() => onNumMouseEnter(n)}
@@ -182,7 +185,7 @@ export default function CodeView({
   })
 
   return (
-    <div className={"code-view hljs" + (dragging ? " is-selecting" : "")}>
+    <div className={`code-view hljs${dragging ? " is-selecting" : ""}`}>
       <table ref={tableRef} className="code-view__table">
         <tbody>{rows}</tbody>
       </table>
@@ -209,7 +212,7 @@ function CodeCommentCard({
       : `${comment.start_line}`
 
   return (
-    <li className={"comment" + (comment.resolved ? " is-resolved" : "")}>
+    <li className={`comment${comment.resolved ? " is-resolved" : ""}`}>
       <span className="comment__avatar">
         <Avatar name={comment.author} />
       </span>

@@ -15,7 +15,6 @@ import DeleteIssueButton from "../components/DeleteIssueButton"
 // when an issue with a body is actually shown.
 const Markdown = lazy(() => import("../components/Markdown"))
 
-
 export default function IssuePage() {
   const { owner = "", repo = "", number: numStr = "" } = useParams()
   const num = Number(numStr)

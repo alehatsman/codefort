@@ -42,7 +42,9 @@ export default function Markdown({ content, owner, repo, basePath }: Props) {
           </a>
         )
       }
-      return <Link to={`/${owner}/${repo}/blob/${resolveRepoPath(basePath, href)}`}>{children}</Link>
+      return (
+        <Link to={`/${owner}/${repo}/blob/${resolveRepoPath(basePath, href)}`}>{children}</Link>
+      )
     },
     img({ src, alt }) {
       if (typeof src !== "string" || isExternalRef(src) || src.startsWith("data:")) {

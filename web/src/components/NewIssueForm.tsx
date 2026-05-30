@@ -24,24 +24,19 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
   const [body, setBody] = useState("")
   const mutation = useCreateIssue(owner, repo)
 
-  // Autofocus the title field when the dialog opens.
+  // Clear the form whenever the dialog closes (submit success, Esc, or backdrop).
+  // Autofocus is handled in open() once the dialog is rendered.
   useEffect(() => {
     const dialog = dialogRef.current
     if (!dialog) return
-    const onShow = () => titleRef.current?.focus()
-    dialog.addEventListener("close", reset)
-    return () => {
-      dialog.removeEventListener("close", reset)
-      void onShow
+    const reset = () => {
+      setTitle("")
+      setBody("")
+      mutation.reset()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  function reset() {
-    setTitle("")
-    setBody("")
-    mutation.reset()
-  }
+    dialog.addEventListener("close", reset)
+    return () => dialog.removeEventListener("close", reset)
+  }, [mutation.reset])
 
   function open() {
     dialogRef.current?.showModal()

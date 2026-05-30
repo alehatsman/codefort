@@ -106,8 +106,11 @@ export default function NewRepoForm({ onCreated }: Props) {
               />
             </label>
             <div className="field__label muted">
-              Creates a bare git repo at <code>{trimmedOwner || "owner"}/{trimmedName || "name"}</code>.
-              Allowed characters: letters, digits, <code>. _ -</code>
+              Creates a bare git repo at{" "}
+              <code>
+                {trimmedOwner || "owner"}/{trimmedName || "name"}
+              </code>
+              . Allowed characters: letters, digits, <code>. _ -</code>
             </div>
             {mutation.error && <div className="error">{(mutation.error as Error).message}</div>}
           </div>
@@ -116,7 +119,11 @@ export default function NewRepoForm({ onCreated }: Props) {
             <button type="button" className="btn" onClick={close} disabled={mutation.isPending}>
               Cancel
             </button>
-            <button type="submit" className="btn btn--primary" disabled={!valid || mutation.isPending}>
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={!valid || mutation.isPending}
+            >
               {mutation.isPending ? "Creating…" : "Create repository"}
             </button>
           </footer>
