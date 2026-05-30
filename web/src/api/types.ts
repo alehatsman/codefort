@@ -130,6 +130,43 @@ export interface CommitList {
   has_more: boolean
 }
 
+export type DiffLineKind = "context" | "add" | "del"
+
+export interface DiffLine {
+  kind: DiffLineKind
+  // 1-based line numbers on each side; 0 where the line is absent (an add has
+  // no old number, a del no new number).
+  old: number
+  new: number
+  text: string
+}
+
+export interface DiffHunk {
+  header: string
+  lines: DiffLine[]
+}
+
+export type DiffStatus = "added" | "modified" | "deleted" | "renamed"
+
+export interface DiffFile {
+  old_path: string
+  new_path: string
+  status: DiffStatus
+  binary: boolean
+  additions: number
+  deletions: number
+  hunks: DiffHunk[]
+}
+
+export interface CommitDetail {
+  commit: Commit
+  parents: string[]
+  files: DiffFile[]
+  additions: number
+  deletions: number
+  truncated: boolean
+}
+
 export interface TreeCommits {
   ref: string
   path?: string

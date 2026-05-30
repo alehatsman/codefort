@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { useCommits, useRepo } from "../api/queries"
 import type { Commit } from "../api/types"
 import RepoHeader from "../components/RepoHeader"
@@ -67,7 +67,7 @@ export default function CommitsPage() {
               <h3 className="commit-group__day">Commits on {g.day}</h3>
               <ul className="commit-list">
                 {g.commits.map((c) => (
-                  <CommitRow key={c.sha} commit={c} />
+                  <CommitRow key={c.sha} owner={owner} repo={repo} commit={c} />
                 ))}
               </ul>
             </section>
@@ -89,40 +89,24 @@ export default function CommitsPage() {
   )
 }
 
-function CommitRow({ commit }: { commit: Commit }) {
-  const [copied, setCopied] = useState(false)
-
-  function copySha() {
-    navigator.clipboard?.writeText(commit.sha).then(
-      () => {
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1200)
-      },
-      () => {},
-    )
-  }
-
+function CommitRow({ owner, repo, commit }: { owner: string; repo: string; commit: Commit }) {
+  const to = `/${owner}/${repo}/commit/${commit.sha}`
   return (
     <li className="commit-row">
       <Avatar name={commit.author} />
       <div className="commit-row__main">
-        <div className="commit-row__subject" title={commit.subject}>
+        <Link to={to} className="commit-row__subject" title={commit.subject}>
           {commit.subject}
-        </div>
+        </Link>
         <div className="commit-row__meta muted small">
           <span className="commit-row__author">{commit.author}</span>
           {" committed "}
           <span title={absoluteTime(commit.date)}>{timeAgo(commit.date)}</span>
         </div>
       </div>
-      <button
-        type="button"
-        className="commit-row__sha"
-        title={copied ? "Copied!" : `Copy full SHA\n${commit.sha}`}
-        onClick={copySha}
-      >
-        {copied ? "✓ copied" : commit.short_sha}
-      </button>
+      <Link to={to} className="commit-row__sha" title={`View commit ${commit.sha}`}>
+        {commit.short_sha}
+      </Link>
     </li>
   )
 }

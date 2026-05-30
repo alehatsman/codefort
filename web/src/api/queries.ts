@@ -14,6 +14,7 @@ export const keys = {
   blob: (owner: string, repo: string, path: string) => ["blob", owner, repo, path] as const,
   commits: (owner: string, repo: string, path = "", page = 1, perPage = 0) =>
     ["commits", owner, repo, path, page, perPage] as const,
+  commit: (owner: string, repo: string, sha: string) => ["commit", owner, repo, sha] as const,
   treeCommits: (owner: string, repo: string, path: string) =>
     ["treeCommits", owner, repo, path] as const,
   issues: (owner: string, repo: string, query = "") =>
@@ -99,6 +100,16 @@ export function useCommits(
     queryKey: keys.commits(owner, repo, path, page, perPage),
     queryFn: () => api.getCommits(owner, repo, { path, page, perPage: perPage || undefined }),
     enabled: !!owner && !!repo,
+  })
+}
+
+export function useCommit(owner: string, repo: string, sha: string) {
+  return useQuery({
+    queryKey: keys.commit(owner, repo, sha),
+    queryFn: () => api.getCommit(owner, repo, sha),
+    enabled: !!owner && !!repo && !!sha,
+    // A commit's content is immutable, so never refetch once loaded.
+    staleTime: Infinity,
   })
 }
 

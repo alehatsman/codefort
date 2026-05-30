@@ -4,6 +4,7 @@ import type {
   CIRunDetail,
   ClaimIssueInput,
   Comment,
+  CommitDetail,
   CommitList,
   TreeCommits,
   CreateCommentInput,
@@ -131,6 +132,8 @@ export const api = {
     const qs = q.toString()
     return request<CommitList>(`/api/repos/${owner}/${repo}/commits${qs ? `?${qs}` : ""}`)
   },
+  getCommit: (owner: string, repo: string, sha: string) =>
+    request<CommitDetail>(`/api/repos/${owner}/${repo}/commit/${sha}`),
   getTreeCommits: (owner: string, repo: string, path = "") =>
     request<TreeCommits>(
       `/api/repos/${owner}/${repo}/tree-commits${path ? `?path=${encodeURIComponent(path)}` : ""}`

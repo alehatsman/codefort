@@ -68,6 +68,47 @@ export interface Token {
   revoked_at?: string
 }
 
+export interface Commit {
+  sha: string
+  short_sha: string
+  subject: string
+  body?: string
+  author: string
+  email: string
+  date: string
+}
+
+export interface DiffLine {
+  kind: "context" | "add" | "del"
+  old: number
+  new: number
+  text: string
+}
+
+export interface DiffHunk {
+  header: string
+  lines: DiffLine[]
+}
+
+export interface DiffFile {
+  old_path: string
+  new_path: string
+  status: "added" | "modified" | "deleted" | "renamed"
+  binary: boolean
+  additions: number
+  deletions: number
+  hunks: DiffHunk[]
+}
+
+export interface CommitDetail {
+  commit: Commit
+  parents: string[]
+  files: DiffFile[]
+  additions: number
+  deletions: number
+  truncated: boolean
+}
+
 export interface State {
   identity: string
   repos: Repo[]
@@ -75,6 +116,10 @@ export interface State {
   comments: Comment[]
   tokens: Token[]
   ciRuns: CIRun[]
+  // Commit history (newest first) and per-sha diff detail, for the commit
+  // diff view. Empty by default; specs that need them seed them.
+  commits: Commit[]
+  commitDetails: Record<string, CommitDetail>
 }
 
 const OPEN_STATES: IssueState[] = ["todo", "in_progress"]
@@ -101,6 +146,8 @@ function freshState(seed: Partial<State> = {}): State {
     comments: [],
     tokens: [{ id: 1, name: "test-user", created_at: nowIso(), last_used_at: nowIso() }],
     ciRuns: [],
+    commits: [],
+    commitDetails: {},
     ...seed,
   }
 }
@@ -214,6 +261,20 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       .join("")
     return route.fulfill({ status: 200, contentType: "text/event-stream", body })
   })
+
+  // Commit detail (diff). The /commit/{sha} and /commits regexes are disjoint
+  // (no "s"), so they don't shadow each other.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/commit\/[^/]+$/, (route) => {
+    const sha = new URL(route.request().url()).pathname.split("/").pop() ?? ""
+    const detail = state.commitDetails[sha]
+    if (!detail) return json(route, 404, { error: "commit not found: " + sha })
+    return json(route, 200, detail)
+  })
+
+  // Commit history list.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/commits(\?.*)?$/, (route) =>
+    json(route, 200, { ref: "main", commits: state.commits, has_more: false })
+  )
 
   // Whoami
   await page.route(/\/api\/whoami$/, (route) => json(route, 200, { name: state.identity }))

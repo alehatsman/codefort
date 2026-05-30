@@ -42,7 +42,7 @@ export function splitLines(tree: Root): ReactNode[][] {
           </span>
         ) : (
           part
-        ),
+        )
       )
     })
   }
@@ -68,17 +68,28 @@ export function highlightNodes(tree: Root): ReactNode[] {
         </span>
       ) : (
         text
-      ),
+      )
     )
   })
   return nodes
+}
+
+/**
+ * Highlight a single line of code into React nodes. Used by the split diff
+ * view, which colours each side's lines independently. Highlighting per line
+ * loses multi-line token context (block comments, template strings) but keeps
+ * the diff renderer simple; an empty line yields no nodes.
+ */
+export function highlightLine(text: string, lang?: string): ReactNode[] {
+  if (text === "") return []
+  return highlightNodes(highlight(text, lang))
 }
 
 // walk emits each text run with the class of its nearest ancestor element.
 function walk(
   nodes: RootContent[],
   emit: (text: string, className?: string) => void,
-  className?: string,
+  className?: string
 ) {
   for (const node of nodes) {
     if (node.type === "text") {
