@@ -29,12 +29,13 @@ binary is missing or not executable in the image.
 
 ## Configuration
 
-The runner reads two settings (see `internal/config/config.go`):
+The runner reads these settings (see `internal/config/config.go`):
 
 | env | default | meaning |
 | --- | --- | --- |
 | `MOONGIT_CI_ISOLATION` | `docker` | `docker` runs jobs in containers; `none` runs them on the host (legacy, untrusted). |
 | `MOONGIT_CI_DEFAULT_IMAGE` | `moongit-ci:latest` | image a job uses when its `mgitci.yml` doesn't set `image:`. |
+| `MOONGIT_CI_JOB_CONCURRENCY` | `4` | how many of a run's jobs run at once; the runner schedules jobs in dependency waves and runs every ready job concurrently up to this cap. |
 
 ## Per-job image override
 

@@ -11,8 +11,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alehatsman/moongit/internal/ci"
@@ -237,28 +239,54 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 		jobIDs[jn] = job.ID
 	}
 
-	// Execute jobs in topo order. A job whose dependency didn't succeed is
-	// skipped. Sequential in v1; parallelism is #26.
+	// Schedule jobs in dependency waves: every job whose needs have all
+	// succeeded runs concurrently (bounded by CIJobConcurrency); a job whose
+	// dependency failed/was skipped is itself skipped, cascading. So the DAG's
+	// available parallelism is used — independent roots run together — while the
+	// `needs` ordering is still honored.
+	limit := max(r.cfg.CIJobConcurrency, 1)
 	status := make(map[string]storage.JobStatus, len(order))
-	anyNotSuccess := false
+	pending := make(map[string]bool, len(order))
 	for _, jn := range order {
-		job := pipeline.Jobs[jn]
-		if dep, unmet := firstUnsatisfied(job.Needs, status); unmet {
-			log.Info("ci job skipped (dependency not satisfied)", "job", jn, "dep", dep)
-			r.finishJob(jobIDs[jn], storage.JobSkipped, nil)
-			status[jn] = storage.JobSkipped
-			anyNotSuccess = true
-			continue
+		pending[jn] = true
+	}
+	anyNotSuccess := false
+
+	for len(pending) > 0 && ctx.Err() == nil {
+		var ready []string
+		for jn := range pending {
+			isReady, isSkip := classifyJob(pipeline.Jobs[jn].Needs, status)
+			switch {
+			case isSkip:
+				log.Info("ci job skipped (dependency not satisfied)", "job", jn)
+				r.finishJob(jobIDs[jn], storage.JobSkipped, nil)
+				status[jn] = storage.JobSkipped
+				delete(pending, jn)
+				anyNotSuccess = true
+			case isReady:
+				ready = append(ready, jn)
+			}
 		}
-		st := r.runJob(ctx, owner, name, run.Number, jn, jobIDs[jn], job, workDir)
-		status[jn] = st
-		if st != storage.JobSuccess {
-			anyNotSuccess = true
+		if len(ready) == 0 {
+			// Nothing ready this pass. Either we just skipped a cascade (loop
+			// again to propagate) or all remaining jobs await an in-flight wave;
+			// since a wave is fully awaited below, "no ready, no skip" can only
+			// mean a malformed DAG — break rather than spin.
+			if len(pending) == 0 {
+				break
+			}
+			break
 		}
-		if ctx.Err() != nil {
-			break // timeout / shutdown: stop launching further jobs
+		sort.Strings(ready) // deterministic launch order (logs/tests)
+		for jn, st := range r.runWave(ctx, owner, name, run.Number, jobIDs, pipeline, ready, workDir, limit) {
+			status[jn] = st
+			delete(pending, jn)
+			if st != storage.JobSuccess {
+				anyNotSuccess = true
+			}
 		}
 	}
+	// A run-timeout / shutdown can leave jobs pending; the run is errored below.
 
 	final := storage.RunSuccess
 	switch {
@@ -372,15 +400,56 @@ func (r *ciRunner) runJob(ctx context.Context, owner, repo string, runNum int, j
 	return storage.JobSuccess
 }
 
-// firstUnsatisfied returns the first dependency that did not finish
-// successfully; a job runs only when all its needs succeeded.
-func firstUnsatisfied(needs []string, status map[string]storage.JobStatus) (string, bool) {
+// runWave runs jobs concurrently — each in its own goroutine, at most `limit`
+// at once — and returns their terminal statuses keyed by job name. runJob is
+// self-contained (its own per-job container, event log, and short DB txns), so
+// the only shared state here is the writer pool, which serializes the brief
+// status writes; nothing in this function mutates shared maps.
+func (r *ciRunner) runWave(ctx context.Context, owner, repo string, runNum int, jobIDs map[string]int64, pipeline ci.Pipeline, jobs []string, workDir string, limit int) map[string]storage.JobStatus {
+	type result struct {
+		name string
+		st   storage.JobStatus
+	}
+	results := make(chan result, len(jobs))
+	sem := make(chan struct{}, limit)
+	var wg sync.WaitGroup
+	for _, jn := range jobs {
+		wg.Add(1)
+		go func(jn string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			st := r.runJob(ctx, owner, repo, runNum, jn, jobIDs[jn], pipeline.Jobs[jn], workDir)
+			results <- result{jn, st}
+		}(jn)
+	}
+	wg.Wait()
+	close(results)
+
+	out := make(map[string]storage.JobStatus, len(jobs))
+	for res := range results {
+		out[res.name] = res.st
+	}
+	return out
+}
+
+// classifyJob decides a job's schedulability from its dependencies' statuses:
+// ready when every need has succeeded, skip when any resolved need did not
+// succeed (failed/skipped/errored), and neither (wait) when a need is still
+// pending. ready and skip are mutually exclusive.
+func classifyJob(needs []string, status map[string]storage.JobStatus) (ready, skip bool) {
+	allResolvedSuccess := true
 	for _, dep := range needs {
-		if status[dep] != storage.JobSuccess {
-			return dep, true
+		st, resolved := status[dep]
+		if !resolved {
+			allResolvedSuccess = false
+			continue
+		}
+		if st != storage.JobSuccess {
+			return false, true
 		}
 	}
-	return "", false
+	return allResolvedSuccess, false
 }
 
 // emit appends an event, logging (not failing) on write error — a broken log

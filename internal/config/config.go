@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -39,6 +40,12 @@ type Config struct {
 	// CIPollInterval is how often the CI runner polls for a queued run when
 	// idle. Set via MOONGIT_CI_POLL_INTERVAL (default 5s).
 	CIPollInterval time.Duration
+
+	// CIJobConcurrency caps how many of a run's jobs execute at once: the
+	// runner schedules jobs in dependency waves and runs every ready job (all
+	// needs satisfied) concurrently up to this many. Set via
+	// MOONGIT_CI_JOB_CONCURRENCY (default 4); values < 1 are treated as 1.
+	CIJobConcurrency int
 
 	// CISecret gates the loopback /internal/ci/events endpoint that the
 	// post-receive hook calls. Set via MOONGIT_CI_SECRET; empty means the
@@ -123,6 +130,13 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("MOONGIT_CI_POLL_INTERVAL: %w", err)
 	}
 	cfg.CIPollInterval = ciPoll
+
+	jobConc, err := strconv.Atoi(envOr("MOONGIT_CI_JOB_CONCURRENCY", "4"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_CI_JOB_CONCURRENCY: %w", err)
+	}
+	cfg.CIJobConcurrency = jobConc
+
 	cfg.CISecret = envOr("MOONGIT_CI_SECRET", "")
 
 	cfg.CIIsolation = envOr("MOONGIT_CI_ISOLATION", "docker")

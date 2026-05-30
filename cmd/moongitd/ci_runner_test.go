@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -131,6 +132,56 @@ jobs:
 	}
 	if !sawStdout {
 		t.Error("event stream missing step.stdout line 'ok'")
+	}
+}
+
+func TestExecuteRunParallelRoots(t *testing.T) {
+	// a and b are independent roots; c joins them. With concurrency > 1 the two
+	// roots must overlap in time.
+	pipeline := `
+version: "1"
+jobs:
+  a:
+    steps: [{run: echo a}]
+  b:
+    steps: [{run: echo b}]
+  c:
+    needs: [a, b]
+    steps: [{run: echo c}]
+`
+	var cur, maxSeen int64
+	trackExec := func(context.Context, string, string) (stepResult, error) {
+		n := atomic.AddInt64(&cur, 1)
+		for {
+			old := atomic.LoadInt64(&maxSeen)
+			if n <= old || atomic.CompareAndSwapInt64(&maxSeen, old, n) {
+				break
+			}
+		}
+		time.Sleep(40 * time.Millisecond) // widen the overlap window
+		atomic.AddInt64(&cur, -1)
+		return stepResult{RC: 0, Stdout: "ok\n"}, nil
+	}
+
+	r, run := newTestRunner(t, pipeline, true, trackExec)
+	r.cfg.CIJobConcurrency = 4
+	r.executeRun(context.Background(), run)
+
+	got, _ := storage.GetRun(r.db, run.RepoID, run.Number)
+	if got.Status != storage.RunSuccess {
+		t.Errorf("run status = %q, want success", got.Status)
+	}
+	jobs, _ := storage.ListJobs(r.db, run.ID)
+	if len(jobs) != 3 {
+		t.Fatalf("jobs = %d, want 3", len(jobs))
+	}
+	for _, j := range jobs {
+		if j.Status != storage.JobSuccess {
+			t.Errorf("job %q = %q, want success", j.Name, j.Status)
+		}
+	}
+	if maxSeen < 2 {
+		t.Errorf("max concurrent steps = %d, want >= 2 (roots a and b should overlap)", maxSeen)
 	}
 }
 
