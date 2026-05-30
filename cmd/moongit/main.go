@@ -37,6 +37,8 @@ func run(args []string) error {
 	switch args[0] {
 	case "issue":
 		return runIssue(args[1:])
+	case "review":
+		return runReview(args[1:])
 	case "ci":
 		return runCI(args[1:])
 	case "help", "-h", "--help":
@@ -60,6 +62,11 @@ USAGE:
     moongit issue unclaim <number>
     moongit issue delete  <number> [--yes]
     moongit issue comment <number> --body <b>
+
+    moongit review list    [--ref <branch>] [--path <p>] [--state open|resolved|all] [--json]
+    moongit review resolve <id>
+    moongit review reopen  <id>
+    moongit review delete  <id>
 
     moongit ci validate  [path]   (defaults to ./mgitci.yml)
 
@@ -522,6 +529,151 @@ func runIssueComment(args []string) error {
 		return fmt.Errorf("decode response: %w", err)
 	}
 	fmt.Printf("commented on #%d by %s at %s\n", num, c.Author, c.CreatedAt.Local().Format(time.RFC3339))
+	return nil
+}
+
+// runReview dispatches `moongit review <subcommand>` — the read/triage side of
+// the code-review comments anchored to file blocks on a branch.
+func runReview(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: moongit review <list|resolve|reopen|delete>")
+	}
+	switch args[0] {
+	case "list":
+		return runReviewList(args[1:])
+	case "resolve":
+		return runReviewSetResolved(args[1:], true)
+	case "reopen":
+		return runReviewSetResolved(args[1:], false)
+	case "delete":
+		return runReviewDelete(args[1:])
+	default:
+		return fmt.Errorf("unknown review subcommand: %s", args[0])
+	}
+}
+
+func runReviewList(args []string) error {
+	fs := flag.NewFlagSet("review list", flag.ContinueOnError)
+	ref := fs.String("ref", "", "branch to review (defaults to the repo's default branch)")
+	path := fs.String("path", "", "scope to a single file path")
+	state := fs.String("state", "open", "open | resolved | all")
+	asJSON := fs.Bool("json", false, "emit the raw API JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	switch *state {
+	case "open", "resolved", "all":
+	default:
+		return fmt.Errorf("invalid --state %q (want open|resolved|all)", *state)
+	}
+
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+	q := url.Values{}
+	if *ref != "" {
+		q.Set("ref", *ref)
+	}
+	if *path != "" {
+		q.Set("path", *path)
+	}
+	q.Set("state", *state)
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/code-comments?%s", target.server, target.owner, target.repo, q.Encode())
+	resp, raw, err := httpDo(http.MethodGet, endpoint, nil, "")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	if *asJSON {
+		fmt.Println(string(raw))
+		return nil
+	}
+	var comments []api.CodeComment
+	if err := json.Unmarshal(raw, &comments); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	if len(comments) == 0 {
+		fmt.Println("(no comments)")
+		return nil
+	}
+	for _, c := range comments {
+		lines := fmt.Sprintf("L%d", c.StartLine)
+		if c.EndLine > c.StartLine {
+			lines = fmt.Sprintf("L%d-L%d", c.StartLine, c.EndLine)
+		}
+		flag := "open"
+		if c.Resolved {
+			flag = "resolved"
+		}
+		fmt.Printf("#%d  %s:%s  @%s  [%s]  (%s)\n", c.ID, c.Path, lines, c.Author, flag, c.Ref)
+		fmt.Printf("    %s\n", strings.ReplaceAll(c.Body, "\n", "\n    "))
+		if c.Snippet != "" {
+			fmt.Println("    ┄┄┄")
+			for _, l := range strings.Split(c.Snippet, "\n") {
+				fmt.Printf("    │ %s\n", l)
+			}
+		}
+		fmt.Println()
+	}
+	return nil
+}
+
+func runReviewSetResolved(args []string, resolved bool) error {
+	verb, past := "resolve", "resolved"
+	if !resolved {
+		verb, past = "reopen", "reopened"
+	}
+	if len(args) != 1 {
+		return fmt.Errorf("usage: moongit review %s <id>", verb)
+	}
+	id, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil || id <= 0 {
+		return fmt.Errorf("invalid comment id: %s", args[0])
+	}
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(api.UpdateCodeCommentRequest{Resolved: &resolved})
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/code-comments/%d", target.server, target.owner, target.repo, id)
+	resp, raw, err := httpDo(http.MethodPatch, endpoint, bytes.NewReader(payload), "application/json")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	fmt.Printf("comment #%d %s\n", id, past)
+	return nil
+}
+
+func runReviewDelete(args []string) error {
+	if len(args) != 1 {
+		return errors.New("usage: moongit review delete <id>")
+	}
+	id, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil || id <= 0 {
+		return fmt.Errorf("invalid comment id: %s", args[0])
+	}
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/code-comments/%d", target.server, target.owner, target.repo, id)
+	resp, raw, err := httpDo(http.MethodDelete, endpoint, nil, "")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	fmt.Printf("comment #%d deleted\n", id)
 	return nil
 }
 
