@@ -1,0 +1,16 @@
+# moongit CI — hello-world pipeline (dogfooding the moongitci stack).
+# Schema: version "1", jobs wired into a DAG via `needs`. `run:` is sugar for a
+# mooncake shell step; each job's steps run in order via `mooncake step`.
+version: "1"
+on:
+  push:
+    branches: [main]
+jobs:
+  hello:
+    steps:
+      - run: echo "hello world from moongit CI"
+      - run: echo "commit built at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  goodbye:
+    needs: [hello]
+    steps:
+      - run: echo "goodbye — pipeline complete"
