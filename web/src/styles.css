@@ -1043,7 +1043,6 @@ pre {
 }
 .body__content {
   padding: var(--space-4);
-  white-space: pre-wrap;
 }
 
 /* Sidebar ------------------------------------------------------------- */
@@ -1370,7 +1369,6 @@ pre {
 }
 .comment__body {
   padding: var(--space-4);
-  white-space: pre-wrap;
 }
 .comment__delete {
   margin-left: auto;

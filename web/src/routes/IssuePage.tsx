@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react"
 import { useParams } from "react-router-dom"
 import { useComments, useIssue, useRepo, useWhoami } from "../api/queries"
 import RepoHeader from "../components/RepoHeader"
@@ -8,6 +9,10 @@ import StateIcon from "../components/StateIcon"
 import Avatar from "../components/Avatar"
 import CommentItem from "../components/CommentItem"
 import DeleteIssueButton from "../components/DeleteIssueButton"
+
+// The markdown renderer pulls in remark/rehype + the highlighter; load it only
+// when an issue with a body is actually shown.
+const Markdown = lazy(() => import("../components/Markdown"))
 
 export default function IssuePage() {
   const { owner = "", repo = "", number: numStr = "" } = useParams()
@@ -49,7 +54,11 @@ export default function IssuePage() {
                 <Avatar name={iss.author} /> {iss.author} •{" "}
                 {new Date(iss.created_at).toLocaleString()}
               </div>
-              <div className="body__content">{iss.body}</div>
+              <div className="body__content">
+                <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
+                  <Markdown content={iss.body} owner={owner} repo={repo} basePath="" />
+                </Suspense>
+              </div>
             </div>
           )}
 

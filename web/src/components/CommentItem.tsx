@@ -1,6 +1,11 @@
+import { lazy, Suspense } from "react"
 import { useDeleteComment } from "../api/mutations"
 import type { Comment } from "../api/types"
 import Avatar from "./Avatar"
+
+// The markdown renderer pulls in remark/rehype + the highlighter; load it lazily
+// so the comment list doesn't drag it into the main bundle.
+const Markdown = lazy(() => import("./Markdown"))
 
 interface Props {
   owner: string
@@ -49,7 +54,11 @@ export default function CommentItem({ owner, repo, issueNumber, comment, canDele
             </button>
           )}
         </div>
-        <div className="comment__body">{comment.body}</div>
+        <div className="comment__body">
+          <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
+            <Markdown content={comment.body} owner={owner} repo={repo} basePath="" />
+          </Suspense>
+        </div>
         {del.error && <div className="error inline">{(del.error as Error).message}</div>}
       </div>
     </li>
