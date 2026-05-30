@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -86,6 +87,224 @@ func (s *Server) handleCommits(w http.ResponseWriter, r *http.Request) {
 	}
 	out.Commits = commits
 	writeJSON(w, http.StatusOK, out)
+}
+
+// shaPattern bounds the {sha} path segment to hex so it can't smuggle git
+// options (a leading dash) or refspecs into the plumbing commands below. Short
+// (abbreviated) shas down to 4 chars are allowed; git resolves them.
+var shaPattern = regexp.MustCompile(`^[0-9a-fA-F]{4,64}$`)
+
+// hunkHeaderRe parses a unified-diff hunk header: "@@ -old,n +new,m @@ trailer".
+// The line counts are optional (a single-line hunk omits them); the trailer is
+// the enclosing function/section git prints after the second @@.
+var hunkHeaderRe = regexp.MustCompile(`^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@ ?(.*)$`)
+
+// maxDiffLines caps the total number of diff lines parsed across all files in
+// one commit, so a pathological commit can't blow up the response. When the
+// budget is hit, remaining lines are dropped and CommitDetail.Truncated is set.
+const maxDiffLines = 20000
+
+// handleCommit returns one commit's metadata plus its diff against the first
+// parent — the first parent for a merge, the empty tree for a root commit —
+// parsed into structured per-file hunks for the side-by-side diff view.
+func (s *Server) handleCommit(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+		return
+	}
+	repoDir, ok := s.repoDirOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	sha := r.PathValue("sha")
+	if !shaPattern.MatchString(sha) {
+		writeError(w, http.StatusBadRequest, "invalid commit sha")
+		return
+	}
+	if !hasCommits(r.Context(), repoDir) {
+		writeError(w, http.StatusNotFound, "commit not found: "+sha)
+		return
+	}
+
+	raw, err := gitOutput(r.Context(), repoDir, "log", "-1", "--format="+commitFormat, sha)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "commit not found: "+sha)
+		return
+	}
+	commits := parseCommits(raw)
+	if len(commits) == 0 {
+		writeError(w, http.StatusNotFound, "commit not found: "+sha)
+		return
+	}
+
+	parents := commitParents(r.Context(), repoDir, sha)
+
+	// Diff against the first parent (--root for a parentless commit). The
+	// explicit two-tree form makes a merge diff against its first parent rather
+	// than producing the empty default merge diff.
+	args := []string{"diff-tree", "--no-commit-id", "-p", "-r", "-M", "--no-color"}
+	if len(parents) == 0 {
+		args = append(args, "--root", sha)
+	} else {
+		args = append(args, parents[0], sha)
+	}
+	patch, err := gitOutput(r.Context(), repoDir, args...)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "diff failed")
+		return
+	}
+
+	files, truncated := parseUnifiedDiff(patch, maxDiffLines)
+	detail := api.CommitDetail{
+		Commit:    commits[0],
+		Parents:   parents,
+		Files:     files,
+		Truncated: truncated,
+	}
+	for _, f := range files {
+		detail.Additions += f.Additions
+		detail.Deletions += f.Deletions
+	}
+	writeJSON(w, http.StatusOK, detail)
+}
+
+// commitParents returns the parent SHAs of sha (empty for a root commit).
+// `rev-list --parents -n 1` prints "<sha> <parent1> <parent2> ...".
+func commitParents(ctx context.Context, repoDir, sha string) []string {
+	raw, err := gitOutput(ctx, repoDir, "rev-list", "--parents", "-n", "1", sha)
+	if err != nil {
+		return nil
+	}
+	fields := strings.Fields(string(raw))
+	if len(fields) <= 1 {
+		return nil
+	}
+	return fields[1:]
+}
+
+// parseUnifiedDiff turns `git diff-tree -p` output into structured per-file
+// diffs, tracking old/new line numbers per line so the frontend can render a
+// split (side-by-side) view. Parsing stops appending lines once the budget is
+// hit and reports truncated=true; file entries are still emitted (just without
+// the dropped hunks).
+func parseUnifiedDiff(patch []byte, budget int) (files []api.DiffFile, truncated bool) {
+	var cur *api.DiffFile
+	var hunk *api.DiffHunk
+	oldLine, newLine, total := 0, 0, 0
+
+	flushHunk := func() {
+		if cur != nil && hunk != nil {
+			cur.Hunks = append(cur.Hunks, *hunk)
+			hunk = nil
+		}
+	}
+	flushFile := func() {
+		flushHunk()
+		if cur != nil {
+			files = append(files, *cur)
+			cur = nil
+		}
+	}
+
+	for ln := range strings.SplitSeq(string(patch), "\n") {
+		switch {
+		case strings.HasPrefix(ln, "diff --git "):
+			flushFile()
+			old, nw := parseDiffGitPaths(ln)
+			cur = &api.DiffFile{OldPath: old, NewPath: nw, Status: "modified"}
+		case cur == nil:
+			// Preamble before the first file header — ignore.
+			continue
+		case strings.HasPrefix(ln, "@@"):
+			flushHunk()
+			os, ns, hdr := parseHunkHeader(ln)
+			oldLine, newLine = os, ns
+			hunk = &api.DiffHunk{Header: hdr}
+		case hunk != nil:
+			// Inside a hunk: classify the line by its leading marker. A "\ No
+			// newline at end of file" marker (and the trailing empty split
+			// element) carry no line and leave the counters untouched.
+			if ln == "" || ln[0] == '\\' {
+				continue
+			}
+			if total >= budget {
+				truncated = true
+				continue
+			}
+			dl := api.DiffLine{Text: ln[1:]}
+			switch ln[0] {
+			case '+':
+				dl.Kind, dl.New = "add", newLine
+				newLine++
+				cur.Additions++
+			case '-':
+				dl.Kind, dl.Old = "del", oldLine
+				oldLine++
+				cur.Deletions++
+			default: // ' ' context
+				dl.Kind, dl.Old, dl.New = "context", oldLine, newLine
+				oldLine++
+				newLine++
+			}
+			hunk.Lines = append(hunk.Lines, dl)
+			total++
+		case strings.HasPrefix(ln, "new file mode"):
+			cur.Status = "added"
+		case strings.HasPrefix(ln, "deleted file mode"):
+			cur.Status = "deleted"
+		case strings.HasPrefix(ln, "rename from "):
+			cur.Status = "renamed"
+			cur.OldPath = strings.TrimPrefix(ln, "rename from ")
+		case strings.HasPrefix(ln, "rename to "):
+			cur.Status = "renamed"
+			cur.NewPath = strings.TrimPrefix(ln, "rename to ")
+		case strings.HasPrefix(ln, "Binary files "):
+			cur.Binary = true
+		case strings.HasPrefix(ln, "--- "):
+			if p := strings.TrimPrefix(ln, "--- "); p != "/dev/null" {
+				cur.OldPath = stripDiffPathPrefix(p)
+			}
+		case strings.HasPrefix(ln, "+++ "):
+			if p := strings.TrimPrefix(ln, "+++ "); p != "/dev/null" {
+				cur.NewPath = stripDiffPathPrefix(p)
+			}
+		}
+	}
+	flushFile()
+	return files, truncated
+}
+
+// parseHunkHeader extracts the 1-based old/new start lines and the trailing
+// section header from an @@ line, defaulting to (1, 1, "") when malformed.
+func parseHunkHeader(ln string) (oldStart, newStart int, header string) {
+	m := hunkHeaderRe.FindStringSubmatch(ln)
+	if m == nil {
+		return 1, 1, ""
+	}
+	oldStart, _ = strconv.Atoi(m[1])
+	newStart, _ = strconv.Atoi(m[2])
+	return oldStart, newStart, m[3]
+}
+
+// parseDiffGitPaths recovers the old/new paths from a "diff --git a/x b/y"
+// line. The --- / +++ / rename lines are the authoritative source; this is the
+// fallback for entries that lack them (binary or mode-only changes). Paths with
+// a literal " b/" substring are ambiguous in this form, but git emits the
+// authoritative lines for those cases.
+func parseDiffGitPaths(ln string) (old, nw string) {
+	s := strings.TrimPrefix(ln, "diff --git ")
+	if i := strings.Index(s, " b/"); i >= 0 {
+		return stripDiffPathPrefix(s[:i]), stripDiffPathPrefix(s[i+1:])
+	}
+	return "", ""
+}
+
+// stripDiffPathPrefix drops the a/ or b/ prefix git puts on diff paths.
+func stripDiffPathPrefix(p string) string {
+	if strings.HasPrefix(p, "a/") || strings.HasPrefix(p, "b/") {
+		return p[2:]
+	}
+	return p
 }
 
 // handleTreeCommits annotates the directory listing at ?path= with commit

@@ -168,6 +168,52 @@ type TreeCommits struct {
 	Entries map[string]Commit `json:"entries"` // child full path -> last commit touching it
 }
 
+// DiffLine is one line within a hunk. Old/New are 1-based line numbers in the
+// pre-/post-image; the side that doesn't carry the line is 0 (context lines
+// carry both, an add carries only New, a del only Old). Text is the line body
+// without the leading +/-/space marker.
+type DiffLine struct {
+	Kind string `json:"kind"` // "context" | "add" | "del"
+	Old  int    `json:"old"`
+	New  int    `json:"new"`
+	Text string `json:"text"`
+}
+
+// DiffHunk is a contiguous run of context/changed lines, introduced by an @@
+// header in the unified patch. Header is the text trailing the second @@ (the
+// enclosing function/section git prints), empty when absent.
+type DiffHunk struct {
+	Header string     `json:"header"`
+	Lines  []DiffLine `json:"lines"`
+}
+
+// DiffFile is the diff for a single path. For a rename OldPath != NewPath; for
+// an add OldPath is "", for a delete NewPath is "". Binary files carry counts
+// of 0 and no hunks.
+type DiffFile struct {
+	OldPath   string     `json:"old_path"`
+	NewPath   string     `json:"new_path"`
+	Status    string     `json:"status"` // "added" | "modified" | "deleted" | "renamed"
+	Binary    bool       `json:"binary"`
+	Additions int        `json:"additions"`
+	Deletions int        `json:"deletions"`
+	Hunks     []DiffHunk `json:"hunks"`
+}
+
+// CommitDetail is a single commit's metadata plus its diff against the first
+// parent (the empty tree for a root commit, the first parent for a merge),
+// parsed into structured per-file hunks for the side-by-side diff view.
+// Additions/Deletions are the totals across Files. Truncated is set when the
+// diff exceeded the server's line budget and some hunks were dropped.
+type CommitDetail struct {
+	Commit    Commit     `json:"commit"`
+	Parents   []string   `json:"parents"`
+	Files     []DiffFile `json:"files"`
+	Additions int        `json:"additions"`
+	Deletions int        `json:"deletions"`
+	Truncated bool       `json:"truncated"`
+}
+
 // CIRun is the public view of a CI run. Number is the per-repo run number
 // (the address clients use); the internal DB id is not exposed.
 type CIRun struct {
