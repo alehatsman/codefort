@@ -1,0 +1,64 @@
+# moongit web — conventions
+
+Vite + React 19 SPA. Read this before adding or editing components.
+
+## Styling: hand-written semantic BEM, no utility framework
+
+- CSS lives in `src/styles.css` as semantic **BEM** — `block__element--modifier`
+  (`board-col`, `board-col__head`, `board-col__head--done`). Theme values are
+  CSS custom properties (`var(--border)`, `var(--fg-muted)`) defined alongside
+  `src/theme.ts`. No Tailwind, no CSS-in-JS, no CSS modules.
+- One class names the thing; modifiers (`--state`, `is-active`, `is-loading`,
+  `is-vim-selected`) toggle variants. State flags use the `is-*` prefix.
+
+## Composing className: use `clsx`, not template-literal ternaries
+
+`clsx` is a dependency. Conditional classes go through it — never
+`` `base ${cond ? "x" : ""}` `` (that leaves a trailing space / empty token).
+
+```tsx
+import clsx from "clsx"
+
+// conditional modifier — object form
+<div className={clsx("board-col", { "is-over": isOver })} />
+<Link className={clsx("tab", { "is-active": isActive })} />
+
+// optional passthrough className — clsx drops undefined cleanly
+<div className={clsx("commit-meta", className)} />
+```
+
+Pure interpolation into a modifier (no conditional) stays a plain template
+literal — `clsx` adds nothing there, so don't force it:
+
+```tsx
+<span className={`ci-badge ci-badge--${status}`} />        // fine
+<td className={`diff-code diff-code--${kind}`} />          // fine
+```
+
+Rule of thumb: a `?`/`&&` in the className → `clsx`. Just `${value}` → template
+literal.
+
+## Lint + format: Biome
+
+`biome.json` governs both. Run before committing:
+
+- `npm run lint` — check (CI-equivalent)
+- `npm run lint:fix` — check + autofix/format
+
+Style: **no semicolons** (`semi: false`). Imports are auto-ordered by Biome
+(don't hand-sort). a11y rules are currently warn-only (see issue tracker);
+don't add new warnings.
+
+## Tests: Playwright
+
+`npm test` runs the suite (`tests/*.spec.ts`). Add/extend a spec for new
+interactive UI. The `vimnav` h/l tab-switch test can flake under parallel load
+— re-run it isolated (`npx playwright test tests/vimnav.spec.ts:60`) before
+treating a single failure as a regression.
+
+## Worktree gotcha
+
+A fresh git worktree needs its **own** `npm install` — don't symlink
+`node_modules` from the primary checkout (two copies of `@playwright/test`
+break the runner). After **rebasing** onto a moved `main`, run `npm install`
+again: new devDeps may have landed (Biome did this way).
