@@ -186,8 +186,7 @@ export function useCIRuns(owner: string, repo: string) {
     enabled: !!owner && !!repo,
     // Poll the list while any run is still live, so a freshly pushed run shows
     // progress without a refresh; stop once everything is terminal.
-    refetchInterval: (q) =>
-      q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false,
+    refetchInterval: (q) => (q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false),
   })
 }
 

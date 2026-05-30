@@ -30,6 +30,7 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
     location.pathname.startsWith(`${base}/commits`)
   const isIssues = location.pathname.startsWith(`${base}/issues`)
   const isIntel = location.pathname.startsWith(`${base}/intel`)
+  const isPipelines = location.pathname.startsWith(`${base}/pipelines`)
 
   return (
     <div className="repo-header">
@@ -43,6 +44,9 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
         </Link>
         <Link to={`${base}/intel`} className={`tab ${isIntel ? "is-active" : ""}`}>
           Intel
+        </Link>
+        <Link to={`${base}/pipelines`} className={`tab ${isPipelines ? "is-active" : ""}`}>
+          Pipelines
         </Link>
       </nav>
     </div>

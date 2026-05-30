@@ -36,9 +36,7 @@
 
   /* Elevation */
   --shadow-sm: 0 1px 0 rgba(31, 35, 40, 0.04);
-  --shadow-md:
-    0 8px 24px rgba(31, 35, 40, 0.12),
-    0 0 0 1px rgba(31, 35, 40, 0.04);
+  --shadow-md: 0 8px 24px rgba(31, 35, 40, 0.12), 0 0 0 1px rgba(31, 35, 40, 0.04);
   --backdrop: rgba(31, 35, 40, 0.4);
 
   /* Radius */
@@ -58,11 +56,9 @@
 
   /* Typography */
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica,
-    Arial, sans-serif;
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
   --font-mono:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
   --text-2xs: 10px;
   --text-xs: 11px;
@@ -182,9 +178,7 @@
   --state-closed-bg: #44182b;
 
   --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.4);
-  --shadow-md:
-    0 8px 24px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.3);
   --backdrop: rgba(0, 0, 0, 0.5);
 
   /* Monokai syntax + code surface */
@@ -2271,4 +2265,174 @@ h3 {
     flex-direction: row;
     flex-wrap: wrap;
   }
+}
+
+/* CI / Pipelines ------------------------------------------------------- */
+.pipelines__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.pipelines__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.pipelines__lead {
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+/* Status pill — colors track issue-state vars by meaning. */
+.ci-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-none);
+  text-transform: capitalize;
+}
+.ci-badge--success {
+  background: var(--state-todo-bg);
+  color: var(--state-todo);
+}
+.ci-badge--running {
+  background: var(--state-in_progress-bg);
+  color: var(--state-in_progress);
+}
+.ci-badge--failed,
+.ci-badge--error {
+  background: var(--state-closed-bg);
+  color: var(--state-closed);
+}
+.ci-badge--queued,
+.ci-badge--canceled,
+.ci-badge--skipped {
+  background: var(--neutral-muted);
+  color: var(--fg-muted);
+}
+
+/* Runs table */
+.ci-runs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.ci-runs th {
+  text-align: left;
+  font-weight: var(--weight-medium);
+  color: var(--fg-muted);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+.ci-runs td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border-muted);
+}
+.ci-runs__num {
+  font-weight: var(--weight-medium);
+}
+.ci-runs__sha {
+  font-family: var(--font-mono);
+}
+
+/* Run detail */
+.ci-run-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.ci-run-head__back {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+.ci-run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.ci-run-meta dt {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+.ci-run-meta dd {
+  margin: 2px 0 0;
+}
+
+/* Jobs */
+.ci-jobs__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.ci-jobs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--fg);
+}
+.ci-jobs__tab.is-active {
+  border-color: var(--accent-muted);
+}
+.ci-jobs__name {
+  font-weight: var(--weight-medium);
+}
+
+/* Step timeline + log viewer */
+.ci-step {
+  margin-bottom: var(--space-3);
+}
+.ci-step__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+.ci-step__status {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-circle);
+  background: var(--fg-muted);
+}
+.ci-step__status--ok {
+  background: var(--state-todo);
+}
+.ci-step__status--failed,
+.ci-step__status--error {
+  background: var(--state-closed);
+}
+.ci-step__status--running {
+  background: var(--state-in_progress);
+}
+.ci-step__action {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.ci-log {
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--code-bg);
+  color: var(--code-fg);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-x: auto;
+  white-space: pre;
+}
+.ci-log__stderr {
+  color: var(--state-closed);
 }

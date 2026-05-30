@@ -232,13 +232,7 @@ export interface IntelFileSummary {
 // --- CI (moongitci) ---
 
 // Mirrors storage.RunStatus. queued -> running -> a terminal state.
-export type CIRunStatus =
-  | "queued"
-  | "running"
-  | "success"
-  | "failed"
-  | "canceled"
-  | "error"
+export type CIRunStatus = "queued" | "running" | "success" | "failed" | "canceled" | "error"
 
 // Mirrors storage.JobStatus.
 export type CIJobStatus = "queued" | "running" | "success" | "failed" | "skipped" | "error"
