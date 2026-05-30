@@ -3,3 +3,8 @@
 
 # Dependency lockfile — huge, pure noise for code intel.
 web/package-lock.json
+
+# Playwright output: failure screenshots, traces and error-context.md dumps.
+# Regenerated on every test run and full of stale UI snapshots — noise.
+web/test-results/
+web/playwright-report/
