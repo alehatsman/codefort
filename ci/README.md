@@ -38,6 +38,21 @@ The runner reads these settings (see `internal/config/config.go`):
 | `MOONGIT_CI_JOB_CONCURRENCY` | `4` | how many of a run's jobs run at once; the runner schedules jobs in dependency waves and runs every ready job concurrently up to this cap. |
 | `MOONGIT_CI_RUN_CONCURRENCY` | `1` | how many CI runs execute at once. The default runs them one at a time (the historical behavior); raise it to use spare capacity, remembering each running job is its own container. |
 
+## Triggering runs
+
+A run normally starts on `git push` when an `mgitci.yml` is present at the
+pushed commit. Two on-demand paths exist for re-running or starting CI without
+a push:
+
+- **Re-run** a past run from the web UI (the Re-run button) or
+  `POST /api/repos/{owner}/{repo}/ci/runs/{number}/rerun` — re-enqueues that
+  run's exact commit.
+- **Manual trigger** for an arbitrary ref (branch, tag, or commit SHA):
+  `mgit ci run <ref>`, or `POST /api/repos/{owner}/{repo}/ci/runs` with body
+  `{"ref": "<ref>"}`. The server resolves the ref to a commit and enqueues a
+  run with event `manual`. CI must be enabled for the repo, and the usual
+  `mgitci.yml`-present gate still applies at run time.
+
 ## Per-job image override
 
 A job may pin its own image in `mgitci.yml`:

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -130,6 +131,78 @@ func (s *Server) handleRerunCIRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	writeJSON(w, http.StatusAccepted, toAPIRun(run))
+}
+
+// handleTriggerCIRun starts a CI run for an arbitrary ref (branch, tag, or
+// commit SHA) without a git push — the on-demand counterpart to the
+// push-driven hook. It resolves the ref to a commit against the bare repo and
+// enqueues a run with event "manual". Requires CI still enabled; the runner's
+// mgitci.yml gate still applies at execution time, so triggering a commit that
+// carries no pipeline simply yields a canceled run, exactly like a push.
+func (s *Server) handleTriggerCIRun(w http.ResponseWriter, r *http.Request) {
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	var req api.TriggerCIRunRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	req.Ref = strings.TrimSpace(req.Ref)
+	if req.Ref == "" {
+		writeError(w, http.StatusBadRequest, "ref is required")
+		return
+	}
+	// A leading dash would let the ref masquerade as a git flag; reject it
+	// rather than smuggle options into rev-parse.
+	if strings.HasPrefix(req.Ref, "-") {
+		writeError(w, http.StatusBadRequest, "invalid ref")
+		return
+	}
+
+	enabled, err := storage.RepoCIEnabled(s.db, repoID)
+	if err != nil {
+		s.logger.Error("ci trigger enabled check", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if !enabled {
+		writeError(w, http.StatusConflict, "CI is disabled for this repo")
+		return
+	}
+
+	owner := r.PathValue("owner")
+	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
+	bareRepo := filepath.Join(s.cfg.ReposDir, owner, repo+".git")
+
+	// Resolve the ref to a concrete commit. ^{commit} peels annotated tags;
+	// -q --verify turns an unknown ref into a clean non-zero exit instead of
+	// echoing the input back.
+	out, err := gitOutput(r.Context(), bareRepo, "rev-parse", "-q", "--verify", req.Ref+"^{commit}")
+	sha := strings.TrimSpace(string(out))
+	if err != nil || sha == "" {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("cannot resolve ref %q", req.Ref))
+		return
+	}
+
+	msg, author := gitCommitMeta(bareRepo, sha)
+	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
+		CommitSHA:    sha,
+		CommitMsg:    msg,
+		CommitAuthor: author,
+		Ref:          req.Ref,
+		Event:        "manual",
+		Trigger:      identityFromContext(r),
+	})
+	if err != nil {
+		s.logger.Error("ci trigger enqueue", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	s.logger.Info("ci run triggered", "repo", owner+"/"+repo, "run", run.Number, "ref", req.Ref)
 	writeJSON(w, http.StatusAccepted, toAPIRun(run))
 }
 

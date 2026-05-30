@@ -299,6 +299,13 @@ type CIRun struct {
 	FinishedAt   *time.Time `json:"finished_at"`
 }
 
+// TriggerCIRunRequest starts a CI run for an arbitrary ref (branch, tag, or
+// commit SHA) without a git push. The server resolves Ref to a commit against
+// the bare repo and enqueues a run with event "manual".
+type TriggerCIRunRequest struct {
+	Ref string `json:"ref"`
+}
+
 // CIJob is one job within a run, addressed by Name (which is also the key in
 // the per-job event-stream path).
 type CIJob struct {

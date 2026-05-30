@@ -69,6 +69,7 @@ USAGE:
     moongit review delete  <id>
 
     moongit ci validate  [path]   (defaults to ./mgitci.yml)
+    moongit ci run       <ref>    (trigger a run for a branch/tag/sha)
 
 Identity: the server stamps author/assignee from the name of the token
 in MOONGIT_TOKEN. Mint a token with "moongitd token create <name>" and
@@ -681,14 +682,60 @@ func runReviewDelete(args []string) error {
 // (no server round-trip): they operate on the mgitci.yml in the working copy.
 func runCI(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit ci validate [path]")
+		return errors.New("usage: moongit ci <validate|run> ...")
 	}
 	switch args[0] {
 	case "validate":
 		return runCIValidate(args[1:])
+	case "run":
+		return runCITrigger(args[1:])
 	default:
 		return fmt.Errorf("unknown ci subcommand: %s", args[0])
 	}
+}
+
+// runCITrigger starts a CI run for a ref (branch, tag, or commit SHA) without a
+// push — the on-demand counterpart to push-driven CI. The server resolves the
+// ref against the repo and enqueues a run with event "manual".
+func runCITrigger(args []string) error {
+	fs := flag.NewFlagSet("ci run", flag.ContinueOnError)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return errors.New("usage: moongit ci run <ref>")
+	}
+	ref := fs.Arg(0)
+
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(api.TriggerCIRunRequest{Ref: ref})
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/ci/runs", target.server, target.owner, target.repo)
+	resp, raw, err := httpDo(http.MethodPost, endpoint, bytes.NewReader(payload), "application/json")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode == http.StatusConflict {
+		return errors.New("CI is disabled for this repo")
+	}
+	if resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	var run api.CIRun
+	if err := json.Unmarshal(raw, &run); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	sha := run.CommitSHA
+	if len(sha) > 12 {
+		sha = sha[:12]
+	}
+	fmt.Printf("run #%d queued — %s @ %s [%s]\n", run.Number, run.Ref, sha, run.Status)
+	return nil
 }
 
 // runCIValidate parses and validates an mgitci.yml locally, reporting the
