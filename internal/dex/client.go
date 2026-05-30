@@ -275,6 +275,25 @@ type PackageSummary struct {
 	Summary string `json:"summary"`
 }
 
+// FileSummary returns the file_summary chunk dex composed for a single file
+// path, or "" when dex has no summary for it (the common case — only some
+// files get summarized). Like Overview, dex exposes no enumerate-by-kind
+// endpoint, so we run one targeted search keyed on the path — its tokens
+// dominate the lexical half of dex's hybrid ranking, so the file's own
+// chunks rank top — and filter to the exact Path + file_summary kind.
+func (c *Client) FileSummary(ctx context.Context, projectID, path string) (string, error) {
+	res, err := c.Search(ctx, projectID, path+" file summary overview purpose", 30)
+	if err != nil {
+		return "", err
+	}
+	for _, h := range res.Hits {
+		if h.Kind == "file_summary" && h.Path == path && h.Content != "" {
+			return h.Content, nil
+		}
+	}
+	return "", nil
+}
+
 // Callees returns call-graph successors of name (functions it invokes).
 func (c *Client) Callees(ctx context.Context, projectID, name string, k int) (*SearchResult, error) {
 	return c.callEdge(ctx, projectID, "callees", name, k)

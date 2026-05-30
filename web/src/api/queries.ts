@@ -17,6 +17,8 @@ export const keys = {
   comments: (owner: string, repo: string, n: number) => ["comments", owner, repo, n] as const,
   intel: (owner: string, repo: string) => ["intel", owner, repo] as const,
   intelOverview: (owner: string, repo: string) => ["intelOverview", owner, repo] as const,
+  intelFileSummary: (owner: string, repo: string, path: string) =>
+    ["intelFileSummary", owner, repo, path] as const,
 }
 
 export function useWhoami() {
@@ -118,6 +120,21 @@ export function useIntelOverview(owner: string, repo: string, enabled: boolean) 
     // Two dex round trips per fetch — only run when we know dex is up
     // and this repo is indexed (gated on useIntel's found flag).
     enabled: enabled && !!owner && !!repo,
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useIntelFileSummary(
+  owner: string,
+  repo: string,
+  path: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: keys.intelFileSummary(owner, repo, path),
+    queryFn: () => api.getIntelFileSummary(owner, repo, path),
+    // One dex round trip per file view — gate on dex up + repo indexed.
+    enabled: enabled && !!owner && !!repo && !!path,
     staleTime: 5 * 60_000,
   })
 }

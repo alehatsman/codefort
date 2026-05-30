@@ -122,6 +122,52 @@ func (s *Server) handleIntelOverview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, ov)
 }
 
+// fileSummaryResponse is the payload for the per-file dex summary surfaced
+// on the Code tab's blob view. Summary is empty when dex has no summary for
+// the file (the common case — only some files are summarized), which the UI
+// renders as a plain breadcrumb with no card.
+type fileSummaryResponse struct {
+	Path    string `json:"path"`
+	Summary string `json:"summary"`
+}
+
+// handleIntelFileSummary returns the dex file_summary chunk for a single
+// file (?path=...), backing the collapsible overview card on the blob view.
+// A missing summary is a 200 with an empty summary, not an error — most
+// files simply aren't summarized.
+func (s *Server) handleIntelFileSummary(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+		return
+	}
+	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
+	path := strings.TrimSpace(r.URL.Query().Get("path"))
+	if path == "" {
+		writeError(w, http.StatusBadRequest, "path is required")
+		return
+	}
+	if !s.dex.Enabled() {
+		writeError(w, http.StatusServiceUnavailable, "dex integration not configured")
+		return
+	}
+	proj, err := s.dex.ResolveProject(r.Context(), repo)
+	if errors.Is(err, dex.ErrProjectNotFound) {
+		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
+		return
+	}
+	if err != nil {
+		s.logger.Error("dex resolve project", "err", err)
+		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+		return
+	}
+	summary, err := s.dex.FileSummary(r.Context(), proj.ID, path)
+	if err != nil {
+		s.logger.Error("dex file summary", "err", err)
+		writeError(w, http.StatusBadGateway, "dex file summary failed: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, fileSummaryResponse{Path: path, Summary: summary})
+}
+
 // handleIntelSearch proxies a semantic or symbol search to dex, scoped to
 // the dex project that matches this repo.
 func (s *Server) handleIntelSearch(w http.ResponseWriter, r *http.Request) {

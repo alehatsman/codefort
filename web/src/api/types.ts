@@ -173,6 +173,11 @@ export interface IntelOverview {
   packages: IntelPackageSummary[]
 }
 
+export interface IntelFileSummary {
+  path: string
+  summary: string
+}
+
 export interface IntelSearchResult {
   status: string
   hint?: string
