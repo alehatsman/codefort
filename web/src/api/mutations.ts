@@ -171,6 +171,16 @@ export function useSpawnAgent(owner: string, repo: string, n: number) {
   })
 }
 
+// useCreateAgentTurn queues a follow-up message on an agent run; once accepted,
+// refresh the run so the queued turn shows and the transcript starts tailing.
+export function useCreateAgentTurn(owner: string, repo: string, n: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (text: string) => api.createAgentTurn(owner, repo, n, text),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRun(owner, repo, n) }),
+  })
+}
+
 // useTriggerCIRun starts a run for an arbitrary ref without a push; like a
 // rerun, the fresh run tops the list, so refresh it once accepted.
 export function useTriggerCIRun(owner: string, repo: string) {

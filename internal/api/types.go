@@ -325,10 +325,31 @@ type CIJob struct {
 	FinishedAt *time.Time `json:"finished_at"`
 }
 
-// CIRunDetail is a run plus its jobs, for the run-detail view.
+// CIRunDetail is a run plus its jobs, for the run-detail view. For an agent run
+// it also carries the conversation's follow-up turns (the issue body is turn 1
+// and isn't listed here), so the UI can show queued/in-flight messages that
+// haven't reached the event stream yet.
 type CIRunDetail struct {
 	CIRun
-	Jobs []CIJob `json:"jobs"`
+	Jobs  []CIJob     `json:"jobs"`
+	Turns []AgentTurn `json:"turns,omitempty"`
+}
+
+// AgentTurn is one human follow-up message in an agent run's conversation.
+type AgentTurn struct {
+	Seq        int        `json:"seq"`
+	Author     string     `json:"author"`
+	Body       string     `json:"body"`
+	Status     string     `json:"status"` // pending | running | done | error
+	CreatedAt  time.Time  `json:"created_at"`
+	FinishedAt *time.Time `json:"finished_at"`
+}
+
+// CreateAgentTurnRequest queues a follow-up turn (a message to the agent) on an
+// agent run that's awaiting input (or running — it queues behind the current
+// turn).
+type CreateAgentTurnRequest struct {
+	Text string `json:"text"`
 }
 
 // Token represents an API token's metadata. The plaintext token itself

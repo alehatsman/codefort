@@ -2,10 +2,15 @@ import clsx from "clsx"
 import { Fragment, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useCIRun, useCIRuns, useRefs, useRepo } from "../api/queries"
-import { useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from "../api/mutations"
+import {
+  useCreateAgentTurn,
+  useRerunCIRun,
+  useSetCIEnabled,
+  useTriggerCIRun,
+} from "../api/mutations"
 import { useJobEventStream } from "../lib/ciEvents"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
-import type { CIEvent, CIJob, CIRun, Repo } from "../api/types"
+import type { CIEvent, CIJob, CIRun, CIRunDetail, Repo } from "../api/types"
 import RepoHeader from "../components/RepoHeader"
 import CIStatusBadge from "../components/CIStatusBadge"
 
@@ -257,7 +262,10 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
       </dl>
 
       {run.kind === "agent" ? (
-        <AgentTranscript owner={owner} repo={repo} runNumber={runNumber} />
+        <>
+          <AgentTranscript owner={owner} repo={repo} runNumber={runNumber} />
+          <AgentMessageBox owner={owner} repo={repo} runNumber={runNumber} run={run} />
+        </>
       ) : jobs.length === 0 ? (
         <div className="empty">No jobs — the run was gated or hasn't started.</div>
       ) : (
@@ -425,6 +433,73 @@ function AgentTranscript({
         </div>
       ))}
     </div>
+  )
+}
+
+// AgentMessageBox lets a human send follow-up turns to an agent run. It's live
+// while the run isn't terminal: a message sent mid-turn queues behind the
+// current one (the server accepts it; the dispatch loop runs it next).
+function AgentMessageBox({
+  owner,
+  repo,
+  runNumber,
+  run,
+}: {
+  owner: string
+  repo: string
+  runNumber: number
+  run: CIRunDetail
+}) {
+  const [text, setText] = useState("")
+  const send = useCreateAgentTurn(owner, repo, runNumber)
+  const terminal = ["success", "failed", "canceled", "error"].includes(run.status)
+  const queued = (run.turns ?? []).filter((t) => t.status === "pending" || t.status === "running")
+
+  if (terminal) {
+    return (
+      <div className="agent-msgbox agent-msgbox--done muted small">
+        This agent run has finished.
+      </div>
+    )
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    const t = text.trim()
+    if (!t) return
+    send.mutate(t, { onSuccess: () => setText("") })
+  }
+
+  return (
+    <form className="agent-msgbox" onSubmit={submit}>
+      {queued.length > 0 && (
+        <div className="muted small">
+          {queued.length} message{queued.length > 1 ? "s" : ""} queued…
+        </div>
+      )}
+      <textarea
+        className="input agent-msgbox__input"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={
+          run.status === "running"
+            ? "Agent is working — your message will queue…"
+            : "Send the agent a message…"
+        }
+        aria-label="Message to the agent"
+        rows={3}
+      />
+      <div className="agent-msgbox__actions">
+        <button
+          type="submit"
+          className="btn btn--small btn--primary"
+          disabled={send.isPending || text.trim() === ""}
+        >
+          {send.isPending ? "Sending…" : "Send"}
+        </button>
+      </div>
+      {send.error && <div className="error inline">{(send.error as Error).message}</div>}
+    </form>
   )
 }
 

@@ -1,4 +1,5 @@
 import type {
+  AgentTurn,
   Blob,
   CIRun,
   CIRunDetail,
@@ -238,5 +239,12 @@ export const api = {
     request<CIRun>(`/api/repos/${owner}/${repo}/issues/${n}/agent`, {
       method: "POST",
       body: ref ? { ref } : {},
+    }),
+  // createAgentTurn queues a follow-up message on an agent run; the dispatch
+  // loop resumes the session and streams the response onto the run's events.
+  createAgentTurn: (owner: string, repo: string, n: number, text: string) =>
+    request<AgentTurn>(`/api/repos/${owner}/${repo}/ci/runs/${n}/turns`, {
+      method: "POST",
+      body: { text },
     }),
 }

@@ -80,6 +80,19 @@ func (s *Server) handleGetCIRun(w http.ResponseWriter, r *http.Request) {
 	for i, j := range jobs {
 		detail.Jobs[i] = toAPIJob(j)
 	}
+	// An agent run's conversation: the follow-up turns (issue body is turn 1).
+	if run.Kind == storage.RunKindAgent {
+		turns, err := storage.ListTurns(s.rdb, run.ID)
+		if err != nil {
+			s.logger.Error("ci list turns", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		detail.Turns = make([]api.AgentTurn, len(turns))
+		for i, t := range turns {
+			detail.Turns[i] = toAPITurn(t)
+		}
+	}
 	writeJSON(w, http.StatusOK, detail)
 }
 

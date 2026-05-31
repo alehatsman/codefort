@@ -2744,7 +2744,8 @@ h3 {
   background: var(--state-todo-bg);
   color: var(--state-todo);
 }
-.ci-badge--running {
+.ci-badge--running,
+.ci-badge--awaiting_input {
   background: var(--state-in_progress-bg);
   color: var(--state-in_progress);
 }
@@ -2985,4 +2986,26 @@ h3 {
 .agent-entry--result .agent-entry__label {
   color: var(--fg);
   font-weight: var(--weight-medium);
+}
+
+/* Message box for sending the agent follow-up turns. */
+.agent-msgbox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.agent-msgbox--done {
+  border-top: 1px solid var(--border);
+}
+.agent-msgbox__input {
+  width: 100%;
+  font-family: inherit;
+  resize: vertical;
+}
+.agent-msgbox__actions {
+  display: flex;
+  justify-content: flex-end;
 }

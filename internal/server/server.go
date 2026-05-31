@@ -134,6 +134,7 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/ci/runs/{number}", s.handleGetCIRun)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/ci/runs/{number}/jobs/{job}/events", s.handleCIJobEvents)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/ci/runs/{number}/rerun", s.handleRerunCIRun)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/ci/runs/{number}/turns", s.handleCreateAgentTurn)
 
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel", s.handleIntel)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/overview", s.handleIntelOverview)

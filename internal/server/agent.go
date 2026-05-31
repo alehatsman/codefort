@@ -96,3 +96,67 @@ func (s *Server) handleSpawnAgent(w http.ResponseWriter, r *http.Request) {
 	s.logger.Info("agent run spawned", "repo", owner+"/"+repo, "issue", num, "run", run.Number, "ref", ref)
 	writeJSON(w, http.StatusAccepted, toAPIRun(run))
 }
+
+// handleCreateAgentTurn queues a follow-up turn (a human message) on an agent
+// run. The run must be an agent run that hasn't finished; a turn sent while a
+// turn is in flight simply queues behind it. The turn-dispatch loop picks it up,
+// resumes the claude session, and streams the response onto the run's event log.
+func (s *Server) handleCreateAgentTurn(w http.ResponseWriter, r *http.Request) {
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+	num, ok := runNumberOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	var req api.CreateAgentTurnRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	req.Text = strings.TrimSpace(req.Text)
+	if req.Text == "" {
+		writeError(w, http.StatusBadRequest, "text is required")
+		return
+	}
+
+	run, err := storage.GetRun(s.db, repoID, num)
+	if errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "run not found")
+		return
+	}
+	if err != nil {
+		s.logger.Error("agent turn get run", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if run.Kind != storage.RunKindAgent {
+		writeError(w, http.StatusBadRequest, "not an agent run")
+		return
+	}
+	if run.Status.Terminal() {
+		writeError(w, http.StatusConflict, "agent run has finished")
+		return
+	}
+
+	turn, err := storage.EnqueueTurn(s.db, run.ID, identityFromContext(r), req.Text)
+	if err != nil {
+		s.logger.Error("agent turn enqueue", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusAccepted, toAPITurn(turn))
+}
+
+func toAPITurn(t storage.AgentTurn) api.AgentTurn {
+	return api.AgentTurn{
+		Seq:        t.Seq,
+		Author:     t.Author,
+		Body:       t.Body,
+		Status:     string(t.Status),
+		CreatedAt:  t.CreatedAt,
+		FinishedAt: t.FinishedAt,
+	}
+}

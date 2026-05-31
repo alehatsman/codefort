@@ -192,6 +192,57 @@ test("agent run renders the claude transcript instead of the job DAG", async ({ 
   await expect(page.locator(".ci-dag")).toHaveCount(0)
 })
 
+test("an awaiting-input agent run shows a message box and queues a follow-up", async ({ page }) => {
+  const state = await mockApi(page, {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 1,
+        total_issues: 1,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 1,
+        kind: "agent",
+        issue_number: 5,
+        status: "awaiting_input",
+        commit_sha: "deadbeefcafe1234",
+        ref: "HEAD",
+        event: "agent",
+        trigger: "agent#17",
+        created_at: iso,
+        started_at: iso,
+        finished_at: null,
+        jobs: [{ name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+        events: {
+          agent: [
+            { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #5: do it" } },
+            { seq: 2, type: "agent.turn.completed", time: 0, data: { turn: 1, status: "success" } },
+          ],
+        },
+      },
+    ],
+  })
+  await page.goto("/alice/demo/pipelines/1")
+
+  // The status reads "awaiting input" and the message box is available.
+  await expect(page.getByText("awaiting input").first()).toBeVisible()
+  const box = page.getByLabel("Message to the agent")
+  await expect(box).toBeVisible()
+
+  await box.fill("please also add a test")
+  await page.getByRole("button", { name: "Send" }).click()
+
+  // The mock recorded the queued turn.
+  await expect.poll(() => state.ciRuns[0].turns?.length ?? 0).toBe(1)
+  expect(state.ciRuns[0].turns?.[0].body).toBe("please also add a test")
+})
+
 test("run detail surfaces commit context, the job DAG, and step commands", async ({ page }) => {
   await mockApi(page, enabledSeed())
   await page.goto("/alice/demo/pipelines/1")

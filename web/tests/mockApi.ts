@@ -58,10 +58,20 @@ export interface CIJob {
   finished_at: string | null
 }
 
+export interface AgentTurn {
+  seq: number
+  author: string
+  body: string
+  status: "pending" | "running" | "done" | "error"
+  created_at: string
+  finished_at: string | null
+}
+
 export interface CIRun {
   number: number
   kind?: "ci" | "agent"
   issue_number?: number
+  turns?: AgentTurn[]
   commit_sha: string
   commit_msg?: string
   commit_author?: string
@@ -307,6 +317,27 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     if (!run) return json(route, 404, { error: "run not found" })
     const { events: _events, ...detail } = run
     return json(route, 200, detail)
+  })
+  // Agent follow-up turn: queue a message on an agent run.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/turns$/, (route) => {
+    const parts = new URL(route.request().url()).pathname.split("/")
+    const n = Number(parts[parts.length - 2])
+    const run = state.ciRuns.find((r) => r.number === n)
+    if (!run) return json(route, 404, { error: "run not found" })
+    if (run.kind !== "agent") return json(route, 400, { error: "not an agent run" })
+    const text = ((route.request().postDataJSON() as { text?: string }).text ?? "").trim()
+    if (!text) return json(route, 400, { error: "text is required" })
+    run.turns = run.turns ?? []
+    const turn: AgentTurn = {
+      seq: run.turns.length + 1,
+      author: state.identity,
+      body: text,
+      status: "pending",
+      created_at: nowIso(),
+      finished_at: null,
+    }
+    run.turns.push(turn)
+    return json(route, 202, turn)
   })
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/rerun$/, (route) => {
     const parts = new URL(route.request().url()).pathname.split("/")

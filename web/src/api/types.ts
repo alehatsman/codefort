@@ -317,7 +317,14 @@ export interface IntelSummaries {
 // --- CI (moongitci) ---
 
 // Mirrors storage.RunStatus. queued -> running -> a terminal state.
-export type CIRunStatus = "queued" | "running" | "success" | "failed" | "canceled" | "error"
+export type CIRunStatus =
+  | "queued"
+  | "running"
+  | "awaiting_input" // agent-only: parked between turns
+  | "success"
+  | "failed"
+  | "canceled"
+  | "error"
 
 // Mirrors storage.JobStatus.
 export type CIJobStatus = "queued" | "running" | "success" | "failed" | "skipped" | "error"
@@ -350,8 +357,22 @@ export interface CIJob {
   finished_at: string | null
 }
 
+export type AgentTurnStatus = "pending" | "running" | "done" | "error"
+
+// AgentTurn is one human follow-up message in an agent run's conversation.
+export interface AgentTurn {
+  seq: number
+  author: string
+  body: string
+  status: AgentTurnStatus
+  created_at: string
+  finished_at: string | null
+}
+
 export interface CIRunDetail extends CIRun {
   jobs: CIJob[]
+  // Follow-up turns for an agent run (issue body is turn 1, not listed).
+  turns?: AgentTurn[]
 }
 
 // CIEvent mirrors internal/ci.Event — one entry in a job's append-only event

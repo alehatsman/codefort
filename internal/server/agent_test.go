@@ -86,6 +86,91 @@ func TestSpawnAgentUnknownIssue(t *testing.T) {
 	}
 }
 
+// createTurn drives handleCreateAgentTurn for run `num` with a message body.
+func createTurn(t *testing.T, s *Server, num int, text string) *httptest.ResponseRecorder {
+	t.Helper()
+	body, _ := json.Marshal(api.CreateAgentTurnRequest{Text: text})
+	req := httptest.NewRequest(http.MethodPost, "/api/repos/alice/repo/ci/runs/"+strconv.Itoa(num)+"/turns", bytes.NewReader(body))
+	req.SetPathValue("owner", "alice")
+	req.SetPathValue("repo", "repo")
+	req.SetPathValue("number", strconv.Itoa(num))
+	req = req.WithContext(context.WithValue(req.Context(), tokenCtxKey{}, api.Token{Name: "agent#17"}))
+	rr := httptest.NewRecorder()
+	s.handleCreateAgentTurn(rr, req)
+	return rr
+}
+
+// A follow-up turn on an agent run queues a pending turn linked to the run.
+func TestCreateAgentTurnQueues(t *testing.T) {
+	s, repoID := newCITriggerServer(t)
+	issue, err := storage.CreateIssue(s.db, repoID, api.CreateIssueRequest{Title: "x", Author: "alice"})
+	if err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	n := issue.Number
+	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
+		Kind: storage.RunKindAgent, IssueNumber: &n, CommitSHA: "abc", Ref: "HEAD", Event: "agent",
+	})
+	if err != nil {
+		t.Fatalf("EnqueueRun: %v", err)
+	}
+
+	rr := createTurn(t, s, run.Number, "  please also add tests  ")
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("code = %d, want 202; body=%s", rr.Code, rr.Body.String())
+	}
+	var turn api.AgentTurn
+	if err := json.Unmarshal(rr.Body.Bytes(), &turn); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if turn.Seq != 1 || turn.Status != "pending" || turn.Author != "agent#17" {
+		t.Errorf("turn = %+v, want seq 1 / pending / agent#17", turn)
+	}
+	if turn.Body != "please also add tests" {
+		t.Errorf("body = %q, want trimmed text", turn.Body)
+	}
+
+	stored, err := storage.ListTurns(s.db, run.ID)
+	if err != nil || len(stored) != 1 {
+		t.Fatalf("ListTurns = %v, %v; want one turn", stored, err)
+	}
+}
+
+// Empty text is a 400; a turn on a CI run is a 400; a turn on a finished run is
+// a 409.
+func TestCreateAgentTurnRejections(t *testing.T) {
+	s, repoID := newCITriggerServer(t)
+
+	// CI run -> not an agent run.
+	ciRun, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{CommitSHA: "a", Ref: "main", Event: "push"})
+	if err != nil {
+		t.Fatalf("EnqueueRun ci: %v", err)
+	}
+	if rr := createTurn(t, s, ciRun.Number, "hi"); rr.Code != http.StatusBadRequest {
+		t.Errorf("turn on CI run code = %d, want 400", rr.Code)
+	}
+
+	// Agent run, empty text -> 400.
+	n := 1
+	agentRun, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
+		Kind: storage.RunKindAgent, IssueNumber: &n, CommitSHA: "a", Ref: "HEAD", Event: "agent",
+	})
+	if err != nil {
+		t.Fatalf("EnqueueRun agent: %v", err)
+	}
+	if rr := createTurn(t, s, agentRun.Number, "   "); rr.Code != http.StatusBadRequest {
+		t.Errorf("empty text code = %d, want 400", rr.Code)
+	}
+
+	// Finished agent run -> 409.
+	if err := storage.FinishRun(s.db, agentRun.ID, storage.RunSuccess); err != nil {
+		t.Fatalf("FinishRun: %v", err)
+	}
+	if rr := createTurn(t, s, agentRun.Number, "hi"); rr.Code != http.StatusConflict {
+		t.Errorf("turn on finished run code = %d, want 409", rr.Code)
+	}
+}
+
 // An unresolvable base ref is a 400.
 func TestSpawnAgentBadRef(t *testing.T) {
 	s, repoID := newCITriggerServer(t)
