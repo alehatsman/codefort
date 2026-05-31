@@ -12,12 +12,16 @@ import (
 type RunStatus string
 
 const (
-	RunQueued   RunStatus = "queued"
-	RunRunning  RunStatus = "running"
-	RunSuccess  RunStatus = "success"
-	RunFailed   RunStatus = "failed"
-	RunCanceled RunStatus = "canceled"
-	RunError    RunStatus = "error" // infrastructure failure (checkout/parse), not a job's non-zero exit
+	RunQueued  RunStatus = "queued"
+	RunRunning RunStatus = "running"
+	// RunAwaitingInput is an agent-only non-terminal state: a turn finished and
+	// the run is holding its container open, waiting for the next human turn
+	// (or a finish / idle-timeout). CI runs never enter it.
+	RunAwaitingInput RunStatus = "awaiting_input"
+	RunSuccess       RunStatus = "success"
+	RunFailed        RunStatus = "failed"
+	RunCanceled      RunStatus = "canceled"
+	RunError         RunStatus = "error" // infrastructure failure (checkout/parse), not a job's non-zero exit
 )
 
 // Terminal reports whether the status is a final state (no further transitions).
@@ -253,13 +257,16 @@ func FinishRun(db *sql.DB, runID int64, status RunStatus) error {
 	return affected(res, err)
 }
 
-// ReconcileOrphanRuns finalizes runs left 'running' with no live runner — the
-// classic orphan a moongitd restart strands mid-run (the in-flight goroutine
-// dies before its status writes commit). It must be called at startup, before
-// the runner takes new work, when no run can legitimately be in flight: every
-// 'running' run is therefore an orphan. Each is marked error, its running job
-// errored and its queued jobs skipped, so the UI shows a terminal result
-// instead of a job stuck forever. Returns the number of runs reconciled.
+// ReconcileOrphanRuns finalizes runs left in flight with no live runner — the
+// classic orphan a moongitd restart strands (the in-flight goroutine dies
+// before its status writes commit; an agent run's detached container is swept
+// at startup too). It must be called at startup, before the runner takes new
+// work, when no run can legitimately be in flight: every 'running' run — and
+// every agent run parked in 'awaiting_input', whose container the startup
+// sweep just removed — is therefore an orphan. Each is marked error, its
+// running job errored, its queued jobs skipped, and its un-finished turns
+// errored, so the UI shows a terminal result instead of something stuck
+// forever. Returns the number of runs reconciled.
 func ReconcileOrphanRuns(db *sql.DB) (int, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -267,21 +274,32 @@ func ReconcileOrphanRuns(db *sql.DB) (int, error) {
 	}
 	defer tx.Rollback()
 
+	// Orphans are runs left running or (agent-only) awaiting_input.
+	const orphanRuns = `SELECT id FROM ci_runs WHERE status IN ('running','awaiting_input')`
+
 	if _, err := tx.Exec(`
 		UPDATE ci_jobs SET status = ?, finished_at = strftime('%s','now')
-		 WHERE status = ? AND run_id IN (SELECT id FROM ci_runs WHERE status = ?)
-	`, string(JobError), string(JobRunning), string(RunRunning)); err != nil {
+		 WHERE status = ? AND run_id IN (`+orphanRuns+`)
+	`, string(JobError), string(JobRunning)); err != nil {
 		return 0, err
 	}
 	if _, err := tx.Exec(`
 		UPDATE ci_jobs SET status = ?, finished_at = strftime('%s','now')
-		 WHERE status = ? AND run_id IN (SELECT id FROM ci_runs WHERE status = ?)
-	`, string(JobSkipped), string(JobQueued), string(RunRunning)); err != nil {
+		 WHERE status = ? AND run_id IN (`+orphanRuns+`)
+	`, string(JobSkipped), string(JobQueued)); err != nil {
+		return 0, err
+	}
+	// Error any pending/running turns of the orphaned agent runs.
+	if _, err := tx.Exec(`
+		UPDATE agent_turns SET status = ?, finished_at = strftime('%s','now')
+		 WHERE status IN ('pending','running') AND run_id IN (`+orphanRuns+`)
+	`, string(TurnError)); err != nil {
 		return 0, err
 	}
 	res, err := tx.Exec(`
-		UPDATE ci_runs SET status = ?, finished_at = strftime('%s','now') WHERE status = ?
-	`, string(RunError), string(RunRunning))
+		UPDATE ci_runs SET status = ?, finished_at = strftime('%s','now')
+		 WHERE status IN ('running','awaiting_input')
+	`, string(RunError))
 	if err != nil {
 		return 0, err
 	}

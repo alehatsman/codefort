@@ -166,6 +166,30 @@ var migrations = []string{
 	ALTER TABLE ci_runs ADD COLUMN issue_number INTEGER;
 	CREATE INDEX IF NOT EXISTS idx_ci_runs_kind ON ci_runs(kind);
 	`,
+
+	// 9: agent turns. An agent run is a conversation: turn 1 is the issue body
+	// (executed inline, not stored), and each later human message is a row here
+	// dispatched as its own claude --resume turn while the run sits in
+	// awaiting_input between turns. seq is per-run and monotonic. status mirrors
+	// the dispatch lifecycle; claimed_at is the dispatcher lease so a crashed
+	// dispatch can be retried, same pattern as ci_runs. See #76.
+	`
+	CREATE TABLE IF NOT EXISTS agent_turns (
+	    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	    run_id      INTEGER NOT NULL REFERENCES ci_runs(id) ON DELETE CASCADE,
+	    seq         INTEGER NOT NULL,
+	    author      TEXT NOT NULL,
+	    body        TEXT NOT NULL,
+	    status      TEXT NOT NULL DEFAULT 'pending',
+	    claimed_at  INTEGER,
+	    created_at  INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+	    started_at  INTEGER,
+	    finished_at INTEGER,
+	    UNIQUE (run_id, seq)
+	);
+	CREATE INDEX IF NOT EXISTS idx_agent_turns_run    ON agent_turns(run_id);
+	CREATE INDEX IF NOT EXISTS idx_agent_turns_status ON agent_turns(status);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —
