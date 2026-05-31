@@ -142,6 +142,35 @@ func ClaimNextTurn(db *sql.DB, lease time.Duration) (AgentTurn, CIRun, error) {
 	return turn, run, nil
 }
 
+// ListExpiredAwaitingRuns returns agent runs parked in awaiting_input whose
+// started_at is older than maxAge — the lifetime-expired sessions the reaper
+// finalizes (tearing down their held container). A non-positive maxAge
+// disables it.
+func ListExpiredAwaitingRuns(db *sql.DB, maxAge time.Duration) ([]CIRun, error) {
+	if maxAge <= 0 {
+		return nil, nil
+	}
+	rows, err := db.Query(`
+		SELECT `+runColumns+` FROM ci_runs
+		 WHERE kind = 'agent' AND status = 'awaiting_input'
+		   AND started_at IS NOT NULL
+		   AND started_at <= strftime('%s','now') - ?
+	`, int64(maxAge.Seconds()))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	runs := make([]CIRun, 0)
+	for rows.Next() {
+		run, err := scanRun(rows)
+		if err != nil {
+			return nil, err
+		}
+		runs = append(runs, run)
+	}
+	return runs, rows.Err()
+}
+
 // FinishTurn sets a turn's terminal status and finished_at.
 func FinishTurn(db *sql.DB, turnID int64, status TurnStatus) error {
 	res, err := db.Exec(`

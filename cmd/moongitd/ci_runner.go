@@ -91,6 +91,13 @@ type ciRunner struct {
 	newSession   sessionFactory
 	checkout     checkoutFunc
 	readPipeline pipelineReader
+
+	// Agent turn loop: attachSession binds to an already-running agent
+	// container (no docker run) so a follow-up turn can resume the session;
+	// teardownContainer removes a finalized agent container. Both are injected
+	// so the turn-loop tests run without docker.
+	attachSession     func(ctx context.Context, name string) (jobSession, error)
+	teardownContainer func(name string)
 }
 
 func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner {
@@ -104,13 +111,22 @@ func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner 
 	if cfg.CIIsolation == "none" {
 		// Legacy path: steps run on the host as the moongitd user.
 		r.newSession = func(_ context.Context, _, workDir, _ string) (jobSession, error) {
-			return &hostSession{workDir: workDir, exec: runMooncakeStep}, nil
+			return &hostSession{workDir: workDir, exec: runMooncakeStep, stream: runClaudeStreamHost}, nil
 		}
+		r.attachSession = func(_ context.Context, _ string) (jobSession, error) {
+			return nil, errors.New("agent turn resume requires docker isolation")
+		}
+		r.teardownContainer = func(string) {}
 	} else {
 		// Default: one throwaway container per job, steps run via docker exec.
 		r.newSession = func(ctx context.Context, name, workDir, image string) (jobSession, error) {
 			return openDockerSession(ctx, logger, name, workDir, image)
 		}
+		// Resume binds to the still-running agent container by name.
+		r.attachSession = func(_ context.Context, name string) (jobSession, error) {
+			return &dockerSession{name: name, logger: logger}, nil
+		}
+		r.teardownContainer = func(name string) { removeContainer(logger, name) }
 	}
 	return r
 }
@@ -163,6 +179,11 @@ func (r *ciRunner) run(ctx context.Context) {
 		// Dispatch every claimable run of each kind before sleeping.
 		r.drainKind(ctx, &wg, ciSem, storage.RunKindCI, r.runLease())
 		r.drainKind(ctx, &wg, agentSem, storage.RunKindAgent, r.agentLease())
+		// Reap lifetime-expired parked agent sessions, then dispatch any
+		// queued follow-up turns. Turns share the agent pool: a parked run
+		// holds no slot, and dispatching its next turn briefly takes one.
+		r.reapExpiredAgents(ctx)
+		r.drainTurns(ctx, &wg, agentSem)
 		if ctx.Err() != nil {
 			return
 		}
@@ -171,6 +192,36 @@ func (r *ciRunner) run(ctx context.Context) {
 			return
 		case <-ticker.C:
 		}
+	}
+}
+
+// drainTurns claims and dispatches every currently-dispatchable follow-up turn
+// (a parked run's next pending message), bounded by the agent pool, returning
+// when nothing more is claimable or the context is cancelled. Mirrors drainKind.
+func (r *ciRunner) drainTurns(ctx context.Context, wg *sync.WaitGroup, sem chan struct{}) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			return
+		}
+		turn, run, err := storage.ClaimNextTurn(r.db, r.turnLease())
+		if err != nil {
+			<-sem
+			if !errors.Is(err, storage.ErrNoTurnPending) {
+				r.logger.Error("agent claim turn", "err", err)
+			}
+			return
+		}
+		wg.Add(1)
+		go func(turn storage.AgentTurn, run storage.CIRun) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			r.dispatchTurn(ctx, turn, run)
+		}(turn, run)
 	}
 }
 
@@ -229,6 +280,16 @@ func (r *ciRunner) agentLease() time.Duration {
 		return 0
 	}
 	return r.cfg.AgentRunTimeout + 5*time.Minute
+}
+
+// turnLease is the claim lease for follow-up turns, derived from the per-turn
+// timeout: long enough that a live dispatch is never stolen, short enough that
+// a crashed dispatch's 'running' turn eventually re-dispatches.
+func (r *ciRunner) turnLease() time.Duration {
+	if r.cfg.AgentTurnTimeout <= 0 {
+		return 0
+	}
+	return r.cfg.AgentTurnTimeout + 2*time.Minute
 }
 
 // executeRun runs one claimed run end-to-end: gate, checkout, per-job step
@@ -686,12 +747,33 @@ func streamCommand(ctx context.Context, cmd *exec.Cmd, onLine func(line []byte))
 // timeout so teardown still runs after a run-timeout has cancelled the parent
 // context — otherwise the detached container would leak.
 func (d *dockerSession) Close() error {
+	removeContainer(d.logger, d.name)
+	return nil
+}
+
+// removeContainer force-removes a container by name, best-effort. It uses a
+// fresh short-lived context so teardown still runs after the parent context was
+// cancelled (a run timeout) — otherwise a detached agent container would leak.
+// It backs both dockerSession.Close and the agent turn-loop teardown (where the
+// container outlives any single session handle).
+func removeContainer(logger *slog.Logger, name string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if out, err := exec.CommandContext(ctx, "docker", "rm", "-f", d.name).CombinedOutput(); err != nil {
-		d.logger.Error("ci container cleanup", "name", d.name, "err", err, "out", strings.TrimSpace(string(out)))
+	if out, err := exec.CommandContext(ctx, "docker", "rm", "-f", name).CombinedOutput(); err != nil {
+		logger.Error("container cleanup", "name", name, "err", err, "out", strings.TrimSpace(string(out)))
 	}
-	return nil
+}
+
+// runClaudeStreamHost runs the agent command on the host (the CIIsolation=none
+// path), streaming stdout line-by-line. Agent runs normally use docker; this
+// exists so the host session isn't missing the capability.
+func runClaudeStreamHost(ctx context.Context, workDir string, argv []string, onLine func(line []byte)) (int, error) {
+	if len(argv) == 0 {
+		return -1, errors.New("empty agent command")
+	}
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd.Dir = workDir
+	return streamCommand(ctx, cmd, onLine)
 }
 
 // sweepOrphanContainers removes any moongit-ci-* or moongit-agent-* containers

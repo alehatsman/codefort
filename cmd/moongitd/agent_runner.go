@@ -7,17 +7,20 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/alehatsman/moongit/internal/api"
 	"github.com/alehatsman/moongit/internal/ci"
 	"github.com/alehatsman/moongit/internal/storage"
 )
 
-// executeAgentRun runs one claimed agent run end-to-end. It mirrors
-// executeRun's CI path — resolve repo, fresh workspace, checkout, run the work
-// in an isolated container, finalize — but instead of a translated mgitci.yml
-// it works the issue the run serves via a single synthetic "agent" job. The
-// job's body (the actual Claude turn loop) is the executor seam #76 fills;
-// #74 lands everything around it so the lifecycle is real.
+// agentJobName is the single job every agent run carries.
+const agentJobName = "agent"
+
+// executeAgentRun runs turn 1 of a claimed agent run: resolve repo, fresh
+// workspace, checkout, open the container, and run the issue body as the first
+// claude turn. On success the run is *parked* in awaiting_input with its
+// container left running — the turn dispatcher resumes it for follow-up turns,
+// and the reaper / an explicit finish tears it down. Only an infrastructure
+// failure (bad checkout, container won't open, exec died) finalizes the run
+// here, cleaning up as it goes.
 func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	log := r.logger.With("kind", "agent", "run_id", run.ID, "run", run.Number, "sha", short(run.CommitSHA))
 
@@ -29,8 +32,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 	log = log.With("repo", owner+"/"+name)
 
-	// Gate: an agent run must serve a real issue. Unlike CI there's no
-	// mgitci.yml requirement — the issue is the work.
+	// Gate: an agent run must serve a real issue — the issue is the work.
 	if run.IssueNumber == nil {
 		log.Error("agent run has no issue")
 		r.finish(run.ID, storage.RunError)
@@ -44,9 +46,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 	log = log.With("issue", issue.Number)
 
-	// Fresh workspace; always cleaned up. Kept under a separate "agent" subtree
-	// from CI's so the two never collide on run id.
-	workDir := filepath.Join(r.cfg.DataDir, "agent", "work", strconv.FormatInt(run.ID, 10))
+	workDir := agentWorkDir(r.cfg.DataDir, run.ID)
 	if err := os.RemoveAll(workDir); err == nil {
 		err = os.MkdirAll(workDir, 0o755)
 	}
@@ -55,110 +55,164 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		r.finish(run.ID, storage.RunError)
 		return
 	}
-	defer os.RemoveAll(workDir)
 
-	ctx := parent
-	if r.cfg.AgentRunTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(parent, r.cfg.AgentRunTimeout)
-		defer cancel()
-	}
-
-	if err := r.checkout(ctx, filepath.Join(r.cfg.ReposDir, owner, name+".git"), run.CommitSHA, workDir); err != nil {
+	if err := r.checkout(parent, filepath.Join(r.cfg.ReposDir, owner, name+".git"), run.CommitSHA, workDir); err != nil {
 		log.Error("agent checkout", "err", err)
+		os.RemoveAll(workDir)
 		r.finish(run.ID, storage.RunError)
 		return
 	}
 
-	// One synthetic job carries the agent session, so the run-detail UI, event
-	// stream, and retention all treat it exactly like a CI job.
+	// One synthetic job carries the whole agent session, so the run-detail UI,
+	// event stream, and retention treat it like a CI job. It stays 'running'
+	// across turns and is finalized only when the session ends.
 	job, err := storage.CreateJob(r.db, run.ID, agentJobName, nil)
 	if err != nil {
 		log.Error("agent create job", "err", err)
+		os.RemoveAll(workDir)
 		r.finish(run.ID, storage.RunError)
 		return
 	}
-
-	st := r.runAgentJob(ctx, owner, name, run.ID, run.Number, job.ID, workDir, issue)
-
-	final := storage.RunSuccess
-	switch {
-	case ctx.Err() != nil:
-		final = storage.RunError
-	case st != storage.JobSuccess:
-		final = storage.RunFailed
+	if err := storage.StartJob(r.db, job.ID); err != nil {
+		log.Error("agent start job", "err", err)
 	}
-	r.finish(run.ID, final)
-	log.Info("agent run finished", "status", final)
-}
 
-// agentJobName is the single job every agent run carries.
-const agentJobName = "agent"
-
-// runAgentJob opens the agent's container and drives one turn of the claude
-// session, streaming its stream-json output onto the job's events.jsonl so the
-// existing SSE endpoint + run viewer render the live transcript with no
-// transport changes. It composes the launch context (system prompt + turn-1
-// issue prompt), runs `claude -p … --output-format stream-json` in the
-// container, translates each line into an agent event, and maps claude's
-// terminal result / exit code onto the run status.
-//
-// This is turn 1 only (the single-turn slice of #76). The awaiting_input turn
-// loop — follow-up turns via POST /runs/{id}/turns onto the same session, and
-// the idle reaper — is the next slice; dex grounding + scoped creds layer in
-// via #77 / dex#6.
-func (r *ciRunner) runAgentJob(ctx context.Context, owner, repo string, runID int64, runNum int, jobID int64, workDir string, issue api.Issue) storage.JobStatus {
-	log := r.logger.With("kind", "agent", "run", runNum, "issue", issue.Number)
-
-	elog, err := ci.OpenEventLog(r.cfg.DataDir, owner, repo, runNum, agentJobName)
+	elog, err := ci.OpenEventLog(r.cfg.DataDir, owner, name, run.Number, agentJobName)
 	if err != nil {
 		log.Error("agent open event log", "err", err)
-		r.finishJob(jobID, storage.JobError, nil)
-		return storage.JobError
-	}
-	defer elog.Close()
-
-	if err := storage.StartJob(r.db, jobID); err != nil {
-		log.Error("agent start job", "err", err)
+		r.failAgentRun(run.ID, job.ID, workDir)
+		return
 	}
 	r.emit(elog, ci.EventRunStarted, map[string]any{"total_steps": 1})
 
-	// Open the agent's container (the same isolation seam CI jobs use). A
-	// failure here — image missing, docker down — fails the run loudly.
-	sess, err := r.newSession(ctx, agentContainerName(jobID), workDir, r.cfg.AgentDefaultImage)
+	// Open the container (the same isolation seam CI jobs use). A failure here
+	// — image missing, docker down — fails the run loudly. NOTE: we do not
+	// Close the session on the happy path; the container must outlive this
+	// goroutine for follow-up turns to resume into it.
+	sess, err := r.newSession(parent, agentContainerName(job.ID), workDir, r.cfg.AgentDefaultImage)
 	if err != nil {
 		r.emit(elog, ci.EventAgentRaw, map[string]any{"line": err.Error()})
 		r.emit(elog, ci.EventRunFailed, map[string]any{"error": err.Error()})
-		r.finishJob(jobID, storage.JobError, nil)
+		elog.Close()
 		log.Error("agent open session", "image", r.cfg.AgentDefaultImage, "err", err)
-		return storage.JobError
+		r.failAgentRun(run.ID, job.ID, workDir)
+		return
 	}
-	defer sess.Close()
-
 	stream, ok := sess.(streamingSession)
 	if !ok {
-		// docker + host sessions both implement it; a session that doesn't
-		// can't run an agent.
-		msg := "agent session does not support streaming exec"
-		r.emit(elog, ci.EventRunFailed, map[string]any{"error": msg})
-		r.finishJob(jobID, storage.JobError, nil)
-		log.Error(msg)
-		return storage.JobError
+		r.emit(elog, ci.EventRunFailed, map[string]any{"error": "session does not support streaming exec"})
+		elog.Close()
+		r.failAgentRun(run.ID, job.ID, workDir)
+		return
 	}
 
-	// Compose and run turn 1: the issue body as the user message, with the
-	// moongit-authored system prompt for role/scope/safety.
-	systemPrompt := composeAgentSystemPrompt(owner, repo, issue)
-	turnPrompt := composeTurnPrompt(issue)
-	argv := buildClaudeArgv(agentSessionID(runID), turnPrompt, systemPrompt, false)
+	systemPrompt := composeAgentSystemPrompt(owner, name, issue)
+	status, execErr := r.runAgentTurn(parent, stream, elog, run.ID, 1, composeTurnPrompt(issue), systemPrompt, false)
+	elog.Close()
 
-	r.emit(elog, ci.EventAgentTurnStarted, map[string]any{"turn": 1, "prompt": turnPrompt})
+	if execErr != nil {
+		// Infra failure (couldn't run claude / ctx cancel): the container is
+		// likely unusable — finalize and tear down.
+		log.Error("agent turn 1 exec", "err", execErr)
+		r.failAgentRun(run.ID, job.ID, workDir)
+		return
+	}
+	// Turn 1 ran (success, or claude reported an error result the human can
+	// course-correct): park awaiting input, leaving the container alive.
+	if err := storage.MarkRunAwaitingInput(r.db, run.ID); err != nil {
+		log.Error("agent park awaiting_input", "err", err)
+	}
+	log.Info("agent run awaiting input", "turn1_status", status)
+}
+
+// dispatchTurn runs one claimed follow-up turn on a parked run: resume the
+// claude session inside the still-running container, stream onto the same event
+// log, and re-park awaiting input. An exec failure finalizes the run.
+func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, run storage.CIRun) {
+	log := r.logger.With("kind", "agent", "run", run.Number, "turn", turn.Seq)
+
+	owner, name, err := storage.RepoIdent(r.db, run.RepoID)
+	if err != nil {
+		log.Error("agent turn resolve repo", "err", err)
+		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		r.finish(run.ID, storage.RunError)
+		return
+	}
+	jobID, ok := r.agentJobID(run.ID)
+	if !ok {
+		log.Error("agent turn: no agent job for run")
+		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		r.failAgentRun(run.ID, 0, agentWorkDir(r.cfg.DataDir, run.ID))
+		return
+	}
+
+	elog, err := ci.OpenEventLog(r.cfg.DataDir, owner, name, run.Number, agentJobName)
+	if err != nil {
+		log.Error("agent turn open event log", "err", err)
+		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		return
+	}
+
+	sess, err := r.attachSession(parent, agentContainerName(jobID))
+	if err != nil {
+		r.emit(elog, ci.EventRunFailed, map[string]any{"error": err.Error()})
+		elog.Close()
+		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		log.Error("agent turn attach", "err", err)
+		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
+		return
+	}
+	stream, ok := sess.(streamingSession)
+	if !ok {
+		r.emit(elog, ci.EventRunFailed, map[string]any{"error": "session does not support streaming exec"})
+		elog.Close()
+		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
+		return
+	}
+
+	// turn.Seq is the follow-up index (1-based); display number accounts for
+	// turn 1 being the issue body. Resume the session; the system prompt is
+	// already in it, so it's omitted.
+	_, execErr := r.runAgentTurn(parent, stream, elog, run.ID, turn.Seq+1, turn.Body, "", true)
+	elog.Close()
+
+	if execErr != nil {
+		log.Error("agent turn exec", "err", execErr)
+		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
+		return
+	}
+	if err := storage.FinishTurn(r.db, turn.ID, storage.TurnDone); err != nil {
+		log.Error("agent finish turn", "err", err)
+	}
+	if err := storage.MarkRunAwaitingInput(r.db, run.ID); err != nil {
+		log.Error("agent re-park awaiting_input", "err", err)
+	}
+	log.Info("agent turn done; awaiting input")
+}
+
+// runAgentTurn composes and runs one claude turn under a per-turn deadline,
+// streaming each stream-json line onto the event log as an agent event and
+// bracketing the turn with turn.started/completed. It returns the turn status
+// and any executor error (couldn't run claude / cancelled), but does not itself
+// finalize the run or job — the caller decides whether to park or fail.
+func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession, elog *ci.EventLog, runID int64, turnNum int, prompt, systemPrompt string, resume bool) (status string, execErr error) {
+	ctx := parent
+	if r.cfg.AgentTurnTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(parent, r.cfg.AgentTurnTimeout)
+		defer cancel()
+	}
+
+	argv := buildClaudeArgv(agentSessionID(runID), prompt, systemPrompt, resume)
+	r.emit(elog, ci.EventAgentTurnStarted, map[string]any{"turn": turnNum, "prompt": prompt})
 
 	var result *claudeResult
 	exitCode, execErr := stream.ExecStream(ctx, argv, func(line []byte) {
 		et, data, res := translateClaudeLine(line)
 		if et == "" {
-			return // blank line
+			return
 		}
 		r.emit(elog, et, data)
 		if res != nil {
@@ -166,35 +220,86 @@ func (r *ciRunner) runAgentJob(ctx context.Context, owner, repo string, runID in
 		}
 	})
 
-	status := turnStatus(result, exitCode, execErr)
-	turnData := map[string]any{"turn": 1, "status": status}
+	status = turnStatus(result, exitCode, execErr)
+	turnData := map[string]any{"turn": turnNum, "status": status}
 	if result != nil {
 		turnData["num_turns"] = result.NumTurns
 		turnData["duration_ms"] = result.DurationMS
 		turnData["cost_usd"] = result.TotalCostUSD
 	}
 	r.emit(elog, ci.EventAgentTurnCompleted, turnData)
+	return status, execErr
+}
 
-	// execErr is a real executor failure (couldn't run claude, or ctx cancel),
-	// distinct from claude running and reporting an error result.
-	if execErr != nil {
-		r.emit(elog, ci.EventRunFailed, map[string]any{"error": execErr.Error()})
+// reapExpiredAgents finalizes agent runs parked past their lifetime cap, tearing
+// down the container they were holding so an abandoned session can't hold
+// resources forever.
+func (r *ciRunner) reapExpiredAgents(ctx context.Context) {
+	runs, err := storage.ListExpiredAwaitingRuns(r.db, r.cfg.AgentRunTimeout)
+	if err != nil {
+		r.logger.Error("agent reap list", "err", err)
+		return
+	}
+	for _, run := range runs {
+		if ctx.Err() != nil {
+			return
+		}
+		log := r.logger.With("kind", "agent", "run", run.Number)
+		owner, name, err := storage.RepoIdent(r.db, run.RepoID)
+		if err == nil {
+			if elog, e := ci.OpenEventLog(r.cfg.DataDir, owner, name, run.Number, agentJobName); e == nil {
+				r.emit(elog, ci.EventRunCompleted, map[string]any{"reason": "idle timeout"})
+				elog.Close()
+			}
+		}
+		jobID, _ := r.agentJobID(run.ID)
+		r.tearDownAgent(jobID, agentWorkDir(r.cfg.DataDir, run.ID))
+		zero := 0
+		r.finishJob(jobID, storage.JobSuccess, &zero)
+		r.finish(run.ID, storage.RunCanceled)
+		log.Info("agent run reaped (lifetime cap)")
+	}
+}
+
+// failAgentRun finalizes a broken agent run: tear down its container + workspace
+// and mark the job and run errored.
+func (r *ciRunner) failAgentRun(runID, jobID int64, workDir string) {
+	r.tearDownAgent(jobID, workDir)
+	if jobID != 0 {
 		r.finishJob(jobID, storage.JobError, nil)
-		log.Error("agent turn exec", "err", execErr)
-		return storage.JobError
 	}
-	if status != "success" {
-		r.emit(elog, ci.EventRunFailed, map[string]any{"status": status})
-		ec := exitCode
-		r.finishJob(jobID, storage.JobFailed, &ec)
-		log.Info("agent turn not successful", "status", status, "exit", exitCode)
-		return storage.JobFailed
-	}
+	r.finish(runID, storage.RunError)
+}
 
-	r.emit(elog, ci.EventRunCompleted, map[string]any{"total_steps": 1})
-	zero := 0
-	r.finishJob(jobID, storage.JobSuccess, &zero)
-	return storage.JobSuccess
+// tearDownAgent removes the agent's container (best-effort) and its workspace.
+func (r *ciRunner) tearDownAgent(jobID int64, workDir string) {
+	if jobID != 0 && r.teardownContainer != nil {
+		r.teardownContainer(agentContainerName(jobID))
+	}
+	if workDir != "" {
+		os.RemoveAll(workDir)
+	}
+}
+
+// agentJobID returns the id of a run's single "agent" job.
+func (r *ciRunner) agentJobID(runID int64) (int64, bool) {
+	jobs, err := storage.ListJobs(r.db, runID)
+	if err != nil {
+		r.logger.Error("agent list jobs", "run_id", runID, "err", err)
+		return 0, false
+	}
+	for _, j := range jobs {
+		if j.Name == agentJobName {
+			return j.ID, true
+		}
+	}
+	return 0, false
+}
+
+// agentWorkDir is the deterministic workspace path for an agent run, kept under
+// a separate subtree from CI's so the two never collide on run id.
+func agentWorkDir(dataDir string, runID int64) string {
+	return filepath.Join(dataDir, "agent", "work", strconv.FormatInt(runID, 10))
 }
 
 // agentContainerName builds a docker-safe, collision-free name for an agent

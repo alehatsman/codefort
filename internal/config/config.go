@@ -80,11 +80,18 @@ type Config struct {
 	// MOONGIT_AGENT_RUN_CONCURRENCY (default 1); values < 1 are treated as 1.
 	AgentRunConcurrency int
 
-	// AgentRunTimeout is the hard wall-clock limit for a single agent run. Note
-	// this is the whole-run cap, not a per-turn one — the interactive turn loop
-	// (#76) layers per-turn deadlines and an idle reaper on top. Set via
-	// MOONGIT_AGENT_RUN_TIMEOUT (default 60m). Zero or negative disables it.
+	// AgentRunTimeout is the whole-session lifetime cap for an agent run: a run
+	// parked in awaiting_input is reaped (container torn down, run finalized)
+	// once it's older than this, so an abandoned session can't hold a container
+	// forever. Set via MOONGIT_AGENT_RUN_TIMEOUT (default 60m). Zero or negative
+	// disables the reaper.
 	AgentRunTimeout time.Duration
+
+	// AgentTurnTimeout is the per-turn wall-clock limit: one claude invocation
+	// (turn 1 or a follow-up) runs under this deadline; an overrunning turn is
+	// killed and the turn errored. Set via MOONGIT_AGENT_TURN_TIMEOUT (default
+	// 15m). Zero or negative disables the per-turn deadline.
+	AgentTurnTimeout time.Duration
 
 	// AgentDefaultImage is the container image an agent run executes in: the CI
 	// base image plus the Claude CLI and the dex MCP shim (#75). Set via
@@ -204,6 +211,12 @@ func Load() (*Config, error) {
 	cfg.AgentRunTimeout = agentTimeout
 
 	cfg.AgentDefaultImage = envOr("MOONGIT_AGENT_DEFAULT_IMAGE", "moongit-agent:latest")
+
+	agentTurnTimeout, err := time.ParseDuration(envOr("MOONGIT_AGENT_TURN_TIMEOUT", "15m"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_AGENT_TURN_TIMEOUT: %w", err)
+	}
+	cfg.AgentTurnTimeout = agentTurnTimeout
 
 	return cfg, nil
 }
