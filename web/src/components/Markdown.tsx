@@ -54,9 +54,16 @@ export default function Markdown({ content, owner, repo, basePath }: Props) {
     },
     code({ className, children }) {
       const match = /language-(\w+)/.exec(className ?? "")
-      if (!match) return <code className="md-code-inline">{children}</code>
-      const text = String(children).replace(/\n$/, "")
-      return <code className="hljs">{highlightNodes(highlight(text, match[1]))}</code>
+      if (match) {
+        const text = String(children).replace(/\n$/, "")
+        return <code className="hljs">{highlightNodes(highlight(text, match[1]))}</code>
+      }
+      // No language class. A fenced block with no info string lands here too,
+      // but inline code can never contain a newline — so treat multi-line as a
+      // block, rendered as a plain <code> that inherits the <pre> surface
+      // rather than the inline pill (which paints a per-line fill with gaps).
+      if (String(children).includes("\n")) return <code>{children}</code>
+      return <code className="md-code-inline">{children}</code>
     },
   }
 

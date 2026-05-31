@@ -239,7 +239,7 @@ test("issue body and comments render markdown", async ({ page }) => {
         id: 1,
         number: 1,
         title: "Rendered",
-        body: "## Plan\n\nUse **bold** and `code`.",
+        body: "## Plan\n\nUse **bold** and `code`.\n\n```\nplain block\nsecond line\n```",
         author: "test-user",
         state: "todo",
         assignee: null,
@@ -262,7 +262,11 @@ test("issue body and comments render markdown", async ({ page }) => {
   // Body markdown: heading, bold, inline code become real elements.
   await expect(page.locator(".body__content h2")).toHaveText("Plan")
   await expect(page.locator(".body__content strong")).toHaveText("bold")
-  await expect(page.locator(".body__content code")).toHaveText("code")
+  // Inline code keeps the pill class; a no-language fence renders as a block
+  // <pre><code> without it, so it doesn't paint a striped per-line fill.
+  await expect(page.locator(".body__content code.md-code-inline")).toHaveText("code")
+  await expect(page.locator(".body__content pre code")).toContainText("plain block")
+  await expect(page.locator(".body__content pre code.md-code-inline")).toHaveCount(0)
 
   // Comment markdown: external link renders as an anchor opening in a new tab.
   const link = page.locator(".comment__body a", { hasText: "link" })
