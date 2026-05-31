@@ -24,12 +24,19 @@ func agentSessionID(runID int64) string {
 
 // buildClaudeArgv assembles the headless claude invocation for one turn. The
 // prompt is the turn's user message (the issue body on turn 1, a follow-up
-// message thereafter). bypassPermissions is the default because the container
-// is the sandbox — claude's in-app prompts are redundant against a hard jail,
-// and headless -p has no TTY to answer them anyway (see #76). resume picks
-// `--resume` over `--session-id` for follow-up turns on the same session.
-// mcpConfigPath, when set, attaches the dex MCP server and restricts claude to
-// only the servers in that file (--strict-mcp-config).
+// message thereafter). resume picks `--resume` over `--session-id` for
+// follow-up turns on the same session. mcpConfigPath, when set, attaches the
+// dex MCP server, restricting claude to only the servers in that file
+// (--strict-mcp-config).
+//
+// Permissions: --permission-mode bypassPermissions reliably auto-approves the
+// file/search tools (Edit/Write/Read/Glob/Grep) — which is what lets the agent
+// resolve a code issue. Execution tools (Bash) are NOT reliably unlockable
+// headlessly under subscription auth — neither this flag,
+// --dangerously-skip-permissions, --allowedTools, nor a settings.json allow
+// survives the session-id/system-prompt flags the agent needs (a managed/usage
+// policy re-gates them). So the agent edits files; running commands (git,
+// tests, mgit) belongs to a moongit/mooncake-controlled executor — see #110.
 func buildClaudeArgv(sessionID, prompt, systemPrompt, mcpConfigPath string, resume bool) []string {
 	argv := []string{
 		"claude", "-p", prompt,

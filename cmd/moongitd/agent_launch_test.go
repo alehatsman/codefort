@@ -38,7 +38,7 @@ func TestBuildClaudeArgv(t *testing.T) {
 		t.Errorf("missing streaming flags: %v", turn1)
 	}
 	if !argvHas(turn1, "--permission-mode", "bypassPermissions") {
-		t.Errorf("missing bypassPermissions: %v", turn1)
+		t.Errorf("missing --permission-mode bypassPermissions: %v", turn1)
 	}
 	if !argvHas(turn1, "--append-system-prompt", "be good") {
 		t.Errorf("missing system prompt: %v", turn1)
