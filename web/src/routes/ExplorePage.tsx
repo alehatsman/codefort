@@ -159,7 +159,10 @@ function distinctParents(packages: IntelPackageSummary[]): string[] {
 
 /* ── Hero ────────────────────────────────────────────────────────────────
    The repo summary as the lead answer, with the index's headline numbers as a
-   confident chip strip (the dry IndexMeta footer, promoted and trimmed). */
+   confident chip strip (the dry IndexMeta footer, promoted and trimmed). A
+   collapsible <details> card (same pattern as DiffView's file cards): the repo
+   name is the always-visible toggle, the prose + stats the body, so a reader
+   can close the summary once they've read it. */
 function Hero({
   repo,
   project,
@@ -173,32 +176,36 @@ function Hero({
 }) {
   const composed = Math.max(0, project.chunks - project.pending_summaries)
   return (
-    <header className="explore-hero">
-      <h1 className="explore-hero__name">{repo}</h1>
-      {summary?.trim() ? (
-        <p className="explore-hero__summary">{summary.trim()}</p>
-      ) : loading ? (
-        <p className="muted small">Loading summary…</p>
-      ) : (
-        <p className="muted small">dex hasn't composed a repo summary yet.</p>
-      )}
-      <div className="explore-stats">
-        <span className="explore-stat">{project.files.toLocaleString()} files</span>
-        <span className="explore-stat">{project.chunks.toLocaleString()} chunks</span>
-        <span className="explore-stat">{composed.toLocaleString()} summaries</span>
-        {project.pending_summaries > 0 && (
-          <span className="explore-stat explore-stat--pending">
-            {project.pending_summaries.toLocaleString()} pending
-          </span>
+    <details className="explore-hero" open>
+      <summary className="explore-hero__head">
+        <h1 className="explore-hero__name">{repo}</h1>
+      </summary>
+      <div className="explore-hero__body">
+        {summary?.trim() ? (
+          <p className="explore-hero__summary">{summary.trim()}</p>
+        ) : loading ? (
+          <p className="muted small">Loading summary…</p>
+        ) : (
+          <p className="muted small">dex hasn't composed a repo summary yet.</p>
         )}
-        {project.last_indexed && (
-          <span className="explore-stat" title={absoluteTime(project.last_indexed)}>
-            indexed {timeAgo(project.last_indexed)}
-          </span>
-        )}
-        {project.embed_model && <span className="explore-stat">{project.embed_model}</span>}
+        <div className="explore-stats">
+          <span className="explore-stat">{project.files.toLocaleString()} files</span>
+          <span className="explore-stat">{project.chunks.toLocaleString()} chunks</span>
+          <span className="explore-stat">{composed.toLocaleString()} summaries</span>
+          {project.pending_summaries > 0 && (
+            <span className="explore-stat explore-stat--pending">
+              {project.pending_summaries.toLocaleString()} pending
+            </span>
+          )}
+          {project.last_indexed && (
+            <span className="explore-stat" title={absoluteTime(project.last_indexed)}>
+              indexed {timeAgo(project.last_indexed)}
+            </span>
+          )}
+          {project.embed_model && <span className="explore-stat">{project.embed_model}</span>}
+        </div>
       </div>
-    </header>
+    </details>
   )
 }
 

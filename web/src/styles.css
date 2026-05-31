@@ -2281,14 +2281,36 @@ h3 {
   margin: 0 0 var(--space-3);
 }
 
-/* Hero: the repo summary as the lead answer + the index's headline numbers. */
+/* Hero: a collapsible card — the repo name is the toggle, the summary prose +
+   index stats the body. Default open; click the name to close once read. */
 .explore-hero {
   margin: var(--space-4) 0 var(--space-5);
 }
+.explore-hero__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  cursor: pointer;
+  list-style: none;
+}
+.explore-hero__head::-webkit-details-marker {
+  display: none;
+}
+.explore-hero__head::before {
+  content: "▾";
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+.explore-hero:not([open]) .explore-hero__head::before {
+  content: "▸";
+}
 .explore-hero__name {
-  margin: 0 0 var(--space-2);
+  margin: 0;
   font-size: var(--text-2xl);
   font-weight: var(--weight-semibold);
+}
+.explore-hero__body {
+  margin-top: var(--space-3);
 }
 .explore-hero__summary {
   margin: 0 0 var(--space-3);

@@ -83,6 +83,13 @@ test("Explore: hero summary, layered package map, and hotspots render", async ({
   await expect(page.locator(".explore-stat").filter({ hasText: "42 files" })).toBeVisible()
   await expect(page.locator(".explore-stat--pending")).toContainText("5 pending")
 
+  // Hero is a collapsible card (open by default); clicking the name closes it,
+  // hiding the summary prose while the repo name stays visible.
+  await expect(page.locator(".explore-hero__summary")).toBeVisible()
+  await page.locator(".explore-hero__head").click()
+  await expect(page.locator(".explore-hero__summary")).toBeHidden()
+  await expect(page.locator(".explore-hero__name")).toBeVisible()
+
   // Package map is grouped into layers, not a flat list.
   await expect(page.locator(".pkg-layer__name").filter({ hasText: "HTTP / API" })).toBeVisible()
   await expect(page.locator(".pkg-layer__name").filter({ hasText: "Storage" })).toBeVisible()
