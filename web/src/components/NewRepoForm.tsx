@@ -68,6 +68,7 @@ export default function NewRepoForm({ onCreated }: Props) {
         + New repo
       </button>
 
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click-to-dismiss only; <dialog> handles Esc/keyboard natively */}
       <dialog ref={dialogRef} className="modal" onClick={onBackdropClick}>
         <form className="modal__form" onSubmit={submit}>
           <header className="modal__head">

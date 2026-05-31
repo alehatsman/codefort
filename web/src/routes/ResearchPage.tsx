@@ -181,10 +181,10 @@ function AskView({
             Suggested reads <span className="muted small">({reads.length})</span>
           </h3>
           <ol className="ask__reads">
-            {reads.map((rd, i) => {
+            {reads.map((rd) => {
               const a = ann[rd.path]
               return (
-                <li key={`${rd.path}:${rd.start_line}:${i}`} className="ask-read">
+                <li key={`${rd.path}:${rd.start_line}-${rd.end_line}`} className="ask-read">
                   <div className="ask-read__head">
                     <a
                       className="hit__path"
@@ -229,8 +229,8 @@ function AskView({
             All semantic matches <span className="muted small">({result.hits.length})</span>
           </summary>
           <ul className="intel__hits" style={{ marginTop: 8 }}>
-            {result.hits.map((h, i) => (
-              <li key={`${h.path}:${h.start_line}:${i}`} className="hit">
+            {result.hits.map((h) => (
+              <li key={`${h.path}:${h.start_line}-${h.end_line}`} className="hit">
                 <div className="hit__head">
                   <a
                     className="hit__path"
@@ -336,8 +336,8 @@ function SearchHits({
     <>
       {result.hint && <div className="intel__hint muted small">{result.hint}</div>}
       <ul className="intel__hits">
-        {result.hits.map((h, i) => (
-          <li key={`${h.path}:${h.start_line}:${i}`} className="hit">
+        {result.hits.map((h) => (
+          <li key={`${h.path}:${h.start_line}-${h.end_line}`} className="hit">
             <div className="hit__head">
               <a
                 className="hit__path"

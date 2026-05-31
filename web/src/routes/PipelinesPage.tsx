@@ -199,6 +199,7 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
   // Default the open job to the first one that isn't skipped, falling back to
   // the first job; once the user picks one, honor that.
   const activeJob = selectedJob ?? jobs.find((j) => j.status !== "skipped")?.name ?? jobs[0]?.name
+  const activeJobObj = jobs.find((j) => j.name === activeJob)
 
   function doRerun() {
     rerun.mutate(runNumber, {
@@ -261,13 +262,13 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
       ) : (
         <div className="ci-jobs">
           <JobDag jobs={jobs} active={activeJob} onSelect={setSelectedJob} />
-          {activeJob && (
+          {activeJobObj && (
             <JobLog
-              key={activeJob}
+              key={activeJobObj.name}
               owner={owner}
               repo={repo}
               runNumber={runNumber}
-              job={jobs.find((j) => j.name === activeJob)!}
+              job={activeJobObj}
             />
           )}
         </div>
@@ -294,7 +295,7 @@ function JobDag({
   return (
     <nav className="ci-dag" aria-label="Jobs">
       {stages.map((stage, si) => (
-        <Fragment key={si}>
+        <Fragment key={stage.map((j) => j.name).join("+")}>
           {si > 0 && (
             <div className="ci-dag__arrow" aria-hidden="true">
               →
@@ -382,6 +383,7 @@ function JobLog({
           {step.lines.length > 0 && (
             <pre className="ci-log">
               {step.lines.map((l, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: append-only log output, no stable id; line order never changes
                 <code key={i} className={l.stream === "stderr" ? "ci-log__stderr" : ""}>
                   {l.text}
                   {"\n"}
@@ -412,14 +414,14 @@ interface StepView {
 // don't appear in the timeline.
 function foldSteps(events: CIEvent[]): StepView[] {
   const byID = new Map<string, StepView>()
-  const order: string[] = []
+  const order: StepView[] = []
 
   const ensure = (id: string): StepView => {
     let s = byID.get(id)
     if (!s) {
       s = { id, lines: [] }
       byID.set(id, s)
-      order.push(id)
+      order.push(s)
     }
     return s
   }
@@ -453,7 +455,7 @@ function foldSteps(events: CIEvent[]): StepView[] {
       }
     }
   }
-  return order.map((id) => byID.get(id)!)
+  return order
 }
 
 // --- formatting helpers ------------------------------------------------------

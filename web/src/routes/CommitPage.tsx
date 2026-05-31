@@ -88,6 +88,7 @@ export default function CommitPage() {
               {detail.additions > 0 && <span className="diff-file__add"> +{detail.additions}</span>}
               {detail.deletions > 0 && <span className="diff-file__del"> −{detail.deletions}</span>}
             </span>
+            {/* biome-ignore lint/a11y/useSemanticElements: a labeled segmented toggle is a valid ARIA group; no native element fits */}
             <div className="diff-summary__toggle" role="group" aria-label="Diff layout">
               <button
                 type="button"

@@ -114,8 +114,8 @@ function SplitTable({ hunks, lang }: { hunks: DiffHunk[]; lang?: string }) {
         <col className="diff-col-code" />
       </colgroup>
       <tbody>
-        {hunks.map((h, hi) => (
-          <HunkSplit key={hi} hunk={h} lang={lang} />
+        {hunks.map((h) => (
+          <HunkSplit key={h.header} hunk={h} lang={lang} />
         ))}
       </tbody>
     </table>
@@ -131,8 +131,8 @@ function HunkSplit({ hunk, lang }: { hunk: DiffHunk; lang?: string }) {
           {hunk.header || "…"}
         </td>
       </tr>
-      {rows.map((r, i) => (
-        <tr key={i} className="diff-row">
+      {rows.map((r) => (
+        <tr key={`${r.left?.old ?? "_"}:${r.right?.new ?? "_"}`} className="diff-row">
           <td className="diff-num" data-line={r.left ? r.left.old : ""} />
           <td className={`diff-code diff-code--${r.left ? r.left.kind : "empty"}`}>
             {r.left ? cell(r.left.text, lang) : null}
@@ -156,8 +156,8 @@ function UnifiedTable({ hunks, lang }: { hunks: DiffHunk[]; lang?: string }) {
         <col className="diff-col-code" />
       </colgroup>
       <tbody>
-        {hunks.map((h, hi) => (
-          <HunkUnified key={hi} hunk={h} lang={lang} />
+        {hunks.map((h) => (
+          <HunkUnified key={h.header} hunk={h} lang={lang} />
         ))}
       </tbody>
     </table>
@@ -172,8 +172,8 @@ function HunkUnified({ hunk, lang }: { hunk: DiffHunk; lang?: string }) {
           {hunk.header || "…"}
         </td>
       </tr>
-      {hunk.lines.map((l, i) => (
-        <tr key={i} className="diff-row">
+      {hunk.lines.map((l) => (
+        <tr key={`${l.old}:${l.new}`} className="diff-row">
           <td className="diff-num" data-line={l.old || ""} />
           <td className="diff-num" data-line={l.new || ""} />
           <td className={`diff-code diff-code--${l.kind}`}>
