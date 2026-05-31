@@ -293,3 +293,37 @@ test("spawn agent from an issue navigates to the new run", async ({ page }) => {
   // The agent run shares the CI run surface, so we land on its run view.
   await expect(page).toHaveURL(/\/alice\/demo\/pipelines\/1$/)
 })
+
+test("a root-absolute link in a comment points at the app route, not a blob path", async ({
+  page,
+}) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1,
+        number: 1,
+        title: "Linked",
+        author: "test-user",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+    comments: [
+      {
+        id: 1,
+        issue_id: 1,
+        author: "moongit-agent",
+        body: "Finished — see [run #1](/alice/demo/pipelines/1).",
+        created_at: now,
+      },
+    ],
+  })
+  await page.goto("/alice/demo/issues/1")
+
+  const link = page.locator(".comment__body a", { hasText: "run #1" })
+  // The run link resolves to the app route verbatim — not rewritten under /blob.
+  await expect(link).toHaveAttribute("href", "/alice/demo/pipelines/1")
+})

@@ -42,6 +42,12 @@ export default function Markdown({ content, owner, repo, basePath }: Props) {
           </a>
         )
       }
+      // A root-absolute href is an in-app route (e.g. a run link in an agent's
+      // handoff comment, /owner/repo/pipelines/N) — link to it as-is rather
+      // than rewriting it into a repo file path under /blob.
+      if (href.startsWith("/")) {
+        return <Link to={href}>{children}</Link>
+      }
       return (
         <Link to={`/${owner}/${repo}/blob/${resolveRepoPath(basePath, href)}`}>{children}</Link>
       )
