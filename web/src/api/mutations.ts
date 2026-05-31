@@ -160,6 +160,16 @@ export function useRerunCIRun(owner: string, repo: string) {
   })
 }
 
+// useTriggerCIRun starts a run for an arbitrary ref without a push; like a
+// rerun, the fresh run tops the list, so refresh it once accepted.
+export function useTriggerCIRun(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ref: string) => api.triggerCIRun(owner, repo, ref),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) }),
+  })
+}
+
 // useSetCIEnabled flips a repo's CI opt-in and refreshes repo views (the
 // Pipelines tab gates its UI on this flag).
 export function useSetCIEnabled(owner: string, repo: string) {

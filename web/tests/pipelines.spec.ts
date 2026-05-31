@@ -137,6 +137,32 @@ test("re-run enqueues a fresh run and navigates to it", async ({ page }) => {
   await expect(page.getByText("queued").first()).toBeVisible()
 })
 
+test("Run pipeline triggers a manual run for the default branch", async ({ page }) => {
+  await mockApi(page, enabledSeed())
+  await page.goto("/alice/demo/pipelines")
+
+  // The ref input pre-fills with the repo's default branch.
+  await expect(page.getByLabel("Ref to run")).toHaveValue("main")
+
+  await page.getByRole("button", { name: "Run pipeline" }).click()
+
+  // The freshly queued run lands in the list.
+  await expect(page.getByRole("link", { name: "#2" })).toBeVisible()
+  await expect(page.getByText("queued").first()).toBeVisible()
+})
+
+test("an unresolvable ref surfaces the server error inline", async ({ page }) => {
+  await mockApi(page, enabledSeed())
+  await page.goto("/alice/demo/pipelines")
+
+  await page.getByLabel("Ref to run").fill("no-such-ref")
+  await page.getByRole("button", { name: "Run pipeline" }).click()
+
+  await expect(page.getByText(/cannot resolve ref/)).toBeVisible()
+  // No new run row appeared.
+  await expect(page.getByRole("link", { name: "#2" })).toHaveCount(0)
+})
+
 test("Pipelines tab is reachable from the repo nav", async ({ page }) => {
   await mockApi(page, enabledSeed())
   await page.goto("/alice/demo")

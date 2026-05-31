@@ -223,6 +223,8 @@ export const api = {
 
   listCIRuns: (owner: string, repo: string, limit = 0) =>
     request<CIRun[]>(`/api/repos/${owner}/${repo}/ci/runs${limit ? `?limit=${limit}` : ""}`),
+  triggerCIRun: (owner: string, repo: string, ref: string) =>
+    request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs`, { method: "POST", body: { ref } }),
   getCIRun: (owner: string, repo: string, n: number) =>
     request<CIRunDetail>(`/api/repos/${owner}/${repo}/ci/runs/${n}`),
   rerunCIRun: (owner: string, repo: string, n: number) =>

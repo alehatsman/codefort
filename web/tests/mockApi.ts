@@ -262,9 +262,37 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     return json(route, 200, repo)
   })
 
-  // CI: runs list / detail / rerun / events (SSE)
+  // CI: runs list (GET) / manual trigger (POST) / detail / rerun / events (SSE)
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs(\?.*)?$/, (route) => {
-    // Strip jobs from the list view, matching the server's list shape.
+    const req = route.request()
+    if (req.method() === "POST") {
+      const ref = ((req.postDataJSON() as { ref?: string }).ref ?? "").trim()
+      if (!ref) return json(route, 400, { error: "ref is required" })
+      // Mirror the server: only a known ref resolves to a commit; anything
+      // else is a 400. (Disabled-repo 409s never reach here — the UI gates
+      // the trigger on ci_enabled.)
+      if (!state.branches.includes(ref)) {
+        return json(route, 400, { error: `cannot resolve ref "${ref}"` })
+      }
+      const next: CIRun = {
+        number: state.ciRuns.length ? Math.max(...state.ciRuns.map((r) => r.number)) + 1 : 1,
+        commit_sha: "feedface0000abcd",
+        commit_msg: "manual run",
+        commit_author: state.identity,
+        ref: `refs/heads/${ref}`,
+        event: "manual",
+        trigger: state.identity,
+        status: "queued",
+        created_at: nowIso(),
+        started_at: null,
+        finished_at: null,
+        jobs: [],
+      }
+      state.ciRuns.unshift(next)
+      const { jobs: _j, events: _e, ...run } = next
+      return json(route, 202, run)
+    }
+    // GET: strip jobs from the list view, matching the server's list shape.
     return json(
       route,
       200,

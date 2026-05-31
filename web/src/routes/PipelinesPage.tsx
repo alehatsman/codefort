@@ -1,8 +1,8 @@
 import clsx from "clsx"
 import { Fragment, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
-import { useCIRun, useCIRuns, useRepo } from "../api/queries"
-import { useRerunCIRun, useSetCIEnabled } from "../api/mutations"
+import { useCIRun, useCIRuns, useRefs, useRepo } from "../api/queries"
+import { useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from "../api/mutations"
 import { useJobEventStream } from "../lib/ciEvents"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import type { CIEvent, CIJob, CIRun, Repo } from "../api/types"
@@ -46,24 +46,57 @@ function RunList({ repo }: { repo: Repo }) {
 function EnabledRunList({ owner, repo }: { owner: string; repo: string }) {
   const runsQ = useCIRuns(owner, repo)
   const setEnabled = useSetCIEnabled(owner, repo)
+  const refsQ = useRefs(owner, repo)
+  const trigger = useTriggerCIRun(owner, repo)
+  // The input defaults to the repo's default branch until the user edits it
+  // (null = untouched, so a freshly loaded default still flows through).
+  const [refInput, setRefInput] = useState<string | null>(null)
+  const ref = refInput ?? refsQ.data?.default ?? ""
+
+  function runPipeline(e: React.FormEvent) {
+    e.preventDefault()
+    const r = ref.trim()
+    if (!r) return
+    trigger.mutate(r)
+  }
 
   return (
     <section className="pipelines">
       <div className="pipelines__head">
         <h2 className="pipelines__title">Pipelines</h2>
-        <button
-          type="button"
-          className="btn btn--small"
-          onClick={() => setEnabled.mutate(false)}
-          disabled={setEnabled.isPending}
-          title="Disable CI for this repo"
-        >
-          Disable CI
-        </button>
+        <div className="pipelines__actions">
+          <form className="pipelines__run" onSubmit={runPipeline}>
+            <input
+              className="input pipelines__run-ref"
+              value={ref}
+              onChange={(e) => setRefInput(e.target.value)}
+              placeholder="branch, tag, or commit"
+              aria-label="Ref to run"
+            />
+            <button
+              type="submit"
+              className="btn btn--small btn--primary"
+              disabled={trigger.isPending || ref.trim() === ""}
+            >
+              {trigger.isPending ? "Running…" : "Run pipeline"}
+            </button>
+          </form>
+          <button
+            type="button"
+            className="btn btn--small"
+            onClick={() => setEnabled.mutate(false)}
+            disabled={setEnabled.isPending}
+            title="Disable CI for this repo"
+          >
+            Disable CI
+          </button>
+        </div>
       </div>
       <p className="muted small pipelines__lead">
-        Runs trigger on push when an <code>mgitci.yml</code> is present at the pushed commit.
+        Runs trigger on push when an <code>mgitci.yml</code> is present at the pushed commit, or on
+        demand for any ref above.
       </p>
+      {trigger.error && <div className="error inline">{(trigger.error as Error).message}</div>}
 
       {runsQ.isLoading && <div className="loading">Loading…</div>}
       {runsQ.error && <div className="error">{(runsQ.error as Error).message}</div>}
