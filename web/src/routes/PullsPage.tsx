@@ -29,9 +29,9 @@ export default function PullsPage() {
     raw === null
       ? [...DEFAULT_STATES]
       : raw
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s): s is PRState => PR_STATES.includes(s as PRState))
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s): s is PRState => PR_STATES.includes(s as PRState))
 
   const repoQ = useRepo(owner, repo)
   // Empty selection => no state param => the server returns every state, the

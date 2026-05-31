@@ -43,6 +43,7 @@ export default function CompareView({ compare }: Props) {
           {compare.additions > 0 && <span className="diff-file__add"> +{compare.additions}</span>}
           {compare.deletions > 0 && <span className="diff-file__del"> −{compare.deletions}</span>}
         </span>
+        {/* biome-ignore lint/a11y/useSemanticElements: a labeled segmented toggle is a valid ARIA group; no native element fits */}
         <div className="diff-summary__toggle" role="group" aria-label="Diff layout">
           <button
             type="button"

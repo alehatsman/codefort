@@ -695,7 +695,6 @@ func TestHandleIssueCommitsUnbornRepo(t *testing.T) {
 		t.Errorf("unborn: status=%d len=%d, want 200 0", code, len(out))
 	}
 }
-||||||| parent of e6f7060 (feat(server): branch compare endpoint (base..head three-dot diff))
 
 // TestHandleIssueCommitsBranchLabel verifies a commit that lives only on a
 // feature branch (not on the default branch) reports that feature branch as its
