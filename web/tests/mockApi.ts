@@ -127,6 +127,35 @@ export interface CommitDetail {
   truncated: boolean
 }
 
+export type PRState = "open" | "merged" | "closed"
+
+export interface PullRequest {
+  id: number
+  number: number
+  base_ref: string
+  head_ref: string
+  title: string
+  body?: string
+  author: string
+  state: PRState
+  created_at: string
+  updated_at: string
+  merged_at: string | null
+}
+
+export interface Compare {
+  base: string
+  head: string
+  merge_base: string
+  ahead: number
+  behind: number
+  commits: Commit[]
+  files: DiffFile[]
+  additions: number
+  deletions: number
+  truncated: boolean
+}
+
 export interface State {
   identity: string
   repos: Repo[]
@@ -144,6 +173,13 @@ export interface State {
   // Commits referencing an issue, keyed by issue number. Empty by default;
   // the issue→commits section spec seeds it.
   issueCommits: Record<number, Commit[]>
+  // Pull requests + the canned compare returned by /compare and embedded in PR
+  // detail (the server computes it from git; the mock serves a fixture).
+  pulls: PullRequest[]
+  compare: Compare
+  // When set, the merge endpoint returns 409 with these conflicting paths
+  // instead of merging — lets a spec exercise the conflict surface.
+  conflictPaths: string[] | null
 }
 
 const OPEN_STATES: IssueState[] = ["todo", "in_progress"]
@@ -175,7 +211,52 @@ function freshState(seed: Partial<State> = {}): State {
     commits: [],
     commitDetails: {},
     issueCommits: {},
+    pulls: [],
+    compare: defaultCompare(),
+    conflictPaths: null,
     ...seed,
+  }
+}
+
+// defaultCompare is a small canned three-dot diff: feature is 1 commit / 1 file
+// ahead of main, so the compare screen renders a diff and the merge button is
+// enabled. Specs needing other shapes seed `compare`.
+function defaultCompare(): Compare {
+  return {
+    base: "main",
+    head: "feature",
+    merge_base: "0000000000000000000000000000000000000000",
+    ahead: 1,
+    behind: 0,
+    commits: [
+      {
+        sha: "feature00000000000000000000000000000000a",
+        short_sha: "feature0",
+        subject: "add feature.txt",
+        author: "test-user",
+        email: "test@user",
+        date: nowIso(),
+      },
+    ],
+    files: [
+      {
+        old_path: "",
+        new_path: "feature.txt",
+        status: "added",
+        binary: false,
+        additions: 1,
+        deletions: 0,
+        hunks: [
+          {
+            header: "@@ -0,0 +1 @@",
+            lines: [{ kind: "add", old: 0, new: 1, text: "feature" }],
+          },
+        ],
+      },
+    ],
+    additions: 1,
+    deletions: 0,
+    truncated: false,
   }
 }
 
@@ -586,6 +667,90 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       return route.fulfill({ status: 204 })
     }
     return route.continue()
+  })
+
+  // Branch compare: serve the canned fixture, echoing the requested base/head.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/compare(\?.*)?$/, (route) => {
+    const url = new URL(route.request().url())
+    const base = url.searchParams.get("base") || "main"
+    const head = url.searchParams.get("head") || "feature"
+    return json(route, 200, { ...state.compare, base, head })
+  })
+
+  // Pull request merge (POST). Registered before the collection/detail routes;
+  // its regex is disjoint (ends in /merge) so ordering doesn't actually matter.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/pulls\/\d+\/merge$/, (route) => {
+    const parts = new URL(route.request().url()).pathname.split("/")
+    const n = Number(parts[parts.length - 2])
+    const pr = state.pulls.find((p) => p.number === n)
+    if (!pr) return json(route, 404, { error: "pull request not found" })
+    if (pr.state !== "open") return json(route, 409, { error: `pull request is ${pr.state}` })
+    if (state.conflictPaths) {
+      return json(route, 409, {
+        error: "merge conflict; resolve locally and push",
+        conflicts: state.conflictPaths,
+      })
+    }
+    const ffOnly = (route.request().postDataJSON() as { method?: string }).method === "ff-only"
+    pr.state = "merged"
+    pr.merged_at = nowIso()
+    pr.updated_at = nowIso()
+    return json(route, 200, {
+      ...pr,
+      merge_commit: "merged00000000000000000000000000000000a",
+      fast_forward: ffOnly,
+    })
+  })
+
+  // One pull request (GET detail / PATCH).
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/pulls\/\d+$/, (route) => {
+    const req = route.request()
+    const n = Number(new URL(req.url()).pathname.split("/").pop())
+    const pr = state.pulls.find((p) => p.number === n)
+    if (!pr) return json(route, 404, { error: "pull request not found" })
+    if (req.method() === "PATCH") {
+      const body = req.postDataJSON() as { title?: string; body?: string; state?: PRState }
+      if (body.state === "merged") {
+        return json(route, 400, { error: "cannot set state to merged; use the merge endpoint" })
+      }
+      if (body.title !== undefined) pr.title = body.title
+      if (body.body !== undefined) pr.body = body.body
+      if (body.state !== undefined) pr.state = body.state
+      pr.updated_at = nowIso()
+      return json(route, 200, pr)
+    }
+    // GET detail: embed the compare fixture + review comments on the head ref.
+    const comments = state.codeComments.filter((c) => c.ref === pr.head_ref)
+    return json(route, 200, { ...pr, compare: state.compare, comments })
+  })
+
+  // Pull requests collection (GET list / POST create).
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/pulls(\?.*)?$/, (route) => {
+    const req = route.request()
+    const url = new URL(req.url())
+    if (req.method() === "POST") {
+      const body = req.postDataJSON() as { base: string; head: string; title: string; body?: string }
+      const number = state.pulls.length ? Math.max(...state.pulls.map((p) => p.number)) + 1 : 1
+      const pr: PullRequest = {
+        id: state.pulls.length + 1,
+        number,
+        base_ref: body.base,
+        head_ref: body.head,
+        title: body.title,
+        body: body.body ?? "",
+        author: state.identity,
+        state: "open",
+        created_at: nowIso(),
+        updated_at: nowIso(),
+        merged_at: null,
+      }
+      state.pulls.push(pr)
+      return json(route, 201, pr)
+    }
+    // GET: filter by ?state= (absent = any).
+    const want = url.searchParams.get("state")
+    const out = want ? state.pulls.filter((p) => p.state === want) : state.pulls
+    return json(route, 200, [...out].sort((a, b) => b.number - a.number))
   })
 
   return state

@@ -30,6 +30,8 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
     location.pathname.startsWith(`${base}/blob/`) ||
     location.pathname.startsWith(`${base}/commits`)
   const isIssues = location.pathname.startsWith(`${base}/issues`)
+  const isPulls =
+    location.pathname.startsWith(`${base}/pulls`) || location.pathname.startsWith(`${base}/compare`)
   const isReview = location.pathname.startsWith(`${base}/review`)
   const isResearch = location.pathname.startsWith(`${base}/research`)
   const isSummaries = location.pathname.startsWith(`${base}/summaries`)
@@ -44,6 +46,9 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
         <Link to={`${base}/issues`} className={clsx("tab", { "is-active": isIssues })}>
           Issues
           {openIssues !== undefined && <span className="tab__count">{openIssues}</span>}
+        </Link>
+        <Link to={`${base}/pulls`} className={clsx("tab", { "is-active": isPulls })}>
+          Pull requests
         </Link>
         <Link to={`${base}/review`} className={clsx("tab", { "is-active": isReview })}>
           Review

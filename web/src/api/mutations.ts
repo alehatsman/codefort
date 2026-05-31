@@ -6,9 +6,12 @@ import type {
   CreateCodeCommentInput,
   CreateCommentInput,
   CreateIssueInput,
+  CreatePullRequestInput,
   CreateRepoInput,
   CreateTokenInput,
+  MergeRequestInput,
   UpdateIssueInput,
+  UpdatePullRequestInput,
   UpdateRepoInput,
 } from "./types"
 
@@ -147,6 +150,51 @@ export function useDeleteCodeComment(owner: string, repo: string) {
   return useMutation({
     mutationFn: (id: number) => api.deleteCodeComment(owner, repo, id),
     onSuccess: () => invalidateCodeComments(qc, owner, repo),
+  })
+}
+
+// Pull requests. The pulls key is hierarchical (["pulls", owner, repo, state]),
+// so invalidating the owner/repo prefix refreshes every state-filtered list at
+// once; a write touching one PR also refreshes its detail query.
+function invalidatePullWrites(
+  qc: ReturnType<typeof useQueryClient>,
+  owner: string,
+  repo: string,
+  n?: number
+) {
+  qc.invalidateQueries({ queryKey: ["pulls", owner, repo] })
+  if (n !== undefined) {
+    qc.invalidateQueries({ queryKey: keys.pull(owner, repo, n) })
+  }
+}
+
+export function useCreatePull(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreatePullRequestInput) => api.createPull(owner, repo, input),
+    onSuccess: () => invalidatePullWrites(qc, owner, repo),
+  })
+}
+
+export function useUpdatePull(owner: string, repo: string, n: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpdatePullRequestInput) => api.updatePull(owner, repo, n, input),
+    onSuccess: () => invalidatePullWrites(qc, owner, repo, n),
+  })
+}
+
+// useMergePull merges the PR; on success the base branch advanced, so refresh
+// the PR (now merged) and any branch-derived views (commits, compare).
+export function useMergePull(owner: string, repo: string, n: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: MergeRequestInput) => api.mergePull(owner, repo, n, input),
+    onSuccess: () => {
+      invalidatePullWrites(qc, owner, repo, n)
+      qc.invalidateQueries({ queryKey: ["commits", owner, repo] })
+      qc.invalidateQueries({ queryKey: ["compare", owner, repo] })
+    },
   })
 }
 

@@ -40,6 +40,10 @@ export const keys = {
   intelSummaries: (owner: string, repo: string) => ["intelSummaries", owner, repo] as const,
   ciRuns: (owner: string, repo: string) => ["ciRuns", owner, repo] as const,
   ciRun: (owner: string, repo: string, n: number) => ["ciRun", owner, repo, n] as const,
+  compare: (owner: string, repo: string, base: string, head: string) =>
+    ["compare", owner, repo, base, head] as const,
+  pulls: (owner: string, repo: string, state = "") => ["pulls", owner, repo, state] as const,
+  pull: (owner: string, repo: string, n: number) => ["pull", owner, repo, n] as const,
 }
 
 // A run is "live" (queued or running) until it reaches a terminal state. Lists
@@ -310,6 +314,33 @@ export function useCommitCIStatus(owner: string, repo: string, enabled = true) {
       for (const run of runs) if (!byCommit.has(run.commit_sha)) byCommit.set(run.commit_sha, run)
       return byCommit
     },
+  })
+}
+
+// useCompare fetches the three-dot diff of head vs base. Enabled only when both
+// branches are chosen; a self-compare (base === head) is skipped since the
+// server rejects it and there's nothing to show.
+export function useCompare(owner: string, repo: string, base: string, head: string) {
+  return useQuery({
+    queryKey: keys.compare(owner, repo, base, head),
+    queryFn: () => api.getCompare(owner, repo, base, head),
+    enabled: !!owner && !!repo && !!base && !!head && base !== head,
+  })
+}
+
+export function usePulls(owner: string, repo: string, state = "") {
+  return useQuery({
+    queryKey: keys.pulls(owner, repo, state),
+    queryFn: () => api.listPulls(owner, repo, state),
+    enabled: !!owner && !!repo,
+  })
+}
+
+export function usePull(owner: string, repo: string, n: number) {
+  return useQuery({
+    queryKey: keys.pull(owner, repo, n),
+    queryFn: () => api.getPull(owner, repo, n),
+    enabled: !!owner && !!repo && Number.isFinite(n),
   })
 }
 

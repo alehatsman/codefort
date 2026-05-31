@@ -216,6 +216,81 @@ export interface UpdateCodeCommentInput {
 
 export type CodeCommentState = "open" | "resolved" | "all"
 
+// --- Pull requests ---
+
+export type PRState = "open" | "merged" | "closed"
+
+export const PR_STATES: readonly PRState[] = ["open", "merged", "closed"] as const
+
+export interface PullRequest {
+  id: number
+  number: number
+  base_ref: string
+  head_ref: string
+  title: string
+  body?: string
+  author: string
+  state: PRState
+  created_at: string
+  updated_at: string
+  merged_at: string | null
+}
+
+// Compare is the three-dot diff of head relative to base: the changes head
+// introduces since merge_base(base, head), with ahead/behind counts and the
+// base..head commit list. merge_base is "" when the histories are unrelated.
+export interface Compare {
+  base: string
+  head: string
+  merge_base: string
+  ahead: number
+  behind: number
+  commits: Commit[]
+  files: DiffFile[]
+  additions: number
+  deletions: number
+  truncated: boolean
+}
+
+// PullRequestDetail embeds the head-vs-base compare and the review comments
+// anchored to the head branch.
+export interface PullRequestDetail extends PullRequest {
+  compare: Compare
+  comments: CodeComment[]
+}
+
+export interface CreatePullRequestInput {
+  base: string
+  head: string
+  title: string
+  body?: string
+}
+
+export interface UpdatePullRequestInput {
+  title?: string
+  body?: string
+  state?: PRState
+}
+
+export type MergeMethod = "merge" | "ff-only"
+
+export interface MergeRequestInput {
+  method?: MergeMethod
+}
+
+export interface MergeResult extends PullRequest {
+  merge_commit: string
+  fast_forward: boolean
+}
+
+// MergeConflictResponse is the 409 body when a merge can't proceed: a message
+// plus the conflicting paths (absent for non-conflict 409s like "not
+// fast-forwardable" or a concurrent base move).
+export interface MergeConflictResponse {
+  error: string
+  conflicts?: string[]
+}
+
 // --- Intel (dex integration) ---
 
 export interface IntelService {

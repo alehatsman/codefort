@@ -7,6 +7,7 @@ import type {
   CodeCommentState,
   Comment,
   Commit,
+  Compare,
   CommitDetail,
   CommitList,
   TreeCommits,
@@ -14,10 +15,16 @@ import type {
   CreateCommentInput,
   CreatedToken,
   CreateIssueInput,
+  CreatePullRequestInput,
   CreateRepoInput,
   CreateTokenInput,
+  MergeRequestInput,
+  MergeResult,
+  PullRequest,
+  PullRequestDetail,
   RefList,
   UpdateCodeCommentInput,
+  UpdatePullRequestInput,
   Intel,
   IntelFileSummary,
   IntelOverview,
@@ -47,12 +54,19 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY)
 }
 
-/** ApiError carries the HTTP status so callers can branch on 401, 409, etc. */
+/**
+ * ApiError carries the HTTP status so callers can branch on 401, 409, etc.
+ * `body` holds the parsed JSON error body when there is one, so callers can
+ * read structured fields (e.g. a merge conflict's `conflicts` paths) beyond the
+ * flat message.
+ */
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  body?: unknown
+  constructor(status: number, message: string, body?: unknown) {
     super(message)
     this.status = status
+    this.body = body
   }
 }
 
@@ -81,13 +95,16 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   const raw = await resp.text()
   if (!resp.ok) {
     let message = raw || resp.statusText
+    let body: unknown
     try {
-      const parsed = JSON.parse(raw)
-      if (parsed && typeof parsed.error === "string") message = parsed.error
+      body = JSON.parse(raw)
+      if (body && typeof (body as { error?: unknown }).error === "string") {
+        message = (body as { error: string }).error
+      }
     } catch {
-      // raw stays as message
+      // raw stays as message; body stays undefined
     }
-    throw new ApiError(resp.status, message)
+    throw new ApiError(resp.status, message, body)
   }
   if (!raw) return undefined as T
   return JSON.parse(raw) as T
@@ -223,6 +240,26 @@ export const api = {
     }),
   deleteCodeComment: (owner: string, repo: string, id: number) =>
     request<void>(`/api/repos/${owner}/${repo}/code-comments/${id}`, { method: "DELETE" }),
+
+  getCompare: (owner: string, repo: string, base: string, head: string) => {
+    const q = new URLSearchParams({ base, head })
+    return request<Compare>(`/api/repos/${owner}/${repo}/compare?${q.toString()}`)
+  },
+
+  listPulls: (owner: string, repo: string, state = "") => {
+    const q = new URLSearchParams()
+    if (state) q.set("state", state)
+    const qs = q.toString()
+    return request<PullRequest[]>(`/api/repos/${owner}/${repo}/pulls${qs ? `?${qs}` : ""}`)
+  },
+  getPull: (owner: string, repo: string, n: number) =>
+    request<PullRequestDetail>(`/api/repos/${owner}/${repo}/pulls/${n}`),
+  createPull: (owner: string, repo: string, body: CreatePullRequestInput) =>
+    request<PullRequest>(`/api/repos/${owner}/${repo}/pulls`, { method: "POST", body }),
+  updatePull: (owner: string, repo: string, n: number, body: UpdatePullRequestInput) =>
+    request<PullRequest>(`/api/repos/${owner}/${repo}/pulls/${n}`, { method: "PATCH", body }),
+  mergePull: (owner: string, repo: string, n: number, body: MergeRequestInput) =>
+    request<MergeResult>(`/api/repos/${owner}/${repo}/pulls/${n}/merge`, { method: "POST", body }),
 
   listCIRuns: (owner: string, repo: string, limit = 0) =>
     request<CIRun[]>(`/api/repos/${owner}/${repo}/ci/runs${limit ? `?limit=${limit}` : ""}`),

@@ -2962,3 +2962,135 @@ h3 {
 .ci-log__stderr {
   color: var(--state-closed);
 }
+
+/* --- Pull requests: list state badge, compare pickers, PR detail --- */
+
+/* PR state badge — open=green, merged=purple, closed=red, matching issues. */
+.pr-state {
+  flex: none;
+  align-self: center;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: lowercase;
+}
+.pr-state--open {
+  color: var(--state-todo);
+  background: var(--state-todo-bg);
+}
+.pr-state--merged {
+  color: var(--state-done);
+  background: var(--state-done-bg);
+}
+.pr-state--closed {
+  color: var(--state-closed);
+  background: var(--state-closed-bg);
+}
+
+/* Compare screen: base/head pickers + the inline create-PR form. */
+.compare__pickers {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+.compare__arrow {
+  color: var(--fg-muted);
+}
+.compare__create {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 720px;
+  margin-bottom: var(--space-5);
+}
+.compare__title,
+.compare__body {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+.compare__body {
+  min-height: 5em;
+  resize: vertical;
+}
+.compare__create .btn {
+  align-self: flex-start;
+}
+
+/* Shared compare body: ahead/behind line + commit list before the diff. */
+.compare-view__range {
+  margin: var(--space-3) 0;
+}
+.compare-view__commits {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.compare-view__commit {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+}
+.compare-view__commit + .compare-view__commit {
+  border-top: 1px solid var(--border-muted);
+}
+.compare-view__sha {
+  flex: none;
+  color: var(--fg-muted);
+}
+.compare-view__subject {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* PR detail header + merge controls. */
+.pull-head {
+  margin: var(--space-4) 0;
+}
+.pull-head__number {
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+.pull-head__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.pull-head__body {
+  margin-top: var(--space-3);
+}
+.pull-merge {
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.pull-merge__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.pull-merge__opt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+.pull-merge__conflicts {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-5);
+}
