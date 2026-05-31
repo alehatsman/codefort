@@ -81,11 +81,13 @@ func composeAgentSystemPrompt(owner, repo string, issue api.Issue) string {
 	b.WriteString("Make focused changes there that address the issue; do not wander beyond its scope.\n")
 	b.WriteString("Stay within /work. You run inside an isolated container with no ambient credentials ")
 	b.WriteString("and tightly scoped network access — treat anything outside the workspace as off-limits.\n")
+	b.WriteString("Do your work by editing files in /work directly (read/edit/write). Running shell ")
+	b.WriteString("commands isn't available in this session, so don't rely on git, tests, or other ")
+	b.WriteString("CLIs — if a command needs running, describe it in your summary and it'll be handled ")
+	b.WriteString("by moongit. moongit snapshots your file changes into a branch and posts the summary ")
+	b.WriteString("for you when the run is finished.\n")
 	b.WriteString("When you finish, end your turn with a concise summary of what you changed and why.\n")
 	b.WriteString("If a decision falls outside your mandate, do not guess: stop and ask it as your final ")
 	b.WriteString("message, and a human will answer in the next turn.\n")
-	fmt.Fprintf(&b, "You can post progress or questions on the issue with `mgit issue comment %d "+
-		"--body \"...\"` — MOONGIT_TOKEN and MOONGIT_SERVER are already set in your environment.\n",
-		issue.Number)
 	return b.String()
 }

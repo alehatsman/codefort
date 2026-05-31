@@ -70,7 +70,7 @@ func TestComposeTurnPrompt(t *testing.T) {
 
 func TestComposeAgentSystemPrompt(t *testing.T) {
 	p := composeAgentSystemPrompt("alice", "repo", api.Issue{Number: 7, Title: "Fix it"})
-	for _, want := range []string{"alice/repo", "#7", "Fix it", "/work", "mgit issue comment 7"} {
+	for _, want := range []string{"alice/repo", "#7", "Fix it", "/work"} {
 		if !strings.Contains(p, want) {
 			t.Errorf("system prompt missing %q:\n%s", want, p)
 		}
