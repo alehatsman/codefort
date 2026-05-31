@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -85,11 +86,33 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 	r.emit(elog, ci.EventRunStarted, map[string]any{"total_steps": 1})
 
-	// Open the container (the same isolation seam CI jobs use). A failure here
-	// — image missing, docker down — fails the run loudly. NOTE: we do not
-	// Close the session on the happy path; the container must outlive this
-	// goroutine for follow-up turns to resume into it.
-	sess, err := r.newSession(parent, agentContainerName(job.ID), workDir, r.cfg.AgentDefaultImage)
+	// Mint the ephemeral, per-run moongit token and compose the container env
+	// (creds, scoped token, dex wiring). The token is revoked on teardown.
+	moongitToken, err := storage.GenerateTokenString()
+	if err == nil {
+		_, err = storage.CreateToken(r.db, agentTokenName(run.ID), moongitToken)
+	}
+	if err != nil {
+		r.emit(elog, ci.EventRunFailed, map[string]any{"error": "mint agent token: " + err.Error()})
+		elog.Close()
+		log.Error("agent mint token", "err", err)
+		r.failAgentRun(run.ID, job.ID, workDir)
+		return
+	}
+	env := agentContainerEnv(r.cfg, moongitToken, agentServerURL(r.cfg))
+
+	// Generate the dex MCP config (if dex is configured) into the workspace.
+	mcpPath, _, err := writeDexMCPConfig(workDir, r.cfg)
+	if err != nil {
+		log.Error("agent write mcp config", "err", err)
+		mcpPath = "" // non-fatal: run without dex MCP
+	}
+
+	// Open the container (the same isolation seam CI jobs use) with the env
+	// injected. A failure here — image missing, docker down — fails the run
+	// loudly. NOTE: we do not Close the session on the happy path; the
+	// container must outlive this goroutine for follow-up turns to resume.
+	sess, err := r.newAgentSession(parent, agentContainerName(job.ID), workDir, r.cfg.AgentDefaultImage, env)
 	if err != nil {
 		r.emit(elog, ci.EventAgentRaw, map[string]any{"line": err.Error()})
 		r.emit(elog, ci.EventRunFailed, map[string]any{"error": err.Error()})
@@ -107,7 +130,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 
 	systemPrompt := composeAgentSystemPrompt(owner, name, issue)
-	status, execErr := r.runAgentTurn(parent, stream, elog, run.ID, 1, composeTurnPrompt(issue), systemPrompt, false)
+	status, execErr := r.runAgentTurn(parent, stream, elog, run.ID, 1, composeTurnPrompt(issue), systemPrompt, mcpPath, false)
 	elog.Close()
 
 	if execErr != nil {
@@ -173,8 +196,13 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 
 	// turn.Seq is the follow-up index (1-based); display number accounts for
 	// turn 1 being the issue body. Resume the session; the system prompt is
-	// already in it, so it's omitted.
-	_, execErr := r.runAgentTurn(parent, stream, elog, run.ID, turn.Seq+1, turn.Body, "", true)
+	// already in it, so it's omitted. The MCP config file persists in the
+	// workspace from turn 1.
+	mcpPath := ""
+	if r.cfg.DexURL != "" {
+		mcpPath = "/work/" + dexMCPConfigName
+	}
+	_, execErr := r.runAgentTurn(parent, stream, elog, run.ID, turn.Seq+1, turn.Body, "", mcpPath, true)
 	elog.Close()
 
 	if execErr != nil {
@@ -197,7 +225,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 // bracketing the turn with turn.started/completed. It returns the turn status
 // and any executor error (couldn't run claude / cancelled), but does not itself
 // finalize the run or job — the caller decides whether to park or fail.
-func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession, elog *ci.EventLog, runID int64, turnNum int, prompt, systemPrompt string, resume bool) (status string, execErr error) {
+func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession, elog *ci.EventLog, runID int64, turnNum int, prompt, systemPrompt, mcpPath string, resume bool) (status string, execErr error) {
 	ctx := parent
 	if r.cfg.AgentTurnTimeout > 0 {
 		var cancel context.CancelFunc
@@ -205,7 +233,7 @@ func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession,
 		defer cancel()
 	}
 
-	argv := buildClaudeArgv(agentSessionID(runID), prompt, systemPrompt, resume)
+	argv := buildClaudeArgv(agentSessionID(runID), prompt, systemPrompt, mcpPath, resume)
 	r.emit(elog, ci.EventAgentTurnStarted, map[string]any{"turn": turnNum, "prompt": prompt})
 
 	var result *claudeResult
@@ -253,7 +281,7 @@ func (r *ciRunner) reapExpiredAgents(ctx context.Context) {
 			}
 		}
 		jobID, _ := r.agentJobID(run.ID)
-		r.tearDownAgent(jobID, agentWorkDir(r.cfg.DataDir, run.ID))
+		r.tearDownAgent(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
 		zero := 0
 		r.finishJob(jobID, storage.JobSuccess, &zero)
 		r.finish(run.ID, storage.RunCanceled)
@@ -261,20 +289,24 @@ func (r *ciRunner) reapExpiredAgents(ctx context.Context) {
 	}
 }
 
-// failAgentRun finalizes a broken agent run: tear down its container + workspace
-// and mark the job and run errored.
+// failAgentRun finalizes a broken agent run: tear down its container +
+// workspace + token and mark the job and run errored.
 func (r *ciRunner) failAgentRun(runID, jobID int64, workDir string) {
-	r.tearDownAgent(jobID, workDir)
+	r.tearDownAgent(runID, jobID, workDir)
 	if jobID != 0 {
 		r.finishJob(jobID, storage.JobError, nil)
 	}
 	r.finish(runID, storage.RunError)
 }
 
-// tearDownAgent removes the agent's container (best-effort) and its workspace.
-func (r *ciRunner) tearDownAgent(jobID int64, workDir string) {
+// tearDownAgent releases a finished agent run's resources: remove the container
+// (best-effort), revoke its ephemeral moongit token, and delete the workspace.
+func (r *ciRunner) tearDownAgent(runID, jobID int64, workDir string) {
 	if jobID != 0 && r.teardownContainer != nil {
 		r.teardownContainer(agentContainerName(jobID))
+	}
+	if err := storage.RevokeToken(r.db, agentTokenName(runID)); err != nil && !errors.Is(err, storage.ErrNotFound) {
+		r.logger.Error("agent revoke token", "run_id", runID, "err", err)
 	}
 	if workDir != "" {
 		os.RemoveAll(workDir)

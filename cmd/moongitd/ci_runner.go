@@ -92,10 +92,12 @@ type ciRunner struct {
 	checkout     checkoutFunc
 	readPipeline pipelineReader
 
-	// Agent turn loop: attachSession binds to an already-running agent
-	// container (no docker run) so a follow-up turn can resume the session;
-	// teardownContainer removes a finalized agent container. Both are injected
-	// so the turn-loop tests run without docker.
+	// Agent turn loop: newAgentSession opens the turn-1 container with the
+	// per-run env (creds) injected and host reachability; attachSession binds to
+	// that already-running container (no docker run) so a follow-up turn can
+	// resume the session; teardownContainer removes a finalized agent container.
+	// All injected so the turn-loop tests run without docker.
+	newAgentSession   func(ctx context.Context, name, workDir, image string, env []string) (jobSession, error)
 	attachSession     func(ctx context.Context, name string) (jobSession, error)
 	teardownContainer func(name string)
 }
@@ -113,6 +115,9 @@ func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner 
 		r.newSession = func(_ context.Context, _, workDir, _ string) (jobSession, error) {
 			return &hostSession{workDir: workDir, exec: runMooncakeStep, stream: runClaudeStreamHost}, nil
 		}
+		r.newAgentSession = func(_ context.Context, _, workDir, _ string, _ []string) (jobSession, error) {
+			return &hostSession{workDir: workDir, exec: runMooncakeStep, stream: runClaudeStreamHost}, nil
+		}
 		r.attachSession = func(_ context.Context, _ string) (jobSession, error) {
 			return nil, errors.New("agent turn resume requires docker isolation")
 		}
@@ -121,6 +126,10 @@ func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner 
 		// Default: one throwaway container per job, steps run via docker exec.
 		r.newSession = func(ctx context.Context, name, workDir, image string) (jobSession, error) {
 			return openDockerSession(ctx, logger, name, workDir, image)
+		}
+		// The agent's turn-1 container carries the per-run env + host reachability.
+		r.newAgentSession = func(ctx context.Context, name, workDir, image string, env []string) (jobSession, error) {
+			return openAgentDockerSession(ctx, logger, name, workDir, image, env)
 		}
 		// Resume binds to the still-running agent container by name.
 		r.attachSession = func(_ context.Context, name string) (jobSession, error) {
@@ -155,6 +164,15 @@ func (r *ciRunner) run(ctx context.Context) {
 		r.logger.Error("ci reconcile orphan runs", "err", err)
 	} else if n > 0 {
 		r.logger.Info("ci reconciled orphaned runs", "count", n)
+	}
+
+	// Ephemeral agent-run tokens are revoked on finalize; a crash can strand
+	// some valid. Their runs were just reconciled, so none should still be
+	// live — revoke any leftovers before taking new work.
+	if n, err := storage.RevokeAgentRunTokens(r.db); err != nil {
+		r.logger.Error("agent revoke leftover tokens", "err", err)
+	} else if n > 0 {
+		r.logger.Info("agent revoked leftover run tokens", "count", n)
 	}
 
 	// A crashed runner can leave job containers behind; reap them before
@@ -679,6 +697,34 @@ func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, 
 		"--entrypoint", "sleep",
 		image, "infinity",
 	}
+	out, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("docker run %s: %v (%s)", image, err, strings.TrimSpace(string(out)))
+	}
+	return &dockerSession{name: name, logger: logger}, nil
+}
+
+// openAgentDockerSession starts the agent's container like openDockerSession but
+// injects the per-run env (creds, scoped token, dex wiring) and gives it host
+// reachability (host.docker.internal -> the host gateway), so the in-container
+// claude/mgit/dex shim can reach moongitd, the LLM endpoint, and the hot dex
+// index. The container stays alive (sleep infinity) across turns; teardown is
+// explicit (it is not removed when a turn's session handle is dropped).
+func openAgentDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, image string, env []string) (jobSession, error) {
+	args := []string{
+		"run", "-d", "--rm",
+		"--name", name,
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+		"-v", workDir + ":/work",
+		"-w", "/work",
+		// Reach the host's moongitd / dex / LLM endpoint. WSL2 maps
+		// host-gateway to the host, same as Docker Desktop.
+		"--add-host", "host.docker.internal:host-gateway",
+	}
+	for _, e := range env {
+		args = append(args, "-e", e)
+	}
+	args = append(args, "--entrypoint", "sleep", image, "infinity")
 	out, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("docker run %s: %v (%s)", image, err, strings.TrimSpace(string(out)))

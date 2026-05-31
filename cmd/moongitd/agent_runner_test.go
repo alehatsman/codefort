@@ -60,10 +60,11 @@ var successTurn = []string{
 type agentHarness struct {
 	r         *ciRunner
 	run       storage.CIRun
-	opened    *atomic.Int32 // newSession (turn-1 container open)
+	opened    *atomic.Int32 // newAgentSession (turn-1 container open)
 	attached  *atomic.Int32 // attachSession (follow-up resume)
 	teardowns *atomic.Int32 // teardownContainer
 	gotArgv   *[]string     // argv of the last ExecStream
+	gotEnv    *[]string     // env passed to the turn-1 container
 }
 
 func newAgentHarness(t *testing.T, opts agentTestOpts) agentHarness {
@@ -102,21 +103,26 @@ func newAgentHarness(t *testing.T, opts agentTestOpts) agentHarness {
 	}
 
 	var opened, attached, teardowns atomic.Int32
-	var gotArgv []string
+	var gotArgv, gotEnv []string
 	fake := func() (jobSession, error) {
 		return &fakeAgentSession{lines: opts.lines, exitCode: opts.exitCode, gotArgv: &gotArgv}, nil
 	}
 	r := &ciRunner{
 		db: db,
 		cfg: &config.Config{
-			DataDir:           dir,
-			ReposDir:          filepath.Join(dir, "repos"),
-			AgentRunTimeout:   time.Minute,
-			AgentTurnTimeout:  time.Minute,
-			AgentDefaultImage: "moongit-agent:latest",
+			Addr:                  ":8080",
+			DataDir:               dir,
+			ReposDir:              filepath.Join(dir, "repos"),
+			AgentRunTimeout:       time.Minute,
+			AgentTurnTimeout:      time.Minute,
+			AgentDefaultImage:     "moongit-agent:latest",
+			AgentClaudeOAuthToken: "oauth-tok",
+			DexURL:                "http://dex.local",
+			DexToken:              "dex-tok",
+			DexProject:            "proj-1",
 		},
 		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		newSession: func(_ context.Context, _, _, image string) (jobSession, error) {
+		newAgentSession: func(_ context.Context, _, _, image string, env []string) (jobSession, error) {
 			if image != "moongit-agent:latest" {
 				t.Errorf("agent image = %q, want moongit-agent:latest", image)
 			}
@@ -124,6 +130,7 @@ func newAgentHarness(t *testing.T, opts agentTestOpts) agentHarness {
 				return nil, opts.sessionErr
 			}
 			opened.Add(1)
+			gotEnv = env
 			return fake()
 		},
 		attachSession: func(_ context.Context, _ string) (jobSession, error) {
@@ -137,7 +144,7 @@ func newAgentHarness(t *testing.T, opts agentTestOpts) agentHarness {
 			return nil, false, nil
 		},
 	}
-	return agentHarness{r: r, run: run, opened: &opened, attached: &attached, teardowns: &teardowns, gotArgv: &gotArgv}
+	return agentHarness{r: r, run: run, opened: &opened, attached: &attached, teardowns: &teardowns, gotArgv: &gotArgv, gotEnv: &gotEnv}
 }
 
 func (h agentHarness) status(t *testing.T) storage.RunStatus {
@@ -193,6 +200,60 @@ func TestExecuteAgentRunParksAfterTurn1(t *testing.T) {
 	if !argvContains(argv, "make it so") {
 		t.Errorf("turn 1 prompt should carry the issue body: %v", argv)
 	}
+}
+
+// The run injects scoped per-run credentials into the container env, mints a
+// real ephemeral moongit token (revoked on teardown), and wires the dex MCP.
+func TestAgentRunInjectsCredentials(t *testing.T) {
+	h := newAgentHarness(t, agentTestOpts{lines: successTurn})
+	h.r.executeAgentRun(context.Background(), h.run)
+
+	env := *h.gotEnv
+	for k, want := range map[string]string{
+		"CLAUDE_CODE_OAUTH_TOKEN": "oauth-tok",
+		"MOONGIT_SERVER":          "http://host.docker.internal:8080",
+		"DEX_REMOTE_URL":          "http://dex.local",
+		"DEX_SERVE_TOKEN":         "dex-tok",
+		"DEX_PROJECT":             "proj-1",
+	} {
+		if got := envValue(env, k); got != want {
+			t.Errorf("env %s = %q, want %q (all: %v)", k, got, want, env)
+		}
+	}
+
+	mgitTok := envValue(env, "MOONGIT_TOKEN")
+	if mgitTok == "" {
+		t.Fatal("MOONGIT_TOKEN not injected")
+	}
+	// The injected token is a real, active moongit token while parked.
+	tok, err := storage.LookupToken(h.r.db, mgitTok)
+	if err != nil {
+		t.Fatalf("injected token not valid: %v", err)
+	}
+	if tok.Name != agentTokenName(h.run.ID) {
+		t.Errorf("token name = %q, want %q", tok.Name, agentTokenName(h.run.ID))
+	}
+
+	// dex MCP is wired into the launch.
+	if !argvHas(*h.gotArgv, "--mcp-config", "/work/"+dexMCPConfigName) || !argvContains(*h.gotArgv, "--strict-mcp-config") {
+		t.Errorf("argv missing dex MCP config: %v", *h.gotArgv)
+	}
+
+	// On teardown the ephemeral token is revoked.
+	h.r.cfg.AgentRunTimeout = time.Nanosecond
+	h.r.reapExpiredAgents(context.Background())
+	if _, err := storage.LookupToken(h.r.db, mgitTok); err == nil {
+		t.Error("token still valid after teardown; want revoked")
+	}
+}
+
+func envValue(env []string, key string) string {
+	for _, e := range env {
+		if strings.HasPrefix(e, key+"=") {
+			return e[len(key)+1:]
+		}
+	}
+	return ""
 }
 
 // A follow-up turn resumes the session in the running container and re-parks.

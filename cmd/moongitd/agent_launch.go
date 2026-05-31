@@ -28,7 +28,9 @@ func agentSessionID(runID int64) string {
 // is the sandbox — claude's in-app prompts are redundant against a hard jail,
 // and headless -p has no TTY to answer them anyway (see #76). resume picks
 // `--resume` over `--session-id` for follow-up turns on the same session.
-func buildClaudeArgv(sessionID, prompt, systemPrompt string, resume bool) []string {
+// mcpConfigPath, when set, attaches the dex MCP server and restricts claude to
+// only the servers in that file (--strict-mcp-config).
+func buildClaudeArgv(sessionID, prompt, systemPrompt, mcpConfigPath string, resume bool) []string {
 	argv := []string{
 		"claude", "-p", prompt,
 		"--output-format", "stream-json",
@@ -42,6 +44,9 @@ func buildClaudeArgv(sessionID, prompt, systemPrompt string, resume bool) []stri
 	}
 	if systemPrompt != "" {
 		argv = append(argv, "--append-system-prompt", systemPrompt)
+	}
+	if mcpConfigPath != "" {
+		argv = append(argv, "--mcp-config", mcpConfigPath, "--strict-mcp-config")
 	}
 	return argv
 }

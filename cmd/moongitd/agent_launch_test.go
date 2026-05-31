@@ -24,7 +24,10 @@ func TestAgentSessionIDStableAndValid(t *testing.T) {
 }
 
 func TestBuildClaudeArgv(t *testing.T) {
-	turn1 := buildClaudeArgv("sid", "do it", "be good", false)
+	turn1 := buildClaudeArgv("sid", "do it", "be good", "/work/mcp.json", false)
+	if !argvHas(turn1, "--mcp-config", "/work/mcp.json") || !argvContains(turn1, "--strict-mcp-config") {
+		t.Errorf("mcp config path not wired: %v", turn1)
+	}
 	if argvHas(turn1, "--resume", "sid") {
 		t.Error("turn 1 must not --resume")
 	}
@@ -45,7 +48,7 @@ func TestBuildClaudeArgv(t *testing.T) {
 	}
 
 	// A follow-up turn resumes the same session instead of setting it.
-	follow := buildClaudeArgv("sid", "more", "", true)
+	follow := buildClaudeArgv("sid", "more", "", "", true)
 	if !argvHas(follow, "--resume", "sid") || argvContains(follow, "--session-id") {
 		t.Errorf("follow-up turn must --resume, not --session-id: %v", follow)
 	}

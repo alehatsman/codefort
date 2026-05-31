@@ -98,6 +98,27 @@ type Config struct {
 	// MOONGIT_AGENT_DEFAULT_IMAGE. Only used when CIIsolation="docker".
 	AgentDefaultImage string
 
+	// Agent credentials, injected per-run into the container env — never baked
+	// into the image (#77). AgentClaudeOAuthToken is the subscription token from
+	// `claude setup-token` (CLAUDE_CODE_OAUTH_TOKEN); AgentAnthropicAPIKey is the
+	// alternate API-key path (ANTHROPIC_API_KEY); exactly one is needed for the
+	// agent to authenticate headlessly. AgentLLMBaseURL optionally overrides the
+	// LLM endpoint (ANTHROPIC_BASE_URL — Anthropic now, a local GPU model later).
+	// Set via MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN / _ANTHROPIC_API_KEY / _LLM_BASE_URL.
+	AgentClaudeOAuthToken string
+	AgentAnthropicAPIKey  string
+	AgentLLMBaseURL       string
+
+	// AgentServerURL is how the in-container agent reaches this moongitd (for
+	// mgit / git over the host gateway). Empty defaults to
+	// http://host.docker.internal:<port-of-Addr>. Set via MOONGIT_AGENT_SERVER_URL.
+	AgentServerURL string
+
+	// DexProject is the dex project id (keyed by the canonical repo root) the
+	// agent's dex MCP queries. Empty omits the dex MCP wiring. Set via
+	// MOONGIT_AGENT_DEX_PROJECT.
+	DexProject string
+
 	// CIRetainRuns caps how many of a repo's most recent CI runs are kept: a
 	// periodic reaper prunes terminal runs beyond this many (and their on-disk
 	// event logs), keeping disk + DB bounded. queued/running runs are never
@@ -211,6 +232,11 @@ func Load() (*Config, error) {
 	cfg.AgentRunTimeout = agentTimeout
 
 	cfg.AgentDefaultImage = envOr("MOONGIT_AGENT_DEFAULT_IMAGE", "moongit-agent:latest")
+	cfg.AgentClaudeOAuthToken = envOr("MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN", "")
+	cfg.AgentAnthropicAPIKey = envOr("MOONGIT_AGENT_ANTHROPIC_API_KEY", "")
+	cfg.AgentLLMBaseURL = envOr("MOONGIT_AGENT_LLM_BASE_URL", "")
+	cfg.AgentServerURL = envOr("MOONGIT_AGENT_SERVER_URL", "")
+	cfg.DexProject = envOr("MOONGIT_AGENT_DEX_PROJECT", "")
 
 	agentTurnTimeout, err := time.ParseDuration(envOr("MOONGIT_AGENT_TURN_TIMEOUT", "15m"))
 	if err != nil {

@@ -178,6 +178,22 @@ func RevokeTokenByID(db *sql.DB, id int64) error {
 	return nil
 }
 
+// RevokeAgentRunTokens revokes any still-active ephemeral per-run agent tokens
+// (named "agent-run-<id>", minted by an agent run and normally revoked on
+// finalize). Called at startup so tokens stranded by a crash — their run
+// reconciled, but the token never revoked — don't linger valid. Returns the
+// number revoked.
+func RevokeAgentRunTokens(db *sql.DB) (int64, error) {
+	res, err := db.Exec(
+		`UPDATE tokens SET revoked_at = strftime('%s','now')
+		   WHERE name LIKE 'agent-run-%' AND revoked_at IS NULL`,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // RevokeStaleAgentTokens revokes per-agent session tokens — those named
 // "agent#<n>", minted one-per-spawn by the `ce` launcher — whose last
 // activity is older than ttl (measured from last_used_at, falling back to
