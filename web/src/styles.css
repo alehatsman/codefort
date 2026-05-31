@@ -955,9 +955,16 @@ a.file-tree__commit:hover {
   font: var(--text-sm) / 20px var(--font-mono);
   table-layout: fixed;
 }
+/* Fixed table-layout takes column widths from <col>, not from cells in later
+   rows (the first row is a colspan hunk header). Size columns here so the
+   number gutters stay narrow and the code columns absorb the rest. */
+.diff-col-num {
+  width: 44px;
+}
+.diff-col-code {
+  width: auto;
+}
 .diff-num {
-  width: 1%;
-  min-width: 44px;
   padding: 0 var(--space-2);
   text-align: right;
   color: var(--fg-muted);
@@ -1416,6 +1423,11 @@ a.file-tree__commit:hover {
 .markdown-body pre code {
   font: var(--text-sm) / 20px var(--font-mono);
   white-space: pre;
+  /* The base `code` rule paints a neutral fill for inline code; inside a fenced
+     block that fill lands on each wrapped line (display:inline) as a striped
+     per-line highlight. Block code inherits the <pre> surface instead. */
+  padding: 0;
+  background: none;
 }
 .markdown-body input[type="checkbox"] {
   margin: 0 var(--space-1) 0 0;

@@ -105,6 +105,14 @@ function pairRows(lines: DiffLine[]): SplitRow[] {
 function SplitTable({ hunks, lang }: { hunks: DiffHunk[]; lang?: string }) {
   return (
     <table className="diff-split hljs">
+      {/* Fixed layout sizes columns from <col>, not later-row cells: keep the
+          two number columns narrow so each code column splits the rest. */}
+      <colgroup>
+        <col className="diff-col-num" />
+        <col className="diff-col-code" />
+        <col className="diff-col-num" />
+        <col className="diff-col-code" />
+      </colgroup>
       <tbody>
         {hunks.map((h, hi) => (
           <HunkSplit key={hi} hunk={h} lang={lang} />
@@ -142,6 +150,11 @@ function HunkSplit({ hunk, lang }: { hunk: DiffHunk; lang?: string }) {
 function UnifiedTable({ hunks, lang }: { hunks: DiffHunk[]; lang?: string }) {
   return (
     <table className="diff-unified hljs">
+      <colgroup>
+        <col className="diff-col-num" />
+        <col className="diff-col-num" />
+        <col className="diff-col-code" />
+      </colgroup>
       <tbody>
         {hunks.map((h, hi) => (
           <HunkUnified key={hi} hunk={h} lang={lang} />
