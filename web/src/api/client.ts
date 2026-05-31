@@ -1,6 +1,8 @@
 import type {
+  AgentSettings,
   AgentTurn,
   Blob,
+  UpdateAgentSettingsInput,
   CIRun,
   CIRunDetail,
   ClaimIssueInput,
@@ -251,4 +253,9 @@ export const api = {
   // summary comment) and finalizes it.
   finishAgentRun: (owner: string, repo: string, n: number) =>
     request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/finish`, { method: "POST" }),
+
+  // Global agent settings (write-only Claude token).
+  getAgentSettings: () => request<AgentSettings>("/api/settings/agent"),
+  updateAgentSettings: (body: UpdateAgentSettingsInput) =>
+    request<AgentSettings>("/api/settings/agent", { method: "PUT", body }),
 }

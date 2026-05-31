@@ -190,6 +190,18 @@ var migrations = []string{
 	CREATE INDEX IF NOT EXISTS idx_agent_turns_run    ON agent_turns(run_id);
 	CREATE INDEX IF NOT EXISTS idx_agent_turns_status ON agent_turns(status);
 	`,
+
+	// 10: server settings — a generic key/value store for operator-set config
+	// that shouldn't require a restart (e.g. the global agent Claude token,
+	// #106). Values may be secrets; the API surface that reads them must be
+	// write-only (never echo a secret back).
+	`
+	CREATE TABLE IF NOT EXISTS settings (
+	    key        TEXT PRIMARY KEY,
+	    value      TEXT NOT NULL,
+	    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+	);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

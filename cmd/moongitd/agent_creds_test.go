@@ -18,7 +18,7 @@ func TestAgentContainerEnvOAuthAndDex(t *testing.T) {
 		DexToken:              "dt",
 		DexProject:            "p",
 	}
-	env := agentContainerEnv(cfg, "mgt_tok", "http://host.docker.internal:8080")
+	env := agentContainerEnv(cfg, "", "mgt_tok", "http://host.docker.internal:8080")
 	want := []string{
 		"CLAUDE_CODE_OAUTH_TOKEN=oauth",
 		"ANTHROPIC_BASE_URL=http://llm.local",
@@ -43,13 +43,27 @@ func TestAgentContainerEnvOAuthAndDex(t *testing.T) {
 
 func TestAgentContainerEnvAPIKeyFallbackNoDex(t *testing.T) {
 	cfg := &config.Config{AgentAnthropicAPIKey: "sk-xyz"} // no OAuth, no dex
-	env := agentContainerEnv(cfg, "tok", "url")
+	env := agentContainerEnv(cfg, "", "tok", "url")
 	if !contains(env, "ANTHROPIC_API_KEY=sk-xyz") {
 		t.Errorf("API-key fallback missing: %v", env)
 	}
 	for _, e := range env {
 		if strings.HasPrefix(e, "CLAUDE_CODE_OAUTH_TOKEN=") || strings.HasPrefix(e, "DEX_") {
 			t.Errorf("unexpected env %q (no OAuth, no dex): %v", e, env)
+		}
+	}
+}
+
+// An operator-set token (Settings, #106) wins over the env OAuth/API-key.
+func TestAgentContainerEnvOverrideWins(t *testing.T) {
+	cfg := &config.Config{AgentClaudeOAuthToken: "from-env", AgentAnthropicAPIKey: "sk-env"}
+	env := agentContainerEnv(cfg, "from-settings", "tok", "url")
+	if !contains(env, "CLAUDE_CODE_OAUTH_TOKEN=from-settings") {
+		t.Errorf("override not used: %v", env)
+	}
+	for _, e := range env {
+		if e == "CLAUDE_CODE_OAUTH_TOKEN=from-env" || strings.HasPrefix(e, "ANTHROPIC_API_KEY=") {
+			t.Errorf("env creds leaked past the override: %v", env)
 		}
 	}
 }

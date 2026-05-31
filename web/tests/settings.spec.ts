@@ -59,3 +59,22 @@ test("placeholder sections are clearly not-yet-available", async ({ page }) => {
   await page.getByRole("button", { name: "SSH keys" }).click()
   await expect(page.getByText("Coming soon.", { exact: false })).toBeVisible()
 })
+
+test("agent section sets and clears the global Claude token", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/settings")
+
+  await page.getByRole("button", { name: "Agent" }).click()
+  await expect(page.getByText(/No Claude token configured/)).toBeVisible()
+
+  await page.getByLabel("Claude token").fill("sk-ant-oat01-secret")
+  await page.getByRole("button", { name: "Save token" }).click()
+
+  // Now reports configured; the field is cleared (write-only).
+  await expect(page.getByText(/A Claude token is configured/)).toBeVisible()
+  await expect(page.getByLabel("Claude token")).toHaveValue("")
+
+  // Clear it.
+  await page.getByRole("button", { name: "Clear" }).click()
+  await expect(page.getByText(/No Claude token configured/)).toBeVisible()
+})

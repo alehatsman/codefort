@@ -148,6 +148,7 @@ export interface State {
   // Local branches for the /refs endpoint; defaults to ["main"].
   branches: string[]
   tokens: Token[]
+  agentClaudeTokenSet: boolean
   ciRuns: CIRun[]
   // Commit history (newest first) and per-sha diff detail, for the commit
   // diff view. Empty by default; specs that need them seed them.
@@ -180,6 +181,7 @@ function freshState(seed: Partial<State> = {}): State {
     codeComments: [],
     branches: ["main"],
     tokens: [{ id: 1, name: "test-user", created_at: nowIso(), last_used_at: nowIso() }],
+    agentClaudeTokenSet: false,
     ciRuns: [],
     commits: [],
     commitDetails: {},
@@ -400,6 +402,18 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
 
   // Whoami
   await page.route(/\/api\/whoami$/, (route) => json(route, 200, { name: state.identity }))
+
+  // Agent settings — write-only Claude token (GET reports set/unset; PUT sets/clears).
+  await page.route(/\/api\/settings\/agent$/, (route) => {
+    const req = route.request()
+    if (req.method() === "PUT") {
+      const body = req.postDataJSON() as { claude_oauth_token?: string }
+      if (typeof body.claude_oauth_token === "string") {
+        state.agentClaudeTokenSet = body.claude_oauth_token.trim() !== ""
+      }
+    }
+    return json(route, 200, { claude_oauth_token_set: state.agentClaudeTokenSet })
+  })
 
   // Tokens collection (GET list / POST create)
   await page.route(/\/api\/tokens$/, async (route) => {

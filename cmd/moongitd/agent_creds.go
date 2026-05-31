@@ -22,13 +22,16 @@ func agentTokenName(runID int64) string {
 
 // agentContainerEnv builds the KEY=VALUE environment injected into an agent
 // container at creation — everything per-run and scoped, nothing in the image.
-// claude auth prefers the subscription OAuth token and falls back to the API
-// key; the ephemeral moongit token + server URL let the in-container git/mgit
-// talk to moongitd; the dex bearer/endpoint/project wire the hot index when
-// configured. Order is stable for testability.
-func agentContainerEnv(cfg *config.Config, moongitToken, serverURL string) []string {
+// claude auth prefers the operator-set token (claudeOverride, from Settings),
+// then the OAuth token env, then the API-key env; the ephemeral moongit token +
+// server URL let the in-container git/mgit talk to moongitd; the dex bearer/
+// endpoint/project wire the hot index when configured. Order is stable for
+// testability.
+func agentContainerEnv(cfg *config.Config, claudeOverride, moongitToken, serverURL string) []string {
 	var env []string
 	switch {
+	case claudeOverride != "":
+		env = append(env, "CLAUDE_CODE_OAUTH_TOKEN="+claudeOverride)
 	case cfg.AgentClaudeOAuthToken != "":
 		env = append(env, "CLAUDE_CODE_OAUTH_TOKEN="+cfg.AgentClaudeOAuthToken)
 	case cfg.AgentAnthropicAPIKey != "":

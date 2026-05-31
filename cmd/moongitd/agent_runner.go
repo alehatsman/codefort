@@ -99,7 +99,10 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		r.failAgentRun(run.ID, job.ID, workDir)
 		return
 	}
-	env := agentContainerEnv(r.cfg, moongitToken, agentServerURL(r.cfg))
+	// Effective Claude token: operator-set Settings value wins over the env
+	// (#106), so spawning works without a moongitd restart.
+	claudeToken := storage.SettingValue(r.db, storage.SettingAgentClaudeToken)
+	env := agentContainerEnv(r.cfg, claudeToken, moongitToken, agentServerURL(r.cfg))
 
 	// Generate the dex MCP config (if dex is configured) into the workspace.
 	mcpPath, _, err := writeDexMCPConfig(workDir, r.cfg)

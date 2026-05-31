@@ -8,6 +8,7 @@ import type { CIRun, CodeCommentState, Issue, Repo } from "./types"
 export const keys = {
   whoami: () => ["whoami"] as const,
   tokens: () => ["tokens"] as const,
+  agentSettings: () => ["agentSettings"] as const,
   repos: () => ["repos"] as const,
   repo: (owner: string, repo: string) => ["repo", owner, repo] as const,
   refs: (owner: string, repo: string) => ["refs", owner, repo] as const,
@@ -59,6 +60,13 @@ export function useTokens() {
   return useQuery({
     queryKey: keys.tokens(),
     queryFn: () => api.listTokens(),
+  })
+}
+
+export function useAgentSettings() {
+  return useQuery({
+    queryKey: keys.agentSettings(),
+    queryFn: () => api.getAgentSettings(),
   })
 }
 

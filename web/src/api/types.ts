@@ -358,6 +358,18 @@ export interface CIJob {
   finished_at: string | null
 }
 
+// AgentSettings mirrors api.AgentSettings — write-only: the token value is
+// never returned, only whether one is configured.
+export interface AgentSettings {
+  claude_oauth_token_set: boolean
+}
+
+// UpdateAgentSettingsInput sets the global agent Claude token: omit to leave
+// unchanged, "" to clear, a value to set.
+export interface UpdateAgentSettingsInput {
+  claude_oauth_token?: string
+}
+
 export type AgentTurnStatus = "pending" | "running" | "done" | "error"
 
 // AgentTurn is one human follow-up message in an agent run's conversation.

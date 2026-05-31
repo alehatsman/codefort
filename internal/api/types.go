@@ -352,6 +352,18 @@ type CreateAgentTurnRequest struct {
 	Text string `json:"text"`
 }
 
+// AgentSettings is the operator-facing agent config. The Claude token is
+// write-only — the API reports only whether one is set, never its value.
+type AgentSettings struct {
+	ClaudeTokenSet bool `json:"claude_oauth_token_set"`
+}
+
+// UpdateAgentSettingsRequest sets the global agent Claude token. A nil pointer
+// leaves it unchanged; an empty string clears it; any other value sets it.
+type UpdateAgentSettingsRequest struct {
+	ClaudeToken *string `json:"claude_oauth_token"`
+}
+
 // Token represents an API token's metadata. The plaintext token itself
 // is never returned over the API except once, in CreatedToken at creation
 // time — list/lookup never expose it.

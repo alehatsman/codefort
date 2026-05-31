@@ -3,6 +3,7 @@ import { api } from "./client"
 import { keys } from "./queries"
 import type {
   ClaimIssueInput,
+  UpdateAgentSettingsInput,
   CreateCodeCommentInput,
   CreateCommentInput,
   CreateIssueInput,
@@ -178,6 +179,15 @@ export function useCreateAgentTurn(owner: string, repo: string, n: number) {
   return useMutation({
     mutationFn: (text: string) => api.createAgentTurn(owner, repo, n, text),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRun(owner, repo, n) }),
+  })
+}
+
+// useUpdateAgentSettings sets/clears the global agent Claude token.
+export function useUpdateAgentSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpdateAgentSettingsInput) => api.updateAgentSettings(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.agentSettings() }),
   })
 }
 
