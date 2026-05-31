@@ -129,9 +129,9 @@ test("review tab groups comments by file, deep-links, and filters by state", asy
   // The snippet is shown for review context.
   await expect(page.locator(".review-row__snippet").first()).toContainText("la2")
 
-  // Switch to "all" → the resolved one appears too. One is open (Resolve), one
-  // is already resolved (Reopen).
-  await page.getByRole("button", { name: "all" }).click()
+  // Also checking "resolved" (open stays checked) → state=all, so the resolved
+  // one appears too. One is open (Resolve), one is already resolved (Reopen).
+  await page.getByRole("checkbox", { name: "resolved" }).click()
   await expect(page.getByText("already done")).toBeVisible()
   await expect(page.getByRole("button", { name: "Reopen" })).toHaveCount(1)
 
@@ -140,7 +140,7 @@ test("review tab groups comments by file, deep-links, and filters by state", asy
   await expect(page.getByRole("button", { name: "Reopen" })).toHaveCount(2)
   expect(state.codeComments.every((c) => c.resolved)).toBe(true)
 
-  // The open filter is now empty.
-  await page.getByRole("button", { name: "open", exact: true }).click()
+  // Unchecking "resolved" leaves only the open filter, which is now empty.
+  await page.getByRole("checkbox", { name: "resolved" }).click()
   await expect(page.getByText("open comment here")).toHaveCount(0)
 })

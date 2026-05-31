@@ -1,17 +1,8 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { usePulls, useRepo } from "../api/queries"
-import type { PRState } from "../api/types"
+import { PR_STATES, type PRState } from "../api/types"
 import OverviewCard from "../components/OverviewCard"
 import RepoHeader from "../components/RepoHeader"
-
-// PR list states the filter offers, plus "all" (no state param). Mirrors the
-// issue list's chip filter, scaled down to the PR lifecycle.
-const FILTERS: readonly { value: string; label: string }[] = [
-  { value: "open", label: "open" },
-  { value: "merged", label: "merged" },
-  { value: "closed", label: "closed" },
-  { value: "all", label: "all" },
-]
 
 const STATE_LABEL: Record<PRState, string> = {
   open: "open",
@@ -19,23 +10,44 @@ const STATE_LABEL: Record<PRState, string> = {
   closed: "closed",
 }
 
+// No state param => the default view (open only), matching the issue list's
+// "active states" default rather than showing everything.
+const DEFAULT_STATES: readonly PRState[] = ["open"]
+
 export default function PullsPage() {
   const { owner = "", repo = "" } = useParams()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const filter = params.get("state") ?? "open"
+
+  // State filter lives in the URL as a comma-joined ?state= (the server's
+  // parsePRStates splits it), mirroring the issue list's checkbox chips. An
+  // absent param is the default; an explicit (even empty) param is honored so
+  // an all-unchecked selection round-trips instead of snapping back to default.
+  const raw = params.get("state")
+  const activeStates: PRState[] =
+    raw === null
+      ? [...DEFAULT_STATES]
+      : raw
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s): s is PRState => PR_STATES.includes(s as PRState))
 
   const repoQ = useRepo(owner, repo)
-  // "all" omits the state param entirely; any other value is sent through.
-  const { data, isLoading, error } = usePulls(owner, repo, filter === "all" ? "" : filter)
+  // Empty selection => no state param => the server returns every state, the
+  // same "no filter = all" behavior the issue list has.
+  const { data, isLoading, error } = usePulls(owner, repo, activeStates.join(","))
 
-  function setFilter(value: string) {
+  function toggleState(s: PRState) {
+    const next = activeStates.includes(s)
+      ? activeStates.filter((x) => x !== s)
+      : [...activeStates, s]
     setParams(
       (prev) => {
-        const next = new URLSearchParams(prev)
-        if (value === "open") next.delete("state")
-        else next.set("state", value)
-        return next
+        const p = new URLSearchParams(prev)
+        // Persist the selection verbatim — an empty value (state=) is distinct
+        // from an absent param (the default), so unchecking all sticks.
+        p.set("state", next.join(","))
+        return p
       },
       { replace: true }
     )
@@ -62,15 +74,14 @@ export default function PullsPage() {
       <div className="filters">
         <div className="filter-row">
           <span className="filter-label">state:</span>
-          {FILTERS.map((f) => (
-            <label key={f.value} className="chip">
+          {PR_STATES.map((s) => (
+            <label key={s} className="chip">
               <input
-                type="radio"
-                name="pr-state"
-                checked={filter === f.value}
-                onChange={() => setFilter(f.value)}
+                type="checkbox"
+                checked={activeStates.includes(s)}
+                onChange={() => toggleState(s)}
               />
-              {f.label}
+              {s}
             </label>
           ))}
         </div>

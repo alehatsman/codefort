@@ -73,8 +73,13 @@ test("pull request list filters by state", async ({ page }) => {
   await expect(page.getByText("Open one")).toBeVisible()
   await expect(page.getByText("Merged one")).toBeHidden()
 
-  // Switch the filter to merged.
-  await page.getByRole("radio", { name: "merged" }).click()
+  // Checking "merged" adds it to the default open selection — both show.
+  await page.getByRole("checkbox", { name: "merged" }).click()
+  await expect(page.getByText("Open one")).toBeVisible()
+  await expect(page.getByText("Merged one")).toBeVisible()
+
+  // Unchecking "open" narrows to merged only.
+  await page.getByRole("checkbox", { name: "open" }).click()
   await expect(page.getByText("Merged one")).toBeVisible()
   await expect(page.getByText("Open one")).toBeHidden()
 })

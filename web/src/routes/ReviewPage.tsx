@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { Link, useParams, useSearchParams } from "react-router-dom"
 import { useCodeComments, useRepo, useWhoami } from "../api/queries"
 import { useDeleteCodeComment, useSetCodeCommentResolved } from "../api/mutations"
@@ -6,7 +7,17 @@ import BranchSelector from "../components/BranchSelector"
 import Avatar from "../components/Avatar"
 import type { CodeComment, CodeCommentState } from "../api/types"
 
-const STATES: CodeCommentState[] = ["open", "resolved", "all"]
+// The two real comment states. Both checked (or neither) => "all"; the
+// checkbox set maps onto the server's single ?state= (open|resolved|all),
+// keeping this filter visually identical to the issue list's chips.
+const COMMENT_STATES = ["open", "resolved"] as const
+
+// Derive the server state from which chips are checked. Neither checked falls
+// back to "all" (no filter = everything), mirroring the issue list.
+function deriveState(open: boolean, resolved: boolean): CodeCommentState {
+  if (open === resolved) return "all"
+  return open ? "open" : "resolved"
+}
 
 /**
  * Review tab: every code comment on the selected branch, grouped by file, each
@@ -25,11 +36,24 @@ export default function ReviewPage() {
   const commentsQ = useCodeComments(owner, repo, { ref: gitRef, state })
   const whoamiQ = useWhoami()
 
-  function setState(s: CodeCommentState) {
+  const checkedOpen = state === "open" || state === "all"
+  const checkedResolved = state === "resolved" || state === "all"
+
+  // Toggle one chip, recompute the server state, and write it to ?state=
+  // ("open" is the default, so it drops the param to keep the URL bare).
+  function toggleState(which: (typeof COMMENT_STATES)[number]) {
+    const open = which === "open" ? !checkedOpen : checkedOpen
+    const resolved = which === "resolved" ? !checkedResolved : checkedResolved
+    const s = deriveState(open, resolved)
     const next = new URLSearchParams(params)
     if (s === "open") next.delete("state")
     else next.set("state", s)
     setParams(next, { replace: true })
+  }
+
+  const checked: Record<(typeof COMMENT_STATES)[number], boolean> = {
+    open: checkedOpen,
+    resolved: checkedResolved,
   }
 
   const comments = commentsQ.data ?? []
@@ -40,16 +64,13 @@ export default function ReviewPage() {
       <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
       <div className="repo-toolbar">
         <BranchSelector owner={owner} repo={repo} />
-        <div className="seg" role="tablist" aria-label="Comment state">
-          {STATES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`seg__btn${state === s ? " is-active" : ""}`}
-              onClick={() => setState(s)}
-            >
+        <div className="filter-row">
+          <span className="filter-label">state:</span>
+          {COMMENT_STATES.map((s) => (
+            <label key={s} className="chip">
+              <input type="checkbox" checked={checked[s]} onChange={() => toggleState(s)} />
               {s}
-            </button>
+            </label>
           ))}
         </div>
       </div>
@@ -109,7 +130,7 @@ function ReviewRow({
       : `L${comment.start_line}`
 
   return (
-    <li className={`review-row${comment.resolved ? " is-resolved" : ""}`}>
+    <li className={clsx("review-row", { "is-resolved": comment.resolved })}>
       <div className="review-row__head">
         <Avatar name={comment.author} />
         <strong>{comment.author}</strong>
