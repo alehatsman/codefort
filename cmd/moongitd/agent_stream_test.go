@@ -52,15 +52,15 @@ func TestTranslateClaudeLine(t *testing.T) {
 func TestTurnStatus(t *testing.T) {
 	cases := []struct {
 		name    string
-		result  *claudeResult
+		result  *turnResult
 		exit    int
 		execErr error
 		want    string
 	}{
-		{"clean success", &claudeResult{Subtype: "success"}, 0, nil, "success"},
-		{"error result", &claudeResult{Subtype: "error_max_turns", IsError: true}, 0, nil, "failed"},
-		{"is_error flag", &claudeResult{Subtype: "success", IsError: true}, 0, nil, "failed"},
-		{"non-zero exit", &claudeResult{Subtype: "success"}, 1, nil, "error"},
+		{"clean success", &turnResult{Subtype: "success"}, 0, nil, "success"},
+		{"error result", &turnResult{Subtype: "error_max_turns", IsError: true}, 0, nil, "failed"},
+		{"is_error flag", &turnResult{Subtype: "success", IsError: true}, 0, nil, "failed"},
+		{"non-zero exit", &turnResult{Subtype: "success"}, 1, nil, "error"},
 		{"missing result", nil, 0, nil, "error"},
 		{"exec error", nil, 0, errTest("boom"), "error"},
 	}

@@ -202,6 +202,15 @@ var migrations = []string{
 	    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 	);
 	`,
+
+	// 11: per-run agent execution model (#110). An agent run executes via
+	// one of the pluggable execution models ('claude-edit' = claude edits
+	// files directly; 'mooncake-pilot' = mooncake plans+applies actions).
+	// Chosen at spawn, stored here. CI runs ignore it; the default keeps
+	// existing rows on the original model.
+	`
+	ALTER TABLE ci_runs ADD COLUMN execution_model TEXT NOT NULL DEFAULT 'claude-edit';
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

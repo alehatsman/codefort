@@ -11,7 +11,19 @@ const (
 	// (a `claude setup-token` value) injected into agent containers as
 	// CLAUDE_CODE_OAUTH_TOKEN. It's a secret — never return it over the API.
 	SettingAgentClaudeToken = "agent.claude_oauth_token"
+
+	// SettingAgentExecutionModel is the operator-set default execution model
+	// for agent runs that don't pick one at spawn ("claude-edit" |
+	// "mooncake-pilot"). Unset falls back to DefaultExecutionModel (#110).
+	SettingAgentExecutionModel = "agent.execution_model"
 )
+
+// ValidExecutionModel reports whether m is a known agent execution model.
+// Shared by the spawn endpoint and the settings endpoint so both reject
+// the same bad values.
+func ValidExecutionModel(m string) bool {
+	return m == ExecModelClaudeEdit || m == ExecModelMooncakePilot
+}
 
 // GetSetting returns a setting's value, or ErrNotFound when unset.
 func GetSetting(db *sql.DB, key string) (string, error) {

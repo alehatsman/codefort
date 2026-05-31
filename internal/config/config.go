@@ -114,6 +114,12 @@ type Config struct {
 	// http://host.docker.internal:<port-of-Addr>. Set via MOONGIT_AGENT_SERVER_URL.
 	AgentServerURL string
 
+	// AgentPilotMaxIterations caps the plan→apply iterations a single
+	// mooncake-pilot turn runs (`mooncake pilot run --max-iterations`).
+	// Only used by the mooncake-pilot execution model (#110). Set via
+	// MOONGIT_AGENT_PILOT_MAX_ITERATIONS.
+	AgentPilotMaxIterations int
+
 	// DexProject is the dex project id (keyed by the canonical repo root) the
 	// agent's dex MCP queries. Empty omits the dex MCP wiring. Set via
 	// MOONGIT_AGENT_DEX_PROJECT.
@@ -243,6 +249,12 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("MOONGIT_AGENT_TURN_TIMEOUT: %w", err)
 	}
 	cfg.AgentTurnTimeout = agentTurnTimeout
+
+	pilotIters, err := strconv.Atoi(envOr("MOONGIT_AGENT_PILOT_MAX_ITERATIONS", "10"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_AGENT_PILOT_MAX_ITERATIONS: %w", err)
+	}
+	cfg.AgentPilotMaxIterations = pilotIters
 
 	return cfg, nil
 }

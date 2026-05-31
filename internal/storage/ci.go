@@ -23,9 +23,9 @@ const (
 	// posting the summary) before the run goes terminal.
 	RunFinishing RunStatus = "finishing"
 	RunSuccess   RunStatus = "success"
-	RunFailed        RunStatus = "failed"
-	RunCanceled      RunStatus = "canceled"
-	RunError         RunStatus = "error" // infrastructure failure (checkout/parse), not a job's non-zero exit
+	RunFailed    RunStatus = "failed"
+	RunCanceled  RunStatus = "canceled"
+	RunError     RunStatus = "error" // infrastructure failure (checkout/parse), not a job's non-zero exit
 )
 
 // Terminal reports whether the status is a final state (no further transitions).
@@ -50,6 +50,17 @@ const (
 	RunKindAgent RunKind = "agent"
 )
 
+// Agent execution models (#110): the pluggable strategy an agent run uses
+// inside its container. Canonical here so storage (default), the server
+// (validation), and the runner (executor selection) share one vocabulary.
+const (
+	ExecModelClaudeEdit    = "claude-edit"
+	ExecModelMooncakePilot = "mooncake-pilot"
+	// DefaultExecutionModel seeds runs that don't specify one (and the
+	// column default for pre-#110 / CI rows).
+	DefaultExecutionModel = ExecModelClaudeEdit
+)
+
 // JobStatus is the lifecycle state of a single job within a run.
 type JobStatus string
 
@@ -68,22 +79,26 @@ var ErrNoRunQueued = errors.New("no run queued")
 
 // CIRun is one pipeline execution for a repo, identified per-repo by Number.
 type CIRun struct {
-	ID           int64
-	RepoID       int64
-	Number       int
-	Kind         RunKind // ci (default) | agent
-	IssueNumber  *int    // the issue an agent run serves; nil for CI runs
-	CommitSHA    string
-	CommitMsg    string // commit subject, frozen at enqueue (may be empty)
-	CommitAuthor string // commit author name, frozen at enqueue (may be empty)
-	Ref          string
-	Event        string
-	Trigger      string
-	Status       RunStatus
-	ClaimedAt    *time.Time
-	CreatedAt    time.Time
-	StartedAt    *time.Time
-	FinishedAt   *time.Time
+	ID          int64
+	RepoID      int64
+	Number      int
+	Kind        RunKind // ci (default) | agent
+	IssueNumber *int    // the issue an agent run serves; nil for CI runs
+	// ExecutionModel is the agent run's pluggable execution model
+	// ('claude-edit' | 'mooncake-pilot'); 'claude-edit' for CI rows by
+	// the column default, unused by CI (#110).
+	ExecutionModel string
+	CommitSHA      string
+	CommitMsg      string // commit subject, frozen at enqueue (may be empty)
+	CommitAuthor   string // commit author name, frozen at enqueue (may be empty)
+	Ref            string
+	Event          string
+	Trigger        string
+	Status         RunStatus
+	ClaimedAt      *time.Time
+	CreatedAt      time.Time
+	StartedAt      *time.Time
+	FinishedAt     *time.Time
 }
 
 // CIJob is one job within a run, identified within the run by Name.
@@ -103,14 +118,17 @@ type CIJob struct {
 // timestamps are assigned by EnqueueRun. Kind defaults to RunKindCI when empty;
 // IssueNumber is set only for agent runs.
 type NewRun struct {
-	Kind         RunKind
-	IssueNumber  *int
-	CommitSHA    string
-	CommitMsg    string
-	CommitAuthor string
-	Ref          string
-	Event        string
-	Trigger      string
+	Kind        RunKind
+	IssueNumber *int
+	// ExecutionModel is the agent execution model; empty falls back to the
+	// column default ('claude-edit'). Set only for agent runs (#110).
+	ExecutionModel string
+	CommitSHA      string
+	CommitMsg      string
+	CommitAuthor   string
+	Ref            string
+	Event          string
+	Trigger        string
 }
 
 // EnqueueRun allocates the next per-repo run number and inserts a queued run.
@@ -134,11 +152,15 @@ func EnqueueRun(db *sql.DB, repoID int64, r NewRun) (CIRun, error) {
 	if kind == "" {
 		kind = RunKindCI
 	}
+	execModel := r.ExecutionModel
+	if execModel == "" {
+		execModel = DefaultExecutionModel
+	}
 	run, err := scanRun(tx.QueryRow(`
-		INSERT INTO ci_runs(repo_id, number, kind, issue_number, commit_sha, commit_msg, commit_author, ref, event, trigger, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO ci_runs(repo_id, number, kind, issue_number, execution_model, commit_sha, commit_msg, commit_author, ref, event, trigger, status)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING `+runColumns+`
-	`, repoID, next, string(kind), r.IssueNumber, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued)))
+	`, repoID, next, string(kind), r.IssueNumber, execModel, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued)))
 	if err != nil {
 		return CIRun{}, err
 	}
@@ -499,7 +521,7 @@ func affected(res sql.Result, err error) error {
 	return nil
 }
 
-const runColumns = "id, repo_id, number, kind, issue_number, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at"
+const runColumns = "id, repo_id, number, kind, issue_number, execution_model, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at"
 
 func scanRun(s scanner) (CIRun, error) {
 	var r CIRun
@@ -507,7 +529,7 @@ func scanRun(s scanner) (CIRun, error) {
 	var issueNum, claimed, started, finished sql.NullInt64
 	var created int64
 	if err := s.Scan(
-		&r.ID, &r.RepoID, &r.Number, &kind, &issueNum, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
+		&r.ID, &r.RepoID, &r.Number, &kind, &issueNum, &r.ExecutionModel, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
 		&r.Ref, &r.Event, &r.Trigger,
 		&status, &claimed, &created, &started, &finished,
 	); err != nil {

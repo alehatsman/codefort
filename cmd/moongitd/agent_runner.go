@@ -47,6 +47,16 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 	log = log.With("issue", issue.Number)
 
+	// Select the execution model up front so an unknown model fails before
+	// we spend a workspace + container on it (#110).
+	exec, err := newAgentExecutor(run.ExecutionModel, r.cfg)
+	if err != nil {
+		log.Error("agent executor", "model", run.ExecutionModel, "err", err)
+		r.finish(run.ID, storage.RunError)
+		return
+	}
+	log = log.With("model", exec.Model())
+
 	workDir := agentWorkDir(r.cfg.DataDir, run.ID)
 	if err := os.RemoveAll(workDir); err == nil {
 		err = os.MkdirAll(workDir, 0o755)
@@ -132,8 +142,14 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		return
 	}
 
-	systemPrompt := composeAgentSystemPrompt(owner, name, issue)
-	status, execErr := r.runAgentTurn(parent, stream, elog, run.ID, 1, composeTurnPrompt(issue), systemPrompt, mcpPath, false)
+	spec := turnSpec{
+		sessionID:    agentSessionID(run.ID),
+		prompt:       composeTurnPrompt(issue),
+		systemPrompt: composeAgentSystemPrompt(owner, name, issue),
+		mcpPath:      mcpPath,
+		resume:       false,
+	}
+	status, execErr := r.runAgentTurn(parent, stream, elog, exec, 1, spec)
 	elog.Close()
 
 	if execErr != nil {
@@ -198,15 +214,31 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 		return
 	}
 
+	exec, err := newAgentExecutor(run.ExecutionModel, r.cfg)
+	if err != nil {
+		r.emit(elog, ci.EventRunFailed, map[string]any{"error": err.Error()})
+		elog.Close()
+		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		log.Error("agent turn executor", "model", run.ExecutionModel, "err", err)
+		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
+		return
+	}
+
 	// turn.Seq is the follow-up index (1-based); display number accounts for
-	// turn 1 being the issue body. Resume the session; the system prompt is
-	// already in it, so it's omitted. The MCP config file persists in the
-	// workspace from turn 1.
+	// turn 1 being the issue body. Resume the session (claude); the system
+	// prompt is already in it, so it's omitted. The MCP config file persists
+	// in the workspace from turn 1.
 	mcpPath := ""
 	if r.cfg.DexURL != "" {
 		mcpPath = "/work/" + dexMCPConfigName
 	}
-	_, execErr := r.runAgentTurn(parent, stream, elog, run.ID, turn.Seq+1, turn.Body, "", mcpPath, true)
+	spec := turnSpec{
+		sessionID: agentSessionID(run.ID),
+		prompt:    turn.Body,
+		mcpPath:   mcpPath,
+		resume:    true,
+	}
+	_, execErr := r.runAgentTurn(parent, stream, elog, exec, turn.Seq+1, spec)
 	elog.Close()
 
 	if execErr != nil {
@@ -225,12 +257,14 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 	log.Info("agent turn done; awaiting input")
 }
 
-// runAgentTurn composes and runs one claude turn under a per-turn deadline,
-// streaming each stream-json line onto the event log as an agent event and
-// bracketing the turn with turn.started/completed. It returns the turn status
-// and any executor error (couldn't run claude / cancelled), but does not itself
-// finalize the run or job — the caller decides whether to park or fail.
-func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession, elog *ci.EventLog, runID int64, turnNum int, prompt, systemPrompt, mcpPath string, resume bool) (status string, execErr error) {
+// runAgentTurn composes and runs one turn under a per-turn deadline via the
+// run's executor, streaming each translated output line onto the event log as
+// an agent event and bracketing the turn with turn.started/completed. It
+// returns the turn status and any executor error (couldn't run the CLI /
+// cancelled), but does not itself finalize the run or job — the caller decides
+// whether to park or fail. The executor decides what runs (claude vs mooncake
+// pilot) and how to translate its output.
+func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession, elog *ci.EventLog, exec agentExecutor, turnNum int, spec turnSpec) (status string, execErr error) {
 	ctx := parent
 	if r.cfg.AgentTurnTimeout > 0 {
 		var cancel context.CancelFunc
@@ -238,12 +272,12 @@ func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession,
 		defer cancel()
 	}
 
-	argv := buildClaudeArgv(agentSessionID(runID), prompt, systemPrompt, mcpPath, resume)
-	r.emit(elog, ci.EventAgentTurnStarted, map[string]any{"turn": turnNum, "prompt": prompt})
+	argv := exec.Argv(spec)
+	r.emit(elog, ci.EventAgentTurnStarted, map[string]any{"turn": turnNum, "prompt": spec.prompt, "model": exec.Model()})
 
-	var result *claudeResult
+	var result *turnResult
 	exitCode, execErr := stream.ExecStream(ctx, argv, func(line []byte) {
-		et, data, res := translateClaudeLine(line)
+		et, data, res := exec.Translate(line)
 		if et == "" {
 			return
 		}

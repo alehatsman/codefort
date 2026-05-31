@@ -45,10 +45,11 @@ func translateClaudeLine(line []byte) (eventType string, data map[string]any, re
 }
 
 // turnStatus maps a finished turn onto a CI-style status string for the
-// turn.completed event and run finalization. A missing result (claude died
-// before emitting one) or a non-zero exit is an error; an is_error/non-success
-// result is a failure; otherwise success.
-func turnStatus(result *claudeResult, exitCode int, execErr error) string {
+// turn.completed event and run finalization. A missing result (the CLI died
+// before emitting a terminal record) or a non-zero exit is an error; an
+// is_error/non-success result is a failure; otherwise success. Operates on the
+// model-agnostic turnResult so it serves every executor.
+func turnStatus(result *turnResult, exitCode int, execErr error) string {
 	switch {
 	case execErr != nil || exitCode != 0 || result == nil:
 		return "error"

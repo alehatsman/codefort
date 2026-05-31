@@ -63,6 +63,21 @@ func (s *Server) handleSpawnAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resolve the execution model: an explicit request value wins (must be
+	// known), else the operator's configured default, else the built-in
+	// default (#110).
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		model = storage.SettingValue(s.db, storage.SettingAgentExecutionModel)
+	}
+	if model == "" {
+		model = storage.DefaultExecutionModel
+	}
+	if !storage.ValidExecutionModel(model) {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid execution model %q", model))
+		return
+	}
+
 	owner := r.PathValue("owner")
 	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
 	bareRepo := filepath.Join(s.cfg.ReposDir, owner, repo+".git")
@@ -79,14 +94,15 @@ func (s *Server) handleSpawnAgent(w http.ResponseWriter, r *http.Request) {
 	msg, author := gitCommitMeta(bareRepo, sha)
 	n := issue.Number
 	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
-		Kind:         storage.RunKindAgent,
-		IssueNumber:  &n,
-		CommitSHA:    sha,
-		CommitMsg:    msg,
-		CommitAuthor: author,
-		Ref:          ref,
-		Event:        "agent",
-		Trigger:      identityFromContext(r),
+		Kind:           storage.RunKindAgent,
+		IssueNumber:    &n,
+		ExecutionModel: model,
+		CommitSHA:      sha,
+		CommitMsg:      msg,
+		CommitAuthor:   author,
+		Ref:            ref,
+		Event:          "agent",
+		Trigger:        identityFromContext(r),
 	})
 	if err != nil {
 		s.logger.Error("agent spawn enqueue", "err", err)

@@ -286,25 +286,29 @@ type CommitDetail struct {
 // CIRun is the public view of a CI run. Number is the per-repo run number
 // (the address clients use); the internal DB id is not exposed.
 type CIRun struct {
-	Number       int        `json:"number"`
-	Kind         string     `json:"kind"`                   // "ci" | "agent"
-	IssueNumber  *int       `json:"issue_number,omitempty"` // the issue an agent run serves
-	CommitSHA    string     `json:"commit_sha"`
-	CommitMsg    string     `json:"commit_msg,omitempty"`
-	CommitAuthor string     `json:"commit_author,omitempty"`
-	Ref          string     `json:"ref"`
-	Event        string     `json:"event"`
-	Trigger      string     `json:"trigger,omitempty"`
-	Status       string     `json:"status"`
-	CreatedAt    time.Time  `json:"created_at"`
-	StartedAt    *time.Time `json:"started_at"`
-	FinishedAt   *time.Time `json:"finished_at"`
+	Number         int        `json:"number"`
+	Kind           string     `json:"kind"`                      // "ci" | "agent"
+	IssueNumber    *int       `json:"issue_number,omitempty"`    // the issue an agent run serves
+	ExecutionModel string     `json:"execution_model,omitempty"` // agent model: "claude-edit" | "mooncake-pilot"
+	CommitSHA      string     `json:"commit_sha"`
+	CommitMsg      string     `json:"commit_msg,omitempty"`
+	CommitAuthor   string     `json:"commit_author,omitempty"`
+	Ref            string     `json:"ref"`
+	Event          string     `json:"event"`
+	Trigger        string     `json:"trigger,omitempty"`
+	Status         string     `json:"status"`
+	CreatedAt      time.Time  `json:"created_at"`
+	StartedAt      *time.Time `json:"started_at"`
+	FinishedAt     *time.Time `json:"finished_at"`
 }
 
 // SpawnAgentRequest starts an agent run for an issue. Ref is the base the agent
-// checks out and branches from (optional; defaults to the repo's HEAD).
+// checks out and branches from (optional; defaults to the repo's HEAD). Model
+// selects the execution model ("claude-edit" | "mooncake-pilot"); empty uses
+// the server's configured default (#110).
 type SpawnAgentRequest struct {
-	Ref string `json:"ref,omitempty"`
+	Ref   string `json:"ref,omitempty"`
+	Model string `json:"model,omitempty"`
 }
 
 // TriggerCIRunRequest starts a CI run for an arbitrary ref (branch, tag, or
