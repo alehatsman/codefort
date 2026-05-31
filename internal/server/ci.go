@@ -294,9 +294,8 @@ func (s *Server) handleCIJobEvents(w http.ResponseWriter, r *http.Request) {
 		if err == nil && fresh.Status.Terminal() {
 			// One final drain to catch anything flushed between the read above
 			// and the status going terminal.
-			tail, end, terr := ci.ReadEvents(path, offset)
+			tail, _, terr := ci.ReadEvents(path, offset)
 			if terr == nil {
-				offset = end
 				for _, ev := range tail {
 					if ev.Seq <= lastID {
 						continue

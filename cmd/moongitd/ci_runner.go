@@ -240,15 +240,17 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 
 	// Fresh workspace; always cleaned up.
 	workDir := filepath.Join(r.cfg.DataDir, "ci", "work", strconv.FormatInt(run.ID, 10))
-	if err := os.RemoveAll(workDir); err == nil {
-		err = os.MkdirAll(workDir, 0o755)
-	}
-	if err != nil {
+	if err := os.RemoveAll(workDir); err != nil {
 		log.Error("ci workspace", "err", err)
 		r.finish(run.ID, storage.RunError)
 		return
 	}
-	defer os.RemoveAll(workDir)
+	if err := os.MkdirAll(workDir, 0o755); err != nil {
+		log.Error("ci workspace", "err", err)
+		r.finish(run.ID, storage.RunError)
+		return
+	}
+	defer func() { _ = os.RemoveAll(workDir) }()
 
 	ctx := parent
 	if r.cfg.CIRunTimeout > 0 {

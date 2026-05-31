@@ -3,7 +3,7 @@ package storage
 import (
 	"database/sql"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // registers the pure-Go "sqlite" database/sql driver
 )
 
 // Open returns the writer pool: a single connection so all writes serialize

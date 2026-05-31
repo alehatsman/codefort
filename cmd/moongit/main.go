@@ -477,7 +477,7 @@ func runIssueDelete(args []string) error {
 	if !*yes {
 		fmt.Printf("Delete issue #%d and all its comments? This cannot be undone. [y/N]: ", num)
 		var answer string
-		fmt.Scanln(&answer)
+		_, _ = fmt.Scanln(&answer)
 		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
 			fmt.Println("aborted")
 			return nil
@@ -768,7 +768,7 @@ func runReviewDelete(args []string) error {
 // (no server round-trip): they operate on the mgitci.yml in the working copy.
 func runCI(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit ci <validate|run> ...")
+		return errors.New("usage: moongit ci <validate|run>")
 	}
 	switch args[0] {
 	case "validate":
