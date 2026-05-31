@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import {
   useBlob,
   useCodeComments,
+  useCommitCIStatus,
   useCommits,
   useIntel,
   useIntelSummaries,
@@ -52,9 +53,21 @@ export default function RepoPage() {
         <BranchSelector owner={r.owner} repo={r.name} />
       </div>
       {isBlob ? (
-        <BlobView owner={r.owner} repo={r.name} path={path} gitRef={gitRef} />
+        <BlobView
+          owner={r.owner}
+          repo={r.name}
+          path={path}
+          gitRef={gitRef}
+          ciEnabled={r.ci_enabled}
+        />
       ) : (
-        <TreeView owner={r.owner} repo={r.name} path={path} gitRef={gitRef} />
+        <TreeView
+          owner={r.owner}
+          repo={r.name}
+          path={path}
+          gitRef={gitRef}
+          ciEnabled={r.ci_enabled}
+        />
       )}
     </div>
   )
@@ -65,9 +78,10 @@ interface ViewProps {
   repo: string
   path: string
   gitRef: string
+  ciEnabled: boolean
 }
 
-function TreeView({ owner, repo, path, gitRef }: ViewProps) {
+function TreeView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   const navigate = useNavigate()
   const treeQ = useTree(owner, repo, path, gitRef)
   // Every dex summary for the repo (one cached map): the breadcrumb reads the
@@ -77,6 +91,7 @@ function TreeView({ owner, repo, path, gitRef }: ViewProps) {
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
   const summariesQ = useIntelSummaries(owner, repo, isIndexed)
   const treeCommitsQ = useTreeCommits(owner, repo, path, gitRef)
+  const ciStatusQ = useCommitCIStatus(owner, repo, ciEnabled)
 
   // j/k select a file/folder; Enter opens it. h/l are left to useTabNav.
   const entries = treeQ.data?.entries ?? []
@@ -123,6 +138,7 @@ function TreeView({ owner, repo, path, gitRef }: ViewProps) {
         repo={repo}
         path={path}
         latest={treeCommitsQ.data?.latest}
+        ciRun={ciStatusQ.data?.get(treeCommitsQ.data?.latest?.sha ?? "")}
         total={treeCommitsQ.data?.total ?? 0}
         loading={treeCommitsQ.isLoading}
       />
@@ -140,7 +156,7 @@ function TreeView({ owner, repo, path, gitRef }: ViewProps) {
   )
 }
 
-function BlobView({ owner, repo, path, gitRef }: ViewProps) {
+function BlobView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   const blobQ = useBlob(owner, repo, path, gitRef)
   // The repo's full summary map (one cached query); the breadcrumb reads the
   // repo + ancestor dirs + this file from it. Crumbs dex has nothing for stay
@@ -151,6 +167,7 @@ function BlobView({ owner, repo, path, gitRef }: ViewProps) {
   // Latest commit touching this file, for the GitHub-style header.
   const commitsQ = useCommits(owner, repo, { path, perPage: 1, ref: gitRef })
   const lastCommit = commitsQ.data?.commits?.[0]
+  const ciStatusQ = useCommitCIStatus(owner, repo, ciEnabled)
   // Review comments anchored to this file on this branch, plus the viewer's
   // identity for author-only resolve/delete.
   const commentsQ = useCodeComments(owner, repo, { ref: gitRef, path, state: "all" })
@@ -168,7 +185,13 @@ function BlobView({ owner, repo, path, gitRef }: ViewProps) {
       <OverviewCard owner={owner} repo={repo} path={path} summaries={summaries} />
       <div className="blob">
         {lastCommit && (
-          <CommitMeta owner={owner} repo={repo} commit={lastCommit} className="blob__commit" />
+          <CommitMeta
+            owner={owner}
+            repo={repo}
+            commit={lastCommit}
+            ciRun={ciStatusQ.data?.get(lastCommit.sha)}
+            className="blob__commit"
+          />
         )}
         <div className="blob__head">
           <span className="muted small">

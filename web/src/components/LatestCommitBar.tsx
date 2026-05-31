@@ -1,7 +1,8 @@
 import clsx from "clsx"
 import { Link } from "react-router-dom"
-import type { Commit } from "../api/types"
+import type { CIRun, Commit } from "../api/types"
 import Avatar from "./Avatar"
+import CommitCIStatus from "./CommitCIStatus"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
   repo: string
   path: string
   latest: Commit | null | undefined
+  ciRun?: CIRun
   total: number
   loading: boolean
 }
@@ -19,7 +21,15 @@ interface Props {
  * right. While the commit annotation query is in flight it shows a dim
  * placeholder so the file tree doesn't jump when the data arrives.
  */
-export default function LatestCommitBar({ owner, repo, path, latest, total, loading }: Props) {
+export default function LatestCommitBar({
+  owner,
+  repo,
+  path,
+  latest,
+  ciRun,
+  total,
+  loading,
+}: Props) {
   const commitsHref = `/${owner}/${repo}/commits${path ? `/${path}` : ""}`
 
   return (
@@ -37,6 +47,7 @@ export default function LatestCommitBar({ owner, repo, path, latest, total, load
           <span className="muted small" title={absoluteTime(latest.date)}>
             {timeAgo(latest.date)}
           </span>
+          <CommitCIStatus owner={owner} repo={repo} run={ciRun} />
         </div>
       ) : (
         <div className="latest-commit-bar__commit">

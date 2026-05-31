@@ -1,13 +1,15 @@
 import clsx from "clsx"
 import { Link } from "react-router-dom"
-import type { Commit } from "../api/types"
+import type { CIRun, Commit } from "../api/types"
 import Avatar from "./Avatar"
+import CommitCIStatus from "./CommitCIStatus"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 
 interface Props {
   owner: string
   repo: string
   commit: Commit
+  ciRun?: CIRun
   className?: string
 }
 
@@ -16,7 +18,7 @@ interface Props {
  * relative time — used in the blob header. The subject links to the file's
  * commit history.
  */
-export default function CommitMeta({ owner, repo, commit, className }: Props) {
+export default function CommitMeta({ owner, repo, commit, ciRun, className }: Props) {
   return (
     <div className={clsx("commit-meta", className)}>
       <Avatar name={commit.author} />
@@ -34,6 +36,7 @@ export default function CommitMeta({ owner, repo, commit, className }: Props) {
       <span className="muted small" title={absoluteTime(commit.date)}>
         {timeAgo(commit.date)}
       </span>
+      <CommitCIStatus owner={owner} repo={repo} run={ciRun} />
     </div>
   )
 }

@@ -265,14 +265,37 @@ export function useIntelSummaries(owner: string, repo: string, enabled: boolean)
   })
 }
 
+// Poll the list while any run is still live, so a freshly pushed run shows
+// progress without a refresh; stop once everything is terminal. Shared by
+// useCIRuns and useCommitCIStatus, the two readers of this query.
+const ciRunsRefetchInterval = (q: { state: { data?: CIRun[] } }) =>
+  q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false
+
 export function useCIRuns(owner: string, repo: string) {
   return useQuery({
     queryKey: keys.ciRuns(owner, repo),
     queryFn: () => api.listCIRuns(owner, repo),
     enabled: !!owner && !!repo,
-    // Poll the list while any run is still live, so a freshly pushed run shows
-    // progress without a refresh; stop once everything is terminal.
-    refetchInterval: (q) => (q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false),
+    refetchInterval: ciRunsRefetchInterval,
+  })
+}
+
+// useCommitCIStatus maps each commit SHA to its most recent CI run, for the
+// status badges shown beside commits (history list, last-commit bars). It
+// shares the ciRuns cache key with useCIRuns — one fetch, two readers — and
+// gates on `enabled` so repos without CI never fetch. The list is newest-first,
+// so the first run seen for a SHA is its latest.
+export function useCommitCIStatus(owner: string, repo: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.ciRuns(owner, repo),
+    queryFn: () => api.listCIRuns(owner, repo),
+    enabled: !!owner && !!repo && enabled,
+    refetchInterval: ciRunsRefetchInterval,
+    select: (runs) => {
+      const byCommit = new Map<string, CIRun>()
+      for (const run of runs) if (!byCommit.has(run.commit_sha)) byCommit.set(run.commit_sha, run)
+      return byCommit
+    },
   })
 }
 
