@@ -63,7 +63,7 @@ export default function SummariesPage() {
       )}
       {isIndexed && overviewQ.data && <Summaries overview={overviewQ.data} />}
 
-      {isIndexed && intel?.project && <IndexMeta project={intel.project} showPending />}
+      {isIndexed && intel?.project && <IndexMeta project={intel.project} />}
     </div>
   )
 }
