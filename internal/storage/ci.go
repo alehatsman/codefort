@@ -18,7 +18,11 @@ const (
 	// the run is holding its container open, waiting for the next human turn
 	// (or a finish / idle-timeout). CI runs never enter it.
 	RunAwaitingInput RunStatus = "awaiting_input"
-	RunSuccess       RunStatus = "success"
+	// RunFinishing is an agent-only non-terminal state: the human accepted the
+	// run, and the runner is performing handoff (materializing the branch +
+	// posting the summary) before the run goes terminal.
+	RunFinishing RunStatus = "finishing"
+	RunSuccess   RunStatus = "success"
 	RunFailed        RunStatus = "failed"
 	RunCanceled      RunStatus = "canceled"
 	RunError         RunStatus = "error" // infrastructure failure (checkout/parse), not a job's non-zero exit
@@ -274,8 +278,8 @@ func ReconcileOrphanRuns(db *sql.DB) (int, error) {
 	}
 	defer tx.Rollback()
 
-	// Orphans are runs left running or (agent-only) awaiting_input.
-	const orphanRuns = `SELECT id FROM ci_runs WHERE status IN ('running','awaiting_input')`
+	// Orphans are runs left running or (agent-only) awaiting_input/finishing.
+	const orphanRuns = `SELECT id FROM ci_runs WHERE status IN ('running','awaiting_input','finishing')`
 
 	if _, err := tx.Exec(`
 		UPDATE ci_jobs SET status = ?, finished_at = strftime('%s','now')
@@ -298,7 +302,7 @@ func ReconcileOrphanRuns(db *sql.DB) (int, error) {
 	}
 	res, err := tx.Exec(`
 		UPDATE ci_runs SET status = ?, finished_at = strftime('%s','now')
-		 WHERE status IN ('running','awaiting_input')
+		 WHERE status IN ('running','awaiting_input','finishing')
 	`, string(RunError))
 	if err != nil {
 		return 0, err

@@ -202,6 +202,7 @@ func (r *ciRunner) run(ctx context.Context) {
 		// holds no slot, and dispatching its next turn briefly takes one.
 		r.reapExpiredAgents(ctx)
 		r.drainTurns(ctx, &wg, agentSem)
+		r.drainFinishing(ctx, &wg, agentSem)
 		if ctx.Err() != nil {
 			return
 		}
@@ -240,6 +241,36 @@ func (r *ciRunner) drainTurns(ctx context.Context, wg *sync.WaitGroup, sem chan 
 			defer func() { <-sem }()
 			r.dispatchTurn(ctx, turn, run)
 		}(turn, run)
+	}
+}
+
+// drainFinishing claims and dispatches every agent run the human has accepted
+// (state finishing), bounded by the agent pool, performing handoff for each.
+// Mirrors drainKind/drainTurns.
+func (r *ciRunner) drainFinishing(ctx context.Context, wg *sync.WaitGroup, sem chan struct{}) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			return
+		}
+		run, err := storage.ClaimNextFinishingRun(r.db)
+		if err != nil {
+			<-sem
+			if !errors.Is(err, storage.ErrNoRunQueued) {
+				r.logger.Error("agent claim finishing", "err", err)
+			}
+			return
+		}
+		wg.Add(1)
+		go func(run storage.CIRun) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			r.finishAgentRun(ctx, run)
+		}(run)
 	}
 }
 

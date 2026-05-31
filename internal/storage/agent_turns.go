@@ -190,6 +190,52 @@ func MarkRunAwaitingInput(db *sql.DB, runID int64) error {
 	return affected(res, err)
 }
 
+// MarkRunFinishing accepts a parked agent run: it transitions awaiting_input ->
+// finishing, after which the runner performs handoff. The CAS on awaiting_input
+// rejects a finish on a run that's mid-turn (running) or already terminal —
+// callers get ErrNotFound and can surface a conflict.
+func MarkRunFinishing(db *sql.DB, runID int64) error {
+	res, err := db.Exec(`
+		UPDATE ci_runs SET status = ? WHERE id = ? AND status = ?
+	`, string(RunFinishing), runID, string(RunAwaitingInput))
+	return affected(res, err)
+}
+
+// ClaimNextFinishingRun atomically claims one agent run in the finishing state
+// for handoff, flipping it finishing -> running so a second runner pass won't
+// double-process it (the run goes terminal once handoff completes). Returns
+// ErrNoRunQueued when none are finishing.
+func ClaimNextFinishingRun(db *sql.DB) (CIRun, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return CIRun{}, err
+	}
+	defer tx.Rollback()
+
+	var id int64
+	err = tx.QueryRow(
+		`SELECT id FROM ci_runs WHERE kind = 'agent' AND status = 'finishing' ORDER BY id ASC LIMIT 1`,
+	).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return CIRun{}, ErrNoRunQueued
+	}
+	if err != nil {
+		return CIRun{}, err
+	}
+	run, err := scanRun(tx.QueryRow(`
+		UPDATE ci_runs SET status = 'running'
+		 WHERE id = ? AND status = 'finishing'
+		 RETURNING `+runColumns+`
+	`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return CIRun{}, ErrNoRunQueued
+	}
+	if err != nil {
+		return CIRun{}, err
+	}
+	return run, tx.Commit()
+}
+
 const turnColumns = "id, run_id, seq, author, body, status, claimed_at, created_at, started_at, finished_at"
 
 func scanTurn(s scanner) (AgentTurn, error) {

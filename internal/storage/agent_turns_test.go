@@ -113,6 +113,41 @@ func TestMarkRunAwaitingInputOnlyFromRunning(t *testing.T) {
 	}
 }
 
+func TestFinishingFlow(t *testing.T) {
+	db, repoID := seedRepo(t)
+	run := parkedAgentRun(t, db, repoID)
+
+	// awaiting_input -> finishing accepted.
+	if err := MarkRunFinishing(db, run.ID); err != nil {
+		t.Fatalf("MarkRunFinishing: %v", err)
+	}
+	// The runner claims it for handoff (finishing -> running).
+	claimed, err := ClaimNextFinishingRun(db)
+	if err != nil {
+		t.Fatalf("ClaimNextFinishingRun: %v", err)
+	}
+	if claimed.ID != run.ID || claimed.Status != RunRunning {
+		t.Errorf("claimed = %d/%s, want %d/running", claimed.ID, claimed.Status, run.ID)
+	}
+	// No second claim.
+	if _, err := ClaimNextFinishingRun(db); !errors.Is(err, ErrNoRunQueued) {
+		t.Fatalf("second claim err = %v, want ErrNoRunQueued", err)
+	}
+}
+
+func TestMarkRunFinishingRejectsNonParked(t *testing.T) {
+	db, repoID := seedRepo(t)
+	n := 1
+	run, err := EnqueueRun(db, repoID, NewRun{Kind: RunKindAgent, IssueNumber: &n, CommitSHA: "a", Ref: "HEAD", Event: "agent"})
+	if err != nil {
+		t.Fatalf("EnqueueRun: %v", err)
+	}
+	// queued (not awaiting_input) -> finish is a no-op CAS.
+	if err := MarkRunFinishing(db, run.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("finish on queued err = %v, want ErrNotFound", err)
+	}
+}
+
 func TestReconcileFinalizesAwaitingInput(t *testing.T) {
 	db, repoID := seedRepo(t)
 	run := parkedAgentRun(t, db, repoID)

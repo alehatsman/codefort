@@ -137,6 +137,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		// Infra failure (couldn't run claude / ctx cancel): the container is
 		// likely unusable — finalize and tear down.
 		log.Error("agent turn 1 exec", "err", execErr)
+		r.commentAgentFailure(run, "the first turn failed to run")
 		r.failAgentRun(run.ID, job.ID, workDir)
 		return
 	}
@@ -208,6 +209,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 	if execErr != nil {
 		log.Error("agent turn exec", "err", execErr)
 		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		r.commentAgentFailure(run, fmt.Sprintf("turn %d failed to run", turn.Seq+1))
 		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
 		return
 	}
@@ -285,6 +287,7 @@ func (r *ciRunner) reapExpiredAgents(ctx context.Context) {
 		zero := 0
 		r.finishJob(jobID, storage.JobSuccess, &zero)
 		r.finish(run.ID, storage.RunCanceled)
+		r.commentAgentFailure(run, "idle/lifetime timeout")
 		log.Info("agent run reaped (lifetime cap)")
 	}
 }
