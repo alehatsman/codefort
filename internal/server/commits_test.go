@@ -687,3 +687,186 @@ func TestHandleIssueCommitsUnbornRepo(t *testing.T) {
 		t.Errorf("unborn: status=%d len=%d, want 200 0", code, len(out))
 	}
 }
+||||||| parent of e6f7060 (feat(server): branch compare endpoint (base..head three-dot diff))
+
+// --- branch compare endpoint ---
+
+// newCompareTestServer builds a repo where main and feature diverge from a
+// shared root, so a base=main head=feature compare exercises the three-dot
+// (merge-base) semantics: main's own post-divergence edit must NOT appear in
+// the diff, only what feature introduced.
+//
+//	root      a.txt="one\n"
+//	main      a.txt="one\nmain\n"     (1 commit ahead of root, on base only)
+//	feature   + feature.txt           (1 commit ahead of root, on head only)
+func newCompareTestServer(t *testing.T) *Server {
+	t.Helper()
+	db, err := storage.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := storage.Migrate(db); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	if _, err := storage.EnsureRepo(db, cOwner, cRepo); err != nil {
+		t.Fatalf("EnsureRepo: %v", err)
+	}
+
+	reposDir := t.TempDir()
+	work := t.TempDir()
+	env := append(os.Environ(),
+		"GIT_AUTHOR_NAME=Alice", "GIT_AUTHOR_EMAIL=a@b.c",
+		"GIT_COMMITTER_NAME=Alice", "GIT_COMMITTER_EMAIL=a@b.c",
+	)
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = work
+		cmd.Env = env
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	write := func(rel, content string) {
+		t.Helper()
+		p := filepath.Join(work, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	git("init", "-q", "-b", "main")
+	write("a.txt", "one\n")
+	git("add", ".")
+	git("commit", "-q", "-m", "root commit")
+
+	// feature diverges from root.
+	git("checkout", "-q", "-b", "feature")
+	write("feature.txt", "feature\n")
+	git("add", ".")
+	git("commit", "-q", "-m", "feature work")
+
+	// main advances independently.
+	git("checkout", "-q", "main")
+	write("a.txt", "one\nmain\n")
+	git("add", ".")
+	git("commit", "-q", "-m", "main work")
+
+	bare := filepath.Join(reposDir, cOwner, cRepo+".git")
+	if err := os.MkdirAll(filepath.Dir(bare), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git("clone", "-q", "--bare", work, bare)
+
+	return &Server{
+		cfg:    &config.Config{ReposDir: reposDir},
+		db:     db,
+		rdb:    db,
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+}
+
+func getCompare(t *testing.T, s *Server, query string) (api.Compare, int) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/repos/"+cOwner+"/"+cRepo+"/compare?"+query, nil)
+	req.SetPathValue("owner", cOwner)
+	req.SetPathValue("repo", cRepo)
+	rr := httptest.NewRecorder()
+	s.handleCompare(rr, req)
+	var out api.Compare
+	if rr.Code == http.StatusOK {
+		if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+			t.Fatalf("decode compare %q: %v (body=%s)", query, err, rr.Body.String())
+		}
+	}
+	return out, rr.Code
+}
+
+func TestHandleCompareDiverged(t *testing.T) {
+	s := newCompareTestServer(t)
+	out, code := getCompare(t, s, "base=main&head=feature")
+	if code != http.StatusOK {
+		t.Fatalf("status = %d", code)
+	}
+	// feature is 1 ahead (feature work) and 1 behind (main work).
+	if out.Ahead != 1 || out.Behind != 1 {
+		t.Errorf("ahead/behind = %d/%d, want 1/1", out.Ahead, out.Behind)
+	}
+	if out.MergeBase == "" {
+		t.Error("merge base empty, want the root commit sha")
+	}
+	if len(out.Commits) != 1 || out.Commits[0].Subject != "feature work" {
+		t.Fatalf("commits = %+v, want [feature work]", out.Commits)
+	}
+	// Three-dot diff: only feature.txt, NOT main's a.txt edit.
+	if len(out.Files) != 1 {
+		t.Fatalf("files = %+v, want only feature.txt", out.Files)
+	}
+	f := out.Files[0]
+	if f.NewPath != "feature.txt" || f.Status != "added" {
+		t.Errorf("file = %+v, want feature.txt added", f)
+	}
+	if out.Additions != 1 || out.Deletions != 0 {
+		t.Errorf("totals +%d -%d, want +1 -0", out.Additions, out.Deletions)
+	}
+}
+
+func TestHandleCompareReverseDirection(t *testing.T) {
+	s := newCompareTestServer(t)
+	// base=feature head=main is the mirror: main is 1 ahead, feature 1 behind,
+	// and the diff is main's a.txt edit, not feature.txt.
+	out, _ := getCompare(t, s, "base=feature&head=main")
+	if out.Ahead != 1 || out.Behind != 1 {
+		t.Errorf("ahead/behind = %d/%d, want 1/1", out.Ahead, out.Behind)
+	}
+	if len(out.Files) != 1 || out.Files[0].NewPath != "a.txt" {
+		t.Fatalf("files = %+v, want only a.txt", out.Files)
+	}
+	if out.Additions != 1 {
+		t.Errorf("additions = %d, want 1", out.Additions)
+	}
+}
+
+func TestHandleCompareIdentical(t *testing.T) {
+	s := newCompareTestServer(t)
+	out, code := getCompare(t, s, "base=main&head=main")
+	if code != http.StatusOK {
+		t.Fatalf("status = %d", code)
+	}
+	if out.Ahead != 0 || out.Behind != 0 {
+		t.Errorf("ahead/behind = %d/%d, want 0/0", out.Ahead, out.Behind)
+	}
+	if len(out.Commits) != 0 || len(out.Files) != 0 {
+		t.Errorf("identical compare: commits=%d files=%d, want 0/0", len(out.Commits), len(out.Files))
+	}
+	// Initialized to empty slices, never null, so the web client can map() safely.
+	if out.Commits == nil || out.Files == nil {
+		t.Error("commits/files marshaled as null, want []")
+	}
+}
+
+func TestHandleCompareValidation(t *testing.T) {
+	s := newCompareTestServer(t)
+	tests := []struct {
+		name, query string
+		want        int
+	}{
+		{"missing both", "", http.StatusBadRequest},
+		{"missing head", "base=main", http.StatusBadRequest},
+		{"missing base", "head=feature", http.StatusBadRequest},
+		{"unknown base", "base=nope&head=feature", http.StatusNotFound},
+		{"unknown head", "base=main&head=nope", http.StatusNotFound},
+		{"injection attempt", "base=main&head=--all", http.StatusNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, code := getCompare(t, s, tt.query); code != tt.want {
+				t.Errorf("status = %d, want %d", code, tt.want)
+			}
+		})
+	}
+}

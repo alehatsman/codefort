@@ -283,6 +283,26 @@ type CommitDetail struct {
 	Truncated bool       `json:"truncated"`
 }
 
+// Compare is the difference of Head relative to Base, computed as the
+// three-dot (merge-base) diff git uses for pull requests: the changes Head
+// introduces since the two branches diverged. MergeBase is the SHA the diff is
+// taken against ("" when the histories are unrelated, in which case the diff is
+// the whole Head tree). Ahead/Behind count commits Head/Base has that the other
+// does not. Commits are the Ahead commits (Base..Head), newest first.
+// Additions/Deletions total across Files; Truncated mirrors CommitDetail.
+type Compare struct {
+	Base      string     `json:"base"`       // base branch short name
+	Head      string     `json:"head"`       // head branch short name
+	MergeBase string     `json:"merge_base"` // SHA the diff is taken against; "" if unrelated
+	Ahead     int        `json:"ahead"`      // commits on Head not on Base
+	Behind    int        `json:"behind"`     // commits on Base not on Head
+	Commits   []Commit   `json:"commits"`    // Base..Head, newest first
+	Files     []DiffFile `json:"files"`
+	Additions int        `json:"additions"`
+	Deletions int        `json:"deletions"`
+	Truncated bool       `json:"truncated"`
+}
+
 // CIRun is the public view of a CI run. Number is the per-repo run number
 // (the address clients use); the internal DB id is not exposed.
 type CIRun struct {

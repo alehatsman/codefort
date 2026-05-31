@@ -212,6 +212,87 @@ func (s *Server) handleCommit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, detail)
 }
 
+// emptyTreeSHA is git's well-known SHA-1 hash of the empty tree, used as the
+// diff base when two branches share no history (no merge base) so the compare
+// still renders the whole head tree as additions.
+const emptyTreeSHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+// handleCompare returns the three-dot diff of head relative to base: the
+// changes head introduces since merge-base(base, head), plus the ahead/behind
+// commit counts and the list of commits base..head. This is the read-only
+// foundation of the PR workflow (#70) and is useful on its own as a compare
+// view. No PR object is created.
+func (s *Server) handleCompare(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+		return
+	}
+	repoDir, ok := s.repoDirOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	base := strings.TrimSpace(r.URL.Query().Get("base"))
+	head := strings.TrimSpace(r.URL.Query().Get("head"))
+	if base == "" || head == "" {
+		writeError(w, http.StatusBadRequest, "base and head are required")
+		return
+	}
+	// Validate both against refs/heads — the same injection guard resolveRef
+	// uses, since the values are interpolated into revision args below.
+	if !branchExists(r.Context(), repoDir, base) {
+		writeError(w, http.StatusNotFound, "branch not found: "+base)
+		return
+	}
+	if !branchExists(r.Context(), repoDir, head) {
+		writeError(w, http.StatusNotFound, "branch not found: "+head)
+		return
+	}
+
+	out := api.Compare{Base: base, Head: head, Commits: []api.Commit{}, Files: []api.DiffFile{}}
+
+	// merge-base(base, head): the point the diff is taken against. Missing means
+	// unrelated histories — diff the whole head tree against the empty tree.
+	if mb, err := gitOutput(r.Context(), repoDir, "merge-base", base, head); err == nil {
+		out.MergeBase = strings.TrimSpace(string(mb))
+	}
+	diffBase := out.MergeBase
+	if diffBase == "" {
+		diffBase = emptyTreeSHA
+	}
+
+	// ahead/behind: `rev-list --left-right --count base...head` prints
+	// "<behind>\t<ahead>" (left = base-only, right = head-only).
+	if raw, err := gitOutput(r.Context(), repoDir, "rev-list", "--left-right", "--count", base+"..."+head); err == nil {
+		if f := strings.Fields(string(raw)); len(f) == 2 {
+			out.Behind, _ = strconv.Atoi(f[0])
+			out.Ahead, _ = strconv.Atoi(f[1])
+		}
+	}
+
+	// Commits head has that base does not (base..head), newest first.
+	if raw, err := gitOutput(r.Context(), repoDir, "log", "--format="+commitFormat, base+".."+head); err == nil {
+		if commits := parseCommits(raw); len(commits) > 0 {
+			out.Commits = commits
+		}
+	}
+
+	patch, err := gitOutput(r.Context(), repoDir, "diff-tree", "--no-commit-id", "-p", "-r", "-M", "--no-color", diffBase, head)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "diff failed")
+		return
+	}
+	files, truncated := parseUnifiedDiff(patch, maxDiffLines)
+	if len(files) > 0 {
+		out.Files = files
+	}
+	out.Truncated = truncated
+	for _, f := range files {
+		out.Additions += f.Additions
+		out.Deletions += f.Deletions
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 // commitParents returns the parent SHAs of sha (empty for a root commit).
 // `rev-list --parents -n 1` prints "<sha> <parent1> <parent2> ...".
 func commitParents(ctx context.Context, repoDir, sha string) []string {
