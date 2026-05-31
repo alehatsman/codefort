@@ -8,6 +8,9 @@
 *.test
 *.out
 
+# Generated architecture snapshot (go-quality arch-snapshot; local, read-only)
+/docs-working/
+
 # Runtime data (SQLite db, bare repos)
 /data/
 

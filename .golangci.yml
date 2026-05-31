@@ -1,0 +1,135 @@
+version: "2"
+
+# Shared baseline golangci-lint config for Go projects in this fleet.
+#
+# This is the COMMON core reconciled from mooncake + dex: the bug-catching
+# linter selection, the cyclop soft-cap (35), the staticcheck check set, the
+# base gosec excludes, and the revive rule set. Consumers layer their own
+# project-specific `exclusions.rules` on top (each project's excludes are
+# bound to concrete file paths and stay local). golangci-lint v2 has no native
+# config-merge, so a project either copies this file and appends its excludes,
+# or the go-quality component drops it in as the starting point.
+
+run:
+  timeout: 5m
+  tests: false
+
+linters:
+  # Pragmatic stance: enable bug-catching linters, disable style-pedantry ones.
+  # The dropped linters (gocritic / unparam / dupl / prealloc) flag legitimate
+  # design choices as problems; the gocyclo/dupl soft-cap discipline (see
+  # scripts/budget-status.sh + scripts/dupl-report.sh) covers the complexity
+  # and duplication ratchet without per-PR noise.
+  enable:
+    - gosec
+    - errcheck
+    - staticcheck
+    - govet
+    - ineffassign
+    - unused
+    - misspell
+    - unconvert
+    - bodyclose
+    - revive
+    - cyclop
+  disable:
+    - errname
+    - exhaustive
+    - wrapcheck
+    - goconst
+    - gocyclo     # superseded by cyclop (single cyclomatic source); arch-snapshot uses gocyclo standalone for the soft-cap ratchet
+    - gocritic    # mostly style; the project's review process handles ifElseChain / typeSwitchVar etc.
+    - unparam     # flags interface contracts that always return nil err as "problems"; not actionable
+    - dupl        # over-eager; scripts/dupl-report.sh gives a better targeted report
+    - prealloc    # micro-optimisation noise; profile-driven not lint-driven
+
+  settings:
+    gosec:
+      severity: "medium"
+      confidence: "medium"
+      # Base excludes shared across the fleet. Run gosec via golangci-lint, not
+      # standalone, so this stays the single source of truth.
+      excludes:
+        - G104  # errors unhandled
+        - G115  # integer overflow conversion
+        - G204  # subprocess launched with variable
+        - G301  # bad dir perms
+        - G302  # file perms — config/lockfile use 0644 by design
+        - G304  # path from variable — every config-reading codepath
+        - G306  # bad write perms
+        # moongit additions:
+        - G202  # SQL string concat — query strings built from controlled internal inputs (column/op names), not user data
+        - G702  # command injection via taint analysis — git plumbing args are server-controlled
+        - G704  # SSRF via taint analysis — high false-positive on internal HTTP plumbing
+        - G705  # taint-analysis false positives on internal plumbing
+
+    cyclop:
+      # Aligned with the soft cap (35). Anything above 35 is a refactor target;
+      # the arch-snapshot ratchet drives those down over time. Below 35,
+      # functions pass lint regardless.
+      max-complexity: 35
+
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+
+    revive:
+      enable-all-rules: false
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unused-parameter
+        - name: unreachable-code
+
+    staticcheck:
+      # Keep SA* (the real-bug checks); drop QF/ST/S style suggestions.
+      # ST1020/ST1005/S1008/S1017/S1034 are style preferences, not bugs.
+      # -ST1000: moongit packages don't (yet) all carry package comments; that's
+      # a doc backlog, not a bug. Relaxed here pending incremental package docs.
+      checks: ["all", "-QF*", "-ST1005", "-ST1020", "-ST1000", "-S1008", "-S1017", "-S1034"]
+
+  exclusions:
+    rules:
+      # Deferred cleanup closes (db/rows/stmt/tx.Rollback/conn/channel/file/
+      # response body) — idiomatic best-effort cleanup; the original error is
+      # what matters, and a failed close in a deferred path isn't actionable.
+      - linters: [errcheck]
+        text: 'Error return value of `[^`]*\.(Close|Rollback)` is not checked'
+
+      # fmt.Fprintf/Fprintln/Fprint to operator-facing writers (stdout/stderr,
+      # ssh channels) — best-effort terminal output; idiomatic to ignore.
+      - linters: [errcheck]
+        text: 'Error return value of `fmt\.F'
+
+      # bodyclose in the moongit CLI client: short-lived process that reads the
+      # response then exits, so an unclosed body is process-scoped and benign.
+      # (The daemon side does close its bodies.)
+      - path: cmd/moongit/
+        linters: [bodyclose]
+
+      # revive package-comments overlaps the relaxed staticcheck ST1000 — same
+      # package-doc backlog rationale.
+      - linters: [revive]
+        text: 'package-comments: should have a package comment'
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

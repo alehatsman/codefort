@@ -7,6 +7,20 @@
 # DAG:  build ──▶ test
 #          └────▶ vet
 #        web            (independent root)
+#
+# NOTE: the full Go quality gate now lives in `mooncake task ci` (go-quality
+# module — see tasks.yml). Wiring CI to call it directly is DEFERRED until the
+# runner can support it, which needs three things this image/runner don't have
+# yet (tracked separately):
+#   1. moongit-ci-dev carries golangci-lint/govulncheck/gocyclo/dupl + an M3
+#      mooncake (module insecure-host support, mooncake#44).
+#   2. the job container can reach this moongit to fetch the module — the runner
+#      currently uses the default bridge network, so 127.0.0.1:8080 is the
+#      container, not the host (needs --network host or --add-host + a reachable
+#      MOONCAKE_MODULE_INSECURE host).
+#   3. MOONCAKE_MODULE_INSECURE exported in the job env.
+# Until then the jobs below stay raw; `mooncake task ci` is enforced locally via
+# the pre-push hook.
 version: "1"
 on:
   push:
