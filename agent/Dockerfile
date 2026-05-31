@@ -38,6 +38,12 @@ RUN apt-get update \
 COPY dex /usr/local/bin/dex
 RUN chmod +x /usr/local/bin/dex
 
+# mgit — the moongit issue client, so the agent can comment on the issue it's
+# working (MOONGIT_TOKEN + MOONGIT_SERVER are injected per run, #77). A static
+# build dropped in like dex/mooncake (agent/mgit is a git-ignored build input).
+COPY mgit /usr/local/bin/mgit
+RUN chmod +x /usr/local/bin/mgit
+
 # The agent runs as an arbitrary uid:gid with no passwd entry, so point HOME at
 # a world-writable dir for claude's config/cache/logs (auth itself comes from
 # CLAUDE_CODE_OAUTH_TOKEN in the env, not a config file). /tmp is ephemeral,
@@ -46,6 +52,6 @@ ENV HOME=/tmp
 
 # Fail the build early if any tool the agent needs is missing or unrunnable
 # (mirrors the CI base's `mooncake --version` check).
-RUN claude --version && dex --version && mooncake --version && git --version
+RUN claude --version && dex --version && mgit help >/dev/null && mooncake --version && git --version
 
 WORKDIR /work

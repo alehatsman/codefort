@@ -70,6 +70,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
   Auth comes from `CLAUDE_CODE_OAUTH_TOKEN` / `ANTHROPIC_API_KEY` injected into
   the container env per run (#77), never baked in.
 - `dex` — the stdio→REST MCP shim, wired via a generated `--mcp-config` (#77).
+- `mgit` — the moongit issue client, so the agent can comment on the issue it's
+  working (`mgit issue comment <n> …`); `MOONGIT_TOKEN`/`MOONGIT_SERVER` are
+  injected per run. Drop a static `mgit` into `agent/mgit` (git-ignored build
+  input): `CGO_ENABLED=0 go build -o agent/mgit ./cmd/moongit`.
 - `mooncake`, `git` — inherited from `moongit-ci:latest`.
 
 ## Runtime notes

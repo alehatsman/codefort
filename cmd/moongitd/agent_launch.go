@@ -77,5 +77,8 @@ func composeAgentSystemPrompt(owner, repo string, issue api.Issue) string {
 	b.WriteString("When you finish, end your turn with a concise summary of what you changed and why.\n")
 	b.WriteString("If a decision falls outside your mandate, do not guess: stop and ask it as your final ")
 	b.WriteString("message, and a human will answer in the next turn.\n")
+	fmt.Fprintf(&b, "You can post progress or questions on the issue with `mgit issue comment %d "+
+		"--body \"...\"` — MOONGIT_TOKEN and MOONGIT_SERVER are already set in your environment.\n",
+		issue.Number)
 	return b.String()
 }
