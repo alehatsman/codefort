@@ -32,6 +32,12 @@ vars:
 # golangci-lint in-repo so the local config is honored).
 modules:
   goq: "127.0.0.1:8080/alehatsman/go-quality@v0.1.1"
+  # The web/ quality gate (lint/format/typecheck/build/test/vuln + ci/ci-fast)
+  # comes from the shared **ts-quality** module (alehatsman/ts-quality), the TS
+  # analog of go-quality. The ui-* tasks below wrap tq/*, passing `dir: web` so
+  # each tool runs in the web/ project. Same MOONCAKE_MODULE_INSECURE=127.0.0.1:8080
+  # prereq applies (http fetch).
+  tq: "127.0.0.1:8080/alehatsman/ts-quality@v0.1.0"
 
 tasks:
   # ---- dev loop ---------------------------------------------------------
@@ -211,38 +217,68 @@ tasks:
           argv: ["npm", "run", "dev"]
         cwd: web
 
-  ui-build:
-    desc: Build the UI for production into web/dist/
-    steps:
-      - shell:
-          cmd: "npm install"
-          creates: web/node_modules
-        cwd: web
-      - cmd:
-          argv: ["npm", "run", "build"]
-        cwd: web
-
+  # ---- web quality gate (ts-quality module, dir: web) -------------------
   ui-test-install:
-    desc: One-time install of Playwright browser binaries (chromium ~150MB)
+    desc: Install web deps (npm ci) + Playwright browser binaries (chromium ~150MB)
     steps:
-      - shell:
-          cmd: "npm install"
-          creates: web/node_modules
-        cwd: web
-      - cmd:
-          argv: ["npx", "playwright", "install", "chromium"]
-        cwd: web
+      - use: tq/tools
+        props: { dir: web }
+
+  ui-build:
+    desc: Build the UI for production into web/dist/ (vite build)
+    steps:
+      - use: tq/build
+        props: { dir: web }
+
+  ui-lint:
+    desc: Lint + format check the web UI (biome check)
+    steps:
+      - use: tq/lint
+        props: { dir: web }
+
+  ui-format:
+    desc: Format the web UI in place (biome format --write)
+    steps:
+      - use: tq/format
+        props: { dir: web }
+
+  ui-typecheck:
+    desc: Type-check the web UI (tsc -b)
+    steps:
+      - use: tq/typecheck
+        props: { dir: web }
+
+  ui-vuln:
+    desc: Audit web deps for known vulnerabilities (npm audit, prod deps, high+)
+    steps:
+      - use: tq/vuln
+        props: { dir: web }
 
   ui-test:
     desc: Run Playwright E2E tests (auto-spawns Vite dev server, mocks /api/*)
     steps:
-      - shell:
-          cmd: "npm install"
-          creates: web/node_modules
-        cwd: web
-      - cmd:
-          argv: ["npx", "playwright", "test"]
-        cwd: web
+      - use: tq/test
+        props: { dir: web }
+
+  ui-ci:
+    desc: Full web gate — npm ci + typecheck + lint + build + E2E (tq/ci)
+    steps:
+      - use: tq/ci
+        props: { dir: web }
+
+  ui-ci-fast:
+    desc: Fast web gate — typecheck + lint/format check (tq/ci-fast)
+    steps:
+      - use: tq/ci-fast
+        props: { dir: web }
+
+  ui-sync-config:
+    desc: Refresh web/biome.base.json from the shared ts-quality baseline
+    steps:
+      # Absolute dest via {{ invocation_dir }}: a relative module dest with a
+      # subdir resolves against the module cache dir, not the repo, so pin it.
+      - use: tq/sync-config
+        props: { dest: "{{ invocation_dir }}/web/biome.base.json" }
 
   clean:
     desc: Remove dev build artifacts (keeps ./data/)
