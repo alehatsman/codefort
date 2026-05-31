@@ -443,6 +443,10 @@ func TestHandleCommitRootCommit(t *testing.T) {
 	if out.Commit.Subject != "root commit" {
 		t.Errorf("subject = %q", out.Commit.Subject)
 	}
+	// The commit-detail view labels the primary branch; the root is on main.
+	if out.Commit.Branch != "main" {
+		t.Errorf("branch = %q, want main", out.Commit.Branch)
+	}
 	a := findFile(out.Files, "a.txt")
 	if a == nil {
 		t.Fatal("a.txt not in root diff")
@@ -655,6 +659,10 @@ func TestHandleIssueCommits(t *testing.T) {
 	if out[0].Subject != "close #12 finally" || out[1].Subject != "fix the parser (#12)" {
 		t.Errorf("subjects = %q, %q", out[0].Subject, out[1].Subject)
 	}
+	// All commits are on the default branch, so the primary-branch label is main.
+	if out[0].Branch != "main" || out[1].Branch != "main" {
+		t.Errorf("branches = %q, %q, want main, main", out[0].Branch, out[1].Branch)
+	}
 
 	// #123 matches only its own commit, not the #12 ones.
 	out, _ = getIssueCommits(t, s, "123")
@@ -688,6 +696,83 @@ func TestHandleIssueCommitsUnbornRepo(t *testing.T) {
 	}
 }
 ||||||| parent of e6f7060 (feat(server): branch compare endpoint (base..head three-dot diff))
+
+// TestHandleIssueCommitsBranchLabel verifies a commit that lives only on a
+// feature branch (not on the default branch) reports that feature branch as its
+// primary-branch label, while a commit on main reports "main".
+func TestHandleIssueCommitsBranchLabel(t *testing.T) {
+	db, err := storage.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := storage.Migrate(db); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	if _, err := storage.EnsureRepo(db, cOwner, cRepo); err != nil {
+		t.Fatalf("EnsureRepo: %v", err)
+	}
+
+	reposDir := t.TempDir()
+	work := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = work
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=Alice", "GIT_AUTHOR_EMAIL=a@b.c",
+			"GIT_COMMITTER_NAME=Alice", "GIT_COMMITTER_EMAIL=a@b.c",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	commit := func(subj string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(work, "f.txt"), []byte(subj), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		git("add", ".")
+		git("commit", "-q", "-m", subj)
+	}
+
+	git("init", "-q", "-b", "main")
+	commit("base on main (#7)") // on main
+	git("checkout", "-q", "-b", "feature")
+	commit("work on feature (#7)") // only on feature, never merged
+	// Return to main before cloning so the bare repo's HEAD (its default
+	// branch) is main, not the last-checked-out feature branch.
+	git("checkout", "-q", "main")
+
+	bare := filepath.Join(reposDir, cOwner, cRepo+".git")
+	if err := os.MkdirAll(filepath.Dir(bare), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git("clone", "-q", "--bare", work, bare)
+
+	s := &Server{
+		cfg:    &config.Config{ReposDir: reposDir},
+		db:     db,
+		rdb:    db,
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+
+	out, code := getIssueCommits(t, s, "7")
+	if code != http.StatusOK {
+		t.Fatalf("status = %d", code)
+	}
+	if len(out) != 2 {
+		t.Fatalf("got %d commits for #7, want 2: %+v", len(out), out)
+	}
+	// Newest first: the feature-only commit, then the main commit.
+	if out[0].Subject != "work on feature (#7)" || out[0].Branch != "feature" {
+		t.Errorf("commit[0] = %q on %q, want feature commit on %q", out[0].Subject, out[0].Branch, "feature")
+	}
+	// The base commit is reachable from both feature and main; main wins.
+	if out[1].Subject != "base on main (#7)" || out[1].Branch != "main" {
+		t.Errorf("commit[1] = %q on %q, want base commit on main", out[1].Subject, out[1].Branch)
+	}
+}
 
 // --- branch compare endpoint ---
 

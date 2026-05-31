@@ -299,6 +299,7 @@ test("issue detail lists the commits referencing it", async ({ page }) => {
           author: "alice",
           email: "a@b.c",
           date: now,
+          branch: "main",
         },
         {
           sha: "def5678abc1234def5678abc1234def5678abc12",
@@ -307,6 +308,7 @@ test("issue detail lists the commits referencing it", async ({ page }) => {
           author: "bob",
           email: "b@b.c",
           date: now,
+          branch: "feat/cache",
         },
       ],
     },
@@ -323,6 +325,8 @@ test("issue detail lists the commits referencing it", async ({ page }) => {
     "/alice/demo/commit/abc1234def5678abc1234def5678abc1234def56"
   )
   await expect(section.getByRole("link", { name: "abc1234" })).toBeVisible()
+  // Each row carries its primary-branch label.
+  await expect(section.locator(".branch-tag")).toHaveText(["main", "feat/cache"])
 })
 
 test("issue with no referencing commits hides the Commits section", async ({ page }) => {

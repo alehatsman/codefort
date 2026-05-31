@@ -11,6 +11,7 @@ import StateIcon from "../components/StateIcon"
 import Avatar from "../components/Avatar"
 import CommentItem from "../components/CommentItem"
 import DeleteIssueButton from "../components/DeleteIssueButton"
+import BranchTag from "../components/BranchTag"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it only
 // when an issue with a body is actually shown.
@@ -103,6 +104,7 @@ export default function IssuePage() {
                           <span title={absoluteTime(c.date)}>{timeAgo(c.date)}</span>
                         </div>
                       </div>
+                      {c.branch && <BranchTag branch={c.branch} />}
                       <Link to={to} className="commit-row__sha" title={`View commit ${c.sha}`}>
                         {c.short_sha}
                       </Link>

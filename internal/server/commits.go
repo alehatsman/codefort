@@ -128,6 +128,10 @@ func (s *Server) handleIssueCommits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if commits := parseCommits(raw); len(commits) > 0 {
+		def := headRef(r.Context(), repoDir)
+		for i := range commits {
+			commits[i].Branch = primaryBranch(r.Context(), repoDir, commits[i].SHA, def)
+		}
 		out = commits
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -180,6 +184,8 @@ func (s *Server) handleCommit(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "commit not found: "+sha)
 		return
 	}
+
+	commits[0].Branch = primaryBranch(r.Context(), repoDir, sha, headRef(r.Context(), repoDir))
 
 	parents := commitParents(r.Context(), repoDir, sha)
 

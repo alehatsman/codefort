@@ -94,6 +94,7 @@ export interface Commit {
   author: string
   email: string
   date: string
+  branch?: string
 }
 
 export interface DiffLine {

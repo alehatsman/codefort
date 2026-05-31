@@ -318,6 +318,33 @@ func headRef(ctx context.Context, repoDir string) string {
 	return strings.TrimSpace(string(out))
 }
 
+// primaryBranch returns a single human-friendly label for which branch a commit
+// is on: the default branch (def) if it contains the commit, otherwise the
+// lexically-first local branch that does. Returns "" when no local branch
+// contains the commit or on error — callers treat that as "no hint". `git
+// branch --contains` is one process per call, so use it only for short lists.
+func primaryBranch(ctx context.Context, repoDir, sha, def string) string {
+	raw, err := gitOutput(ctx, repoDir,
+		"branch", "--format=%(refname:short)", "--sort=refname", "--contains", sha)
+	if err != nil {
+		return ""
+	}
+	first := ""
+	for line := range strings.SplitSeq(strings.TrimSpace(string(raw)), "\n") {
+		name := strings.TrimSpace(line)
+		if name == "" {
+			continue
+		}
+		if name == def {
+			return def
+		}
+		if first == "" {
+			first = name
+		}
+	}
+	return first
+}
+
 // resolveRef picks which branch the read handlers should serve. An explicit
 // ?ref= must name an existing local branch — the value is interpolated into
 // git treeishes ("<ref>:path") and revision args below, so validating it

@@ -214,6 +214,12 @@ type Commit struct {
 	Author   string    `json:"author"`
 	Email    string    `json:"email"`
 	Date     time.Time `json:"date"`
+	// Branch is a single human-friendly label for which branch the commit is
+	// on: the default branch if it contains the commit, else the first local
+	// branch that does. Lossy by design (a commit can live on several
+	// branches). Only populated where a branch hint is useful — the issue
+	// commits list and the single-commit view — so it's omitempty elsewhere.
+	Branch string `json:"branch,omitempty"`
 }
 
 // CommitList is a page of commit history on a ref, newest first, optionally

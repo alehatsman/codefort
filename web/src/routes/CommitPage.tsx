@@ -4,6 +4,7 @@ import { useCommit, useRepo } from "../api/queries"
 import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
 import Avatar from "../components/Avatar"
+import BranchTag from "../components/BranchTag"
 import DiffView from "../components/DiffView"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 
@@ -65,6 +66,7 @@ export default function CommitPage() {
                   {copied ? "✓ copied" : detail.commit.short_sha}
                 </button>
               </span>
+              {detail.commit.branch && <BranchTag branch={detail.commit.branch} />}
               {detail.parents.length > 0 && (
                 <span className="commit-detail__parents">
                   {detail.parents.length > 1 ? "parents " : "parent "}

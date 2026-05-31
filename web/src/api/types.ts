@@ -121,6 +121,10 @@ export interface Commit {
   author: string
   email: string
   date: string
+  // Primary branch label: the default branch if it contains the commit, else
+  // the first branch that does. Only set on the issue-commits + commit-detail
+  // responses; absent elsewhere.
+  branch?: string
 }
 
 export interface CommitList {
