@@ -98,6 +98,18 @@ type Config struct {
 	// surface is unaffected — it keeps its Bearer-token auth.
 	BasicUser string
 	BasicPass string
+
+	// SSHAddr is the listen address for the opt-in git SSH transport (e.g.
+	// ":2222"). Empty (default) disables SSH entirely, keeping moongitd a
+	// single HTTP port. When set, moongitd serves git over SSH with publickey
+	// auth against registered keys. Set via MOONGIT_SSH_ADDR.
+	SSHAddr string
+
+	// SSHHostKey is the path to the persisted SSH host private key. It's
+	// generated (ed25519, 0600) on first use if absent so the host identity is
+	// stable across restarts. Set via MOONGIT_SSH_HOST_KEY (default
+	// "$MOONGIT_DATA_DIR/ssh_host_ed25519_key"). Only used when SSHAddr is set.
+	SSHHostKey string
 }
 
 // Load reads MOONGIT_* environment variables and resolves the data directory
@@ -121,6 +133,8 @@ func Load() (*Config, error) {
 	cfg.WebDir = envOr("MOONGIT_WEB_DIR", "")
 	cfg.BasicUser = envOr("MOONGIT_BASIC_USER", "")
 	cfg.BasicPass = envOr("MOONGIT_BASIC_PASS", "")
+	cfg.SSHAddr = envOr("MOONGIT_SSH_ADDR", "")
+	cfg.SSHHostKey = envOr("MOONGIT_SSH_HOST_KEY", filepath.Join(dataDir, "ssh_host_ed25519_key"))
 
 	lease, err := time.ParseDuration(envOr("MOONGIT_CLAIM_LEASE", "60m"))
 	if err != nil {

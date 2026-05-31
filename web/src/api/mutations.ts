@@ -8,6 +8,7 @@ import type {
   CreateIssueInput,
   CreatePullRequestInput,
   CreateRepoInput,
+  CreateSSHKeyInput,
   CreateTokenInput,
   MergeRequestInput,
   UpdateIssueInput,
@@ -36,6 +37,22 @@ export function useRevokeToken() {
   return useMutation({
     mutationFn: (id: number) => api.revokeToken(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.tokens() }),
+  })
+}
+
+export function useAddSSHKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateSSHKeyInput) => api.createSSHKey(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sshKeys() }),
+  })
+}
+
+export function useDeleteSSHKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.deleteSSHKey(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sshKeys() }),
   })
 }
 

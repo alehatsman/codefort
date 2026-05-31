@@ -84,6 +84,8 @@ Environment:
     MOONGIT_WEB_DIR     built web UI dir (web/dist); empty serves API + git only
     MOONGIT_BASIC_USER  HTTP Basic user gating the web UI + git; empty disables it
     MOONGIT_BASIC_PASS  HTTP Basic password (paired with MOONGIT_BASIC_USER)
+    MOONGIT_SSH_ADDR    listen address for the opt-in git SSH transport (e.g. ":2222"); empty disables SSH (one port)
+    MOONGIT_SSH_HOST_KEY  SSH host key path (default "$MOONGIT_DATA_DIR/ssh_host_ed25519_key"); generated if absent
     MOONGIT_DEX_URL     dex serve base URL for the Intel tab (e.g. http://127.0.0.1:8080; empty disables it)
     MOONGIT_DEX_TOKEN   bearer token for dex (DEX_SERVE_TOKEN); empty for token-less loopback
 `)
@@ -165,6 +167,18 @@ func runServe(logger *slog.Logger) error {
 		}
 		listenErr <- nil
 	}()
+
+	// Opt-in git SSH transport: a second listener on the same process, started
+	// only when MOONGIT_SSH_ADDR is set so the default deployment stays one
+	// port. It shuts down with ctx; a listen failure here surfaces on listenErr
+	// to bring the whole process down rather than silently losing SSH.
+	if cfg.SSHAddr != "" {
+		go func() {
+			if err := srv.ServeSSH(ctx, cfg.SSHAddr); err != nil {
+				listenErr <- err
+			}
+		}()
+	}
 
 	var serveErr error
 	select {

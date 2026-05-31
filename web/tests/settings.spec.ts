@@ -52,10 +52,63 @@ test("revoke a token marks it revoked", async ({ page }) => {
   await expect(page.getByText("revoked")).toBeVisible()
 })
 
-test("placeholder sections are clearly not-yet-available", async ({ page }) => {
+test("remaining placeholder sections are clearly not-yet-available", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/settings")
+
+  await page.getByRole("button", { name: "Users" }).click()
+  await expect(page.getByText("Coming soon.", { exact: false })).toBeVisible()
+
+  await page.getByRole("button", { name: "Branch rules" }).click()
+  await expect(page.getByText("Coming soon.", { exact: false })).toBeVisible()
+})
+
+test("add an SSH key shows its fingerprint in the list", async ({ page }) => {
   await mockApi(page)
   await page.goto("/settings")
 
   await page.getByRole("button", { name: "SSH keys" }).click()
-  await expect(page.getByText("Coming soon.", { exact: false })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "SSH keys" })).toBeVisible()
+  await expect(page.getByText("No SSH keys yet.", { exact: false })).toBeVisible()
+
+  await page.getByPlaceholder("ssh-ed25519").fill("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5 laptop")
+  await page.getByPlaceholder("label").fill("laptop")
+  await page.getByRole("button", { name: "Add SSH key" }).click()
+
+  // The new key appears with its fingerprint and label.
+  await expect(page.getByRole("cell", { name: /^SHA256:/ })).toBeVisible()
+  await expect(page.getByRole("cell", { name: "laptop", exact: true })).toBeVisible()
+})
+
+test("an invalid SSH key surfaces a 400 error", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/settings")
+
+  await page.getByRole("button", { name: "SSH keys" }).click()
+  await page.getByPlaceholder("ssh-ed25519").fill("not a key")
+  await page.getByRole("button", { name: "Add SSH key" }).click()
+
+  await expect(page.getByText(/invalid ssh public key/)).toBeVisible()
+})
+
+test("remove an SSH key clears it from the list", async ({ page }) => {
+  await mockApi(page, {
+    sshKeys: [
+      {
+        id: 1,
+        token_name: "test-user",
+        fingerprint: "SHA256:cccccccccccccccccccccccccccccccccccccccccccc",
+        comment: "workstation",
+        created_at: new Date().toISOString(),
+      },
+    ],
+  })
+  page.on("dialog", (d) => d.accept())
+  await page.goto("/settings")
+
+  await page.getByRole("button", { name: "SSH keys" }).click()
+  await expect(page.getByRole("cell", { name: "workstation", exact: true })).toBeVisible()
+
+  await page.getByRole("button", { name: "Remove" }).first().click()
+  await expect(page.getByText("No SSH keys yet.", { exact: false })).toBeVisible()
 })

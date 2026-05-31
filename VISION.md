@@ -17,7 +17,9 @@ and doesn't need to be understood by the next person who reads the source.
 
 - **One process.** `moongitd` serves the API, git smart-HTTP, and the web SPA
   on a single port. There is no sidecar, no reverse proxy requirement, no
-  separate worker pool to keep alive.
+  separate worker pool to keep alive. (The git SSH transport is the one
+  optional second listener — off unless `MOONGIT_SSH_ADDR` is set, and still
+  the same process. The default stays one port.)
 - **One file of state.** SQLite via `modernc.org/sqlite` — pure Go, no CGO, no
   external database to provision, back up, or babysit. Copy the file and you've
   copied the server.

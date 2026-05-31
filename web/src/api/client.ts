@@ -17,6 +17,7 @@ import type {
   CreateIssueInput,
   CreatePullRequestInput,
   CreateRepoInput,
+  CreateSSHKeyInput,
   CreateTokenInput,
   MergeRequestInput,
   MergeResult,
@@ -33,6 +34,7 @@ import type {
   IntelSearchResult,
   Issue,
   Repo,
+  SSHKey,
   Token,
   Tree,
   UpdateIssueInput,
@@ -117,6 +119,11 @@ export const api = {
   createToken: (body: CreateTokenInput) =>
     request<CreatedToken>("/api/tokens", { method: "POST", body }),
   revokeToken: (id: number) => request<void>(`/api/tokens/${id}`, { method: "DELETE" }),
+
+  listSSHKeys: () => request<SSHKey[]>("/api/ssh-keys"),
+  createSSHKey: (body: CreateSSHKeyInput) =>
+    request<SSHKey>("/api/ssh-keys", { method: "POST", body }),
+  deleteSSHKey: (id: number) => request<void>(`/api/ssh-keys/${id}`, { method: "DELETE" }),
 
   listRepos: () => request<Repo[]>("/api/repos"),
   createRepo: (body: CreateRepoInput) => request<Repo>("/api/repos", { method: "POST", body }),

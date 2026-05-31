@@ -180,6 +180,26 @@ var migrations = []string{
 	CREATE INDEX IF NOT EXISTS idx_pulls_repo  ON pull_requests(repo_id);
 	CREATE INDEX IF NOT EXISTS idx_pulls_state ON pull_requests(state);
 	`,
+
+	// 9: SSH public keys for the git SSH transport. Each key is registered
+	// against a token (ON DELETE CASCADE: revoking-then-deleting a token would
+	// drop its keys, though tokens are only ever soft-revoked today). The key's
+	// token name is the push/pull identity, exactly like the Bearer path — one
+	// identity primitive, two credentials. fingerprint is the SHA256 form
+	// (ssh.FingerprintSHA256) and is the unique lookup key during auth;
+	// public_key stores the full authorized_keys line for display + re-parse.
+	`
+	CREATE TABLE IF NOT EXISTS ssh_keys (
+	    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+	    token_id     INTEGER NOT NULL REFERENCES tokens(id) ON DELETE CASCADE,
+	    fingerprint  TEXT NOT NULL UNIQUE,
+	    public_key   TEXT NOT NULL,
+	    comment      TEXT NOT NULL DEFAULT '',
+	    created_at   INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+	    last_used_at INTEGER
+	);
+	CREATE INDEX IF NOT EXISTS idx_ssh_keys_token ON ssh_keys(token_id);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

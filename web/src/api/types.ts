@@ -89,6 +89,25 @@ export interface CreatedToken extends Token {
   secret: string
 }
 
+// --- SSH keys ---
+
+// SSHKey is a registered public key for the git SSH transport. It belongs to a
+// token (token_name is the push/pull identity). The public half isn't a
+// secret, so it's returned in full on every read.
+export interface SSHKey {
+  id: number
+  token_name: string
+  fingerprint: string
+  comment?: string
+  created_at: string
+  last_used_at?: string
+}
+
+export interface CreateSSHKeyInput {
+  public_key: string
+  comment?: string
+}
+
 // --- Code browser ---
 
 export interface TreeEntry {

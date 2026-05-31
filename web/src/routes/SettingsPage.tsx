@@ -1,12 +1,12 @@
 import clsx from "clsx"
 import { useState } from "react"
-import { useTokens, useWhoami } from "../api/queries"
-import { useCreateToken, useRevokeToken } from "../api/mutations"
-import type { CreatedToken, Token } from "../api/types"
+import { useSSHKeys, useTokens, useWhoami } from "../api/queries"
+import { useAddSSHKey, useCreateToken, useDeleteSSHKey, useRevokeToken } from "../api/mutations"
+import type { CreatedToken, SSHKey, Token } from "../api/types"
 
-// Sections of the settings surface. Only "tokens" is backed today; the
-// rest are placeholders until their backends exist (no per-user mgmt, no
-// SSH git transport, no branch-protection enforcement yet).
+// Sections of the settings surface. "tokens" and "ssh" are backed; "users"
+// and "branches" stay placeholders until their backends exist (no per-user
+// mgmt, no branch-protection enforcement yet).
 type Section = "tokens" | "users" | "ssh" | "branches"
 
 const SECTIONS: { id: Section; label: string }[] = [
@@ -43,13 +43,7 @@ export default function SettingsPage() {
               account model yet. User management lands when that backend exists."
           />
         )}
-        {section === "ssh" && (
-          <Placeholder
-            title="SSH keys"
-            note="Git is served over smart-HTTP with Bearer tokens; there's no SSH
-              transport yet, so there's nothing for SSH keys to authenticate."
-          />
-        )}
+        {section === "ssh" && <SSHKeysSection />}
         {section === "branches" && (
           <Placeholder
             title="Branch rules"
@@ -218,6 +212,117 @@ function TokensSection() {
                       Revoke
                     </button>
                   )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  )
+}
+
+function SSHKeysSection() {
+  const keysQ = useSSHKeys()
+  const add = useAddSSHKey()
+  const del = useDeleteSSHKey()
+
+  const [publicKey, setPublicKey] = useState("")
+  const [comment, setComment] = useState("")
+
+  const trimmed = publicKey.trim()
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!trimmed || add.isPending) return
+    add.mutate(
+      { public_key: trimmed, comment: comment.trim() || undefined },
+      {
+        onSuccess: () => {
+          setPublicKey("")
+          setComment("")
+        },
+      }
+    )
+  }
+
+  function onDelete(k: SSHKey) {
+    const label = k.comment || k.fingerprint
+    if (!window.confirm(`Remove SSH key "${label}"? Pushes signed by it will stop working.`)) {
+      return
+    }
+    del.mutate(k.id)
+  }
+
+  return (
+    <section className="settings__section">
+      <h2 className="settings__title">SSH keys</h2>
+      <p className="muted settings__lead">
+        Public keys authenticate git over SSH (clone/push). A key inherits its token's identity, so
+        a push lands as that token's name. Set <code>MOONGIT_SSH_ADDR</code> on the server to enable
+        the transport.
+      </p>
+
+      <form className="settings__create settings__create--stacked" onSubmit={submit}>
+        <textarea
+          className="input"
+          placeholder="ssh-ed25519 AAAA… your-comment"
+          value={publicKey}
+          onChange={(e) => setPublicKey(e.target.value)}
+          rows={3}
+        />
+        <input
+          className="input"
+          placeholder="label (optional — defaults to the key's comment)"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          maxLength={100}
+        />
+        <button className="btn btn--primary" type="submit" disabled={!trimmed || add.isPending}>
+          {add.isPending ? "Adding…" : "Add SSH key"}
+        </button>
+      </form>
+      {add.error && <div className="error inline">{(add.error as Error).message}</div>}
+
+      {keysQ.isLoading && <div className="loading">Loading…</div>}
+      {keysQ.error && <div className="error">{(keysQ.error as Error).message}</div>}
+      {del.error && <div className="error inline">{(del.error as Error).message}</div>}
+
+      {keysQ.data && keysQ.data.length === 0 && (
+        <div className="empty">No SSH keys yet. Add one above.</div>
+      )}
+
+      {keysQ.data && keysQ.data.length > 0 && (
+        <table className="token-table">
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>Fingerprint</th>
+              <th>Added</th>
+              <th>Last used</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {keysQ.data.map((k) => (
+              <tr key={k.id}>
+                <td>{k.comment || <span className="muted">—</span>}</td>
+                <td className="muted">
+                  <code>{k.fingerprint}</code>
+                </td>
+                <td className="muted">{new Date(k.created_at).toLocaleDateString()}</td>
+                <td className="muted">
+                  {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : "never"}
+                </td>
+                <td className="token-table__actions">
+                  <button
+                    type="button"
+                    className="btn btn--small btn--danger"
+                    onClick={() => onDelete(k)}
+                    disabled={del.isPending}
+                  >
+                    Remove
+                  </button>
                 </td>
               </tr>
             ))}

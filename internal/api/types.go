@@ -480,3 +480,25 @@ type CreatedToken struct {
 	Token
 	Secret string `json:"secret"`
 }
+
+// SSHKey is a registered SSH public key for the git SSH transport. It belongs
+// to a token (TokenName is that token's name — the push/pull identity). The
+// public half is not a secret, so unlike tokens it's returned in full on every
+// read. Fingerprint is the SHA256 form (e.g. "SHA256:abc…").
+type SSHKey struct {
+	ID          int64      `json:"id"`
+	TokenName   string     `json:"token_name"`
+	Fingerprint string     `json:"fingerprint"`
+	Comment     string     `json:"comment,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`
+}
+
+// CreateSSHKeyRequest registers an SSH public key against the requesting
+// token. PublicKey is a single authorized_keys line (e.g. "ssh-ed25519 AAAA…
+// comment"). Comment is optional and defaults to the key's own trailing
+// comment when omitted.
+type CreateSSHKeyRequest struct {
+	PublicKey string `json:"public_key"`
+	Comment   string `json:"comment,omitempty"`
+}

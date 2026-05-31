@@ -99,6 +99,10 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("POST /api/tokens", s.handleCreateToken)
 	mux.HandleFunc("DELETE /api/tokens/{id}", s.handleRevokeToken)
 
+	mux.HandleFunc("GET /api/ssh-keys", s.handleListSSHKeys)
+	mux.HandleFunc("POST /api/ssh-keys", s.handleCreateSSHKey)
+	mux.HandleFunc("DELETE /api/ssh-keys/{id}", s.handleDeleteSSHKey)
+
 	mux.HandleFunc("GET /api/repos", s.handleListRepos)
 	mux.HandleFunc("POST /api/repos", s.handleCreateRepo)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}", s.handleGetRepo)

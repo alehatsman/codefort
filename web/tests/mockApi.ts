@@ -86,6 +86,15 @@ export interface Token {
   revoked_at?: string
 }
 
+export interface SSHKey {
+  id: number
+  token_name: string
+  fingerprint: string
+  comment?: string
+  created_at: string
+  last_used_at?: string
+}
+
 export interface Commit {
   sha: string
   short_sha: string
@@ -166,6 +175,7 @@ export interface State {
   // Local branches for the /refs endpoint; defaults to ["main"].
   branches: string[]
   tokens: Token[]
+  sshKeys: SSHKey[]
   ciRuns: CIRun[]
   // Commit history (newest first) and per-sha diff detail, for the commit
   // diff view. Empty by default; specs that need them seed them.
@@ -208,6 +218,7 @@ function freshState(seed: Partial<State> = {}): State {
     codeComments: [],
     branches: ["main"],
     tokens: [{ id: 1, name: "test-user", created_at: nowIso(), last_used_at: nowIso() }],
+    sshKeys: [],
     ciRuns: [],
     commits: [],
     commitDetails: {},
@@ -469,6 +480,39 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const tok = state.tokens.find((t) => t.id === id)
     if (!tok) return json(route, 404, { error: "token not found" })
     tok.revoked_at = nowIso()
+    return route.fulfill({ status: 204 })
+  })
+
+  // SSH keys collection (GET list / POST add)
+  await page.route(/\/api\/ssh-keys$/, async (route) => {
+    const req = route.request()
+    if (req.method() === "GET") return json(route, 200, state.sshKeys)
+    if (req.method() === "POST") {
+      const body = req.postDataJSON() as { public_key: string; comment?: string }
+      if (!body.public_key.startsWith("ssh-")) {
+        return json(route, 400, { error: "invalid ssh public key" })
+      }
+      const key: SSHKey = {
+        id: state.sshKeys.length + 1,
+        token_name: state.identity,
+        fingerprint: "SHA256:" + "b".repeat(43),
+        comment: body.comment || "",
+        created_at: nowIso(),
+      }
+      state.sshKeys.push(key)
+      return json(route, 201, key)
+    }
+    return route.continue()
+  })
+
+  // Delete an SSH key by id
+  await page.route(/\/api\/ssh-keys\/\d+$/, async (route) => {
+    const req = route.request()
+    if (req.method() !== "DELETE") return route.continue()
+    const id = Number(new URL(req.url()).pathname.split("/").pop())
+    const idx = state.sshKeys.findIndex((k) => k.id === id)
+    if (idx === -1) return json(route, 404, { error: "ssh key not found" })
+    state.sshKeys.splice(idx, 1)
     return route.fulfill({ status: 204 })
   })
 
