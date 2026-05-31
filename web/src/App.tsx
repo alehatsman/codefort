@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Route, Routes } from "react-router-dom"
+import { Navigate, Route, Routes, useParams } from "react-router-dom"
 import Layout from "./components/Layout"
 import TokenGate from "./components/TokenGate"
 import { getToken } from "./api/client"
@@ -13,11 +13,17 @@ import ComparePage from "./routes/ComparePage"
 import PullsPage from "./routes/PullsPage"
 import PullPage from "./routes/PullPage"
 import BoardPage from "./routes/BoardPage"
-import ResearchPage from "./routes/ResearchPage"
+import ExplorePage from "./routes/ExplorePage"
 import ReviewPage from "./routes/ReviewPage"
-import SummariesPage from "./routes/SummariesPage"
 import PipelinesPage from "./routes/PipelinesPage"
 import SettingsPage from "./routes/SettingsPage"
+
+// The old Research and Summaries tabs merged into one Explore tab; keep their
+// URLs working by redirecting to the merged page.
+function ExploreRedirect() {
+  const { owner = "", repo = "" } = useParams()
+  return <Navigate to={`/${owner}/${repo}/explore`} replace />
+}
 
 export default function App() {
   const [hasToken, setHasToken] = useState<boolean>(() => getToken() !== null)
@@ -41,9 +47,10 @@ export default function App() {
         <Route path="/:owner/:repo/compare" element={<ComparePage />} />
         <Route path="/:owner/:repo/pulls" element={<PullsPage />} />
         <Route path="/:owner/:repo/pulls/:number" element={<PullPage />} />
-        <Route path="/:owner/:repo/research" element={<ResearchPage />} />
+        <Route path="/:owner/:repo/explore" element={<ExplorePage />} />
+        <Route path="/:owner/:repo/research" element={<ExploreRedirect />} />
+        <Route path="/:owner/:repo/summaries" element={<ExploreRedirect />} />
         <Route path="/:owner/:repo/review" element={<ReviewPage />} />
-        <Route path="/:owner/:repo/summaries" element={<SummariesPage />} />
         <Route path="/:owner/:repo/pipelines" element={<PipelinesPage />} />
         <Route path="/:owner/:repo/pipelines/:number" element={<PipelinesPage />} />
         <Route path="/settings" element={<SettingsPage />} />

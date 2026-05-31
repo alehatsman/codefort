@@ -33,8 +33,11 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
   const isPulls =
     location.pathname.startsWith(`${base}/pulls`) || location.pathname.startsWith(`${base}/compare`)
   const isReview = location.pathname.startsWith(`${base}/review`)
-  const isResearch = location.pathname.startsWith(`${base}/research`)
-  const isSummaries = location.pathname.startsWith(`${base}/summaries`)
+  // Explore absorbed the former Research + Summaries tabs (and their URLs).
+  const isExplore =
+    location.pathname.startsWith(`${base}/explore`) ||
+    location.pathname.startsWith(`${base}/research`) ||
+    location.pathname.startsWith(`${base}/summaries`)
   const isPipelines = location.pathname.startsWith(`${base}/pipelines`)
 
   return (
@@ -53,11 +56,8 @@ export default function RepoHeader({ owner, repo, openIssues }: Props) {
         <Link to={`${base}/review`} className={clsx("tab", { "is-active": isReview })}>
           Review
         </Link>
-        <Link to={`${base}/research`} className={clsx("tab", { "is-active": isResearch })}>
-          Research
-        </Link>
-        <Link to={`${base}/summaries`} className={clsx("tab", { "is-active": isSummaries })}>
-          Summaries
+        <Link to={`${base}/explore`} className={clsx("tab", { "is-active": isExplore })}>
+          Explore
         </Link>
         <Link to={`${base}/pipelines`} className={clsx("tab", { "is-active": isPipelines })}>
           Pipelines

@@ -2267,49 +2267,187 @@ h3 {
   font-size: var(--text-md);
 }
 
-/* --- Research tab (dex code intelligence) --- */
-/* Keep the ask box and its results focused, not stretched edge-to-edge. */
-.research {
-  max-width: 860px;
+/* --- Explore tab (dex code intelligence: hero + ask + map + hotspots) --- */
+/* Keep the column focused, not stretched edge-to-edge. */
+.explore {
+  max-width: 920px;
+}
+.explore-section {
+  margin-top: var(--space-6);
+}
+.explore-section__heading {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 var(--space-3);
 }
 
-/* The ask box leads the tab: a plain prompt, then one control row where the
-   question input is the dominant element. */
-.research-ask {
+/* Hero: the repo summary as the lead answer + the index's headline numbers. */
+.explore-hero {
   margin: var(--space-4) 0 var(--space-5);
 }
-.research-ask__title {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-xl);
+.explore-hero__name {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-2xl);
   font-weight: var(--weight-semibold);
 }
-.research-ask__bar {
+.explore-hero__summary {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg);
+  line-height: var(--leading-relaxed);
+  white-space: pre-wrap;
+}
+.explore-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.explore-stat {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-muted);
+  border-radius: 10px;
+  padding: 1px var(--space-2);
+}
+.explore-stat--pending {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Ask box: one natural-language field; the power modes hide behind Advanced. */
+.explore-ask {
+  margin: var(--space-4) 0;
+}
+.explore-ask__bar {
   display: flex;
   gap: var(--space-2);
 }
-.research-ask__kind {
+.explore-ask__kind {
   flex: 0 0 auto;
   width: auto;
 }
-.research-ask__input {
+.explore-ask__input {
   flex: 1;
 }
-.research-ask__go {
+.explore-ask__go {
   flex: 0 0 auto;
 }
+.explore-ask__advanced {
+  margin-top: var(--space-2);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+.explore-ask__advanced:hover {
+  color: var(--accent);
+}
 
-/* Index provenance — the dry numbers that used to dominate the top of the tab,
-   now a small muted strip pinned at the very bottom. */
-.research-index {
+/* Package map: layered groups of cards, each card a collapsible summary. */
+.pkg-map {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.pkg-layer__name {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  margin: 0 0 var(--space-2);
+}
+.pkg-layer__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-2);
+}
+.pkg-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+}
+.pkg-card__summary {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  margin-top: var(--space-5);
-  padding-top: var(--space-3);
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  list-style: none;
+}
+.pkg-card__summary::-webkit-details-marker {
+  display: none;
+}
+.pkg-card__summary:hover {
+  background: var(--bg-canvas);
+}
+.pkg-card__path {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--accent);
+}
+.pkg-card__when {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.pkg-card__preview {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.pkg-card__body {
+  padding: 0 var(--space-3) var(--space-2);
+  white-space: pre-wrap;
+  line-height: var(--leading-relaxed);
+}
+.pkg-card__browse {
+  display: inline-block;
+  margin: 0 var(--space-3) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* Hotspots: the most-recently-touched packages, newest first. */
+.hotspots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+}
+.hotspot {
+  padding: var(--space-3);
   border-top: 1px solid var(--border-muted);
 }
-.research-index__root {
+.hotspot:first-child {
+  border-top: none;
+}
+.hotspot__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.hotspot__path {
   font-family: var(--font-mono);
+  font-size: var(--text-base);
+  color: var(--accent);
+  text-decoration: none;
+}
+.hotspot__when {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+.hotspot__subject {
+  margin-top: 2px;
+  font-size: var(--text-sm);
 }
 
 .intel__hits {
@@ -2510,90 +2648,9 @@ h3 {
   padding-bottom: var(--space-4);
 }
 
-/* Summaries tab (dex repo overview + package summaries) --------------- */
-.summaries__repo {
-  margin: var(--space-4) 0 var(--space-5);
-}
-.summaries__heading {
-  font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
-  margin: 0 0 var(--space-3);
-}
-.summaries__prose {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius);
-  padding: 14px var(--space-4);
-  white-space: pre-wrap;
-  line-height: var(--leading-relaxed);
-}
-
+/* Breadcrumb header section shared by every repo route (see OverviewCard). */
 .overview {
   margin: var(--space-4) 0 var(--space-5);
-}
-.overview__pkgs {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  overflow: hidden;
-}
-.overview-pkg {
-  border-top: 1px solid var(--border-muted);
-}
-.overview-pkg:first-child {
-  border-top: none;
-}
-/* A flat row: marker · path · one-line preview. (Was a 2-col grid, but the
-   summary::before marker counted as the grid's first cell, pushing the path
-   into a 140px column and wrapping the preview onto a second row.) */
-.overview-pkg summary {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  padding: 10px 14px;
-  cursor: pointer;
-  list-style: none;
-}
-.overview-pkg summary::-webkit-details-marker {
-  display: none;
-}
-.overview-pkg summary::before {
-  content: "▸";
-  flex: 0 0 auto;
-  color: var(--fg-muted);
-  font-size: var(--text-xs);
-}
-.overview-pkg details[open] summary::before {
-  content: "▾";
-}
-.overview-pkg summary:hover {
-  background: var(--bg-canvas);
-}
-.overview-pkg__path {
-  flex: 0 0 auto;
-  font-family: var(--font-mono);
-  font-size: var(--text-base);
-  color: var(--accent);
-  background: none;
-  padding: 0;
-  white-space: nowrap;
-}
-.overview-pkg__preview {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.overview-pkg__body {
-  padding: 0 var(--space-4) 14px var(--space-6);
-  white-space: pre-wrap;
-  line-height: var(--leading-relaxed);
-  color: var(--fg);
 }
 
 /* Vim keyboard navigation ---------------------------------------------- */

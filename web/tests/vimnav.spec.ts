@@ -104,7 +104,7 @@ test("issues list: j/k select a row, Enter opens it; h/l switch tabs", async ({ 
   await page.goto("/alice/demo/issues")
   await expect(activeTab).toHaveText(/Issues/)
   await page.keyboard.press("l")
-  await expect(activeTab).toHaveText("Research")
+  await expect(activeTab).toHaveText("Explore")
   await page.keyboard.press("h")
   await expect(activeTab).toHaveText(/Issues/)
   await page.keyboard.press("h")
