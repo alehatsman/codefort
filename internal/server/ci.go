@@ -261,9 +261,13 @@ func (s *Server) handleCIJobEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate the job belongs to the run. This both 404s unknown jobs and
-	// guarantees jobName is a real (already path-validated) name, so using it
-	// to build the event-log path can't traverse out of the CI root.
+	// Validate the job. An existing job's name is already path-safe. A job that
+	// doesn't exist *yet* on a still-live run is normal — the runner creates it
+	// when it picks the run up (an agent run's "agent" job, or a CI job mid
+	// checkout), and the client connects the moment it navigates in. Rather
+	// than 404 (which makes the client give up), stream and wait for the log to
+	// appear, as long as the name is a safe single path component. Only 404
+	// when the run is terminal, where the job will never appear.
 	jobs, err := storage.ListJobs(s.rdb, run.ID)
 	if err != nil {
 		s.logger.Error("ci events list jobs", "err", err)
@@ -271,8 +275,10 @@ func (s *Server) handleCIJobEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !jobExists(jobs, jobName) {
-		writeError(w, http.StatusNotFound, "job not found")
-		return
+		if run.Status.Terminal() || !safeJobName(jobName) {
+			writeError(w, http.StatusNotFound, "job not found")
+			return
+		}
 	}
 
 	lastID := parseLastEventID(r)
@@ -380,6 +386,13 @@ func jobExists(jobs []storage.CIJob, name string) bool {
 		}
 	}
 	return false
+}
+
+// safeJobName reports whether name is a single safe path component, so streaming
+// the events of a not-yet-created job (live run) can't traverse out of the CI
+// log root. Mirrors the validation OpenEventLog applies when writing.
+func safeJobName(name string) bool {
+	return name != "" && name != "." && name != ".." && !strings.ContainsAny(name, `/\`)
 }
 
 // runNumberOrFail parses the {number} path value as a positive run number.

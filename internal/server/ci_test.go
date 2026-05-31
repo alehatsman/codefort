@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alehatsman/moongit/internal/api"
 	"github.com/alehatsman/moongit/internal/ci"
@@ -368,5 +369,46 @@ func TestJobEventsThroughFullHandler(t *testing.T) {
 	}
 	if body := rr.Body.String(); !strings.Contains(body, "event: "+ci.EventRunCompleted) {
 		t.Errorf("stream missing events through full chain:\n%s", body)
+	}
+}
+
+// safeJobName guards the not-yet-created-job streaming path against traversal.
+func TestSafeJobName(t *testing.T) {
+	for _, ok := range []string{"agent", "build", "step-1", "a.b_c"} {
+		if !safeJobName(ok) {
+			t.Errorf("safeJobName(%q) = false, want true", ok)
+		}
+	}
+	for _, bad := range []string{"", ".", "..", "a/b", `a\b`, "../etc"} {
+		if safeJobName(bad) {
+			t.Errorf("safeJobName(%q) = true, want false", bad)
+		}
+	}
+}
+
+// A not-yet-created job (e.g. an agent run's "agent" job before the runner
+// creates it) on a still-live run streams rather than 404ing — the client
+// connects the moment it navigates in. A terminal run still 404s an unknown
+// job (TestJobEventsUnknownJob). The request is cancelled to unblock the SSE
+// tail loop.
+func TestJobEventsPendingJobOnLiveRunStreams(t *testing.T) {
+	s, repoID := newCIReadServer(t)
+	enqueue(t, s, repoID, "sha", "refs/heads/main") // queued (non-terminal), no jobs yet
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/agent/events", nil).WithContext(ctx)
+	req.SetPathValue("owner", "alice")
+	req.SetPathValue("repo", "repo")
+	req.SetPathValue("number", "1")
+	req.SetPathValue("job", "agent")
+	rr := httptest.NewRecorder()
+	s.handleCIJobEvents(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200 (stream-and-wait, not 404); body=%s", rr.Code, rr.Body.String())
+	}
+	if strings.Contains(rr.Body.String(), "job not found") {
+		t.Errorf("got a 'job not found' error for a live run's pending job:\n%s", rr.Body.String())
 	}
 }
