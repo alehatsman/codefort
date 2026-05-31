@@ -248,11 +248,25 @@ func (s *Server) handleCompare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	out, err := computeCompare(r.Context(), repoDir, base, head)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "diff failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// computeCompare builds the three-dot compare of head relative to base. Callers
+// must validate base/head against refs/heads first (the values are interpolated
+// into the revision args). Commits and Files are always non-nil so the JSON
+// renders arrays. An error is returned only if the diff itself fails; the
+// ahead/behind/commit probes degrade silently to zero/empty.
+func computeCompare(ctx context.Context, repoDir, base, head string) (api.Compare, error) {
 	out := api.Compare{Base: base, Head: head, Commits: []api.Commit{}, Files: []api.DiffFile{}}
 
 	// merge-base(base, head): the point the diff is taken against. Missing means
 	// unrelated histories — diff the whole head tree against the empty tree.
-	if mb, err := gitOutput(r.Context(), repoDir, "merge-base", base, head); err == nil {
+	if mb, err := gitOutput(ctx, repoDir, "merge-base", base, head); err == nil {
 		out.MergeBase = strings.TrimSpace(string(mb))
 	}
 	diffBase := out.MergeBase
@@ -262,7 +276,7 @@ func (s *Server) handleCompare(w http.ResponseWriter, r *http.Request) {
 
 	// ahead/behind: `rev-list --left-right --count base...head` prints
 	// "<behind>\t<ahead>" (left = base-only, right = head-only).
-	if raw, err := gitOutput(r.Context(), repoDir, "rev-list", "--left-right", "--count", base+"..."+head); err == nil {
+	if raw, err := gitOutput(ctx, repoDir, "rev-list", "--left-right", "--count", base+"..."+head); err == nil {
 		if f := strings.Fields(string(raw)); len(f) == 2 {
 			out.Behind, _ = strconv.Atoi(f[0])
 			out.Ahead, _ = strconv.Atoi(f[1])
@@ -270,16 +284,15 @@ func (s *Server) handleCompare(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Commits head has that base does not (base..head), newest first.
-	if raw, err := gitOutput(r.Context(), repoDir, "log", "--format="+commitFormat, base+".."+head); err == nil {
+	if raw, err := gitOutput(ctx, repoDir, "log", "--format="+commitFormat, base+".."+head); err == nil {
 		if commits := parseCommits(raw); len(commits) > 0 {
 			out.Commits = commits
 		}
 	}
 
-	patch, err := gitOutput(r.Context(), repoDir, "diff-tree", "--no-commit-id", "-p", "-r", "-M", "--no-color", diffBase, head)
+	patch, err := gitOutput(ctx, repoDir, "diff-tree", "--no-commit-id", "-p", "-r", "-M", "--no-color", diffBase, head)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "diff failed")
-		return
+		return out, err
 	}
 	files, truncated := parseUnifiedDiff(patch, maxDiffLines)
 	if len(files) > 0 {
@@ -290,7 +303,7 @@ func (s *Server) handleCompare(w http.ResponseWriter, r *http.Request) {
 		out.Additions += f.Additions
 		out.Deletions += f.Deletions
 	}
-	writeJSON(w, http.StatusOK, out)
+	return out, nil
 }
 
 // commitParents returns the parent SHAs of sha (empty for a root commit).

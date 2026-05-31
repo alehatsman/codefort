@@ -154,6 +154,32 @@ var migrations = []string{
 	CREATE INDEX IF NOT EXISTS idx_code_comments_repo ON code_comments(repo_id, ref);
 	CREATE INDEX IF NOT EXISTS idx_code_comments_path ON code_comments(repo_id, ref, path);
 	`,
+
+	// 8: pull requests. A lightweight PR object pairing a head branch with a
+	// base branch; number is per-repo and monotonic like issues/ci_runs. state
+	// is open|merged|closed. merged_at is set only when a PR is merged (the
+	// merge endpoint, #81); it stays NULL for open and plain-closed PRs.
+	// Review threads are NOT stored here — they reuse code_comments anchored to
+	// head_ref (api.CodeComment carries Ref), so there is no PR-comment table.
+	`
+	CREATE TABLE IF NOT EXISTS pull_requests (
+	    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	    repo_id    INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+	    number     INTEGER NOT NULL,
+	    base_ref   TEXT NOT NULL,
+	    head_ref   TEXT NOT NULL,
+	    title      TEXT NOT NULL,
+	    body       TEXT NOT NULL DEFAULT '',
+	    author     TEXT NOT NULL,
+	    state      TEXT NOT NULL DEFAULT 'open',
+	    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+	    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+	    merged_at  INTEGER,
+	    UNIQUE (repo_id, number)
+	);
+	CREATE INDEX IF NOT EXISTS idx_pulls_repo  ON pull_requests(repo_id);
+	CREATE INDEX IF NOT EXISTS idx_pulls_state ON pull_requests(state);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

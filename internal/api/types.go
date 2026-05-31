@@ -303,6 +303,74 @@ type Compare struct {
 	Truncated bool       `json:"truncated"`
 }
 
+// PRState is the lifecycle state of a pull request. The set is closed — see
+// Valid. A PR is born "open"; it becomes "merged" via the merge endpoint or
+// "closed" when abandoned without merging.
+type PRState string
+
+const (
+	PROpen   PRState = "open"
+	PRMerged PRState = "merged"
+	PRClosed PRState = "closed"
+)
+
+// Valid reports whether s is one of the known PR states.
+func (s PRState) Valid() bool {
+	switch s {
+	case PROpen, PRMerged, PRClosed:
+		return true
+	}
+	return false
+}
+
+// AllPRStates is the canonical list, for clients enumerating without hardcoding.
+var AllPRStates = []PRState{PROpen, PRMerged, PRClosed}
+
+// PullRequest pairs a head branch with a base branch for review and merge.
+// Number is per-repo (like issues). MergedAt is non-nil only once the PR is
+// merged. Review comments are not embedded here — see PullRequestDetail.
+type PullRequest struct {
+	ID        int64      `json:"id"`
+	Number    int        `json:"number"`
+	BaseRef   string     `json:"base_ref"`
+	HeadRef   string     `json:"head_ref"`
+	Title     string     `json:"title"`
+	Body      string     `json:"body,omitempty"`
+	Author    string     `json:"author"`
+	State     PRState    `json:"state"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	MergedAt  *time.Time `json:"merged_at"` // nil unless State == merged
+}
+
+// PullRequestDetail is a PR plus the head-vs-base compare (PR 1) and the code
+// review comments anchored to its head branch. Compare is best-effort: if a
+// branch has since been deleted it carries only Base/Head with zero diff.
+type PullRequestDetail struct {
+	PullRequest
+	Compare  Compare       `json:"compare"`
+	Comments []CodeComment `json:"comments"`
+}
+
+// CreatePullRequest opens a PR from Head into Base. Author is stamped
+// server-side from the token; Base/Head must name existing local branches.
+type CreatePullRequest struct {
+	Base   string `json:"base"`
+	Head   string `json:"head"`
+	Title  string `json:"title"`
+	Body   string `json:"body,omitempty"`
+	Author string `json:"-"` // populated server-side from token
+}
+
+// UpdatePullRequest is a partial update: only non-nil fields change. State may
+// move to "closed" (abandon) or back to "open" (reopen); transitioning to
+// "merged" is rejected here — that goes through the merge endpoint (#81).
+type UpdatePullRequest struct {
+	Title *string  `json:"title,omitempty"`
+	Body  *string  `json:"body,omitempty"`
+	State *PRState `json:"state,omitempty"`
+}
+
 // CIRun is the public view of a CI run. Number is the per-repo run number
 // (the address clients use); the internal DB id is not exposed.
 type CIRun struct {
