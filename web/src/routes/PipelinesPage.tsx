@@ -233,7 +233,13 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
         <div>
           <dt>Commit</dt>
           <dd className="ci-runs__sha" title={run.commit_sha}>
-            {shortSHA(run.commit_sha)}
+            {run.commit_sha ? (
+              <Link to={`/${owner}/${repo}/commit/${run.commit_sha}`}>
+                {shortSHA(run.commit_sha)}
+              </Link>
+            ) : (
+              shortSHA(run.commit_sha)
+            )}
             {run.commit_author ? ` · ${run.commit_author}` : ""}
           </dd>
         </div>

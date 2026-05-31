@@ -119,6 +119,12 @@ test("run detail surfaces commit context, the job DAG, and step commands", async
   await expect(page.getByText("fix: handle empty input")).toBeVisible()
   await expect(page.getByText(/Alice Example/)).toBeVisible()
 
+  // The short SHA links through to the commit detail page.
+  await expect(page.getByRole("link", { name: "deadbee" })).toHaveAttribute(
+    "href",
+    "/alice/demo/commit/deadbeefcafe1234"
+  )
+
   // DAG: the dependent job shows what it needs.
   await expect(page.getByText("test")).toBeVisible()
   await expect(page.getByText(/build/).last()).toBeVisible()
