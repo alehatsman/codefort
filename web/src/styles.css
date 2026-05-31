@@ -192,7 +192,10 @@
   --hl-tag: #a6e22e;
   --hl-meta: #75715e;
 
-  --code-bg: #1e1f1c;
+  /* Code surface tracks the canonical Monokai bg (= var(--bg)), one shade
+     above the #1e1f1c canvas — so code blobs read as a distinct surface
+     instead of melting into the page, matching the default github scheme. */
+  --code-bg: var(--bg);
   --code-fg: #f8f8f2;
   --code-line-hl: #3e3d32;
 }
@@ -903,6 +906,10 @@ a.file-tree__commit:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  /* Context (unchanged) lines are transparent and show this surface through;
+     paint it as the code surface so the diff reads as a code panel distinct
+     from the page, while the num gutter / empty cells stay on --bg-canvas. */
+  background: var(--code-bg);
 }
 .diff-file__head {
   display: flex;
