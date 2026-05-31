@@ -371,6 +371,44 @@ type UpdatePullRequest struct {
 	State *PRState `json:"state,omitempty"`
 }
 
+// MergeMethod selects how a PR is merged. "merge" (default) always creates a
+// merge commit; "ff-only" fast-forwards the base ref and fails if the branches
+// have diverged.
+type MergeMethod string
+
+const (
+	MergeCommitMethod MergeMethod = "merge"
+	MergeFFOnlyMethod MergeMethod = "ff-only"
+)
+
+// Valid reports whether m is a known merge method. The empty string is treated
+// as the default (merge) by the handler before validating.
+func (m MergeMethod) Valid() bool {
+	return m == MergeCommitMethod || m == MergeFFOnlyMethod
+}
+
+// MergeRequest is the body of the merge endpoint. An empty Method means the
+// default (merge commit).
+type MergeRequest struct {
+	Method MergeMethod `json:"method,omitempty"`
+}
+
+// MergeResult is returned on a successful merge: the PR (now state=merged) plus
+// the resulting base-ref tip and whether it was a fast-forward.
+type MergeResult struct {
+	PullRequest
+	MergeCommit string `json:"merge_commit"` // base ref tip after the merge
+	FastForward bool   `json:"fast_forward"`
+}
+
+// MergeConflictResponse is the 409 body when a merge can't proceed cleanly: the
+// human message plus the conflicting paths (empty for non-conflict 409s such as
+// "not fast-forwardable" or a concurrent base move).
+type MergeConflictResponse struct {
+	Error     string   `json:"error"`
+	Conflicts []string `json:"conflicts,omitempty"`
+}
+
 // CIRun is the public view of a CI run. Number is the per-repo run number
 // (the address clients use); the internal DB id is not exposed.
 type CIRun struct {
