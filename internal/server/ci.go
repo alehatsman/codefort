@@ -375,6 +375,8 @@ func runNumberOrFail(w http.ResponseWriter, r *http.Request) (int, bool) {
 func toAPIRun(run storage.CIRun) api.CIRun {
 	return api.CIRun{
 		Number:       run.Number,
+		Kind:         string(run.Kind),
+		IssueNumber:  run.IssueNumber,
 		CommitSHA:    run.CommitSHA,
 		CommitMsg:    run.CommitMsg,
 		CommitAuthor: run.CommitAuthor,

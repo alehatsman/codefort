@@ -112,7 +112,8 @@ func (r *ciRunner) run(ctx context.Context) {
 		interval = 5 * time.Second
 	}
 	runConc := max(r.cfg.CIRunConcurrency, 1)
-	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout, "isolation", r.cfg.CIIsolation, "run_concurrency", runConc)
+	agentConc := max(r.cfg.AgentRunConcurrency, 1)
+	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout, "isolation", r.cfg.CIIsolation, "run_concurrency", runConc, "agent_concurrency", agentConc)
 
 	// A restart can strand runs mid-flight: their status writes never committed,
 	// so they sit 'running' with no goroutine driving them. Nothing can be
@@ -130,53 +131,65 @@ func (r *ciRunner) run(ctx context.Context) {
 		sweepOrphanContainers(ctx, r.logger)
 	}
 
-	// At most runConc runs execute at once. We take a slot *before* claiming so
-	// we never hold a claimed run we can't yet execute (its lease would tick
-	// while it waited). wg tracks in-flight runs so shutdown drains them:
-	// run() returns only once every dispatched executeRun has finalized its run
-	// against the still-open DB (the restart-drain contract — see
-	// cmd/moongitd/main.go).
-	sem := make(chan struct{}, runConc)
+	// CI and agent runs drain from independent pools so a burst of one kind
+	// never starves the other. wg tracks in-flight runs across both pools so
+	// shutdown drains them: run() returns only once every dispatched
+	// executeRun has finalized its run against the still-open DB (the
+	// restart-drain contract — see cmd/moongitd/main.go).
+	ciSem := make(chan struct{}, runConc)
+	agentSem := make(chan struct{}, agentConc)
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
-		// Dispatch every claimable run before sleeping, bounded by the slots.
-		for {
-			// Once shutdown starts, stop claiming new work; in-flight runs
-			// drain via the deferred wg.Wait. Guarding here also keeps us from
-			// claiming a queued run only to immediately error it.
-			if ctx.Err() != nil {
-				return
-			}
-			select {
-			case sem <- struct{}{}:
-			case <-ctx.Done():
-				return
-			}
-			run, err := storage.ClaimNextRun(r.db, r.runLease())
-			if err != nil {
-				<-sem // release the unused slot
-				if errors.Is(err, storage.ErrNoRunQueued) {
-					break
-				}
-				r.logger.Error("ci claim", "err", err)
-				break
-			}
-			wg.Add(1)
-			go func(run storage.CIRun) {
-				defer wg.Done()
-				defer func() { <-sem }()
-				r.executeRun(ctx, run)
-			}(run)
+		// Dispatch every claimable run of each kind before sleeping.
+		r.drainKind(ctx, &wg, ciSem, storage.RunKindCI, r.runLease())
+		r.drainKind(ctx, &wg, agentSem, storage.RunKindAgent, r.agentLease())
+		if ctx.Err() != nil {
+			return
 		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
 		}
+	}
+}
+
+// drainKind claims and dispatches every currently-claimable run of one kind,
+// bounded by its pool's slots, returning when nothing more is claimable or the
+// context is cancelled. A slot is taken *before* claiming so a claimed run is
+// never held without a slot to execute it (its lease would tick while it
+// waited). Each dispatched run is tracked on wg for the shutdown drain.
+func (r *ciRunner) drainKind(ctx context.Context, wg *sync.WaitGroup, sem chan struct{}, kind storage.RunKind, lease time.Duration) {
+	for {
+		// Once shutdown starts, stop claiming new work; in-flight runs drain
+		// via the caller's wg.Wait. Guarding here also keeps us from claiming a
+		// queued run only to immediately error it.
+		if ctx.Err() != nil {
+			return
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			return
+		}
+		run, err := storage.ClaimNextRunOfKind(r.db, kind, lease)
+		if err != nil {
+			<-sem // release the unused slot
+			if !errors.Is(err, storage.ErrNoRunQueued) {
+				r.logger.Error("ci claim", "kind", kind, "err", err)
+			}
+			return
+		}
+		wg.Add(1)
+		go func(run storage.CIRun) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			r.executeRun(ctx, run)
+		}(run)
 	}
 }
 
@@ -191,10 +204,30 @@ func (r *ciRunner) runLease() time.Duration {
 	return r.cfg.CIRunTimeout + 5*time.Minute
 }
 
+// agentLease is the claim lease for agent runs, derived from AgentRunTimeout
+// the same way runLease derives from CIRunTimeout: long enough that a live run
+// is never stolen, short enough that a crashed runner's 'running' agent row
+// eventually expires and re-runs.
+func (r *ciRunner) agentLease() time.Duration {
+	if r.cfg.AgentRunTimeout <= 0 {
+		return 0
+	}
+	return r.cfg.AgentRunTimeout + 5*time.Minute
+}
+
 // executeRun runs one claimed run end-to-end: gate, checkout, per-job step
 // execution emitting the event stream, status mirroring, and workspace
 // cleanup.
 func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
+	// An agent run reuses this same claim/lease/drain spine but executes a
+	// containerized Claude session against an issue instead of a translated
+	// mgitci.yml. Branch here so everything upstream (claiming, concurrency,
+	// reconcile, retention) stays shared.
+	if run.Kind == storage.RunKindAgent {
+		r.executeAgentRun(parent, run)
+		return
+	}
+
 	log := r.logger.With("run_id", run.ID, "run", run.Number, "sha", short(run.CommitSHA))
 
 	owner, name, err := storage.RepoIdent(r.db, run.RepoID)
@@ -587,10 +620,13 @@ func (d *dockerSession) Close() error {
 	return nil
 }
 
-// sweepOrphanContainers removes any moongit-ci-* containers left behind by a
-// crashed runner. Best-effort: failures are logged, not fatal.
+// sweepOrphanContainers removes any moongit-ci-* or moongit-agent-* containers
+// left behind by a crashed runner. The two name filters are OR'd by docker, so
+// both CI job containers and agent containers are reaped. Best-effort:
+// failures are logged, not fatal.
 func sweepOrphanContainers(ctx context.Context, logger *slog.Logger) {
-	out, err := exec.CommandContext(ctx, "docker", "ps", "-aq", "--filter", "name=moongit-ci-").Output()
+	out, err := exec.CommandContext(ctx, "docker", "ps", "-aq",
+		"--filter", "name=moongit-ci-", "--filter", "name=moongit-agent-").Output()
 	if err != nil {
 		logger.Warn("ci orphan container scan", "err", err)
 		return

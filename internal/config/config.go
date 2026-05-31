@@ -74,6 +74,23 @@ type Config struct {
 	// Set via MOONGIT_CI_DEFAULT_IMAGE.
 	CIDefaultImage string
 
+	// AgentRunConcurrency caps how many agent runs (kind=agent) execute at
+	// once, independent of CIRunConcurrency so a burst of issue-spawned agents
+	// never starves pipeline CI (and vice versa). Set via
+	// MOONGIT_AGENT_RUN_CONCURRENCY (default 1); values < 1 are treated as 1.
+	AgentRunConcurrency int
+
+	// AgentRunTimeout is the hard wall-clock limit for a single agent run. Note
+	// this is the whole-run cap, not a per-turn one — the interactive turn loop
+	// (#76) layers per-turn deadlines and an idle reaper on top. Set via
+	// MOONGIT_AGENT_RUN_TIMEOUT (default 60m). Zero or negative disables it.
+	AgentRunTimeout time.Duration
+
+	// AgentDefaultImage is the container image an agent run executes in: the CI
+	// base image plus the Claude CLI and the dex MCP shim (#75). Set via
+	// MOONGIT_AGENT_DEFAULT_IMAGE. Only used when CIIsolation="docker".
+	AgentDefaultImage string
+
 	// CIRetainRuns caps how many of a repo's most recent CI runs are kept: a
 	// periodic reaper prunes terminal runs beyond this many (and their on-disk
 	// event logs), keeping disk + DB bounded. queued/running runs are never
@@ -173,6 +190,20 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("MOONGIT_CI_ISOLATION: want \"docker\" or \"none\", got %q", cfg.CIIsolation)
 	}
 	cfg.CIDefaultImage = envOr("MOONGIT_CI_DEFAULT_IMAGE", "moongit-ci:latest")
+
+	agentConc, err := strconv.Atoi(envOr("MOONGIT_AGENT_RUN_CONCURRENCY", "1"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_AGENT_RUN_CONCURRENCY: %w", err)
+	}
+	cfg.AgentRunConcurrency = agentConc
+
+	agentTimeout, err := time.ParseDuration(envOr("MOONGIT_AGENT_RUN_TIMEOUT", "60m"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_AGENT_RUN_TIMEOUT: %w", err)
+	}
+	cfg.AgentRunTimeout = agentTimeout
+
+	cfg.AgentDefaultImage = envOr("MOONGIT_AGENT_DEFAULT_IMAGE", "moongit-agent:latest")
 
 	return cfg, nil
 }

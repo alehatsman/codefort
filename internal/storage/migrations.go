@@ -154,6 +154,18 @@ var migrations = []string{
 	CREATE INDEX IF NOT EXISTS idx_code_comments_repo ON code_comments(repo_id, ref);
 	CREATE INDEX IF NOT EXISTS idx_code_comments_path ON code_comments(repo_id, ref, path);
 	`,
+
+	// 8: agent runs. An issue-spawned Claude agent reuses the entire CI run
+	// spine (event log, SSE, container isolation, lifecycle), modeled as a
+	// synthetic single-job run. kind distinguishes a normal pipeline run
+	// ('ci', the default for every pre-existing row) from an agent run
+	// ('agent'); issue_number links an agent run to the issue it works (NULL
+	// for CI runs). See #74.
+	`
+	ALTER TABLE ci_runs ADD COLUMN kind         TEXT NOT NULL DEFAULT 'ci';
+	ALTER TABLE ci_runs ADD COLUMN issue_number INTEGER;
+	CREATE INDEX IF NOT EXISTS idx_ci_runs_kind ON ci_runs(kind);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

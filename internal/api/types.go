@@ -287,6 +287,8 @@ type CommitDetail struct {
 // (the address clients use); the internal DB id is not exposed.
 type CIRun struct {
 	Number       int        `json:"number"`
+	Kind         string     `json:"kind"`                   // "ci" | "agent"
+	IssueNumber  *int       `json:"issue_number,omitempty"` // the issue an agent run serves
 	CommitSHA    string     `json:"commit_sha"`
 	CommitMsg    string     `json:"commit_msg,omitempty"`
 	CommitAuthor string     `json:"commit_author,omitempty"`
@@ -297,6 +299,12 @@ type CIRun struct {
 	CreatedAt    time.Time  `json:"created_at"`
 	StartedAt    *time.Time `json:"started_at"`
 	FinishedAt   *time.Time `json:"finished_at"`
+}
+
+// SpawnAgentRequest starts an agent run for an issue. Ref is the base the agent
+// checks out and branches from (optional; defaults to the repo's HEAD).
+type SpawnAgentRequest struct {
+	Ref string `json:"ref,omitempty"`
 }
 
 // TriggerCIRunRequest starts a CI run for an arbitrary ref (branch, tag, or

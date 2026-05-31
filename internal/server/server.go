@@ -119,6 +119,7 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("DELETE /api/repos/{owner}/{repo}/issues/{number}", s.handleDeleteIssue)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/claim", s.handleClaimIssue)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/unclaim", s.handleUnclaimIssue)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/agent", s.handleSpawnAgent)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleListComments)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleCreateComment)
 	mux.HandleFunc("DELETE /api/repos/{owner}/{repo}/issues/{number}/comments/{comment_id}", s.handleDeleteComment)
