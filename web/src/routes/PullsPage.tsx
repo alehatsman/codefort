@@ -68,7 +68,7 @@ export default function PullsPage() {
           className="btn btn--primary"
           onClick={() => navigate(`/${owner}/${repo}/compare`)}
         >
-          + New pull request
+          + New pr
         </button>
       </div>
 
