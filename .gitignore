@@ -14,3 +14,7 @@
 # Agent worktrees + local Claude state (also keeps dex from indexing stale
 # worktree copies of the repo).
 .claude/
+
+# Agent image build inputs (binaries, not source) — see agent/README.md
+agent/dex
+agent/mooncake
