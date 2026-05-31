@@ -79,7 +79,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		return
 	}
 
-	st := r.runAgentJob(ctx, owner, name, run.Number, job.ID, workDir, issue)
+	st := r.runAgentJob(ctx, owner, name, run.ID, run.Number, job.ID, workDir, issue)
 
 	final := storage.RunSuccess
 	switch {
@@ -95,16 +95,19 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 // agentJobName is the single job every agent run carries.
 const agentJobName = "agent"
 
-// runAgentJob opens the agent's container and drives its work, emitting the
-// mooncake-shaped event stream into the job's events.jsonl so the existing SSE
-// + run-detail UI render it unchanged.
+// runAgentJob opens the agent's container and drives one turn of the claude
+// session, streaming its stream-json output onto the job's events.jsonl so the
+// existing SSE endpoint + run viewer render the live transcript with no
+// transport changes. It composes the launch context (system prompt + turn-1
+// issue prompt), runs `claude -p … --output-format stream-json` in the
+// container, translates each line into an agent event, and maps claude's
+// terminal result / exit code onto the run status.
 //
-// The container body — launching the Claude CLI, composing the system prompt +
-// dex repo summary + MCP config, streaming stream-json turns onto this event
-// log, and the awaiting_input turn loop — is the executor seam tracked by #76.
-// #74 stops once the container is up and the seam is reached; it emits a single
-// placeholder step so a spawned run renders as a finished job today.
-func (r *ciRunner) runAgentJob(ctx context.Context, owner, repo string, runNum int, jobID int64, workDir string, issue api.Issue) storage.JobStatus {
+// This is turn 1 only (the single-turn slice of #76). The awaiting_input turn
+// loop — follow-up turns via POST /runs/{id}/turns onto the same session, and
+// the idle reaper — is the next slice; dex grounding + scoped creds layer in
+// via #77 / dex#6.
+func (r *ciRunner) runAgentJob(ctx context.Context, owner, repo string, runID int64, runNum int, jobID int64, workDir string, issue api.Issue) storage.JobStatus {
 	log := r.logger.With("kind", "agent", "run", runNum, "issue", issue.Number)
 
 	elog, err := ci.OpenEventLog(r.cfg.DataDir, owner, repo, runNum, agentJobName)
@@ -119,15 +122,12 @@ func (r *ciRunner) runAgentJob(ctx context.Context, owner, repo string, runNum i
 		log.Error("agent start job", "err", err)
 	}
 	r.emit(elog, ci.EventRunStarted, map[string]any{"total_steps": 1})
-	r.emit(elog, ci.EventPlanLoaded, map[string]any{"total_steps": 1})
 
 	// Open the agent's container (the same isolation seam CI jobs use). A
 	// failure here — image missing, docker down — fails the run loudly.
 	sess, err := r.newSession(ctx, agentContainerName(jobID), workDir, r.cfg.AgentDefaultImage)
 	if err != nil {
-		r.emit(elog, ci.EventStepStderr, map[string]any{
-			"step_id": "session", "stream": "stderr", "line": err.Error(), "line_number": 1,
-		})
+		r.emit(elog, ci.EventAgentRaw, map[string]any{"line": err.Error()})
 		r.emit(elog, ci.EventRunFailed, map[string]any{"error": err.Error()})
 		r.finishJob(jobID, storage.JobError, nil)
 		log.Error("agent open session", "image", r.cfg.AgentDefaultImage, "err", err)
@@ -135,24 +135,61 @@ func (r *ciRunner) runAgentJob(ctx context.Context, owner, repo string, runNum i
 	}
 	defer sess.Close()
 
-	// --- executor seam (#76) ---------------------------------------------
-	// The Claude turn loop lands here: launch `claude` in the container with
-	// the composed launch context, stream stream-json turns onto elog, and
-	// hold the container alive in awaiting_input between human turns. For now
-	// emit one synthetic step so the run is a complete, renderable job.
-	const stepID = "step-0001"
-	r.emit(elog, ci.EventStepStarted, map[string]any{
-		"step_id": stepID, "action": "agent", "name": "spawn claude agent", "global_step": 1,
+	stream, ok := sess.(streamingSession)
+	if !ok {
+		// docker + host sessions both implement it; a session that doesn't
+		// can't run an agent.
+		msg := "agent session does not support streaming exec"
+		r.emit(elog, ci.EventRunFailed, map[string]any{"error": msg})
+		r.finishJob(jobID, storage.JobError, nil)
+		log.Error(msg)
+		return storage.JobError
+	}
+
+	// Compose and run turn 1: the issue body as the user message, with the
+	// moongit-authored system prompt for role/scope/safety.
+	systemPrompt := composeAgentSystemPrompt(owner, repo, issue)
+	turnPrompt := composeTurnPrompt(issue)
+	argv := buildClaudeArgv(agentSessionID(runID), turnPrompt, systemPrompt, false)
+
+	r.emit(elog, ci.EventAgentTurnStarted, map[string]any{"turn": 1, "prompt": turnPrompt})
+
+	var result *claudeResult
+	exitCode, execErr := stream.ExecStream(ctx, argv, func(line []byte) {
+		et, data, res := translateClaudeLine(line)
+		if et == "" {
+			return // blank line
+		}
+		r.emit(elog, et, data)
+		if res != nil {
+			result = res
+		}
 	})
-	line := fmt.Sprintf("agent container ready for issue #%d (%q); claude turn loop wired in #76", issue.Number, issue.Title)
-	r.emit(elog, ci.EventStepStdout, map[string]any{
-		"step_id": stepID, "stream": "stdout", "line": line, "line_number": 1,
-	})
-	r.emit(elog, ci.EventStepCompleted, map[string]any{
-		"step_id": stepID, "duration_ms": 0, "changed": false,
-		"result": map[string]any{"rc": 0, "failed": false, "status": "ok"},
-	})
-	// ---------------------------------------------------------------------
+
+	status := turnStatus(result, exitCode, execErr)
+	turnData := map[string]any{"turn": 1, "status": status}
+	if result != nil {
+		turnData["num_turns"] = result.NumTurns
+		turnData["duration_ms"] = result.DurationMS
+		turnData["cost_usd"] = result.TotalCostUSD
+	}
+	r.emit(elog, ci.EventAgentTurnCompleted, turnData)
+
+	// execErr is a real executor failure (couldn't run claude, or ctx cancel),
+	// distinct from claude running and reporting an error result.
+	if execErr != nil {
+		r.emit(elog, ci.EventRunFailed, map[string]any{"error": execErr.Error()})
+		r.finishJob(jobID, storage.JobError, nil)
+		log.Error("agent turn exec", "err", execErr)
+		return storage.JobError
+	}
+	if status != "success" {
+		r.emit(elog, ci.EventRunFailed, map[string]any{"status": status})
+		ec := exitCode
+		r.finishJob(jobID, storage.JobFailed, &ec)
+		log.Info("agent turn not successful", "status", status, "exit", exitCode)
+		return storage.JobFailed
+	}
 
 	r.emit(elog, ci.EventRunCompleted, map[string]any{"total_steps": 1})
 	zero := 0

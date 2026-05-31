@@ -40,6 +40,20 @@ const (
 	EventRunFailed     = "run.failed"
 )
 
+// Agent event types — the live transcript of an agent run, layered on the same
+// append-only stream as the CI events above. A turn (one claude invocation) is
+// bracketed by agent.turn.started/completed; between them, each claude
+// stream-json line becomes one agent.message carrying the parsed object
+// verbatim under Data (schema-tolerant — the renderer keys on the inner
+// "type", and nothing is dropped if Claude's schema evolves). A line that
+// won't parse as JSON is preserved as agent.raw. See #76.
+const (
+	EventAgentTurnStarted   = "agent.turn.started"   // {turn, prompt}
+	EventAgentMessage       = "agent.message"        // {claude: <stream-json object>}
+	EventAgentRaw           = "agent.raw"            // {line} — unparseable stdout
+	EventAgentTurnCompleted = "agent.turn.completed" // {turn, status, num_turns, duration_ms, cost_usd}
+)
+
 // EventLogPath returns the on-disk path for a job's event stream:
 //
 //	<root>/ci/<owner>/<repo>/<run>/<job>.events.jsonl

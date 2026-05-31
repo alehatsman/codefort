@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"database/sql"
@@ -56,6 +57,21 @@ type jobSession interface {
 	Exec(ctx context.Context, stepYAML string) (stepResult, error)
 	Close() error
 }
+
+// streamingSession is the agent counterpart to jobSession.Exec: it runs a
+// command in the session's environment and streams its stdout to onLine one
+// line at a time (each line keeping its trailing newline), returning the
+// process exit code. It's a separate capability — CI's per-step JSON contract
+// is buffered, while a live agent transcript must surface each claude
+// stream-json line as it's written. Both concrete sessions implement it; the
+// agent executor type-asserts for it.
+type streamingSession interface {
+	ExecStream(ctx context.Context, argv []string, onLine func(line []byte)) (exitCode int, err error)
+}
+
+// streamExecutor backs hostSession.ExecStream — the injection point that lets
+// agent executor tests feed canned claude stream-json without a real binary.
+type streamExecutor func(ctx context.Context, workDir string, argv []string, onLine func(line []byte)) (int, error)
 
 // sessionFactory opens a jobSession for one job. name is a stable
 // docker-safe container name; workDir is the checked-out (bind-mountable)
@@ -560,10 +576,20 @@ func (r *ciRunner) finishJob(jobID int64, status storage.JobStatus, exitCode *in
 type hostSession struct {
 	workDir string
 	exec    stepExecutor
+	stream  streamExecutor
 }
 
 func (h *hostSession) Exec(ctx context.Context, stepYAML string) (stepResult, error) {
 	return h.exec(ctx, h.workDir, stepYAML)
+}
+
+// ExecStream runs an agent command on the host. nil stream means this session
+// wasn't built for agent work (the CI host path) — agent runs require docker.
+func (h *hostSession) ExecStream(ctx context.Context, argv []string, onLine func(line []byte)) (int, error) {
+	if h.stream == nil {
+		return -1, errors.New("host session does not support streaming exec")
+	}
+	return h.stream(ctx, h.workDir, argv, onLine)
 }
 
 func (h *hostSession) Close() error { return nil }
@@ -606,6 +632,54 @@ func (d *dockerSession) Exec(ctx context.Context, stepYAML string) (stepResult, 
 	cmd.Stderr = &stderr
 	runErr := cmd.Run()
 	return parseStepResult(ctx, stdout.Bytes(), stderr.Bytes(), runErr)
+}
+
+// ExecStream runs an agent command in the container and streams its stdout
+// line-by-line — the live claude transcript path.
+func (d *dockerSession) ExecStream(ctx context.Context, argv []string, onLine func(line []byte)) (int, error) {
+	cmd := exec.CommandContext(ctx, "docker", append([]string{"exec", d.name}, argv...)...)
+	return streamCommand(ctx, cmd, onLine)
+}
+
+// streamCommand starts cmd and forwards each stdout line (newline kept) to
+// onLine as it arrives, returning the process exit code once it exits. A
+// ReadBytes loop (not bufio.Scanner) avoids the 64 KB line cap, since a single
+// claude stream-json object — a big tool result — can exceed it. A non-zero
+// exit is returned as the code with a nil error (the caller maps exit/result
+// onto run status); only a failure to start or run the process, or a cancelled
+// context, is an executor error.
+func streamCommand(ctx context.Context, cmd *exec.Cmd, onLine func(line []byte)) (int, error) {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return -1, err
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return -1, err
+	}
+	r := bufio.NewReader(stdout)
+	for {
+		line, rerr := r.ReadBytes('\n')
+		if len(line) > 0 {
+			onLine(line)
+		}
+		if rerr != nil {
+			break // EOF (process closing stdout) or read error; Wait reports the real outcome
+		}
+	}
+	werr := cmd.Wait()
+	if ctx.Err() != nil {
+		return -1, fmt.Errorf("agent exec cancelled: %w", ctx.Err())
+	}
+	if werr != nil {
+		var ee *exec.ExitError
+		if errors.As(werr, &ee) {
+			return ee.ExitCode(), nil
+		}
+		return -1, fmt.Errorf("agent exec: %v (%s)", werr, strings.TrimSpace(stderr.String()))
+	}
+	return 0, nil
 }
 
 // Close removes the container. It uses a fresh background context with a short
