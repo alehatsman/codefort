@@ -1638,6 +1638,9 @@ a.file-tree__commit:hover {
 .state-icon--closed {
   color: var(--state-closed);
 }
+.state-icon--merged {
+  color: var(--state-done);
+}
 
 /* Badges (pill labels for state) --------------------------------------- */
 .badge {

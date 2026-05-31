@@ -69,6 +69,9 @@ test("pull request list filters by state", async ({ page }) => {
   await routeIntelOff(page)
 
   await page.goto("/alice/demo/pulls")
+  // Each state chip carries its glyph (open/closed reuse the issue icons,
+  // merged has its own).
+  await expect(page.locator(".filter-row .chip .state-icon--merged")).toBeVisible()
   // Default view is open PRs only.
   await expect(page.getByText("Open one")).toBeVisible()
   await expect(page.getByText("Merged one")).toBeHidden()

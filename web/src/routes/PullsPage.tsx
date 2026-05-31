@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { usePulls, useRepo } from "../api/queries"
 import { PR_STATES, type PRState } from "../api/types"
 import OverviewCard from "../components/OverviewCard"
+import PRStateIcon from "../components/PRStateIcon"
 import RepoHeader from "../components/RepoHeader"
 
 const STATE_LABEL: Record<PRState, string> = {
@@ -81,6 +82,7 @@ export default function PullsPage() {
                 checked={activeStates.includes(s)}
                 onChange={() => toggleState(s)}
               />
+              <PRStateIcon state={s} size={12} />
               {s}
             </label>
           ))}
