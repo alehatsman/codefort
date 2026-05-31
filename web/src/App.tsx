@@ -40,6 +40,8 @@ export default function App() {
         <Route path="/:owner/:repo/summaries" element={<SummariesPage />} />
         <Route path="/:owner/:repo/pipelines" element={<PipelinesPage />} />
         <Route path="/:owner/:repo/pipelines/:number" element={<PipelinesPage />} />
+        <Route path="/:owner/:repo/agents" element={<PipelinesPage kind="agent" />} />
+        <Route path="/:owner/:repo/agents/:number" element={<PipelinesPage kind="agent" />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>
     </Layout>

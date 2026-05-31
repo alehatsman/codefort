@@ -290,8 +290,8 @@ test("spawn agent from an issue navigates to the new run", async ({ page }) => {
 
   await page.getByRole("button", { name: "Spawn agent" }).click()
 
-  // The agent run shares the CI run surface, so we land on its run view.
-  await expect(page).toHaveURL(/\/alice\/demo\/pipelines\/1$/)
+  // Agent runs live under the Agents tab; we land on the new run's view.
+  await expect(page).toHaveURL(/\/alice\/demo\/agents\/1$/)
 })
 
 test("a root-absolute link in a comment points at the app route, not a blob path", async ({

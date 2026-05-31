@@ -40,9 +40,16 @@ func (s *Server) handleListCIRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out := make([]api.CIRun, len(runs))
-	for i, run := range runs {
-		out[i] = toAPIRun(run)
+	// Optional ?kind=ci|agent filter so the Pipelines and Agents tabs each show
+	// only their own runs.
+	kind := storage.RunKind(r.URL.Query().Get("kind"))
+
+	out := make([]api.CIRun, 0, len(runs))
+	for _, run := range runs {
+		if kind != "" && run.Kind != kind {
+			continue
+		}
+		out = append(out, toAPIRun(run))
 	}
 	writeJSON(w, http.StatusOK, out)
 }

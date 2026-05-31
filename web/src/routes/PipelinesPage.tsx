@@ -18,7 +18,11 @@ import CIStatusBadge from "../components/CIStatusBadge"
 // Pipelines tab. One component serves the runs list (/pipelines) and a single
 // run's detail (/pipelines/:number), distinguished by the URL — mirroring how
 // RepoPage serves the code browser routes.
-export default function PipelinesPage() {
+// kind selects which runs this tab serves: "ci" is the Pipelines tab, "agent"
+// is the Agents tab (same components, filtered + relinked).
+type RunKind = "ci" | "agent"
+
+export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
   const { owner = "", repo = "" } = useParams()
   const numberParam = useParams().number
   const repoQ = useRepo(owner, repo)
@@ -34,23 +38,30 @@ export default function PipelinesPage() {
     <div className="repo">
       <RepoHeader owner={r.owner} repo={r.name} openIssues={r.open_issues} />
       {runNumber !== null && Number.isFinite(runNumber) ? (
-        <RunDetail owner={r.owner} repo={r.name} runNumber={runNumber} />
+        <RunDetail owner={r.owner} repo={r.name} runNumber={runNumber} kind={kind} />
       ) : (
-        <RunList repo={r} />
+        <RunList repo={r} kind={kind} />
       )}
     </div>
   )
 }
 
-function RunList({ repo }: { repo: Repo }) {
-  const { owner, name } = repo
-  if (!repo.ci_enabled) return <CIDisabledCard owner={owner} repo={name} />
-
-  return <EnabledRunList owner={owner} repo={name} />
+// runsBasePath is the route segment a kind's runs live under.
+function runsBasePath(kind: RunKind): string {
+  return kind === "agent" ? "agents" : "pipelines"
 }
 
-function EnabledRunList({ owner, repo }: { owner: string; repo: string }) {
-  const runsQ = useCIRuns(owner, repo)
+function RunList({ repo, kind }: { repo: Repo; kind: RunKind }) {
+  const { owner, name } = repo
+  // Agent runs are spawned from issues regardless of the CI opt-in, so the
+  // Agents tab never shows the CI-disabled gate.
+  if (kind === "ci" && !repo.ci_enabled) return <CIDisabledCard owner={owner} repo={name} />
+
+  return <EnabledRunList owner={owner} repo={name} kind={kind} />
+}
+
+function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; kind: RunKind }) {
+  const runsQ = useCIRuns(owner, repo, kind)
   const setEnabled = useSetCIEnabled(owner, repo)
   const refsQ = useRefs(owner, repo)
   const trigger = useTriggerCIRun(owner, repo)
@@ -66,41 +77,55 @@ function EnabledRunList({ owner, repo }: { owner: string; repo: string }) {
     trigger.mutate(r)
   }
 
+  const isAgent = kind === "agent"
+  const base = runsBasePath(kind)
+
   return (
     <section className="pipelines">
       <div className="pipelines__head">
-        <h2 className="pipelines__title">Pipelines</h2>
-        <div className="pipelines__actions">
-          <form className="pipelines__run" onSubmit={runPipeline}>
-            <input
-              className="input pipelines__run-ref"
-              value={ref}
-              onChange={(e) => setRefInput(e.target.value)}
-              placeholder="branch, tag, or commit"
-              aria-label="Ref to run"
-            />
+        <h2 className="pipelines__title">{isAgent ? "Agents" : "Pipelines"}</h2>
+        {!isAgent && (
+          <div className="pipelines__actions">
+            <form className="pipelines__run" onSubmit={runPipeline}>
+              <input
+                className="input pipelines__run-ref"
+                value={ref}
+                onChange={(e) => setRefInput(e.target.value)}
+                placeholder="branch, tag, or commit"
+                aria-label="Ref to run"
+              />
+              <button
+                type="submit"
+                className="btn btn--small btn--primary"
+                disabled={trigger.isPending || ref.trim() === ""}
+              >
+                {trigger.isPending ? "Running…" : "Run pipeline"}
+              </button>
+            </form>
             <button
-              type="submit"
-              className="btn btn--small btn--primary"
-              disabled={trigger.isPending || ref.trim() === ""}
+              type="button"
+              className="btn btn--small"
+              onClick={() => setEnabled.mutate(false)}
+              disabled={setEnabled.isPending}
+              title="Disable CI for this repo"
             >
-              {trigger.isPending ? "Running…" : "Run pipeline"}
+              Disable CI
             </button>
-          </form>
-          <button
-            type="button"
-            className="btn btn--small"
-            onClick={() => setEnabled.mutate(false)}
-            disabled={setEnabled.isPending}
-            title="Disable CI for this repo"
-          >
-            Disable CI
-          </button>
-        </div>
+          </div>
+        )}
       </div>
       <p className="muted small pipelines__lead">
-        Runs trigger on push when an <code>mgitci.yml</code> is present at the pushed commit, or on
-        demand for any ref above.
+        {isAgent ? (
+          <>
+            Agent runs are spawned from an issue (the “Spawn agent” button); each works the issue in
+            an isolated container.
+          </>
+        ) : (
+          <>
+            Runs trigger on push when an <code>mgitci.yml</code> is present at the pushed commit, or
+            on demand for any ref above.
+          </>
+        )}
       </p>
       {trigger.error && <div className="error inline">{(trigger.error as Error).message}</div>}
 
@@ -108,7 +133,13 @@ function EnabledRunList({ owner, repo }: { owner: string; repo: string }) {
       {runsQ.error && <div className="error">{(runsQ.error as Error).message}</div>}
       {runsQ.data && runsQ.data.length === 0 && (
         <div className="empty">
-          No runs yet. Push a commit with an <code>mgitci.yml</code> to trigger the first one.
+          {isAgent ? (
+            <>No agent runs yet. Open an issue and click “Spawn agent” to start one.</>
+          ) : (
+            <>
+              No runs yet. Push a commit with an <code>mgitci.yml</code> to trigger the first one.
+            </>
+          )}
         </div>
       )}
 
@@ -129,7 +160,7 @@ function EnabledRunList({ owner, repo }: { owner: string; repo: string }) {
             {runsQ.data.map((run) => (
               <tr key={run.number}>
                 <td>
-                  <Link className="ci-runs__num" to={`/${owner}/${repo}/pipelines/${run.number}`}>
+                  <Link className="ci-runs__num" to={`/${owner}/${repo}/${base}/${run.number}`}>
                     #{run.number}
                   </Link>
                 </td>
@@ -190,7 +221,17 @@ function CIDisabledCard({ owner, repo }: { owner: string; repo: string }) {
   )
 }
 
-function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; runNumber: number }) {
+function RunDetail({
+  owner,
+  repo,
+  runNumber,
+  kind,
+}: {
+  owner: string
+  repo: string
+  runNumber: number
+  kind: RunKind
+}) {
   const navigate = useNavigate()
   const runQ = useCIRun(owner, repo, runNumber)
   const rerun = useRerunCIRun(owner, repo)
@@ -205,30 +246,35 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
   // Default the open job to the first one that isn't skipped, falling back to
   // the first job; once the user picks one, honor that.
   const activeJob = selectedJob ?? jobs.find((j) => j.status !== "skipped")?.name ?? jobs[0]?.name
+  const base = runsBasePath(kind)
+  const isAgent = kind === "agent"
 
   function doRerun() {
     rerun.mutate(runNumber, {
-      onSuccess: (created) => navigate(`/${owner}/${repo}/pipelines/${created.number}`),
+      onSuccess: (created) => navigate(`/${owner}/${repo}/${base}/${created.number}`),
     })
   }
 
   return (
     <section className="pipelines">
       <div className="ci-run-head">
-        <Link className="ci-run-head__back" to={`/${owner}/${repo}/pipelines`}>
-          ← Pipelines
+        <Link className="ci-run-head__back" to={`/${owner}/${repo}/${base}`}>
+          ← {isAgent ? "Agents" : "Pipelines"}
         </Link>
         <h2 className="pipelines__title">
           Run #{run.number} <CIStatusBadge status={run.status} />
         </h2>
-        <button
-          type="button"
-          className="btn btn--small"
-          onClick={doRerun}
-          disabled={rerun.isPending}
-        >
-          {rerun.isPending ? "Re-running…" : "Re-run"}
-        </button>
+        {/* Re-run re-enqueues a CI run, which is meaningless for an agent run. */}
+        {!isAgent && (
+          <button
+            type="button"
+            className="btn btn--small"
+            onClick={doRerun}
+            disabled={rerun.isPending}
+          >
+            {rerun.isPending ? "Re-running…" : "Re-run"}
+          </button>
+        )}
       </div>
       {rerun.error && <div className="error inline">{(rerun.error as Error).message}</div>}
 

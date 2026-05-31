@@ -306,11 +306,15 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       const { jobs: _j, events: _e, ...run } = next
       return json(route, 202, run)
     }
-    // GET: strip jobs from the list view, matching the server's list shape.
+    // GET: strip jobs from the list view, matching the server's list shape;
+    // honor the optional ?kind=ci|agent filter (kind defaults to "ci").
+    const kind = new URL(route.request().url()).searchParams.get("kind")
     return json(
       route,
       200,
-      state.ciRuns.map(({ jobs: _jobs, events: _events, ...run }) => run)
+      state.ciRuns
+        .filter((r) => !kind || (r.kind ?? "ci") === kind)
+        .map(({ jobs: _jobs, events: _events, ...run }) => run)
     )
   })
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+$/, (route) => {

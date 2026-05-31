@@ -307,3 +307,63 @@ test("Pipelines tab is reachable from the repo nav", async ({ page }) => {
   await page.getByRole("link", { name: "Pipelines" }).click()
   await expect(page).toHaveURL(/\/alice\/demo\/pipelines$/)
 })
+
+test("Agents tab lists only agent runs; Pipelines excludes them", async ({ page }) => {
+  await mockApi(page, {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 1,
+        total_issues: 1,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 2,
+        kind: "agent",
+        issue_number: 5,
+        status: "awaiting_input",
+        commit_sha: "aaaa1111",
+        ref: "HEAD",
+        event: "agent",
+        trigger: "agent#1",
+        created_at: iso,
+        started_at: iso,
+        finished_at: null,
+        jobs: [],
+      },
+      {
+        number: 1,
+        kind: "ci",
+        status: "success",
+        commit_sha: "bbbb2222",
+        commit_msg: "ci run",
+        ref: "refs/heads/main",
+        event: "push",
+        trigger: "alice",
+        created_at: iso,
+        started_at: iso,
+        finished_at: iso,
+        jobs: [],
+      },
+    ],
+  })
+
+  // Agents tab: only the agent run (#2), reachable from the nav.
+  await page.goto("/alice/demo/agents")
+  await expect(page.getByRole("heading", { name: "Agents" })).toBeVisible()
+  await expect(page.getByText(/spawned from an issue/)).toBeVisible()
+  await expect(page.getByRole("link", { name: "#2" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "#1" })).toHaveCount(0)
+  // No "Run pipeline" form on the Agents tab.
+  await expect(page.getByLabel("Ref to run")).toHaveCount(0)
+
+  // Pipelines tab: only the CI run (#1).
+  await page.getByRole("link", { name: "Pipelines" }).click()
+  await expect(page.getByRole("link", { name: "#1" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "#2" })).toHaveCount(0)
+})

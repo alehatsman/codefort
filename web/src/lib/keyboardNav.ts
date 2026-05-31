@@ -97,7 +97,7 @@ export function useListNav({ count, onActivate, getColumns, enabled = true }: Li
 }
 
 // Repo tabs, in the order h/l walk them. Suffixes append to `/owner/repo`.
-const TAB_SUFFIXES = ["", "/issues", "/research", "/summaries", "/pipelines"] as const
+const TAB_SUFFIXES = ["", "/issues", "/research", "/summaries", "/pipelines", "/agents"] as const
 
 /**
  * h/l (and ←/→) cycle between the repo tabs (Code / Issues / Research /
@@ -113,6 +113,7 @@ export function useTabNav(owner: string, repo: string, enabled = true) {
   if (pathname.startsWith(`${base}/issues`)) current = 1
   else if (pathname.startsWith(`${base}/research`)) current = 2
   else if (pathname.startsWith(`${base}/summaries`)) current = 3
+  else if (pathname.startsWith(`${base}/agents`)) current = 5
   else if (pathname.startsWith(`${base}/pipelines`)) current = 4
   const currentRef = useRef(current)
   currentRef.current = current

@@ -19,7 +19,7 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
 
   function onSpawn() {
     spawn.mutate(undefined, {
-      onSuccess: (run) => navigate(`/${owner}/${repo}/pipelines/${run.number}`),
+      onSuccess: (run) => navigate(`/${owner}/${repo}/agents/${run.number}`),
     })
   }
 

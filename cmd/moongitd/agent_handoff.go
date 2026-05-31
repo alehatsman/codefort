@@ -183,9 +183,10 @@ func (r *ciRunner) postAgentComment(issueID int64, body string) {
 	}
 }
 
-// runLink is a relative link to a run's page, for use in issue-comment markdown.
+// runLink is a relative link to an agent run's page, for use in issue-comment
+// markdown (agent runs live under the Agents tab).
 func (r *ciRunner) runLink(owner, repo string, runNumber int) string {
-	return fmt.Sprintf("/%s/%s/pipelines/%d", owner, repo, runNumber)
+	return fmt.Sprintf("/%s/%s/agents/%d", owner, repo, runNumber)
 }
 
 // agentJobIDOrZero returns the run's agent job id, or 0 if absent.

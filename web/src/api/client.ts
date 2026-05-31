@@ -224,8 +224,13 @@ export const api = {
   deleteCodeComment: (owner: string, repo: string, id: number) =>
     request<void>(`/api/repos/${owner}/${repo}/code-comments/${id}`, { method: "DELETE" }),
 
-  listCIRuns: (owner: string, repo: string, limit = 0) =>
-    request<CIRun[]>(`/api/repos/${owner}/${repo}/ci/runs${limit ? `?limit=${limit}` : ""}`),
+  listCIRuns: (owner: string, repo: string, limit = 0, kind = "") => {
+    const q = new URLSearchParams()
+    if (limit) q.set("limit", String(limit))
+    if (kind) q.set("kind", kind)
+    const qs = q.toString()
+    return request<CIRun[]>(`/api/repos/${owner}/${repo}/ci/runs${qs ? `?${qs}` : ""}`)
+  },
   triggerCIRun: (owner: string, repo: string, ref: string) =>
     request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs`, { method: "POST", body: { ref } }),
   getCIRun: (owner: string, repo: string, n: number) =>

@@ -279,10 +279,12 @@ export function useIntelSummaries(owner: string, repo: string, enabled: boolean)
 const ciRunsRefetchInterval = (q: { state: { data?: CIRun[] } }) =>
   q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false
 
-export function useCIRuns(owner: string, repo: string) {
+export function useCIRuns(owner: string, repo: string, kind: "" | "ci" | "agent" = "") {
   return useQuery({
-    queryKey: keys.ciRuns(owner, repo),
-    queryFn: () => api.listCIRuns(owner, repo),
+    // kind is appended so a mutation invalidating the keys.ciRuns prefix still
+    // refreshes every kind variant (react-query matches by prefix).
+    queryKey: [...keys.ciRuns(owner, repo), kind],
+    queryFn: () => api.listCIRuns(owner, repo, 0, kind),
     enabled: !!owner && !!repo,
     refetchInterval: ciRunsRefetchInterval,
   })
