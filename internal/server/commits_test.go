@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -560,5 +561,129 @@ func TestHandleCommitInvalidSha(t *testing.T) {
 	}
 	if _, code := getCommitDetail(t, s, "deadbeef"); code != http.StatusNotFound {
 		t.Errorf("unknown sha status = %d, want 404", code)
+	}
+}
+
+// newIssueRefTestServer seeds a repo whose commit messages reference issues, so
+// the issue→commits endpoint has something to match on.
+func newIssueRefTestServer(t *testing.T, subjects ...string) *Server {
+	t.Helper()
+	db, err := storage.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := storage.Migrate(db); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	if _, err := storage.EnsureRepo(db, cOwner, cRepo); err != nil {
+		t.Fatalf("EnsureRepo: %v", err)
+	}
+
+	reposDir := t.TempDir()
+	work := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = work
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=Alice", "GIT_AUTHOR_EMAIL=a@b.c",
+			"GIT_COMMITTER_NAME=Alice", "GIT_COMMITTER_EMAIL=a@b.c",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+
+	git("init", "-q", "-b", "main")
+	for i, subj := range subjects {
+		if err := os.WriteFile(filepath.Join(work, "f.txt"), []byte(strconv.Itoa(i)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		git("add", ".")
+		git("commit", "-q", "-m", subj)
+	}
+
+	bare := filepath.Join(reposDir, cOwner, cRepo+".git")
+	if err := os.MkdirAll(filepath.Dir(bare), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git("clone", "-q", "--bare", work, bare)
+
+	return &Server{
+		cfg:    &config.Config{ReposDir: reposDir},
+		db:     db,
+		rdb:    db,
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+}
+
+func getIssueCommits(t *testing.T, s *Server, number string) ([]api.Commit, int) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/repos/alice/proj/issues/"+number+"/commits", nil)
+	req.SetPathValue("owner", cOwner)
+	req.SetPathValue("repo", cRepo)
+	req.SetPathValue("number", number)
+	rr := httptest.NewRecorder()
+	s.handleIssueCommits(rr, req)
+	var out []api.Commit
+	if rr.Code == http.StatusOK {
+		if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+			t.Fatalf("decode: %v (body=%s)", err, rr.Body.String())
+		}
+	}
+	return out, rr.Code
+}
+
+func TestHandleIssueCommits(t *testing.T) {
+	s := newIssueRefTestServer(t,
+		"first commit",         // no ref
+		"fix the parser (#12)", // refs #12
+		"start work on #123",   // refs #123, must NOT match #12
+		"close #12 finally",    // refs #12
+	)
+
+	// #12 is referenced by two commits, newest first; the #123 commit and the
+	// unrelated one are excluded.
+	out, code := getIssueCommits(t, s, "12")
+	if code != http.StatusOK {
+		t.Fatalf("status = %d", code)
+	}
+	if len(out) != 2 {
+		t.Fatalf("got %d commits for #12, want 2: %+v", len(out), out)
+	}
+	if out[0].Subject != "close #12 finally" || out[1].Subject != "fix the parser (#12)" {
+		t.Errorf("subjects = %q, %q", out[0].Subject, out[1].Subject)
+	}
+
+	// #123 matches only its own commit, not the #12 ones.
+	out, _ = getIssueCommits(t, s, "123")
+	if len(out) != 1 || out[0].Subject != "start work on #123" {
+		t.Fatalf("got %d commits for #123, want 1 (start work on #123): %+v", len(out), out)
+	}
+
+	// An issue nothing references yields an empty (non-null) list.
+	out, code = getIssueCommits(t, s, "99")
+	if code != http.StatusOK || len(out) != 0 {
+		t.Errorf("#99: status=%d len=%d, want 200 0", code, len(out))
+	}
+}
+
+func TestHandleIssueCommitsInvalidNumber(t *testing.T) {
+	s := newIssueRefTestServer(t, "first commit")
+	if _, code := getIssueCommits(t, s, "0"); code != http.StatusBadRequest {
+		t.Errorf("number 0 status = %d, want 400", code)
+	}
+	if _, code := getIssueCommits(t, s, "abc"); code != http.StatusBadRequest {
+		t.Errorf("number abc status = %d, want 400", code)
+	}
+}
+
+func TestHandleIssueCommitsUnbornRepo(t *testing.T) {
+	// A repo with no commits returns an empty list, not 500.
+	s := newIssueRefTestServer(t)
+	out, code := getIssueCommits(t, s, "1")
+	if code != http.StatusOK || len(out) != 0 {
+		t.Errorf("unborn: status=%d len=%d, want 200 0", code, len(out))
 	}
 }

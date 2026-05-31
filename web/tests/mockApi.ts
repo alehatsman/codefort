@@ -141,6 +141,9 @@ export interface State {
   // diff view. Empty by default; specs that need them seed them.
   commits: Commit[]
   commitDetails: Record<string, CommitDetail>
+  // Commits referencing an issue, keyed by issue number. Empty by default;
+  // the issue→commits section spec seeds it.
+  issueCommits: Record<number, Commit[]>
 }
 
 const OPEN_STATES: IssueState[] = ["todo", "in_progress"]
@@ -171,6 +174,7 @@ function freshState(seed: Partial<State> = {}): State {
     ciRuns: [],
     commits: [],
     commitDetails: {},
+    issueCommits: {},
     ...seed,
   }
 }
@@ -433,6 +437,14 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       return json(route, 200, iss)
     }
     return route.continue()
+  })
+
+  // Commits referencing an issue (#n). Disjoint from /issues/{n} and the
+  // repo-level /commits route, so it doesn't shadow either.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/issues\/\d+\/commits$/, (route) => {
+    const segs = new URL(route.request().url()).pathname.split("/")
+    const n = Number(segs[segs.length - 2])
+    return json(route, 200, state.issueCommits[n] ?? [])
   })
 
   // Claim / unclaim

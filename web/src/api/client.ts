@@ -6,6 +6,7 @@ import type {
   CodeComment,
   CodeCommentState,
   Comment,
+  Commit,
   CommitDetail,
   CommitList,
   TreeCommits,
@@ -161,6 +162,8 @@ export const api = {
     request<Issue[]>(`/api/repos/${owner}/${repo}/issues${query ? `?${query}` : ""}`),
   getIssue: (owner: string, repo: string, n: number) =>
     request<Issue>(`/api/repos/${owner}/${repo}/issues/${n}`),
+  getIssueCommits: (owner: string, repo: string, n: number) =>
+    request<Commit[]>(`/api/repos/${owner}/${repo}/issues/${n}/commits`),
   createIssue: (owner: string, repo: string, body: CreateIssueInput) =>
     request<Issue>(`/api/repos/${owner}/${repo}/issues`, { method: "POST", body }),
   updateIssue: (owner: string, repo: string, n: number, body: UpdateIssueInput) =>

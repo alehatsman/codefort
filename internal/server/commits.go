@@ -92,6 +92,47 @@ func (s *Server) handleCommits(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+// handleIssueCommits returns commits whose message references this issue,
+// newest first, across all branches. A commit references issue N when its
+// message contains "#N" on a non-digit boundary (GitHub convention), so "#12"
+// does not match "#123". Returns an empty list for an unborn repo or no match.
+func (s *Server) handleIssueCommits(w http.ResponseWriter, r *http.Request) {
+	num, err := strconv.Atoi(r.PathValue("number"))
+	if err != nil || num <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid issue number")
+		return
+	}
+	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+		return
+	}
+	repoDir, ok := s.repoDirOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	out := []api.Commit{}
+	if !hasCommits(r.Context(), repoDir) {
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+
+	// The leading '#' anchors the left boundary (a digit before N would not be
+	// preceded by '#'); the trailing class rejects a longer number.
+	pattern := "#" + strconv.Itoa(num) + "([^0-9]|$)"
+	raw, err := gitOutput(r.Context(), repoDir,
+		"log", "--all", "-E", "--grep="+pattern,
+		"--format="+commitFormat,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "git log failed")
+		return
+	}
+	if commits := parseCommits(raw); len(commits) > 0 {
+		out = commits
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 // shaPattern bounds the {sha} path segment to hex so it can't smuggle git
 // options (a leading dash) or refspecs into the plumbing commands below. Short
 // (abbreviated) shas down to 4 chars are allowed; git resolves them.

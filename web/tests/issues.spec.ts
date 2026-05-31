@@ -273,3 +273,77 @@ test("issue body and comments render markdown", async ({ page }) => {
   await expect(link).toHaveAttribute("href", "https://example.com")
   await expect(link).toHaveAttribute("target", "_blank")
 })
+
+test("issue detail lists the commits referencing it", async ({ page }) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1,
+        number: 1,
+        title: "Caching layer",
+        body: "",
+        author: "alice",
+        state: "in_progress",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+    issueCommits: {
+      1: [
+        {
+          sha: "abc1234def5678abc1234def5678abc1234def56",
+          short_sha: "abc1234",
+          subject: "feat: add cache (#1)",
+          author: "alice",
+          email: "a@b.c",
+          date: now,
+        },
+        {
+          sha: "def5678abc1234def5678abc1234def5678abc12",
+          short_sha: "def5678",
+          subject: "fix: cache eviction for #1",
+          author: "bob",
+          email: "b@b.c",
+          date: now,
+        },
+      ],
+    },
+  })
+  await page.goto("/alice/demo/issues/1")
+
+  // The Commits section shows a count and one row per referencing commit,
+  // each linking to the commit detail page.
+  const section = page.locator(".issue-commits")
+  await expect(section.locator(".issue-commits__count")).toHaveText("2")
+  await expect(section.locator(".commit-row")).toHaveCount(2)
+  await expect(section.getByRole("link", { name: "feat: add cache (#1)" })).toHaveAttribute(
+    "href",
+    "/alice/demo/commit/abc1234def5678abc1234def5678abc1234def56"
+  )
+  await expect(section.getByRole("link", { name: "abc1234" })).toBeVisible()
+})
+
+test("issue with no referencing commits hides the Commits section", async ({ page }) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1,
+        number: 1,
+        title: "Lonely issue",
+        body: "",
+        author: "alice",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+  })
+  await page.goto("/alice/demo/issues/1")
+
+  await expect(page.getByRole("heading", { name: /Lonely issue/ })).toBeVisible()
+  await expect(page.locator(".issue-commits")).toHaveCount(0)
+})

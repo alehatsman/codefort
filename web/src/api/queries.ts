@@ -30,6 +30,8 @@ export const keys = {
   issues: (owner: string, repo: string, query = "") =>
     query ? (["issues", owner, repo, query] as const) : (["issues", owner, repo] as const),
   issue: (owner: string, repo: string, n: number) => ["issue", owner, repo, n] as const,
+  issueCommits: (owner: string, repo: string, n: number) =>
+    ["issueCommits", owner, repo, n] as const,
   comments: (owner: string, repo: string, n: number) => ["comments", owner, repo, n] as const,
   intel: (owner: string, repo: string) => ["intel", owner, repo] as const,
   intelOverview: (owner: string, repo: string) => ["intelOverview", owner, repo] as const,
@@ -221,6 +223,18 @@ export function useComments(owner: string, repo: string, n: number) {
     queryKey: keys.comments(owner, repo, n),
     queryFn: () => api.listComments(owner, repo, n),
     enabled: !!owner && !!repo && Number.isFinite(n),
+  })
+}
+
+// Commits whose message references this issue (#n). Resolved server-side from
+// git history, so it changes only when someone pushes; a short stale window
+// keeps the detail page from refetching on every navigation.
+export function useIssueCommits(owner: string, repo: string, n: number) {
+  return useQuery({
+    queryKey: keys.issueCommits(owner, repo, n),
+    queryFn: () => api.getIssueCommits(owner, repo, n),
+    enabled: !!owner && !!repo && Number.isFinite(n),
+    staleTime: 60_000,
   })
 }
 

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react"
-import { useParams } from "react-router-dom"
-import { useComments, useIssue, useRepo, useWhoami } from "../api/queries"
+import { Link, useParams } from "react-router-dom"
+import { useComments, useIssue, useIssueCommits, useRepo, useWhoami } from "../api/queries"
+import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
 import StateButtons from "../components/StateButtons"
@@ -23,6 +24,7 @@ export default function IssuePage() {
   const repoQ = useRepo(owner, repo)
   const issueQ = useIssue(owner, repo, num)
   const commentsQ = useComments(owner, repo, num)
+  const commitsQ = useIssueCommits(owner, repo, num)
 
   if (issueQ.isLoading) return <div className="loading">Loading…</div>
   if (issueQ.error) return <div className="error">{(issueQ.error as Error).message}</div>
@@ -78,6 +80,37 @@ export default function IssuePage() {
                 />
               ))}
             </ul>
+          )}
+
+          {commitsQ.data && commitsQ.data.length > 0 && (
+            <section className="issue-commits">
+              <h3 className="issue-commits__label">
+                Commits <span className="issue-commits__count">{commitsQ.data.length}</span>
+              </h3>
+              <ul className="commit-list">
+                {commitsQ.data.map((c) => {
+                  const to = `/${owner}/${repo}/commit/${c.sha}`
+                  return (
+                    <li key={c.sha} className="commit-row">
+                      <Avatar name={c.author} />
+                      <div className="commit-row__main">
+                        <Link to={to} className="commit-row__subject" title={c.subject}>
+                          {c.subject}
+                        </Link>
+                        <div className="commit-row__meta muted small">
+                          <span className="commit-row__author">{c.author}</span>
+                          {" committed "}
+                          <span title={absoluteTime(c.date)}>{timeAgo(c.date)}</span>
+                        </div>
+                      </div>
+                      <Link to={to} className="commit-row__sha" title={`View commit ${c.sha}`}>
+                        {c.short_sha}
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
           )}
 
           <CommentForm owner={owner} repo={repo} number={iss.number} />
