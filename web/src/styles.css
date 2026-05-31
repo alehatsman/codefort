@@ -684,6 +684,15 @@ a.file-tree__commit:hover {
   color: var(--fg-muted);
 }
 
+/* CI status badge linking to its run — sits beside commits in the history
+   list and the last-commit bars. */
+.commit-ci {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
 /* Commits list page. */
 .commits-page__head {
   display: flex;

@@ -1,9 +1,10 @@
 import { Link, useParams } from "react-router-dom"
-import { useInfiniteCommits, useRepo } from "../api/queries"
-import type { Commit } from "../api/types"
+import { useCommitCIStatus, useInfiniteCommits, useRepo } from "../api/queries"
+import type { CIRun, Commit } from "../api/types"
 import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
 import Avatar from "../components/Avatar"
+import CommitCIStatus from "../components/CommitCIStatus"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 
 const PER_PAGE = 30
@@ -19,6 +20,7 @@ export default function CommitsPage() {
 
   const repoQ = useRepo(owner, repo)
   const commitsQ = useInfiniteCommits(owner, repo, { path, perPage: PER_PAGE })
+  const ciStatusQ = useCommitCIStatus(owner, repo, repoQ.data?.ci_enabled ?? false)
 
   // Flatten the loaded pages into one list, deduped by SHA — page boundaries
   // can shift if new commits land between fetches.
@@ -47,7 +49,13 @@ export default function CommitsPage() {
               <h3 className="commit-group__day">Commits on {g.day}</h3>
               <ul className="commit-list">
                 {g.commits.map((c) => (
-                  <CommitRow key={c.sha} owner={owner} repo={repo} commit={c} />
+                  <CommitRow
+                    key={c.sha}
+                    owner={owner}
+                    repo={repo}
+                    commit={c}
+                    ciRun={ciStatusQ.data?.get(c.sha)}
+                  />
                 ))}
               </ul>
             </section>
@@ -69,7 +77,17 @@ export default function CommitsPage() {
   )
 }
 
-function CommitRow({ owner, repo, commit }: { owner: string; repo: string; commit: Commit }) {
+function CommitRow({
+  owner,
+  repo,
+  commit,
+  ciRun,
+}: {
+  owner: string
+  repo: string
+  commit: Commit
+  ciRun?: CIRun
+}) {
   const to = `/${owner}/${repo}/commit/${commit.sha}`
   return (
     <li className="commit-row">
@@ -84,6 +102,7 @@ function CommitRow({ owner, repo, commit }: { owner: string; repo: string; commi
           <span title={absoluteTime(commit.date)}>{timeAgo(commit.date)}</span>
         </div>
       </div>
+      <CommitCIStatus owner={owner} repo={repo} run={ciRun} />
       <Link to={to} className="commit-row__sha" title={`View commit ${commit.sha}`}>
         {commit.short_sha}
       </Link>
