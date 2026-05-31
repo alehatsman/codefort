@@ -60,6 +60,8 @@ export interface CIJob {
 
 export interface CIRun {
   number: number
+  kind?: "ci" | "agent"
+  issue_number?: number
   commit_sha: string
   commit_msg?: string
   commit_author?: string
@@ -457,6 +459,32 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     iss.assignee = null
     iss.updated_at = nowIso()
     return json(route, 200, iss)
+  })
+
+  // Spawn agent — enqueues a kind=agent run linked to the issue, like the
+  // server's POST /issues/{n}/agent. Mirrors the trigger mock's run shape.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/issues\/\d+\/agent$/, (route) => {
+    const url = new URL(route.request().url())
+    const n = Number(url.pathname.split("/")[url.pathname.split("/").length - 2])
+    const iss = state.issues.find((i) => i.number === n)
+    if (!iss) return json(route, 404, { error: "issue not found" })
+    const next: CIRun = {
+      number: state.ciRuns.length ? Math.max(...state.ciRuns.map((r) => r.number)) + 1 : 1,
+      kind: "agent",
+      issue_number: n,
+      commit_sha: "feedface0000abcd",
+      ref: "HEAD",
+      event: "agent",
+      trigger: state.identity,
+      status: "queued",
+      created_at: nowIso(),
+      started_at: null,
+      finished_at: null,
+      jobs: [],
+    }
+    state.ciRuns.unshift(next)
+    const { jobs: _j, events: _e, ...run } = next
+    return json(route, 202, run)
   })
 
   // Comments collection

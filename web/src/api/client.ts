@@ -229,4 +229,14 @@ export const api = {
     request<CIRunDetail>(`/api/repos/${owner}/${repo}/ci/runs/${n}`),
   rerunCIRun: (owner: string, repo: string, n: number) =>
     request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/rerun`, { method: "POST" }),
+
+  // spawnAgent starts a Claude agent run for an issue. ref pins the base the
+  // agent checks out (optional; the server defaults to the repo's HEAD). The
+  // resulting agent run shares the ci_runs surface, so it shows up under
+  // Pipelines and streams over the same run/job event endpoints.
+  spawnAgent: (owner: string, repo: string, n: number, ref?: string) =>
+    request<CIRun>(`/api/repos/${owner}/${repo}/issues/${n}/agent`, {
+      method: "POST",
+      body: ref ? { ref } : {},
+    }),
 }

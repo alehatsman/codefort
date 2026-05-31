@@ -322,8 +322,13 @@ export type CIRunStatus = "queued" | "running" | "success" | "failed" | "cancele
 // Mirrors storage.JobStatus.
 export type CIJobStatus = "queued" | "running" | "success" | "failed" | "skipped" | "error"
 
+// Mirrors storage.RunKind: a normal pipeline run vs. an issue-spawned agent run.
+export type CIRunKind = "ci" | "agent"
+
 export interface CIRun {
   number: number
+  kind: CIRunKind
+  issue_number?: number
   commit_sha: string
   commit_msg?: string
   commit_author?: string

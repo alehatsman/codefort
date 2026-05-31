@@ -160,6 +160,17 @@ export function useRerunCIRun(owner: string, repo: string) {
   })
 }
 
+// useSpawnAgent starts a Claude agent run for an issue. The agent run shares
+// the ci_runs surface, so refresh the runs list once it's accepted (the run
+// view lives under Pipelines).
+export function useSpawnAgent(owner: string, repo: string, n: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ref?: string) => api.spawnAgent(owner, repo, n, ref),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) }),
+  })
+}
+
 // useTriggerCIRun starts a run for an arbitrary ref without a push; like a
 // rerun, the fresh run tops the list, so refresh it once accepted.
 export function useTriggerCIRun(owner: string, repo: string) {

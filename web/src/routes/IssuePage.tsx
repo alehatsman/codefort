@@ -10,6 +10,7 @@ import StateIcon from "../components/StateIcon"
 import Avatar from "../components/Avatar"
 import CommentItem from "../components/CommentItem"
 import DeleteIssueButton from "../components/DeleteIssueButton"
+import SpawnAgentButton from "../components/SpawnAgentButton"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it only
 // when an issue with a body is actually shown.
@@ -98,6 +99,10 @@ export default function IssuePage() {
               state={iss.state}
               me={me.data?.name}
             />
+          </section>
+          <section className="sidebar__section">
+            <h3 className="sidebar__label">Agent</h3>
+            <SpawnAgentButton owner={owner} repo={repo} number={iss.number} />
           </section>
           <section className="sidebar__section">
             <h3 className="sidebar__label">Danger zone</h3>

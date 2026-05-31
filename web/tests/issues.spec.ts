@@ -269,3 +269,27 @@ test("issue body and comments render markdown", async ({ page }) => {
   await expect(link).toHaveAttribute("href", "https://example.com")
   await expect(link).toHaveAttribute("target", "_blank")
 })
+
+test("spawn agent from an issue navigates to the new run", async ({ page }) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1,
+        number: 1,
+        title: "Wire the thing",
+        author: "test-user",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+  })
+  await page.goto("/alice/demo/issues/1")
+
+  await page.getByRole("button", { name: "Spawn agent" }).click()
+
+  // The agent run shares the CI run surface, so we land on its run view.
+  await expect(page).toHaveURL(/\/alice\/demo\/pipelines\/1$/)
+})
