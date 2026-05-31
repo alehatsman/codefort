@@ -39,6 +39,8 @@ func run(args []string) error {
 		return runIssue(args[1:])
 	case "review":
 		return runReview(args[1:])
+	case "pr":
+		return runPR(args[1:])
 	case "ci":
 		return runCI(args[1:])
 	case "help", "-h", "--help":
@@ -68,6 +70,11 @@ USAGE:
     moongit review resolve <id>
     moongit review reopen  <id>
     moongit review delete  <id>
+
+    moongit pr create  --base <ref> --head <ref> --title <t> [--body <b>]
+    moongit pr list    [--state open|merged|closed|all]
+    moongit pr show    <number>
+    moongit pr merge   <number> [--ff-only]
 
     moongit ci validate  [path]   (defaults to ./mgitci.yml)
     moongit ci run       <ref>    (trigger a run for a branch/tag/sha)

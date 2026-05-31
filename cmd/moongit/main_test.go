@@ -106,6 +106,38 @@ func TestParseRemote(t *testing.T) {
 	}
 }
 
+// TestRunPRDispatch covers the `pr` argument-parsing and validation branches
+// that fire before any server round-trip (so no remote/token is needed).
+func TestRunPRDispatch(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      []string
+		errSubstr string
+	}{
+		{"no subcommand", []string{}, "usage: moongit pr"},
+		{"unknown subcommand", []string{"frobnicate"}, "unknown pr subcommand"},
+		{"create missing flags", []string{"create", "--title", "t"}, "usage: moongit pr create"},
+		{"create missing title", []string{"create", "--base", "main", "--head", "f"}, "usage: moongit pr create"},
+		{"list invalid state", []string{"list", "--state", "bogus"}, "invalid --state"},
+		{"show no arg", []string{"show"}, "usage: moongit pr show"},
+		{"show bad number", []string{"show", "abc"}, "invalid pull request number"},
+		{"merge no arg", []string{"merge"}, "usage: moongit pr merge"},
+		{"merge bad number", []string{"merge", "0"}, "invalid pull request number"},
+		{"merge extra args", []string{"merge", "1", "extra"}, "unexpected extra args"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := runPR(tt.args)
+			if err == nil {
+				t.Fatalf("runPR(%v) = nil, want error", tt.args)
+			}
+			if !strings.Contains(err.Error(), tt.errSubstr) {
+				t.Errorf("error %q missing substring %q", err.Error(), tt.errSubstr)
+			}
+		})
+	}
+}
+
 func TestParseLineSpec(t *testing.T) {
 	tests := []struct {
 		spec      string
