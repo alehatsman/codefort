@@ -241,6 +241,11 @@ test("an awaiting-input agent run shows a message box and queues a follow-up", a
   // The mock recorded the queued turn.
   await expect.poll(() => state.ciRuns[0].turns?.length ?? 0).toBe(1)
   expect(state.ciRuns[0].turns?.[0].body).toBe("please also add a test")
+
+  // Finishing the run hands off; the box switches to the finishing note.
+  await page.getByRole("button", { name: "Finish" }).click()
+  await expect.poll(() => state.ciRuns[0].status).toBe("finishing")
+  await expect(page.getByText(/Finishing/)).toBeVisible()
 })
 
 test("run detail surfaces commit context, the job DAG, and step commands", async ({ page }) => {

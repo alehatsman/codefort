@@ -2745,7 +2745,8 @@ h3 {
   color: var(--state-todo);
 }
 .ci-badge--running,
-.ci-badge--awaiting_input {
+.ci-badge--awaiting_input,
+.ci-badge--finishing {
   background: var(--state-in_progress-bg);
   color: var(--state-in_progress);
 }
@@ -3007,5 +3008,6 @@ h3 {
 }
 .agent-msgbox__actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2);
 }

@@ -339,6 +339,20 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     run.turns.push(turn)
     return json(route, 202, turn)
   })
+  // Finish an agent run: park -> finishing (the runner would then hand off).
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/finish$/, (route) => {
+    const parts = new URL(route.request().url()).pathname.split("/")
+    const n = Number(parts[parts.length - 2])
+    const run = state.ciRuns.find((r) => r.number === n)
+    if (!run) return json(route, 404, { error: "run not found" })
+    if (run.kind !== "agent") return json(route, 400, { error: "not an agent run" })
+    if (run.status !== "awaiting_input") {
+      return json(route, 409, { error: "run is not awaiting input" })
+    }
+    run.status = "finishing"
+    const { jobs: _j, events: _e, ...out } = run
+    return json(route, 202, out)
+  })
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/rerun$/, (route) => {
     const parts = new URL(route.request().url()).pathname.split("/")
     const n = Number(parts[parts.length - 2])

@@ -321,6 +321,7 @@ export type CIRunStatus =
   | "queued"
   | "running"
   | "awaiting_input" // agent-only: parked between turns
+  | "finishing" // agent-only: handing off (branch + summary)
   | "success"
   | "failed"
   | "canceled"

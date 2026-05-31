@@ -150,6 +150,49 @@ func (s *Server) handleCreateAgentTurn(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, toAPITurn(turn))
 }
 
+// handleFinishAgentRun accepts a parked agent run: it transitions the run to
+// finishing, after which the runner materializes the agent/issue-<n> branch and
+// posts the summary comment (#78). The run must be an agent run currently
+// awaiting input — finishing a run that's mid-turn or already terminal is a 409.
+func (s *Server) handleFinishAgentRun(w http.ResponseWriter, r *http.Request) {
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+	num, ok := runNumberOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	run, err := storage.GetRun(s.db, repoID, num)
+	if errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "run not found")
+		return
+	}
+	if err != nil {
+		s.logger.Error("agent finish get run", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if run.Kind != storage.RunKindAgent {
+		writeError(w, http.StatusBadRequest, "not an agent run")
+		return
+	}
+
+	// CAS awaiting_input -> finishing; ErrNotFound means it wasn't parked.
+	if err := storage.MarkRunFinishing(s.db, run.ID); errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusConflict, "run is not awaiting input (busy or already finished)")
+		return
+	} else if err != nil {
+		s.logger.Error("agent finish mark", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	run.Status = storage.RunFinishing
+	writeJSON(w, http.StatusAccepted, toAPIRun(run))
+}
+
 func toAPITurn(t storage.AgentTurn) api.AgentTurn {
 	return api.AgentTurn{
 		Seq:        t.Seq,

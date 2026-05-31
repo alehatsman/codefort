@@ -247,4 +247,8 @@ export const api = {
       method: "POST",
       body: { text },
     }),
+  // finishAgentRun accepts a parked agent run; the server hands off (branch +
+  // summary comment) and finalizes it.
+  finishAgentRun: (owner: string, repo: string, n: number) =>
+    request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/finish`, { method: "POST" }),
 }

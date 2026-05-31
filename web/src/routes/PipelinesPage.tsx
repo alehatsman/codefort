@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom"
 import { useCIRun, useCIRuns, useRefs, useRepo } from "../api/queries"
 import {
   useCreateAgentTurn,
+  useFinishAgentRun,
   useRerunCIRun,
   useSetCIEnabled,
   useTriggerCIRun,
@@ -452,13 +453,23 @@ function AgentMessageBox({
 }) {
   const [text, setText] = useState("")
   const send = useCreateAgentTurn(owner, repo, runNumber)
+  const finish = useFinishAgentRun(owner, repo, runNumber)
   const terminal = ["success", "failed", "canceled", "error"].includes(run.status)
   const queued = (run.turns ?? []).filter((t) => t.status === "pending" || t.status === "running")
 
   if (terminal) {
     return (
       <div className="agent-msgbox agent-msgbox--done muted small">
-        This agent run has finished.
+        This agent run has finished
+        {run.status === "success" ? " — see the issue for the result branch." : "."}
+      </div>
+    )
+  }
+
+  if (run.status === "finishing") {
+    return (
+      <div className="agent-msgbox agent-msgbox--done muted small">
+        Finishing — handing off the result…
       </div>
     )
   }
@@ -491,6 +502,15 @@ function AgentMessageBox({
       />
       <div className="agent-msgbox__actions">
         <button
+          type="button"
+          className="btn btn--small"
+          onClick={() => finish.mutate()}
+          disabled={finish.isPending || run.status === "running"}
+          title="Hand off the agent's work: push agent/issue-N and comment on the issue"
+        >
+          {finish.isPending ? "Finishing…" : "Finish"}
+        </button>
+        <button
           type="submit"
           className="btn btn--small btn--primary"
           disabled={send.isPending || text.trim() === ""}
@@ -499,6 +519,7 @@ function AgentMessageBox({
         </button>
       </div>
       {send.error && <div className="error inline">{(send.error as Error).message}</div>}
+      {finish.error && <div className="error inline">{(finish.error as Error).message}</div>}
     </form>
   )
 }
