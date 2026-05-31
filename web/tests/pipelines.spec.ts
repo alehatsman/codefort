@@ -111,6 +111,87 @@ test("pipelines tab lists runs and opens a run's job log", async ({ page }) => {
   await expect(page.getByText("hello from ci")).toBeVisible()
 })
 
+test("agent run renders the claude transcript instead of the job DAG", async ({ page }) => {
+  await mockApi(page, {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 1,
+        total_issues: 1,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 1,
+        kind: "agent",
+        issue_number: 5,
+        commit_sha: "deadbeefcafe1234",
+        ref: "HEAD",
+        event: "agent",
+        trigger: "agent#17",
+        status: "success",
+        created_at: iso,
+        started_at: iso,
+        finished_at: iso,
+        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        events: {
+          agent: [
+            { seq: 1, type: "run.started", time: 0, data: { total_steps: 1 } },
+            { seq: 2, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #5: do it" } },
+            {
+              seq: 3,
+              type: "agent.message",
+              time: 0,
+              data: {
+                claude: {
+                  type: "assistant",
+                  message: { role: "assistant", content: [{ type: "text", text: "on it now" }] },
+                },
+              },
+            },
+            {
+              seq: 4,
+              type: "agent.message",
+              time: 0,
+              data: {
+                claude: {
+                  type: "assistant",
+                  message: {
+                    role: "assistant",
+                    content: [{ type: "tool_use", name: "Bash", input: { command: "ls" } }],
+                  },
+                },
+              },
+            },
+            {
+              seq: 5,
+              type: "agent.turn.completed",
+              time: 0,
+              data: { turn: 1, status: "success", num_turns: 2, duration_ms: 1200 },
+            },
+            { seq: 6, type: "run.completed", time: 0, data: { total_steps: 1 } },
+          ],
+        },
+      },
+    ],
+  })
+  await page.goto("/alice/demo/pipelines/1")
+
+  await expect(page.getByRole("heading", { name: /Run #1/ })).toBeVisible()
+  // Turn header, assistant text, and the tool call all render in the transcript.
+  await expect(page.getByText("Turn 1")).toBeVisible()
+  await expect(page.getByText("on it now")).toBeVisible()
+  await expect(page.getByText("🔧 Bash")).toBeVisible()
+  await expect(page.getByText(/Turn complete/)).toBeVisible()
+  // It's the transcript, not the CI job DAG.
+  await expect(page.locator(".agent-transcript")).toBeVisible()
+  await expect(page.locator(".ci-dag")).toHaveCount(0)
+})
+
 test("run detail surfaces commit context, the job DAG, and step commands", async ({ page }) => {
   await mockApi(page, enabledSeed())
   await page.goto("/alice/demo/pipelines/1")

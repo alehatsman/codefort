@@ -2927,3 +2927,62 @@ h3 {
 .ci-log__stderr {
   color: var(--state-closed);
 }
+
+/* Agent run transcript — the live claude conversation, folded from the
+   agent.* event stream into typed entries. */
+.agent-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.agent-entry {
+  border-left: 3px solid var(--border);
+  padding: var(--space-1) var(--space-3);
+}
+.agent-entry__label {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  font-weight: var(--weight-medium);
+  margin-bottom: 2px;
+}
+.agent-entry__body {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* A turn header opens each turn; the issue prompt sits under it. */
+.agent-entry--turn {
+  border-left-color: var(--state-in_progress);
+  margin-top: var(--space-2);
+}
+.agent-entry--turn .agent-entry__label {
+  color: var(--fg);
+  font-weight: var(--weight-bold);
+}
+.agent-entry--assistant {
+  border-left-color: var(--accent, var(--state-in_progress));
+}
+/* Tool use + results are the agent's actions; thinking is de-emphasized. */
+.agent-entry--tool_use,
+.agent-entry--tool_result {
+  border-left-color: var(--state-todo);
+}
+.agent-entry--thinking {
+  opacity: 0.7;
+}
+.agent-entry--thinking .agent-entry__body {
+  font-style: italic;
+}
+.agent-entry--system,
+.agent-entry--raw {
+  color: var(--fg-muted);
+}
+.agent-entry--result {
+  border-left-color: var(--state-todo);
+}
+.agent-entry--result .agent-entry__label {
+  color: var(--fg);
+  font-weight: var(--weight-medium);
+}

@@ -256,7 +256,9 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
         </div>
       </dl>
 
-      {jobs.length === 0 ? (
+      {run.kind === "agent" ? (
+        <AgentTranscript owner={owner} repo={repo} runNumber={runNumber} />
+      ) : jobs.length === 0 ? (
         <div className="empty">No jobs — the run was gated or hasn't started.</div>
       ) : (
         <div className="ci-jobs">
@@ -393,6 +395,136 @@ function JobLog({
       ))}
     </div>
   )
+}
+
+// AgentTranscript renders an agent run's live transcript. The agent run has a
+// single "agent" job whose event stream carries agent.* events (one per claude
+// stream-json line); we fold them into readable entries and render in order.
+// The same SSE consumer as CI handles replay + resume, so a terminal run
+// replays its whole transcript and a live one tails it.
+function AgentTranscript({
+  owner,
+  repo,
+  runNumber,
+}: {
+  owner: string
+  repo: string
+  runNumber: number
+}) {
+  const { events, done, error } = useJobEventStream(owner, repo, runNumber, "agent", true)
+  const entries = useMemo(() => foldAgentEvents(events), [events])
+
+  return (
+    <div className="agent-transcript">
+      {error && <div className="error inline">{error}</div>}
+      {entries.length === 0 && !done && <div className="loading">Waiting for the agent…</div>}
+      {entries.map((e, i) => (
+        <div key={i} className={clsx("agent-entry", `agent-entry--${e.kind}`)}>
+          {e.label && <div className="agent-entry__label">{e.label}</div>}
+          <pre className="agent-entry__body">{e.text}</pre>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+interface AgentEntry {
+  kind: "turn" | "thinking" | "assistant" | "tool_use" | "tool_result" | "result" | "system" | "raw"
+  label?: string
+  text: string
+}
+
+// foldAgentEvents reduces the agent event stream into display entries. Each
+// agent.message carries the raw claude stream-json object under data.claude; we
+// pull out the human-meaningful parts (assistant text, tool calls + results,
+// the final result) and fall back to compact JSON for anything unrecognized, so
+// the transcript stays faithful even as Claude's schema evolves.
+function foldAgentEvents(events: CIEvent[]): AgentEntry[] {
+  const out: AgentEntry[] = []
+
+  for (const ev of events) {
+    const d = ev.data ?? {}
+    switch (ev.type) {
+      case "agent.turn.started": {
+        const turn = typeof d.turn === "number" ? d.turn : "?"
+        out.push({ kind: "turn", label: `Turn ${turn}`, text: asString(d.prompt) })
+        break
+      }
+      case "agent.turn.completed": {
+        const status = typeof d.status === "string" ? d.status : "done"
+        const bits = [`status: ${status}`]
+        if (typeof d.num_turns === "number") bits.push(`${d.num_turns} steps`)
+        if (typeof d.duration_ms === "number") bits.push(formatDuration(d.duration_ms))
+        if (typeof d.cost_usd === "number" && d.cost_usd > 0) bits.push(`$${d.cost_usd.toFixed(4)}`)
+        out.push({ kind: "result", label: "Turn complete", text: bits.join(" · ") })
+        break
+      }
+      case "agent.raw":
+        out.push({ kind: "raw", text: asString(d.line) })
+        break
+      case "agent.message":
+        out.push(...foldClaudeMessage(d.claude as Record<string, unknown> | undefined))
+        break
+    }
+  }
+  return out
+}
+
+// foldClaudeMessage turns one claude stream-json object into zero or more
+// transcript entries.
+function foldClaudeMessage(obj: Record<string, unknown> | undefined): AgentEntry[] {
+  if (!obj || typeof obj.type !== "string") return []
+  switch (obj.type) {
+    case "system":
+      return [{ kind: "system", label: "session", text: asString(obj.model ?? obj.subtype) }]
+    case "assistant":
+    case "user":
+      return foldMessageContent(obj)
+    case "result":
+      return [] // summarized by agent.turn.completed
+    default:
+      return []
+  }
+}
+
+function foldMessageContent(obj: Record<string, unknown>): AgentEntry[] {
+  const message = obj.message as { content?: unknown } | undefined
+  const content = message?.content
+  if (!Array.isArray(content)) return []
+  const out: AgentEntry[] = []
+  for (const block of content) {
+    if (!block || typeof block !== "object") continue
+    const b = block as Record<string, unknown>
+    switch (b.type) {
+      case "text":
+        out.push({ kind: "assistant", text: asString(b.text) })
+        break
+      case "thinking":
+        out.push({ kind: "thinking", label: "thinking", text: asString(b.thinking) })
+        break
+      case "tool_use":
+        out.push({ kind: "tool_use", label: `🔧 ${asString(b.name)}`, text: compactJSON(b.input) })
+        break
+      case "tool_result":
+        out.push({ kind: "tool_result", label: "result", text: asString(b.content) })
+        break
+    }
+  }
+  return out
+}
+
+function asString(v: unknown): string {
+  if (typeof v === "string") return v
+  if (v === undefined || v === null) return ""
+  return compactJSON(v)
+}
+
+function compactJSON(v: unknown): string {
+  try {
+    return JSON.stringify(v, null, 2)
+  } catch {
+    return String(v)
+  }
 }
 
 // --- event folding -----------------------------------------------------------
