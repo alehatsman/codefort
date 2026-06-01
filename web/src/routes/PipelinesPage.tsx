@@ -297,10 +297,10 @@ function RunDetail({
             <dt>Model</dt>
             <dd>
               {executionModelLabel(run.execution_model)}
-              {run.execution_model === "mooncake-pilot" && (
+              {run.execution_model === "mooncake-agent" && (
                 <span className="muted small">
                   {" "}
-                  · shell {run.pilot_allow_shell ? "allowed" : "denied"}
+                  · shell {run.mooncake_allow_shell ? "allowed" : "denied"}
                 </span>
               )}
             </dd>

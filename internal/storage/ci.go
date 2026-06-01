@@ -78,7 +78,7 @@ const (
 // (validation), and the runner (executor selection) share one vocabulary.
 const (
 	ExecModelClaudeEdit    = "claude-edit"
-	ExecModelMooncakePilot = "mooncake-pilot"
+	ExecModelMooncakeAgent = "mooncake-agent"
 	// DefaultExecutionModel seeds runs that don't specify one (and the
 	// column default for pre-#110 / CI rows).
 	DefaultExecutionModel = ExecModelClaudeEdit
@@ -112,24 +112,24 @@ type CIRun struct {
 	Kind        RunKind // ci (default) | agent
 	IssueNumber *int    // the issue an agent run serves; nil for CI runs
 	// ExecutionModel is the agent run's pluggable execution model
-	// ('claude-edit' | 'mooncake-pilot'); 'claude-edit' for CI rows by
+	// ('claude-edit' | 'mooncake-agent'); 'claude-edit' for CI rows by
 	// the column default, unused by CI (#110).
 	ExecutionModel string
-	// PilotAllowShell, when set at spawn, drops the default shell/cmd denial
-	// from the mooncake-pilot policy for this run only (#110). Ignored by
+	// MooncakeAllowShell, when set at spawn, drops the default shell/cmd denial
+	// from the mooncake-agent policy for this run only (#110). Ignored by
 	// claude-edit / CI.
-	PilotAllowShell bool
-	CommitSHA       string
-	CommitMsg       string // commit subject, frozen at enqueue (may be empty)
-	CommitAuthor    string // commit author name, frozen at enqueue (may be empty)
-	Ref             string
-	Event           string
-	Trigger         string
-	Status          RunStatus
-	ClaimedAt       *time.Time
-	CreatedAt       time.Time
-	StartedAt       *time.Time
-	FinishedAt      *time.Time
+	MooncakeAllowShell bool
+	CommitSHA          string
+	CommitMsg          string // commit subject, frozen at enqueue (may be empty)
+	CommitAuthor       string // commit author name, frozen at enqueue (may be empty)
+	Ref                string
+	Event              string
+	Trigger            string
+	Status             RunStatus
+	ClaimedAt          *time.Time
+	CreatedAt          time.Time
+	StartedAt          *time.Time
+	FinishedAt         *time.Time
 }
 
 // CIJob is one job within a run, identified within the run by Name.
@@ -154,15 +154,15 @@ type NewRun struct {
 	// ExecutionModel is the agent execution model; empty falls back to the
 	// column default ('claude-edit'). Set only for agent runs (#110).
 	ExecutionModel string
-	// PilotAllowShell overrides the default shell/cmd denial for this
-	// mooncake-pilot run (#110). Set only for agent runs.
-	PilotAllowShell bool
-	CommitSHA       string
-	CommitMsg       string
-	CommitAuthor    string
-	Ref             string
-	Event           string
-	Trigger         string
+	// MooncakeAllowShell overrides the default shell/cmd denial for this
+	// mooncake-agent run (#110). Set only for agent runs.
+	MooncakeAllowShell bool
+	CommitSHA          string
+	CommitMsg          string
+	CommitAuthor       string
+	Ref                string
+	Event              string
+	Trigger            string
 }
 
 // EnqueueRun allocates the next per-repo run number and inserts a queued run.
@@ -191,11 +191,11 @@ func EnqueueRun(db *sql.DB, repoID int64, r NewRun) (CIRun, error) {
 		execModel = DefaultExecutionModel
 	}
 	allowShell := 0
-	if r.PilotAllowShell {
+	if r.MooncakeAllowShell {
 		allowShell = 1
 	}
 	run, err := scanRun(tx.QueryRow(`
-		INSERT INTO ci_runs(repo_id, number, kind, issue_number, execution_model, pilot_allow_shell, commit_sha, commit_msg, commit_author, ref, event, trigger, status)
+		INSERT INTO ci_runs(repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, commit_sha, commit_msg, commit_author, ref, event, trigger, status)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING `+runColumns+`
 	`, repoID, next, string(kind), r.IssueNumber, execModel, allowShell, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued)))
@@ -558,7 +558,7 @@ func affected(res sql.Result, err error) error {
 	return nil
 }
 
-const runColumns = "id, repo_id, number, kind, issue_number, execution_model, pilot_allow_shell, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at"
+const runColumns = "id, repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at"
 
 func scanRun(s scanner) (CIRun, error) {
 	var r CIRun
@@ -574,7 +574,7 @@ func scanRun(s scanner) (CIRun, error) {
 		return r, err
 	}
 	r.Kind = RunKind(kind)
-	r.PilotAllowShell = allowShell != 0
+	r.MooncakeAllowShell = allowShell != 0
 	if issueNum.Valid {
 		n := int(issueNum.Int64)
 		r.IssueNumber = &n

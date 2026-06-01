@@ -94,16 +94,16 @@ func (s *Server) handleSpawnAgent(w http.ResponseWriter, r *http.Request) {
 	msg, author := gitCommitMeta(bareRepo, sha)
 	n := issue.Number
 	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
-		Kind:            storage.RunKindAgent,
-		IssueNumber:     &n,
-		ExecutionModel:  model,
-		PilotAllowShell: req.AllowShell,
-		CommitSHA:       sha,
-		CommitMsg:       msg,
-		CommitAuthor:    author,
-		Ref:             ref,
-		Event:           "agent",
-		Trigger:         identityFromContext(r),
+		Kind:               storage.RunKindAgent,
+		IssueNumber:        &n,
+		ExecutionModel:     model,
+		MooncakeAllowShell: req.AllowShell,
+		CommitSHA:          sha,
+		CommitMsg:          msg,
+		CommitAuthor:       author,
+		Ref:                ref,
+		Event:              "agent",
+		Trigger:            identityFromContext(r),
 	})
 	if err != nil {
 		s.logger.Error("agent spawn enqueue", "err", err)

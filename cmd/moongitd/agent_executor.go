@@ -19,11 +19,11 @@ const (
 	// policy-gated under subscription auth and not reliably unlockable
 	// headlessly (#110), so it can't run commands.
 	agentModelClaudeEdit = storage.ExecModelClaudeEdit
-	// agentModelMooncakePilot runs `mooncake pilot run`. Claude is used
+	// agentModelMooncakeAgent runs `mooncake agent run`. Claude is used
 	// only as a planner (text completion → a mooncake plan); mooncake
 	// itself applies the actions, so commands (tests, git, shell) run
 	// under mooncake's control rather than claude's gated tool-use.
-	agentModelMooncakePilot = storage.ExecModelMooncakePilot
+	agentModelMooncakeAgent = storage.ExecModelMooncakeAgent
 )
 
 // turnInput is the raw, model-agnostic context for one turn; the executor
@@ -31,17 +31,17 @@ const (
 // issue, which follow-up message, the session id) and stays out of prompt
 // composition — so a model-specific prompt never has to be computed for a
 // model that won't use it. claude-edit frames a system prompt and drives a
-// resumable session; mooncake-pilot uses the goal text and ignores
+// resumable session; mooncake-agent uses the goal text and ignores
 // sessionID/resume.
 type turnInput struct {
-	sessionID string    // claude session UUID (claude-edit; pilot ignores)
+	sessionID string    // claude session UUID (claude-edit; mooncake ignores)
 	owner     string    // repo identity, for an executor's framing
 	repo      string    // repo identity, for an executor's framing
 	issue     api.Issue // the run's issue — the task on the first turn
 	message   string    // the follow-up human message; empty on the first turn
 	firstTurn bool      // first turn works the issue; later turns work message
 	mcpPath   string    // dex MCP config path, "" to omit
-	resume    bool      // follow-up turn resumes the session (claude-edit; pilot ignores)
+	resume    bool      // follow-up turn resumes the session (claude-edit; mooncake ignores)
 }
 
 // goal is the turn's user message / goal text: the issue title+body on the
@@ -56,7 +56,7 @@ func (in turnInput) goal() string {
 
 // turnResult is the model-agnostic outcome of one turn, distilled from
 // whatever terminal record the underlying CLI emits (claude's stream-json
-// "result" object, or mooncake's pilot.completed event). Fields a given
+// "result" object, or mooncake's agent.completed event). Fields a given
 // model doesn't report stay zero.
 type turnResult struct {
 	IsError      bool
@@ -85,13 +85,13 @@ type agentExecutor interface {
 // is the default (claude-edit); an unknown model is an error so a bad
 // value fails the run loudly rather than silently picking a default.
 // allowShell is the run's spawn-time override that drops the default
-// shell/cmd denial from the mooncake-pilot policy (#110); claude-edit ignores it.
+// shell/cmd denial from the mooncake-agent policy (#110); claude-edit ignores it.
 func newAgentExecutor(model string, cfg *config.Config, allowShell bool) (agentExecutor, error) {
 	switch model {
 	case "", agentModelClaudeEdit:
 		return &claudeExecutor{}, nil
-	case agentModelMooncakePilot:
-		return newPilotExecutor(cfg, allowShell), nil
+	case agentModelMooncakeAgent:
+		return newMooncakeExecutor(cfg, allowShell), nil
 	default:
 		return nil, fmt.Errorf("unknown agent execution model %q", model)
 	}

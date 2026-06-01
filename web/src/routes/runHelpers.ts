@@ -14,8 +14,8 @@ export function runsBasePath(kind: RunKind): string {
 // (#110). Falls back to the default model when the field is absent (older runs).
 export function executionModelLabel(model: CIRunExecutionModel | undefined): string {
   switch (model) {
-    case "mooncake-pilot":
-      return "Mooncake pilot"
+    case "mooncake-agent":
+      return "Mooncake agent"
     default:
       return "Claude (edit)"
   }

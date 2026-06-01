@@ -14,7 +14,7 @@ const (
 
 	// SettingAgentExecutionModel is the operator-set default execution model
 	// for agent runs that don't pick one at spawn ("claude-edit" |
-	// "mooncake-pilot"). Unset falls back to DefaultExecutionModel (#110).
+	// "mooncake-agent"). Unset falls back to DefaultExecutionModel (#110).
 	SettingAgentExecutionModel = "agent.execution_model"
 
 	// SettingAgentLLMBaseURL is the operator-set LLM endpoint injected into
@@ -34,7 +34,7 @@ const (
 // Shared by the spawn endpoint and the settings endpoint so both reject
 // the same bad values.
 func ValidExecutionModel(m string) bool {
-	return m == ExecModelClaudeEdit || m == ExecModelMooncakePilot
+	return m == ExecModelClaudeEdit || m == ExecModelMooncakeAgent
 }
 
 // GetSetting returns a setting's value, or ErrNotFound when unset.

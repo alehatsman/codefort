@@ -202,7 +202,7 @@ function AgentSection() {
           >
             <option value="">Server default (claude-edit)</option>
             <option value="claude-edit">Claude (edit files)</option>
-            <option value="mooncake-pilot">Mooncake pilot (run actions)</option>
+            <option value="mooncake-agent">Mooncake agent (run actions)</option>
           </select>
         </label>
         <p className="muted small">

@@ -448,16 +448,16 @@ export type CIJobStatus =
 export type CIRunKind = "ci" | "agent"
 
 // Agent execution model (#110): which strategy an agent run uses in its
-// container. claude-edit = Claude edits files directly; mooncake-pilot =
+// container. claude-edit = Claude edits files directly; mooncake-agent =
 // mooncake plans+applies actions (so commands run).
-export type CIRunExecutionModel = "claude-edit" | "mooncake-pilot"
+export type CIRunExecutionModel = "claude-edit" | "mooncake-agent"
 
 export interface CIRun {
   number: number
   kind: CIRunKind
   issue_number?: number
   execution_model?: CIRunExecutionModel
-  pilot_allow_shell?: boolean
+  mooncake_allow_shell?: boolean
   commit_sha: string
   commit_msg?: string
   commit_author?: string

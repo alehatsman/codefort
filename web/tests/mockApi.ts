@@ -71,8 +71,8 @@ export interface CIRun {
   number: number
   kind?: "ci" | "agent"
   issue_number?: number
-  execution_model?: "claude-edit" | "mooncake-pilot"
-  pilot_allow_shell?: boolean
+  execution_model?: "claude-edit" | "mooncake-agent"
+  mooncake_allow_shell?: boolean
   turns?: AgentTurn[]
   commit_sha: string
   commit_msg?: string
@@ -192,7 +192,7 @@ export interface State {
   sshKeys: SSHKey[]
   agentClaudeTokenSet: boolean
   agentTokenEnvFallback: boolean
-  agentExecutionModel: "" | "claude-edit" | "mooncake-pilot"
+  agentExecutionModel: "" | "claude-edit" | "mooncake-agent"
   agentLLMBaseURL: string
   agentAuthTokenSet: boolean
   ciRuns: CIRun[]
@@ -541,7 +541,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     if (req.method() === "PUT") {
       const body = req.postDataJSON() as {
         claude_oauth_token?: string
-        execution_model?: "" | "claude-edit" | "mooncake-pilot"
+        execution_model?: "" | "claude-edit" | "mooncake-agent"
         llm_base_url?: string
         anthropic_auth_token?: string
       }
@@ -724,7 +724,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const iss = state.issues.find((i) => i.number === n)
     if (!iss) return json(route, 404, { error: "issue not found" })
     const body = (route.request().postDataJSON() ?? {}) as {
-      model?: "claude-edit" | "mooncake-pilot"
+      model?: "claude-edit" | "mooncake-agent"
       allow_shell?: boolean
     }
     const model = body.model || state.agentExecutionModel || "claude-edit"
@@ -733,7 +733,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       kind: "agent",
       issue_number: n,
       execution_model: model,
-      pilot_allow_shell: model === "mooncake-pilot" && body.allow_shell === true,
+      mooncake_allow_shell: model === "mooncake-agent" && body.allow_shell === true,
       commit_sha: "feedface0000abcd",
       ref: "HEAD",
       event: "agent",

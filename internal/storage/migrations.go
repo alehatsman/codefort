@@ -298,6 +298,16 @@ var migrations = []string{
 	ALTER TABLE pull_requests ADD COLUMN merge_base_sha TEXT;
 	ALTER TABLE pull_requests ADD COLUMN merge_head_sha TEXT;
 	`,
+
+	// 17: adopt mooncake's pilot→agent rename (#75, no back-compat). The
+	// execution model formerly 'mooncake-pilot' is now 'mooncake-agent', and
+	// the per-run override column pilot_allow_shell becomes mooncake_allow_shell
+	// to match. Both rename in place so existing agent runs keep their model +
+	// allow-shell flag; claude-edit / CI rows are untouched.
+	`
+	UPDATE ci_runs SET execution_model = 'mooncake-agent' WHERE execution_model = 'mooncake-pilot';
+	ALTER TABLE ci_runs RENAME COLUMN pilot_allow_shell TO mooncake_allow_shell;
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —
