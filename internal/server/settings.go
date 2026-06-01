@@ -14,7 +14,7 @@ import (
 // global Claude token is configured (write-only — never the token itself),
 // whether a server-env credential fallback is present, and the default
 // execution model.
-func (s *Server) handleGetAgentSettings(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetAgentSettings(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.agentSettings())
 }
 

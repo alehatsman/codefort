@@ -741,6 +741,10 @@ type dockerSession struct {
 // at /work and the container runs as the moongitd uid:gid so files it writes
 // stay owned by moongitd (root-owned files would break workspace cleanup). The
 // image must be glibc-based and carry `mooncake` on PATH (see ci/Dockerfile).
+//
+// Host reachability (host.docker.internal -> the host gateway, same mapping the
+// agent path uses) lets a job reach this moongit — needed by `mooncake task ci`
+// to fetch the go-quality module over http from host.docker.internal:8080.
 func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, image string) (jobSession, error) {
 	args := []string{
 		"run", "-d", "--rm",
@@ -748,6 +752,7 @@ func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, 
 		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		"-v", workDir + ":/work",
 		"-w", "/work",
+		"--add-host", "host.docker.internal:host-gateway",
 		"--entrypoint", "sleep",
 		image, "infinity",
 	}
@@ -973,35 +978,24 @@ func parseStepResult(ctx context.Context, stdout, stderr []byte, runErr error) (
 	return res, nil
 }
 
-// gitCheckout materializes the repo tree at commitSHA into workDir via
-// `git archive | tar -x` — a clean tree with no .git, which is all CI needs.
+// gitCheckout materializes the repo tree at commitSHA into workDir as a real
+// working tree with a populated .git. A bare `git archive | tar` extract is
+// lighter, but quality gates that shell out to git fail in a .git-less tree —
+// go-quality's full.sh does `cd "$(git rev-parse --show-toplevel)"`, and
+// arch-snapshot/dupl walk the repo — so CI now gets a clone.
+//
+// `--local` hardlinks objects from the sibling bare repo (no copy, no network);
+// `--no-checkout` then a detached checkout pins the exact commit without
+// populating the default branch first. workDir is freshly created and empty
+// (see executeRun), which `git clone` requires.
 func gitCheckout(ctx context.Context, bareRepo, commitSHA, workDir string) error {
-	archive := exec.CommandContext(ctx, "git", "--git-dir", bareRepo, "archive", "--format=tar", commitSHA)
-	tar := exec.CommandContext(ctx, "tar", "-x", "-C", workDir)
-
-	pipe, err := archive.StdoutPipe()
-	if err != nil {
-		return err
+	clone := exec.CommandContext(ctx, "git", "clone", "--quiet", "--local", "--no-checkout", bareRepo, workDir)
+	if out, err := clone.CombinedOutput(); err != nil {
+		return fmt.Errorf("git clone: %v (%s)", err, strings.TrimSpace(string(out)))
 	}
-	tar.Stdin = pipe
-	var aerr, terr bytes.Buffer
-	archive.Stderr = &aerr
-	tar.Stderr = &terr
-
-	if err := tar.Start(); err != nil {
-		return err
-	}
-	if err := archive.Start(); err != nil {
-		return err
-	}
-	// archive.Wait closes the pipe after git exits, giving tar its EOF.
-	archiveErr := archive.Wait()
-	tarErr := tar.Wait()
-	if archiveErr != nil {
-		return fmt.Errorf("git archive: %v (%s)", archiveErr, strings.TrimSpace(aerr.String()))
-	}
-	if tarErr != nil {
-		return fmt.Errorf("tar extract: %v (%s)", tarErr, strings.TrimSpace(terr.String()))
+	checkout := exec.CommandContext(ctx, "git", "-C", workDir, "checkout", "--quiet", "--detach", commitSHA)
+	if out, err := checkout.CombinedOutput(); err != nil {
+		return fmt.Errorf("git checkout %s: %v (%s)", commitSHA, err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }

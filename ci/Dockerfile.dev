@@ -2,12 +2,19 @@
 #
 # The base image (ci/Dockerfile, moongit-ci:latest) is deliberately
 # toolchain-free; this derives from it and adds the Go + Node toolchains
-# moongit's pipeline needs (go build/test/vet/fmt, web build). It still carries
+# moongit's pipeline needs (go build/test/vet/fmt, web build) plus the
+# static-analysis toolchain the go-quality gate shells out to. It still carries
 # mooncake + git from the base, which the runner execs inside the container.
+#
+# `mooncake task ci` (go-quality module) runs golangci-lint/govulncheck/gocyclo/
+# dupl, so those are baked here at pinned versions; dupl-report.sh pipes through
+# python3, so python3 is installed too. goda is optional (the gate skips it).
 #
 # Pin toolchains via official tarballs (apt's Go lags moongit's go.mod). Jobs
 # run as the moongitd uid:gid with no home dir, so HOME/GOCACHE/GOPATH point at
-# world-writable /tmp — otherwise go/npm can't write their caches.
+# world-writable /tmp — otherwise go/npm can't write their caches. The
+# build-time module/build caches are wiped after `go install` so runtime jobs
+# recreate them under their own uid (root-owned cache dirs would be unwritable).
 #
 # Build (from the moongit repo root, after moongit-ci:latest exists):
 #   docker build -t moongit-ci-dev:latest -f ci/Dockerfile.dev ci/
@@ -16,8 +23,15 @@ FROM moongit-ci:latest
 ARG GO_VERSION=1.26.3
 ARG NODE_VERSION=22.21.0
 
+# Static-analysis tool versions — pinned to match the host toolchain so CI and
+# the local pre-push gate flag the same findings. Bump deliberately.
+ARG GOLANGCI_LINT_VERSION=v2.12.2
+ARG GOVULNCHECK_VERSION=v1.3.0
+ARG GOCYCLO_VERSION=v0.6.0
+ARG DUPL_VERSION=v1.1.0
+
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates \
+ && apt-get install -y --no-install-recommends curl ca-certificates python3 \
  && curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
       | tar -C /usr/local -xz \
  && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz" \
@@ -30,4 +44,20 @@ ENV PATH=/usr/local/go/bin:$PATH \
     GOPATH=/tmp/go \
     GOTOOLCHAIN=local
 
-RUN go version && node --version && mooncake --version
+# Install the static-analysis toolchain onto PATH, then wipe the build-time
+# caches so runtime jobs (moongitd uid) own the cache dirs they recreate.
+RUN GOBIN=/usr/local/bin go install \
+      "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}" \
+ && GOBIN=/usr/local/bin go install \
+      "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" \
+ && GOBIN=/usr/local/bin go install \
+      "github.com/fzipp/gocyclo/cmd/gocyclo@${GOCYCLO_VERSION}" \
+ && GOBIN=/usr/local/bin go install \
+      "github.com/mibk/dupl@${DUPL_VERSION}" \
+ && go clean -cache -modcache \
+ && rm -rf /tmp/go /tmp/.cache
+
+RUN go version && node --version && mooncake --version && python3 --version \
+ && for t in golangci-lint govulncheck gocyclo dupl; do \
+      command -v "$t" >/dev/null || { echo "missing tool: $t" >&2; exit 1; }; \
+    done

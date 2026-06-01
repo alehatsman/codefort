@@ -1,7 +1,7 @@
 package main
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // G505: SHA-1 here is RFC-4122 UUIDv5 derivation, not a security primitive.
 	"fmt"
 	"strings"
 
@@ -14,7 +14,7 @@ import (
 // restart. claude requires `--session-id` to be UUID-shaped, hence the version
 // and variant nibbles.
 func agentSessionID(runID int64) string {
-	h := sha1.Sum([]byte(fmt.Sprintf("moongit-agent-run-%d", runID)))
+	h := sha1.Sum([]byte(fmt.Sprintf("moongit-agent-run-%d", runID))) //nolint:gosec // G401: UUIDv5 is defined to use SHA-1; not a security hash.
 	var b [16]byte
 	copy(b[:], h[:16])
 	b[6] = (b[6] & 0x0f) | 0x50 // version 5

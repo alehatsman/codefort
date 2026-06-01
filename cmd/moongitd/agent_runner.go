@@ -59,7 +59,9 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	log = log.With("model", exec.Model())
 
 	workDir := agentWorkDir(r.cfg.DataDir, run.ID)
-	if err := os.RemoveAll(workDir); err == nil {
+	// Assign (not :=) so a RemoveAll/MkdirAll failure is seen by the err check
+	// below — a shadowed inner err here used to swallow both.
+	if err = os.RemoveAll(workDir); err == nil {
 		err = os.MkdirAll(workDir, 0o755)
 	}
 	if err != nil {
@@ -70,7 +72,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 
 	if err := r.checkout(parent, filepath.Join(r.cfg.ReposDir, owner, name+".git"), run.CommitSHA, workDir); err != nil {
 		log.Error("agent checkout", "err", err)
-		os.RemoveAll(workDir)
+		_ = os.RemoveAll(workDir)
 		r.finish(run, storage.RunError)
 		return
 	}
@@ -92,7 +94,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	job, err := storage.CreateJob(r.db, run.ID, agentJobName, nil)
 	if err != nil {
 		log.Error("agent create job", "err", err)
-		os.RemoveAll(workDir)
+		_ = os.RemoveAll(workDir)
 		r.finish(run, storage.RunError)
 		return
 	}
@@ -189,14 +191,14 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 	owner, name, err := storage.RepoIdent(r.db, run.RepoID)
 	if err != nil {
 		log.Error("agent turn resolve repo", "err", err)
-		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		_ = storage.FinishTurn(r.db, turn.ID, storage.TurnError)
 		r.finish(run, storage.RunError)
 		return
 	}
 	jobID, ok := r.agentJobID(run.ID)
 	if !ok {
 		log.Error("agent turn: no agent job for run")
-		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		_ = storage.FinishTurn(r.db, turn.ID, storage.TurnError)
 		r.failAgentRun(run.ID, 0, agentWorkDir(r.cfg.DataDir, run.ID))
 		return
 	}
@@ -204,7 +206,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 	elog, err := ci.OpenEventLog(r.cfg.DataDir, owner, name, run.Number, agentJobName)
 	if err != nil {
 		log.Error("agent turn open event log", "err", err)
-		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		_ = storage.FinishTurn(r.db, turn.ID, storage.TurnError)
 		return
 	}
 
@@ -212,7 +214,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 	if err != nil {
 		r.emit(elog, ci.EventRunFailed, map[string]any{"error": err.Error()})
 		elog.Close()
-		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		_ = storage.FinishTurn(r.db, turn.ID, storage.TurnError)
 		log.Error("agent turn attach", "err", err)
 		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
 		return
@@ -221,7 +223,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 	if !ok {
 		r.emit(elog, ci.EventRunFailed, map[string]any{"error": "session does not support streaming exec"})
 		elog.Close()
-		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		_ = storage.FinishTurn(r.db, turn.ID, storage.TurnError)
 		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
 		return
 	}
@@ -230,7 +232,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 	if err != nil {
 		r.emit(elog, ci.EventRunFailed, map[string]any{"error": err.Error()})
 		elog.Close()
-		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		_ = storage.FinishTurn(r.db, turn.ID, storage.TurnError)
 		log.Error("agent turn executor", "model", run.ExecutionModel, "err", err)
 		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
 		return
@@ -255,7 +257,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 
 	if execErr != nil {
 		log.Error("agent turn exec", "err", execErr)
-		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		_ = storage.FinishTurn(r.db, turn.ID, storage.TurnError)
 		r.commentAgentFailure(run, fmt.Sprintf("turn %d failed to run", turn.Seq+1))
 		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
 		return
@@ -378,7 +380,7 @@ func (r *ciRunner) tearDownAgent(runID, jobID int64, workDir string) {
 		r.logger.Error("agent revoke token", "run_id", runID, "err", err)
 	}
 	if workDir != "" {
-		os.RemoveAll(workDir)
+		_ = os.RemoveAll(workDir)
 	}
 }
 

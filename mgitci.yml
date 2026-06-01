@@ -2,53 +2,34 @@
 #
 # Schema: version "1", jobs wired into a DAG via `needs`; `run:` is sugar for a
 # mooncake shell step. Every job runs in a throwaway container off `image:`
-# (see ci/Dockerfile.dev — the toolchain image carrying go + node + mooncake).
+# (see ci/Dockerfile.dev — the toolchain image carrying go + node + mooncake +
+# the static-analysis tools the gate needs).
 #
-# DAG:  build ──▶ test
-#          └────▶ vet
-#        web            (independent root)
+# DAG:  quality      web        (two independent roots)
 #
-# NOTE: the full Go quality gate now lives in `mooncake task ci` (go-quality
-# module — see tasks.yml). Wiring CI to call it directly is DEFERRED until the
-# runner can support it, which needs three things this image/runner don't have
-# yet (tracked separately):
-#   1. moongit-ci-dev carries golangci-lint/govulncheck/gocyclo/dupl + an M3
-#      mooncake (module insecure-host support, mooncake#44).
-#   2. the job container can reach this moongit to fetch the module — the runner
-#      currently uses the default bridge network, so 127.0.0.1:8080 is the
-#      container, not the host (needs --network host or --add-host + a reachable
-#      MOONCAKE_MODULE_INSECURE host).
-#   3. MOONCAKE_MODULE_INSECURE exported in the job env.
-# Until then the jobs below stay raw; `mooncake task ci` is enforced locally via
-# the pre-push hook.
+# `quality` runs the full Go gate via the shared go-quality module
+# (`mooncake task ci` → goq/ci; see tasks.yml). For the in-container mooncake to
+# fetch that module from this moongit over http, three things line up:
+#   1. ci/Dockerfile.dev bakes golangci-lint/govulncheck/gocyclo/dupl + an M3
+#      mooncake (module insecure-host support) + python3.
+#   2. the runner gives every CI container host reachability
+#      (--add-host host.docker.internal:host-gateway, see ci_runner.go), so
+#      host.docker.internal:8080 resolves to this moongit.
+#   3. MOONCAKE_MODULE_INSECURE marks that host trusted for the http fetch.
+# The CI checkout is now a real working tree with .git (ci_runner.go), which the
+# gate's git-aware scripts (full.sh's `git rev-parse`) require.
 version: "1"
 on:
   push:
     branches: [main, "feat/*"]
 jobs:
-  build:
+  quality:
     image: moongit-ci-dev:latest
     steps:
-      - run: go build ./...
-
-  test:
-    needs: [build]
-    image: moongit-ci-dev:latest
-    steps:
-      - run: go test ./...
-
-  vet:
-    needs: [build]
-    image: moongit-ci-dev:latest
-    steps:
-      - run: |
-          unformatted="$(gofmt -l .)"
-          if [ -n "$unformatted" ]; then
-            echo "gofmt: these files need formatting:"
-            echo "$unformatted"
-            exit 1
-          fi
-      - run: go vet ./...
+      - shell:
+          cmd: mooncake task ci
+        env:
+          MOONCAKE_MODULE_INSECURE: host.docker.internal:8080
 
   web:
     image: moongit-ci-dev:latest

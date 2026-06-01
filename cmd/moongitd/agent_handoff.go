@@ -57,7 +57,7 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 
 	// The MCP config we wrote into the workspace isn't the agent's work — drop
 	// it so it doesn't land in the branch.
-	os.Remove(filepath.Join(workDir, dexMCPConfigName))
+	_ = os.Remove(filepath.Join(workDir, dexMCPConfigName))
 
 	msg := fmt.Sprintf("agent: %s\n\nWorked issue #%d via moongit agent run #%d.\n",
 		issue.Title, issue.Number, run.Number)
@@ -104,7 +104,7 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 // the tree is identical to base, no commit/ref is made (changed=false).
 func materializeAgentBranch(ctx context.Context, bareRepo, base, workDir, ref, author, msg string) (commit string, changed bool, err error) {
 	idx := filepath.Join(os.TempDir(), fmt.Sprintf("moongit-agent-index-%d-%d", os.Getpid(), hashRef(ref)))
-	defer os.Remove(idx)
+	defer func() { _ = os.Remove(idx) }()
 
 	base = strings.TrimSpace(base)
 	env := append(os.Environ(),
