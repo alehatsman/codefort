@@ -11,15 +11,27 @@ shim on PATH. This directory builds the default agent image,
 
 ## Build
 
-1. **Drop a static `dex` binary** carrying the MCP shim (`dex mcp --remote`,
-   from dex#6) into `agent/dex`. The shim only proxies to a remote `dex serve`,
-   so it opens no local index — a plain build is fine (no `sqlite_fts5` tag
-   needed, unlike the host indexer):
+> Shortcut: `mooncake task agent-image` automates everything below (it compiles
+> the build inputs and runs the `docker build`). It needs `moongit-ci:latest`
+> first — `mooncake task ci-images` builds that. The manual steps follow for
+> reference / one-off builds.
+
+1. **Drop a `dex` binary** carrying the MCP shim (`dex mcp --remote`, from
+   dex#6) into `agent/dex`. dex pulls in the sqlite-vec cgo bindings, so it must
+   be built with CGO and the `sqlite_fts5` tag — the same build dex itself uses
+   (a `CGO_ENABLED=0` build no longer compiles: "build constraints exclude all
+   Go files in sqlite-vec-go-bindings/cgo"):
 
    ```sh
    # from a dex checkout
-   CGO_ENABLED=0 go build -o /path/to/moongit/agent/dex ./cmd/dex
+   CGO_ENABLED=1 go build -tags sqlite_fts5 -o /path/to/moongit/agent/dex ./cmd/dex
    ```
+
+   The tag is a compile-time requirement of dex's package graph, not something
+   the shim uses (the shim proxies to a remote `dex serve` and opens no local
+   index). The resulting binary is dynamically linked but runs in the
+   debian-based image as long as the build host's glibc is no newer than the
+   image's.
 
    `agent/dex` is git-ignored — it's a build input, not source. (`agent/mooncake`
    is reserved the same way if a future build wants a newer mooncake than the
@@ -32,8 +44,8 @@ shim on PATH. This directory builds the default agent image,
    docker build -t moongit-agent:latest agent/
    ```
 
-The final `claude --version && dex --version && mooncake --version &&
-git --version` step fails the build early if any tool is missing or not
+The final `claude --version && dex --version && mgit help && mooncake --version
+&& git --version` step fails the build early if any tool is missing or not
 runnable in the image.
 
 > **dex#6 dependency.** Until the dex MCP shim (`dex mcp --remote`) ships, an
