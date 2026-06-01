@@ -27,6 +27,18 @@ import (
 // project matches the repo name.
 var ErrProjectNotFound = errors.New("dex: no indexed project matches this repo")
 
+const (
+	// defaultDexTimeout caps the cheap dex calls (status, search, symbol,
+	// summaries) — they answer in well under a second when healthy, so a tight
+	// bound surfaces a wedged daemon quickly.
+	defaultDexTimeout = 20 * time.Second
+	// askDexTimeout is the budget for /ask, which runs an LLM generation that
+	// routinely takes tens of seconds under embedding/GPU load. The old shared
+	// 15s client timeout was too tight and 502'd the Explore "Ask" feature
+	// even when dex was healthy (#127).
+	askDexTimeout = 90 * time.Second
+)
+
 // Client talks to a dex serve daemon. The zero value is not usable; use New.
 // A nil *Client is valid and means "dex not configured" — callers should
 // treat that as the Intel feature being disabled.
@@ -34,6 +46,10 @@ type Client struct {
 	baseURL string
 	token   string
 	http    *http.Client
+	// Per-op deadlines: cheap calls use timeout; Ask uses askTimeout. Kept as
+	// fields (not the bare consts) so they're tunable and testable.
+	timeout    time.Duration
+	askTimeout time.Duration
 }
 
 // New returns a Client for baseURL (e.g. http://127.0.0.1:8080), or nil when
@@ -45,7 +61,12 @@ func New(baseURL, token string) *Client {
 	return &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		token:   token,
-		http:    &http.Client{Timeout: 15 * time.Second},
+		// No fixed Timeout here: it would cap every call uniformly (the bug in
+		// #127, where /ask needs far longer than cheap calls). Per-call
+		// deadlines are applied in do/Ask instead.
+		http:       &http.Client{},
+		timeout:    defaultDexTimeout,
+		askTimeout: askDexTimeout,
 	}
 }
 
@@ -188,6 +209,11 @@ func (c *Client) FindSymbol(ctx context.Context, projectID, name string, k int) 
 // existing renderer. The graph + suggested_reads sections of the response
 // are richer but need a different UI; they're discarded for now.
 func (c *Client) Ask(ctx context.Context, projectID, question string, k int) (*SearchResult, error) {
+	// /ask is an LLM generation — give it a generous budget instead of the
+	// cheap-call default (#127).
+	ctx, cancel := context.WithTimeout(ctx, c.askTimeout)
+	defer cancel()
+
 	body := map[string]any{"question": question}
 	if k > 0 {
 		body["k"] = k
@@ -355,6 +381,14 @@ func (c *Client) search(ctx context.Context, path string, body map[string]any) (
 // response into out. Non-2xx responses become an error carrying dex's
 // {"error":...} message when present.
 func (c *Client) do(ctx context.Context, method, path string, body any, out any) error {
+	// Apply the cheap-call budget unless the caller already set a deadline
+	// (Ask sets its own, longer one).
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.timeout)
+		defer cancel()
+	}
+
 	var rdr *bytes.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
