@@ -158,7 +158,7 @@ function JobLog({
             {step.lines.length > 0 && (
               <pre className="ci-log">
                 {step.lines.map((l, i) => (
-                  <code
+                  <span
                     // biome-ignore lint/suspicious/noArrayIndexKey: append-only log output, no stable id; line order never changes
                     key={i}
                     className={clsx("ci-log__line", {
@@ -167,7 +167,7 @@ function JobLog({
                   >
                     <LogLine text={l.text} />
                     {"\n"}
-                  </code>
+                  </span>
                 ))}
               </pre>
             )}
