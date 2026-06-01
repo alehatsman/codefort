@@ -38,10 +38,15 @@ modules:
   goq: "127.0.0.1:8080/alehatsman/go-quality@v0.1.1"
   # The web/ quality gate (lint/format/typecheck/build/test/vuln + ci/ci-fast)
   # comes from the shared **ts-quality** module (alehatsman/ts-quality), the TS
-  # analog of go-quality. The ui-* tasks below wrap tq/*, passing `dir: web` so
-  # each tool runs in the web/ project. Same MOONCAKE_MODULE_INSECURE=127.0.0.1:8080
-  # prereq applies (http fetch).
-  tq: "127.0.0.1:8080/alehatsman/ts-quality@v0.1.0"
+  # analog of go-quality. The ui-* tasks below wrap tq/*; `dir: web` is now a
+  # binding-level default prop (mooncake #52), applied to every tq/* export
+  # that declares it and filtered out of those that don't (#57) — tq/sync-config
+  # takes a `dest` instead, so ui-sync-config is unaffected. Same
+  # MOONCAKE_MODULE_INSECURE=127.0.0.1:8080 prereq applies (http fetch).
+  tq:
+    source: "127.0.0.1:8080/alehatsman/ts-quality@v0.1.0"
+    props:
+      dir: web
 
 tasks:
   # ---- dev loop ---------------------------------------------------------
@@ -118,18 +123,12 @@ tasks:
       - log:
           msg: "deployed: rebuilt + reinstalled binaries, rebuilt web UI, restarted moongit.service"
 
-  test:
-    desc: Run unit tests
-    steps:
-      - name: test
-        use: goq/test
-
   # ---- Go quality gate (via the go-quality module) ----------------------
-  vet:
-    desc: go vet
-    steps:
-      - name: vet
-        use: goq/vet
+  # Pure single-use wrappers collapse to the `use:` shorthand; `mooncake task`
+  # lists each go-quality component's own description.
+  test: goq/test
+
+  vet: goq/vet
 
   fmt:
     desc: Format Go sources with gofmt -w (writer; goq/fmt is the ci-fast check)
@@ -139,67 +138,31 @@ tasks:
       - log:
           msg: "code formatted"
 
-  lint:
-    desc: golangci-lint (gosec, staticcheck, cyclop, revive, … via ./.golangci.yml)
-    steps:
-      - name: lint
-        use: goq/lint
+  lint: goq/lint
 
-  vuln:
-    desc: govulncheck — scan for known vulnerabilities in dependencies
-    steps:
-      - name: vuln
-        use: goq/vuln
+  vuln: goq/vuln
 
-  scan:
-    desc: Security + vulnerability scan (lint + vuln)
-    steps:
-      - name: scan
-        use: goq/scan
+  scan: goq/scan
 
-  ai-lint:
-    desc: AI-smell sweep on staged Go files (stub panics, agent TODOs, prompt artifacts)
-    steps:
-      - name: ai-lint
-        use: goq/ai-lint
+  ai-lint: goq/ai-lint
 
+  # Keeps the full form: a non-default prop (args) means it can't be a one-liner.
   ai-lint-all:
     desc: AI-smell sweep on every tracked Go file
     steps:
-      - name: ai-lint-all
-        use: goq/ai-lint
+      - use: goq/ai-lint
         props:
           args: "--all"
 
-  arch-snapshot:
-    desc: Regenerate docs-working/ARCH_SNAPSHOT.md (gitignored; local read-only)
-    steps:
-      - name: arch-snapshot
-        use: goq/arch-snapshot
+  arch-snapshot: goq/arch-snapshot
 
-  budget-status:
-    desc: Show code-quality soft-cap status (gocyclo + god files)
-    steps:
-      - name: budget-status
-        use: goq/budget-status
+  budget-status: goq/budget-status
 
-  dupl:
-    desc: Code-duplication report (production only)
-    steps:
-      - name: dupl
-        use: goq/dupl
+  dupl: goq/dupl
 
-  ci-fast:
-    desc: "Pre-commit gate: vet + gofmt (staged) + ai-lint (staged) + budget"
-    steps:
-      - name: ci-fast
-        use: goq/ci-fast
+  ci-fast: goq/ci-fast
 
-  ci:
-    desc: "Pre-push gate: build + test + lint + vuln + arch + budget + dupl"
-    steps:
-      - name: ci
-        use: goq/ci
+  ci: goq/ci
 
   run:
     desc: Run moongitd in the foreground against ./data/ (dev mode)
@@ -221,60 +184,26 @@ tasks:
           argv: ["npm", "run", "dev"]
         cwd: web
 
-  # ---- web quality gate (ts-quality module, dir: web) -------------------
-  ui-test-install:
-    desc: Install web deps (npm ci) + Playwright browser binaries (chromium ~150MB)
-    steps:
-      - use: tq/tools
-        props: { dir: web }
+  # ---- web quality gate (ts-quality module; dir: web via tq default props) --
+  # Pure wrappers collapse to the `use:` shorthand — dir:web comes from the tq
+  # binding default and `mooncake task` lists each ts-quality component's desc.
+  ui-test-install: tq/tools
 
-  ui-build:
-    desc: Build the UI for production into web/dist/ (vite build)
-    steps:
-      - use: tq/build
-        props: { dir: web }
+  ui-build: tq/build
 
-  ui-lint:
-    desc: Lint + format check the web UI (biome check)
-    steps:
-      - use: tq/lint
-        props: { dir: web }
+  ui-lint: tq/lint
 
-  ui-format:
-    desc: Format the web UI in place (biome format --write)
-    steps:
-      - use: tq/format
-        props: { dir: web }
+  ui-format: tq/format
 
-  ui-typecheck:
-    desc: Type-check the web UI (tsc -b)
-    steps:
-      - use: tq/typecheck
-        props: { dir: web }
+  ui-typecheck: tq/typecheck
 
-  ui-vuln:
-    desc: Audit web deps for known vulnerabilities (npm audit, prod deps, high+)
-    steps:
-      - use: tq/vuln
-        props: { dir: web }
+  ui-vuln: tq/vuln
 
-  ui-test:
-    desc: Run Playwright E2E tests (auto-spawns Vite dev server, mocks /api/*)
-    steps:
-      - use: tq/test
-        props: { dir: web }
+  ui-test: tq/test
 
-  ui-ci:
-    desc: Full web gate — npm ci + typecheck + lint + build + E2E (tq/ci)
-    steps:
-      - use: tq/ci
-        props: { dir: web }
+  ui-ci: tq/ci
 
-  ui-ci-fast:
-    desc: Fast web gate — typecheck + lint/format check (tq/ci-fast)
-    steps:
-      - use: tq/ci-fast
-        props: { dir: web }
+  ui-ci-fast: tq/ci-fast
 
   ui-sync-config:
     desc: Refresh web/biome.base.json from the shared ts-quality baseline
