@@ -184,6 +184,57 @@ func TestMergeCommitClean(t *testing.T) {
 	}
 }
 
+// TestMergedPullDetailShowsDiff guards the regression where a merged PR's
+// detail rendered an empty compare: once head is merged into base, the live
+// base..head diff is empty. The merge freezes the pre-merge tips so the detail
+// endpoint still reproduces the PR's diff.
+func TestMergedPullDetailShowsDiff(t *testing.T) {
+	s, _ := newMergeTestServer(t)
+	openPull(t, s, "main", "feature", "add feature")
+
+	// Sanity: while open, the compare shows feature.txt one commit ahead.
+	rr := drivePull(t, s, s.handleGetPull, http.MethodGet, "/api/repos/alice/proj/pulls/1", "agent#7", "1", nil)
+	var before api.PullRequestDetail
+	if err := json.Unmarshal(rr.Body.Bytes(), &before); err != nil {
+		t.Fatalf("decode open detail: %v", err)
+	}
+	if before.Compare.Ahead != 1 || len(before.Compare.Files) != 1 {
+		t.Fatalf("open compare ahead=%d files=%d, want 1/1", before.Compare.Ahead, len(before.Compare.Files))
+	}
+
+	// Merge it (diverged → merge commit).
+	rr = drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{Method: api.MergeCommitMethod})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("merge status = %d (body=%s)", rr.Code, rr.Body.String())
+	}
+
+	// After merge the detail must still carry the diff (from the frozen tips),
+	// not the empty live-ref compare.
+	rr = drivePull(t, s, s.handleGetPull, http.MethodGet, "/api/repos/alice/proj/pulls/1", "agent#7", "1", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("get merged status = %d (body=%s)", rr.Code, rr.Body.String())
+	}
+	var after api.PullRequestDetail
+	if err := json.Unmarshal(rr.Body.Bytes(), &after); err != nil {
+		t.Fatalf("decode merged detail: %v", err)
+	}
+	if after.State != api.PRMerged {
+		t.Fatalf("state = %q, want merged", after.State)
+	}
+	if after.Compare.Ahead != 1 {
+		t.Errorf("merged compare ahead = %d, want 1 (frozen pre-merge)", after.Compare.Ahead)
+	}
+	if len(after.Compare.Files) != 1 || after.Compare.Files[0].NewPath != "f.txt" {
+		t.Errorf("merged compare files = %+v, want [f.txt]", after.Compare.Files)
+	}
+	// Branch short names are preserved for display even though the diff was
+	// computed from SHAs.
+	if after.Compare.Base != "main" || after.Compare.Head != "feature" {
+		t.Errorf("compare refs = %q/%q, want main/feature", after.Compare.Base, after.Compare.Head)
+	}
+}
+
 func TestMergeConflict(t *testing.T) {
 	s, bare := newMergeTestServer(t)
 	openPull(t, s, "main", "conflict", "conflicting change")

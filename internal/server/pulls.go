@@ -87,9 +87,11 @@ func (s *Server) handleListPulls(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetPull returns the PR plus the head-vs-base compare and the code
-// review comments on its head branch. The compare is best-effort: if a branch
-// has since been deleted it carries only base/head with an empty diff, so a
-// merged or stale PR still renders.
+// review comments on its head branch. For a merged PR the compare is taken
+// against the tips frozen at merge time (live refs would diff empty once head
+// is folded into base); for an open PR it's the live base-vs-head. The compare
+// is best-effort: if the needed commits/branches are gone it carries only
+// base/head with an empty diff, so a stale PR still renders.
 func (s *Server) handleGetPull(w http.ResponseWriter, r *http.Request) {
 	num, err := strconv.Atoi(r.PathValue("number"))
 	if err != nil || num <= 0 {
@@ -122,9 +124,20 @@ func (s *Server) handleGetPull(w http.ResponseWriter, r *http.Request) {
 		Compare:     api.Compare{Base: pr.BaseRef, Head: pr.HeadRef, Commits: []api.Commit{}, Files: []api.DiffFile{}},
 		Comments:    []api.CodeComment{},
 	}
-	// Compare only when both branches still exist; otherwise leave the empty
-	// shell so a PR whose branches were deleted post-merge still loads.
-	if branchExists(r.Context(), repoDir, pr.BaseRef) && branchExists(r.Context(), repoDir, pr.HeadRef) {
+	// A merged PR's compare is computed from the tips frozen at merge time: once
+	// head is merged into base, head is contained in base, so a live base..head
+	// diff is empty. The frozen SHAs reproduce the exact pre-merge diff and
+	// survive branch deletion. PRs merged before migration 16 have no frozen
+	// SHAs and fall through to the live-ref path. The branch short names are
+	// kept for display.
+	if pr.State == api.PRMerged && pr.MergeBaseSHA != "" && pr.MergeHeadSHA != "" {
+		if cmp, err := computeCompare(r.Context(), repoDir, pr.MergeBaseSHA, pr.MergeHeadSHA); err == nil {
+			cmp.Base, cmp.Head = pr.BaseRef, pr.HeadRef
+			detail.Compare = cmp
+		}
+	} else if branchExists(r.Context(), repoDir, pr.BaseRef) && branchExists(r.Context(), repoDir, pr.HeadRef) {
+		// Open/stale PR: compare the live branches when both exist; otherwise
+		// leave the empty shell so a PR whose branch was deleted still loads.
 		if cmp, err := computeCompare(r.Context(), repoDir, pr.BaseRef, pr.HeadRef); err == nil {
 			detail.Compare = cmp
 		}

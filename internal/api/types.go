@@ -352,11 +352,19 @@ type PullRequest struct {
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	MergedAt  *time.Time `json:"merged_at"` // nil unless State == merged
+	// MergeBaseSHA/MergeHeadSHA are the base/head branch tips frozen at merge
+	// time, used to reproduce the pre-merge compare on the detail endpoint (a
+	// merged head is contained in base, so the live-ref diff is empty). Server-
+	// internal: set only for PRs merged after migration 16, never serialized.
+	MergeBaseSHA string `json:"-"`
+	MergeHeadSHA string `json:"-"`
 }
 
 // PullRequestDetail is a PR plus the head-vs-base compare (PR 1) and the code
-// review comments anchored to its head branch. Compare is best-effort: if a
-// branch has since been deleted it carries only Base/Head with zero diff.
+// review comments anchored to its head branch. Compare is best-effort: for a
+// merged PR it's reproduced from the tips frozen at merge time, for an open PR
+// from the live branches; if the needed commits are gone it carries only
+// Base/Head with zero diff.
 type PullRequestDetail struct {
 	PullRequest
 	Compare  Compare       `json:"compare"`
