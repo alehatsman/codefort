@@ -248,13 +248,14 @@ export const api = {
     owner: string,
     repo: string,
     n: number,
-    opts?: { ref?: string; model?: CIRunExecutionModel }
+    opts?: { ref?: string; model?: CIRunExecutionModel; allowShell?: boolean }
   ) =>
     request<CIRun>(`/api/repos/${owner}/${repo}/issues/${n}/agent`, {
       method: "POST",
       body: {
         ...(opts?.ref ? { ref: opts.ref } : {}),
         ...(opts?.model ? { model: opts.model } : {}),
+        ...(opts?.allowShell ? { allow_shell: true } : {}),
       },
     }),
   // createAgentTurn queues a follow-up message on an agent run; the dispatch

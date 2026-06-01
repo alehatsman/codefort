@@ -49,7 +49,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 
 	// Select the execution model up front so an unknown model fails before
 	// we spend a workspace + container on it (#110).
-	exec, err := newAgentExecutor(run.ExecutionModel, r.cfg)
+	exec, err := newAgentExecutor(run.ExecutionModel, r.cfg, run.PilotAllowShell)
 	if err != nil {
 		log.Error("agent executor", "model", run.ExecutionModel, "err", err)
 		r.finish(run.ID, storage.RunError)
@@ -222,7 +222,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 		return
 	}
 
-	exec, err := newAgentExecutor(run.ExecutionModel, r.cfg)
+	exec, err := newAgentExecutor(run.ExecutionModel, r.cfg, run.PilotAllowShell)
 	if err != nil {
 		r.emit(elog, ci.EventRunFailed, map[string]any{"error": err.Error()})
 		elog.Close()

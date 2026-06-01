@@ -286,20 +286,21 @@ type CommitDetail struct {
 // CIRun is the public view of a CI run. Number is the per-repo run number
 // (the address clients use); the internal DB id is not exposed.
 type CIRun struct {
-	Number         int        `json:"number"`
-	Kind           string     `json:"kind"`                      // "ci" | "agent"
-	IssueNumber    *int       `json:"issue_number,omitempty"`    // the issue an agent run serves
-	ExecutionModel string     `json:"execution_model,omitempty"` // agent model: "claude-edit" | "mooncake-pilot"
-	CommitSHA      string     `json:"commit_sha"`
-	CommitMsg      string     `json:"commit_msg,omitempty"`
-	CommitAuthor   string     `json:"commit_author,omitempty"`
-	Ref            string     `json:"ref"`
-	Event          string     `json:"event"`
-	Trigger        string     `json:"trigger,omitempty"`
-	Status         string     `json:"status"`
-	CreatedAt      time.Time  `json:"created_at"`
-	StartedAt      *time.Time `json:"started_at"`
-	FinishedAt     *time.Time `json:"finished_at"`
+	Number          int        `json:"number"`
+	Kind            string     `json:"kind"`                        // "ci" | "agent"
+	IssueNumber     *int       `json:"issue_number,omitempty"`      // the issue an agent run serves
+	ExecutionModel  string     `json:"execution_model,omitempty"`   // agent model: "claude-edit" | "mooncake-pilot"
+	PilotAllowShell bool       `json:"pilot_allow_shell,omitempty"` // mooncake-pilot run allowed to use shell/cmd (#110)
+	CommitSHA       string     `json:"commit_sha"`
+	CommitMsg       string     `json:"commit_msg,omitempty"`
+	CommitAuthor    string     `json:"commit_author,omitempty"`
+	Ref             string     `json:"ref"`
+	Event           string     `json:"event"`
+	Trigger         string     `json:"trigger,omitempty"`
+	Status          string     `json:"status"`
+	CreatedAt       time.Time  `json:"created_at"`
+	StartedAt       *time.Time `json:"started_at"`
+	FinishedAt      *time.Time `json:"finished_at"`
 }
 
 // SpawnAgentRequest starts an agent run for an issue. Ref is the base the agent
@@ -309,6 +310,9 @@ type CIRun struct {
 type SpawnAgentRequest struct {
 	Ref   string `json:"ref,omitempty"`
 	Model string `json:"model,omitempty"`
+	// AllowShell, for the mooncake-pilot model, drops the default shell/cmd
+	// denial for this run so the agent's plan may run shell commands (#110).
+	AllowShell bool `json:"allow_shell,omitempty"`
 }
 
 // TriggerCIRunRequest starts a CI run for an arbitrary ref (branch, tag, or

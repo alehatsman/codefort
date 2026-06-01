@@ -33,10 +33,12 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
   const navigate = useNavigate()
   const spawn = useSpawnAgent(owner, repo, number)
   const [model, setModel] = useState<CIRunExecutionModel>("claude-edit")
+  const [allowShell, setAllowShell] = useState(false)
+  const isPilot = model === "mooncake-pilot"
 
   function onSpawn() {
     spawn.mutate(
-      { model },
+      { model, allowShell: isPilot && allowShell },
       { onSuccess: (run) => navigate(`/${owner}/${repo}/agents/${run.number}`) }
     )
   }
@@ -70,6 +72,23 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
           {spawn.isPending ? "Spawning…" : "Spawn agent"}
         </button>
       </div>
+      {isPilot && (
+        <label className="spawn-agent__shell">
+          <input
+            type="checkbox"
+            checked={allowShell}
+            disabled={spawn.isPending}
+            onChange={(e) => setAllowShell(e.target.checked)}
+          />
+          <span className="small">
+            Allow shell commands{" "}
+            <span className="muted">
+              (otherwise mooncake denies <code>shell</code>/<code>cmd</code>; the agent uses typed
+              actions only)
+            </span>
+          </span>
+        </label>
+      )}
       <p className="muted small">
         {hint} Runs in an isolated container; progress streams under Pipelines.
       </p>

@@ -66,12 +66,14 @@ type agentExecutor interface {
 // newAgentExecutor selects the executor for a run's model. An empty model
 // is the default (claude-edit); an unknown model is an error so a bad
 // value fails the run loudly rather than silently picking a default.
-func newAgentExecutor(model string, cfg *config.Config) (agentExecutor, error) {
+// allowShell is the run's spawn-time override that drops the default
+// shell/cmd denial from the mooncake-pilot policy (#110); claude-edit ignores it.
+func newAgentExecutor(model string, cfg *config.Config, allowShell bool) (agentExecutor, error) {
 	switch model {
 	case "", agentModelClaudeEdit:
 		return &claudeExecutor{}, nil
 	case agentModelMooncakePilot:
-		return newPilotExecutor(cfg), nil
+		return newPilotExecutor(cfg, allowShell), nil
 	default:
 		return nil, fmt.Errorf("unknown agent execution model %q", model)
 	}

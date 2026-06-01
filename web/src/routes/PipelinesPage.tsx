@@ -311,7 +311,15 @@ function RunDetail({
         {isAgent && (
           <div>
             <dt>Model</dt>
-            <dd>{executionModelLabel(run.execution_model)}</dd>
+            <dd>
+              {executionModelLabel(run.execution_model)}
+              {run.execution_model === "mooncake-pilot" && (
+                <span className="muted small">
+                  {" "}
+                  · shell {run.pilot_allow_shell ? "allowed" : "denied"}
+                </span>
+              )}
+            </dd>
           </div>
         )}
         <div>

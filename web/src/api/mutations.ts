@@ -169,7 +169,7 @@ export function useRerunCIRun(owner: string, repo: string) {
 export function useSpawnAgent(owner: string, repo: string, n: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (vars?: { ref?: string; model?: CIRunExecutionModel }) =>
+    mutationFn: (vars?: { ref?: string; model?: CIRunExecutionModel; allowShell?: boolean }) =>
       api.spawnAgent(owner, repo, n, vars),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) }),
   })

@@ -19,7 +19,7 @@ func TestNewAgentExecutorSelection(t *testing.T) {
 		{"bogus", "", true},
 	}
 	for _, c := range cases {
-		exec, err := newAgentExecutor(c.model, cfg)
+		exec, err := newAgentExecutor(c.model, cfg, false)
 		if c.wantErr {
 			if err == nil {
 				t.Errorf("newAgentExecutor(%q): want error, got %T", c.model, exec)

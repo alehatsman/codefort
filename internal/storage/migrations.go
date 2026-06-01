@@ -211,6 +211,14 @@ var migrations = []string{
 	`
 	ALTER TABLE ci_runs ADD COLUMN execution_model TEXT NOT NULL DEFAULT 'claude-edit';
 	`,
+
+	// 12: per-run "allow shell" override for the mooncake-pilot model (#110).
+	// The default policy denies shell/cmd; checking "allow shell" at spawn
+	// drops that denial for this run only. 0 = deny (safe default), 1 = allow.
+	// Ignored by claude-edit and CI runs.
+	`
+	ALTER TABLE ci_runs ADD COLUMN pilot_allow_shell INTEGER NOT NULL DEFAULT 0;
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

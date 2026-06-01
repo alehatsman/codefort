@@ -72,6 +72,7 @@ export interface CIRun {
   kind?: "ci" | "agent"
   issue_number?: number
   execution_model?: "claude-edit" | "mooncake-pilot"
+  pilot_allow_shell?: boolean
   turns?: AgentTurn[]
   commit_sha: string
   commit_msg?: string
@@ -544,13 +545,17 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const n = Number(url.pathname.split("/")[url.pathname.split("/").length - 2])
     const iss = state.issues.find((i) => i.number === n)
     if (!iss) return json(route, 404, { error: "issue not found" })
-    const body = (route.request().postDataJSON() ?? {}) as { model?: "claude-edit" | "mooncake-pilot" }
+    const body = (route.request().postDataJSON() ?? {}) as {
+      model?: "claude-edit" | "mooncake-pilot"
+      allow_shell?: boolean
+    }
     const model = body.model || state.agentExecutionModel || "claude-edit"
     const next: CIRun = {
       number: state.ciRuns.length ? Math.max(...state.ciRuns.map((r) => r.number)) + 1 : 1,
       kind: "agent",
       issue_number: n,
       execution_model: model,
+      pilot_allow_shell: model === "mooncake-pilot" && body.allow_shell === true,
       commit_sha: "feedface0000abcd",
       ref: "HEAD",
       event: "agent",

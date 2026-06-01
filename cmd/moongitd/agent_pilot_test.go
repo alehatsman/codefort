@@ -14,7 +14,7 @@ func TestPilotExecutorArgv(t *testing.T) {
 		AgentPilotAllowActions:  []string{"file.write"},
 		AgentPilotDenyNetwork:   true,
 		AgentPilotMaxRisk:       6,
-	})
+	}, false)
 	if p.Model() != agentModelMooncakePilot {
 		t.Fatalf("Model() = %q, want %q", p.Model(), agentModelMooncakePilot)
 	}
@@ -55,7 +55,7 @@ func TestPilotExecutorArgv(t *testing.T) {
 func TestPilotExecutorArgvNoPolicy(t *testing.T) {
 	// No policy configured → no policy flags emitted (ungated, operator's
 	// explicit choice via empty deny list).
-	argv := newPilotExecutor(&config.Config{}).Argv(turnSpec{prompt: "g"})
+	argv := newPilotExecutor(&config.Config{}, false).Argv(turnSpec{prompt: "g"})
 	for _, f := range []string{"--deny-action", "--allow-action", "--deny-network", "--max-risk"} {
 		if argvContains(argv, f) {
 			t.Errorf("unexpected %s with empty policy: %v", f, argv)
@@ -63,12 +63,29 @@ func TestPilotExecutorArgvNoPolicy(t *testing.T) {
 	}
 }
 
+func TestPilotExecutorAllowShellOverride(t *testing.T) {
+	cfg := &config.Config{AgentPilotDenyActions: []string{"shell", "cmd", "os.shutdown"}}
+	// allowShell=false keeps the default denial.
+	denied := newPilotExecutor(cfg, false).Argv(turnSpec{prompt: "g"})
+	if !argvHas(denied, "--deny-action", "shell") || !argvHas(denied, "--deny-action", "cmd") {
+		t.Errorf("allowShell=false should keep shell/cmd denied: %v", denied)
+	}
+	// allowShell=true drops only shell/cmd; other denies survive.
+	allowed := newPilotExecutor(cfg, true).Argv(turnSpec{prompt: "g"})
+	if argvHas(allowed, "--deny-action", "shell") || argvHas(allowed, "--deny-action", "cmd") {
+		t.Errorf("allowShell=true should drop shell/cmd denial: %v", allowed)
+	}
+	if !argvHas(allowed, "--deny-action", "os.shutdown") {
+		t.Errorf("allowShell=true must preserve other denies: %v", allowed)
+	}
+}
+
 func TestPilotExecutorArgvDefaultIterations(t *testing.T) {
 	// nil cfg / non-positive value falls back to the built-in default.
-	if argv := newPilotExecutor(nil).Argv(turnSpec{prompt: "g"}); !argvHas(argv, "--max-iterations", "10") {
+	if argv := newPilotExecutor(nil, false).Argv(turnSpec{prompt: "g"}); !argvHas(argv, "--max-iterations", "10") {
 		t.Errorf("nil cfg should default to 10 iterations: %v", argv)
 	}
-	if argv := newPilotExecutor(&config.Config{AgentPilotMaxIterations: 0}).Argv(turnSpec{prompt: "g"}); !argvHas(argv, "--max-iterations", "10") {
+	if argv := newPilotExecutor(&config.Config{AgentPilotMaxIterations: 0}, false).Argv(turnSpec{prompt: "g"}); !argvHas(argv, "--max-iterations", "10") {
 		t.Errorf("zero iterations should default to 10: %v", argv)
 	}
 }

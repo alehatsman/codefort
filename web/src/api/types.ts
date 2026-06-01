@@ -343,6 +343,7 @@ export interface CIRun {
   kind: CIRunKind
   issue_number?: number
   execution_model?: CIRunExecutionModel
+  pilot_allow_shell?: boolean
   commit_sha: string
   commit_msg?: string
   commit_author?: string

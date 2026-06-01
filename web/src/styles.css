@@ -1940,6 +1940,16 @@ a.file-tree__commit:hover {
   flex-direction: column;
   gap: var(--space-1);
 }
+.spawn-agent__shell {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  cursor: pointer;
+}
+.spawn-agent__shell input {
+  margin-top: 3px;
+}
 /* Default-model picker in Settings → Agent. */
 .agent-default-model {
   margin-top: var(--space-4);

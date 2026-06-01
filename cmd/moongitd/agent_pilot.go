@@ -31,7 +31,10 @@ type pilotExecutor struct {
 	maxRisk      int
 }
 
-func newPilotExecutor(cfg *config.Config) *pilotExecutor {
+// newPilotExecutor builds the pilot executor from config. allowShell is the
+// run's spawn-time override: when set, shell/cmd are dropped from the policy's
+// deny list for this run, letting the agent's plan run shell commands (#110).
+func newPilotExecutor(cfg *config.Config, allowShell bool) *pilotExecutor {
 	p := &pilotExecutor{maxIterations: pilotMaxIterationsDefault}
 	if cfg != nil {
 		if cfg.AgentPilotMaxIterations > 0 {
@@ -42,7 +45,23 @@ func newPilotExecutor(cfg *config.Config) *pilotExecutor {
 		p.denyNetwork = cfg.AgentPilotDenyNetwork
 		p.maxRisk = cfg.AgentPilotMaxRisk
 	}
+	if allowShell {
+		p.denyActions = withoutShellCmd(p.denyActions)
+	}
 	return p
+}
+
+// withoutShellCmd returns deny with "shell" and "cmd" removed, preserving any
+// other denied actions. Used by the per-run allow-shell override.
+func withoutShellCmd(deny []string) []string {
+	var out []string
+	for _, a := range deny {
+		if a == "shell" || a == "cmd" {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
 }
 
 func (*pilotExecutor) Model() string { return agentModelMooncakePilot }
