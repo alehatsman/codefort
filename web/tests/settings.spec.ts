@@ -52,15 +52,17 @@ test("revoke a token marks it revoked", async ({ page }) => {
   await expect(page.getByText("revoked")).toBeVisible()
 })
 
-test("remaining placeholder sections are clearly not-yet-available", async ({ page }) => {
+test("remaining sections are clearly marked planned, not built", async ({ page }) => {
   await mockApi(page)
   await page.goto("/settings")
 
   await page.getByRole("button", { name: "Users" }).click()
-  await expect(page.getByText("Coming soon.", { exact: false })).toBeVisible()
+  await expect(page.getByText("Planned", { exact: false })).toBeVisible()
+  await expect(page.getByText("Per-user accounts and management are planned", { exact: false })).toBeVisible()
 
   await page.getByRole("button", { name: "Branch rules" }).click()
-  await expect(page.getByText("Coming soon.", { exact: false })).toBeVisible()
+  await expect(page.getByText("Planned", { exact: false })).toBeVisible()
+  await expect(page.getByText("Branch protection is planned", { exact: false })).toBeVisible()
 })
 
 test("add an SSH key shows its fingerprint in the list", async ({ page }) => {

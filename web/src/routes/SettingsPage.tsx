@@ -12,8 +12,8 @@ import type { CIRunExecutionModel, CreatedToken, SSHKey, Token } from "../api/ty
 import ThemeSelect from "../components/ThemeSelect"
 
 // Sections of the settings surface. "tokens", "agent", "ssh", and "appearance"
-// are backed; "users" and "branches" stay placeholders until their backends
-// exist (no per-user mgmt, no branch-protection enforcement yet).
+// are backed. "users" and "branches" are planned features whose server backends
+// aren't built yet, so they render as roadmap placeholders (not dead ends).
 type Section = "tokens" | "agent" | "users" | "ssh" | "branches" | "appearance"
 
 const SECTIONS: { id: Section; label: string }[] = [
@@ -49,16 +49,16 @@ export default function SettingsPage() {
         {section === "users" && (
           <Placeholder
             title="Users"
-            note="Identity comes from API token names today; there's no per-user
-              account model yet. User management lands when that backend exists."
+            note="Per-user accounts and management are planned. Identity is the API
+              token's name today; this section fills in once that backend lands."
           />
         )}
         {section === "ssh" && <SSHKeysSection />}
         {section === "branches" && (
           <Placeholder
             title="Branch rules"
-            note="Branch protection needs enforcement in the push path, which
-              isn't built yet. Rules will appear here once the server enforces them."
+            note="Branch protection is planned. Rules take effect once the server
+              enforces them on the push path; until then any token can push any branch."
           />
         )}
         {section === "appearance" && <AppearanceSection />}
@@ -81,12 +81,15 @@ function AppearanceSection() {
   )
 }
 
+// A section for a feature that's on the roadmap but whose backend isn't built
+// yet. The "Planned." lead signals an intentional, coming feature — not an
+// abandoned stub or a hard non-goal.
 function Placeholder({ title, note }: { title: string; note: string }) {
   return (
     <section className="settings__section">
       <h2 className="settings__title">{title}</h2>
       <div className="empty">
-        <strong>Coming soon.</strong> {note}
+        <strong>Planned.</strong> {note}
       </div>
     </section>
   )
