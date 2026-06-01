@@ -150,7 +150,7 @@ function JobLog({
           <div className="ci-step" key={step.id}>
             <div className={clsx("ci-step__head", { "ci-step__head--failed": failed })}>
               <span className={`ci-step__status ci-step__status--${status}`} />
-              <code className="ci-step__cmd">{step.label ?? step.action ?? step.id}</code>
+              <span className="ci-step__cmd">{step.label ?? step.action ?? step.id}</span>
               {step.durationMs !== undefined && (
                 <span className="muted small ci-step__dur">{formatDuration(step.durationMs)}</span>
               )}

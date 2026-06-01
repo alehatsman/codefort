@@ -243,7 +243,7 @@ function renderCard(card: Card) {
     <div className="ci-step agent-card">
       <div className={clsx("ci-step__head", { "ci-step__head--failed": card.status === "failed" })}>
         {card.status && <span className={`ci-step__status ci-step__status--${card.status}`} />}
-        <code className="ci-step__cmd">{card.title}</code>
+        <span className="ci-step__cmd">{card.title}</span>
       </div>
       {card.body.length > 0 && (
         <div className="ci-log agent-card__body">
@@ -395,15 +395,15 @@ interface AgentEntry {
   // event's seq + a per-event sub-index. The fold helpers don't set it.
   id?: string
   kind:
-    | "step"
-    | "turn"
-    | "thinking"
-    | "assistant"
-    | "tool_use"
-    | "tool_result"
-    | "result"
-    | "system"
-    | "raw"
+  | "step"
+  | "turn"
+  | "thinking"
+  | "assistant"
+  | "tool_use"
+  | "tool_result"
+  | "result"
+  | "system"
+  | "raw"
   // status is set only on "step" entries; it's mutated in place when the step
   // resolves so the live row flips ▶ → ✓/~/✗ without spawning a second line.
   status?: StepStatus
