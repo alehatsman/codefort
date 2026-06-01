@@ -485,6 +485,101 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
   await expect(page.getByText("3 iterations")).toBeVisible()
 })
 
+test("an in-flight agent turn shows a planning/working indicator; a parked run shows none (#133)", async ({
+  page,
+}) => {
+  const repo = {
+    id: 1,
+    owner: "alice",
+    name: "demo",
+    created_at: iso,
+    open_issues: 1,
+    total_issues: 1,
+    ci_enabled: true,
+  }
+  const runBase = {
+    kind: "agent" as const,
+    issue_number: 6,
+    execution_model: "mooncake-pilot" as const,
+    commit_sha: "deadbeefcafe1234",
+    ref: "HEAD",
+    event: "agent",
+    trigger: "agent#17",
+    created_at: iso,
+    started_at: iso,
+  }
+  const turnStarted = {
+    seq: 1,
+    type: "agent.turn.started",
+    time: 0,
+    data: { turn: 1, prompt: "Issue #6: do it" },
+  }
+  const step = (seq: number, type: string, data: Record<string, unknown>) => ({
+    seq,
+    type: "agent.message",
+    time: 0,
+    data: { mooncake: { type, data } },
+  })
+  await mockApi(page, {
+    repos: [repo],
+    ciRuns: [
+      // #1 running, turn started but no content yet → "Planning…"
+      {
+        ...runBase,
+        number: 1,
+        status: "running",
+        finished_at: null,
+        jobs: [{ name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+        events: { agent: [turnStarted] },
+      },
+      // #2 running, a step has begun (no turn.completed) → "Working…"
+      {
+        ...runBase,
+        number: 2,
+        status: "running",
+        finished_at: null,
+        jobs: [{ name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+        events: {
+          agent: [
+            turnStarted,
+            step(2, "step.started", { step_id: "s1", action: "cmd", name: "do a thing" }),
+            step(3, "step.completed", { step_id: "s1", duration_ms: 5, result: { status: "ok" } }),
+          ],
+        },
+      },
+      // #3 parked awaiting input — turn completed → no indicator.
+      {
+        ...runBase,
+        number: 3,
+        status: "awaiting_input",
+        finished_at: null,
+        jobs: [{ name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+        events: {
+          agent: [
+            turnStarted,
+            { seq: 2, type: "agent.turn.completed", time: 0, data: { turn: 1, status: "success" } },
+          ],
+        },
+      },
+    ],
+  })
+
+  // #1: planning — the busy hint shows before any content, no "Working…" yet.
+  await page.goto("/alice/demo/agents/1")
+  await expect(page.getByText("Planning…")).toBeVisible()
+  await expect(page.getByText("Working…")).toHaveCount(0)
+
+  // #2: a step has begun → flips to "Working…".
+  await page.goto("/alice/demo/agents/2")
+  await expect(page.getByText("Working…")).toBeVisible()
+  await expect(page.getByText("Planning…")).toHaveCount(0)
+
+  // #3: parked awaiting input — neither indicator, just the transcript.
+  await page.goto("/alice/demo/agents/3")
+  await expect(page.locator(".agent-transcript")).toBeVisible()
+  await expect(page.locator(".agent-working")).toHaveCount(0)
+})
+
 test("an awaiting-input agent run shows a message box and queues a follow-up", async ({ page }) => {
   const state = await mockApi(page, {
     repos: [

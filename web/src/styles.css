@@ -3474,6 +3474,24 @@ h3 {
   color: var(--fg);
   font-weight: var(--weight-medium);
 }
+/* Live busy hint after the last entry while a turn is in flight — fills the
+   silent gap (esp. mooncake-pilot's planning phase) so it doesn't look hung. */
+.agent-working {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-left: 3px solid var(--state-in_progress);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+.agent-working__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-circle);
+  background: var(--state-in_progress);
+  animation: ci-pulse 1.2s ease-in-out infinite;
+}
 
 /* Message box for sending the agent follow-up turns. */
 .agent-msgbox {

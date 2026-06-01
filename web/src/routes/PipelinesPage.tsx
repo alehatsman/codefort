@@ -346,7 +346,7 @@ function RunDetail({
 
       {run.kind === "agent" ? (
         <>
-          <AgentTranscript owner={owner} repo={repo} runNumber={runNumber} />
+          <AgentTranscript owner={owner} repo={repo} runNumber={runNumber} run={run} />
           <AgentMessageBox owner={owner} repo={repo} runNumber={runNumber} run={run} />
         </>
       ) : jobs.length === 0 ? (
@@ -509,13 +509,37 @@ function AgentTranscript({
   owner,
   repo,
   runNumber,
+  run,
 }: {
   owner: string
   repo: string
   runNumber: number
+  run: CIRunDetail
 }) {
   const { events, done, error } = useJobEventStream(owner, repo, runNumber, "agent", true)
   const entries = useMemo(() => foldAgentEvents(events), [events])
+
+  // A turn is in flight while its agent.turn.started has no matching
+  // turn.completed. During that window the agent is busy but emits nothing
+  // while it plans (mooncake-pilot runs Claude as a one-shot planner, then
+  // bursts the steps), so without a hint the silent gap reads as a hang.
+  // "planning" until the turn produces its first entry, "working" once
+  // steps/output begin. Gated on the run's terminal status (not the stream's
+  // `done`, which also closes on error) so a parked awaiting_input run — turn
+  // already completed — correctly shows nothing.
+  const terminal = ["success", "failed", "canceled", "error"].includes(run.status)
+  const phase = useMemo<"planning" | "working" | null>(() => {
+    if (terminal || error) return null
+    let started = 0
+    let completed = 0
+    for (const e of events) {
+      if (e.type === "agent.turn.started") started++
+      else if (e.type === "agent.turn.completed") completed++
+    }
+    if (started <= completed) return null
+    const lastTurn = entries.map((e) => e.kind).lastIndexOf("turn")
+    return lastTurn >= 0 && lastTurn < entries.length - 1 ? "working" : "planning"
+  }, [events, entries, terminal, error])
 
   return (
     <div className="agent-transcript">
@@ -527,6 +551,12 @@ function AgentTranscript({
           <pre className="agent-entry__body">{e.text}</pre>
         </div>
       ))}
+      {phase && (
+        <div className={clsx("agent-working", `agent-working--${phase}`)} aria-live="polite">
+          <span className="agent-working__dot" aria-hidden="true" />
+          {phase === "planning" ? "Planning…" : "Working…"}
+        </div>
+      )}
     </div>
   )
 }
