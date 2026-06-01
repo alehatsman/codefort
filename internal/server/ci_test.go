@@ -261,6 +261,41 @@ func TestJobEventsResume(t *testing.T) {
 	}
 }
 
+// A still-live run holds no terminal status, so the handler can't close on the
+// resting check. Instead it bounds the response and ends it with a `resume`
+// sentinel so a buffer-until-close hop flushes; the client reconnects from
+// lastID. The test asserts the stream delivers the events already on disk and
+// then the sentinel (rather than hanging until the run finishes).
+func TestJobEventsLiveResumeSentinel(t *testing.T) {
+	s, repoID := newCIReadServer(t)
+	run := enqueue(t, s, repoID, "sha", "refs/heads/main") // stays queued (live)
+	if _, err := storage.CreateJob(s.db, run.ID, "build", nil); err != nil {
+		t.Fatal(err)
+	}
+	elog, err := ci.OpenEventLog(s.cfg.DataDir, "alice", "repo", run.Number, "build")
+	if err != nil {
+		t.Fatalf("OpenEventLog: %v", err)
+	}
+	for _, ty := range []string{ci.EventRunStarted, ci.EventStepStarted} {
+		if _, err := elog.Append(ty, map[string]any{"k": "v"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	elog.Close()
+
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/build/events", "")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200; body=%s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "id: 1") || !strings.Contains(body, "id: 2") {
+		t.Errorf("live stream dropped events:\n%s", body)
+	}
+	if !strings.Contains(body, "event: resume") {
+		t.Errorf("live stream missing resume sentinel (would hang behind a buffering hop):\n%s", body)
+	}
+}
+
 func TestJobEventsUnknownJob(t *testing.T) {
 	s, repoID := newCIReadServer(t)
 	run := enqueue(t, s, repoID, "sha", "refs/heads/main")

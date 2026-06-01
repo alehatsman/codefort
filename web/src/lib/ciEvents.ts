@@ -82,6 +82,11 @@ export function useJobEventStream(
           const reader = resp.body.getReader()
           const decoder = new TextDecoder()
           let buf = ""
+          // The server ends a still-live stream with a `resume` sentinel so a
+          // buffer-until-close network hop flushes the body; that's a pause,
+          // not the end. On seeing it we reconnect (from lastSeq) instead of
+          // marking the stream done.
+          let paused = false
           for (;;) {
             const { value, done: streamDone } = await reader.read()
             if (streamDone) break
@@ -91,16 +96,26 @@ export function useJobEventStream(
             while (sep !== -1) {
               const frame = buf.slice(0, sep)
               buf = buf.slice(sep + 2)
-              const ev = parseFrame(frame)
-              if (ev) {
-                lastSeq.current = Math.max(lastSeq.current, ev.seq)
-                setEvents((prev) => [...prev, ev])
+              if (isResumeFrame(frame)) {
+                paused = true
+              } else {
+                const ev = parseFrame(frame)
+                if (ev) {
+                  lastSeq.current = Math.max(lastSeq.current, ev.seq)
+                  setEvents((prev) => [...prev, ev])
+                }
               }
               sep = buf.indexOf("\n\n")
             }
           }
-          // Stream closed by the server: the run is terminal (or this job is
-          // done). Mark done and stop reconnecting.
+          // Paused close: the run is still live, the server just rotated the
+          // connection so a buffering hop flushes. Reconnect from lastSeq.
+          if (paused) {
+            if (cancelled) return
+            continue
+          }
+          // Stream closed with no resume sentinel: the run is terminal (or this
+          // job is done). Mark done and stop reconnecting.
           if (!cancelled) setDone(true)
           return
         } catch {
@@ -137,6 +152,14 @@ function parseFrame(frame: string): CIEvent | null {
     }
   }
   return null
+}
+
+// isResumeFrame detects the server's non-terminal close sentinel — an
+// `event: resume` frame carrying no data — emitted when a still-live stream is
+// rotated to flush a buffering hop. It's never a real event (those always
+// carry a data line), so parseFrame ignores it; we act on it separately.
+function isResumeFrame(frame: string): boolean {
+  return frame.split("\n").some((line) => line === "event: resume")
 }
 
 function sleep(ms: number): Promise<void> {

@@ -295,6 +295,17 @@ func (s *Server) handleCIJobEvents(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	const poll = 750 * time.Millisecond
+	// maxOpen bounds how long one response stays open while the run is still
+	// live. A buffer-until-close network hop (a WSL2/Windows ingress relay, an
+	// SSH tunnel, a reverse proxy) forwards the body only when the response
+	// ends, so an indefinitely-open stream delivers nothing until the turn
+	// finishes. Periodically ending the response — and resuming via
+	// Last-Event-ID — makes the live transcript flush through such a hop at
+	// ~maxOpen granularity, while a direct client just pays a cheap reconnect.
+	// We signal a non-terminal close with a `resume` sentinel so the client
+	// knows to reconnect rather than treat it as end-of-stream.
+	const maxOpen = 2 * time.Second
+	start := time.Now()
 	var offset int64
 
 	for {
@@ -344,6 +355,18 @@ func (s *Server) handleCIJobEvents(w http.ResponseWriter, r *http.Request) {
 				}
 				flusher.Flush()
 			}
+			return
+		}
+
+		// Live run, but the response has been open long enough: end it so a
+		// buffering hop flushes, after telling the client this is a pause, not
+		// the end. The client reconnects from lastID and the transcript
+		// continues seamlessly.
+		if time.Since(start) >= maxOpen {
+			if _, err := w.Write([]byte("event: resume\n\n")); err != nil {
+				return
+			}
+			flusher.Flush()
 			return
 		}
 
