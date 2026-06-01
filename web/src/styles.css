@@ -3622,6 +3622,11 @@ h3 {
 .agent-entry--thinking .agent-entry__body {
   font-style: italic;
 }
+/* Live planner output streamed during the plan phase (#171 / mooncake #76):
+   the plan text the agent is writing, full-strength like an assistant turn. */
+.agent-entry--planning .agent-entry__body {
+  color: var(--fg);
+}
 .agent-entry--tool_use .agent-entry__label,
 .agent-entry--system .agent-entry__label,
 .agent-entry--raw {
