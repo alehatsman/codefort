@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react"
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { ApiError } from "../api/client"
 import {
   useBlob,
   useCodeComments,
@@ -172,7 +173,17 @@ function BlobView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   const whoamiQ = useWhoami()
 
   if (blobQ.isLoading) return <div className="loading">Loading…</div>
-  if (blobQ.error) return <div className="error">{(blobQ.error as Error).message}</div>
+  if (blobQ.error) {
+    const err = blobQ.error
+    // A relative link in a rendered README (e.g. `examples/`) can point a
+    // /blob/ URL at a directory; the backend 400s with "path is a directory".
+    // Send the viewer to the tree view instead of showing a raw error.
+    if (err instanceof ApiError && err.status === 400 && /is a directory/.test(err.message)) {
+      const suffix = gitRef ? `?ref=${encodeURIComponent(gitRef)}` : ""
+      return <Navigate to={`/${owner}/${repo}/tree/${path}${suffix}`} replace />
+    }
+    return <div className="error">{(err as Error).message}</div>
+  }
   if (!blobQ.data) return null
 
   const b = blobQ.data

@@ -10,10 +10,11 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 30_000,
       retry: (failureCount, err: unknown) => {
-        // Don't retry auth failures.
+        // Don't retry 4xx client errors (auth, not-found, bad request, …) —
+        // they won't fix themselves, and retrying just multiplies the request.
         if (err && typeof err === "object" && "status" in err) {
           const status = (err as { status: number }).status
-          if (status === 401 || status === 403 || status === 404) return false
+          if (status >= 400 && status < 500) return false
         }
         return failureCount < 2
       },
