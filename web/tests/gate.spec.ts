@@ -27,6 +27,12 @@ test("invalid token is rejected at the gate and never persisted", async ({ page 
   expect(stored).toBeNull()
 })
 
+test("the token field is focused on load", async ({ page }) => {
+  await page.goto("/")
+  // autoFocus drops the caret straight into the single field — no click needed.
+  await expect(page.getByPlaceholder("mgt_...")).toBeFocused()
+})
+
 test("valid token passes the gate, persists, and enters the app", async ({ page }) => {
   await mockApi(page) // mocks /api/whoami -> 200 and /api/repos
 

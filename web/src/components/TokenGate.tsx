@@ -46,6 +46,8 @@ export default function TokenGate({ onSet }: Props) {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             disabled={checking}
+            // biome-ignore lint/a11y/noAutofocus: full-screen pre-auth gate with one field — focusing it on load is the expected flow, nothing to skip past.
+            autoFocus
           />
           {error && <div className="error">{error}</div>}
           <button type="submit" disabled={checking}>

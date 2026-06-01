@@ -46,8 +46,9 @@ literal.
 - `npm run lint:fix` — check + autofix/format
 
 Style: **no semicolons** (`semi: false`). Imports are auto-ordered by Biome
-(don't hand-sort). a11y rules are currently warn-only (see issue tracker);
-don't add new warnings.
+(don't hand-sort). a11y rules are error-level — fix the violation rather than
+demote the rule; suppress a deliberate exception inline with a justified
+`// biome-ignore lint/a11y/<rule>: <reason>`.
 
 ## Tests: Playwright
 
