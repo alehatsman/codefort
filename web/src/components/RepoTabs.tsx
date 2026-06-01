@@ -42,6 +42,7 @@ export default function RepoTabs({ owner, repo, openIssues }: Props) {
     location.pathname.startsWith(`${base}/summaries`)
   const isPipelines = location.pathname.startsWith(`${base}/pipelines`)
   const isAgents = location.pathname.startsWith(`${base}/agents`)
+  const isSettings = location.pathname === `${base}/settings`
 
   return (
     <nav className="tabs" aria-label="Repository navigation">
@@ -66,6 +67,9 @@ export default function RepoTabs({ owner, repo, openIssues }: Props) {
       </Link>
       <Link to={`${base}/agents`} className={clsx("tab", { "is-active": isAgents })}>
         Agents
+      </Link>
+      <Link to={`${base}/settings`} className={clsx("tab", { "is-active": isSettings })}>
+        Settings
       </Link>
     </nav>
   )

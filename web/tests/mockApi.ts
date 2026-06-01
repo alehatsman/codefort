@@ -376,6 +376,11 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const [, , , owner, name] = url.pathname.split("/")
     const repo = state.repos.find((r) => r.owner === owner && r.name === name)
     if (!repo) return json(route, 404, { error: "repo not registered: " + owner + "/" + name })
+    if (req.method() === "DELETE") {
+      state.repos = state.repos.filter((r) => r !== repo)
+      recountRepos(state)
+      return route.fulfill({ status: 204 })
+    }
     if (req.method() === "PATCH") {
       const body = req.postDataJSON() as { ci_enabled?: boolean }
       if (typeof body.ci_enabled === "boolean") repo.ci_enabled = body.ci_enabled

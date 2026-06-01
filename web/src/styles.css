@@ -2863,6 +2863,43 @@ h3 {
   font-size: var(--text-md);
 }
 
+/* Danger Zone: irreversible repo-level actions, fenced off in a red-bordered
+   card so they read as deliberately set apart from ordinary settings. */
+.danger-zone {
+  border: 1px solid var(--state-closed);
+  border-radius: 6px;
+  margin-top: var(--space-4);
+  max-width: 60ch;
+}
+.danger-zone__title {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-md);
+  color: var(--state-closed);
+  border-bottom: 1px solid var(--border);
+}
+.danger-zone__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+.danger-zone__copy p {
+  margin: var(--space-1) 0 0;
+}
+.danger-zone__action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.danger-zone__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+}
+
 /* Agent settings: global Claude token (write-only). */
 .agent-token-status {
   margin: var(--space-3) 0;

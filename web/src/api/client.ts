@@ -151,6 +151,8 @@ export const api = {
   getRepo: (owner: string, repo: string) => request<Repo>(`/api/repos/${owner}/${repo}`),
   updateRepo: (owner: string, repo: string, body: UpdateRepoInput) =>
     request<Repo>(`/api/repos/${owner}/${repo}`, { method: "PATCH", body }),
+  deleteRepo: (owner: string, repo: string) =>
+    request<void>(`/api/repos/${owner}/${repo}`, { method: "DELETE" }),
 
   listRefs: (owner: string, repo: string) => request<RefList>(`/api/repos/${owner}/${repo}/refs`),
 

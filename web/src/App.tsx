@@ -17,6 +17,7 @@ import BoardPage from "./routes/BoardPage"
 import ExplorePage from "./routes/ExplorePage"
 import ReviewPage from "./routes/ReviewPage"
 import PipelinesPage from "./routes/PipelinesPage"
+import RepoSettingsPage from "./routes/RepoSettingsPage"
 import SettingsPage from "./routes/SettingsPage"
 
 // The old Research and Summaries tabs merged into one Explore tab; keep their
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/:owner/:repo/pipelines/:number" element={<PipelinesPage />} />
         <Route path="/:owner/:repo/agents" element={<PipelinesPage kind="agent" />} />
         <Route path="/:owner/:repo/agents/:number" element={<PipelinesPage kind="agent" />} />
+        <Route path="/:owner/:repo/settings" element={<RepoSettingsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFound detail="This page doesn’t exist." />} />
       </Routes>
