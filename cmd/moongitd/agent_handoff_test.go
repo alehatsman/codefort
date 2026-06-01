@@ -176,49 +176,84 @@ func TestFinishAgentRunNoChanges(t *testing.T) {
 	}
 }
 
-// initAgentGitRepo makes /work a real repo with a base commit and, given a
-// non-empty originURL, wires it as the `origin` remote so in-container mgit can
-// resolve owner/repo (#120). An empty URL leaves the repo remote-less.
-func TestInitAgentGitRepoWiresOrigin(t *testing.T) {
-	remoteURL := func(t *testing.T, workDir string) (string, error) {
+// wireAgentMoongitRemote adds a `moongit` remote (the server URL) to the
+// already-cloned agent workspace so in-container mgit can resolve owner/repo,
+// without disturbing the clone's local-path `origin` (#144). An empty URL is a
+// no-op; a re-entry re-points an existing `moongit` remote.
+func TestWireAgentMoongitRemote(t *testing.T) {
+	remoteURL := func(t *testing.T, workDir, name string) (string, error) {
 		t.Helper()
-		cmd := exec.Command("git", "remote", "get-url", "origin")
+		cmd := exec.Command("git", "remote", "get-url", name)
 		cmd.Env = append(os.Environ(), "GIT_DIR="+filepath.Join(workDir, ".git"), "GIT_WORK_TREE="+workDir)
 		out, err := cmd.Output()
 		return strings.TrimSpace(string(out)), err
 	}
 
-	t.Run("origin set to the repo URL", func(t *testing.T) {
-		workDir := t.TempDir()
-		if err := os.WriteFile(filepath.Join(workDir, "f.txt"), []byte("hi\n"), 0o644); err != nil {
+	// clonedWorkspace mimics gitCheckout: a real repo whose `origin` is the bare
+	// repo's local filesystem path (no URL scheme — the thing mgit chokes on).
+	clonedWorkspace := func(t *testing.T) (workDir, originPath string) {
+		t.Helper()
+		bare := t.TempDir()
+		run := func(args ...string) {
+			t.Helper()
+			cmd := exec.Command("git", args...)
+			cmd.Env = append(os.Environ(),
+				"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("git %v: %v (%s)", args, err, out)
+			}
+		}
+		seed := t.TempDir()
+		run("-C", seed, "init", "-q", "-b", "main")
+		if err := os.WriteFile(filepath.Join(seed, "f.txt"), []byte("hi\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
+		run("-C", seed, "add", "-A")
+		run("-C", seed, "commit", "-q", "-m", "seed")
+		run("clone", "-q", "--bare", seed, bare)
+		workDir = t.TempDir()
+		run("clone", "-q", "--local", bare, workDir)
+		return workDir, bare
+	}
+
+	t.Run("adds moongit remote, leaves origin untouched", func(t *testing.T) {
+		workDir, originPath := clonedWorkspace(t)
 		want := "http://host.docker.internal:8080/alice/repo.git"
-		if err := initAgentGitRepo(context.Background(), workDir, want); err != nil {
-			t.Fatalf("initAgentGitRepo: %v", err)
+		if err := wireAgentMoongitRemote(context.Background(), workDir, want); err != nil {
+			t.Fatalf("wireAgentMoongitRemote: %v", err)
 		}
-		// A base commit exists (the pilot needs git history).
-		head := exec.Command("git", "rev-parse", "HEAD")
-		head.Env = append(os.Environ(), "GIT_DIR="+filepath.Join(workDir, ".git"))
-		if out, err := head.Output(); err != nil || strings.TrimSpace(string(out)) == "" {
-			t.Fatalf("no base commit: %v", err)
+		if got, err := remoteURL(t, workDir, "moongit"); err != nil || got != want {
+			t.Errorf("moongit = %q, %v; want %q", got, err, want)
 		}
-		got, err := remoteURL(t, workDir)
-		if err != nil || got != want {
-			t.Errorf("origin = %q, %v; want %q", got, err, want)
+		// The clone's local-path origin is preserved (and is still scheme-less,
+		// which is exactly why we don't rely on it).
+		if got, err := remoteURL(t, workDir, "origin"); err != nil || got != originPath {
+			t.Errorf("origin = %q, %v; want %q (clone's local path, untouched)", got, err, originPath)
 		}
 	})
 
-	t.Run("empty URL leaves no remote", func(t *testing.T) {
-		workDir := t.TempDir()
-		if err := os.WriteFile(filepath.Join(workDir, "f.txt"), []byte("hi\n"), 0o644); err != nil {
-			t.Fatal(err)
+	t.Run("idempotent — re-entry re-points moongit", func(t *testing.T) {
+		workDir, _ := clonedWorkspace(t)
+		first := "http://host.docker.internal:8080/alice/repo.git"
+		second := "http://host.docker.internal:9090/alice/repo.git"
+		if err := wireAgentMoongitRemote(context.Background(), workDir, first); err != nil {
+			t.Fatalf("first: %v", err)
 		}
-		if err := initAgentGitRepo(context.Background(), workDir, ""); err != nil {
-			t.Fatalf("initAgentGitRepo: %v", err)
+		if err := wireAgentMoongitRemote(context.Background(), workDir, second); err != nil {
+			t.Fatalf("second: %v", err)
 		}
-		if got, err := remoteURL(t, workDir); err == nil {
-			t.Errorf("expected no origin remote, got %q", got)
+		if got, err := remoteURL(t, workDir, "moongit"); err != nil || got != second {
+			t.Errorf("moongit = %q, %v; want %q", got, err, second)
+		}
+	})
+
+	t.Run("empty URL is a no-op", func(t *testing.T) {
+		workDir, _ := clonedWorkspace(t)
+		if err := wireAgentMoongitRemote(context.Background(), workDir, ""); err != nil {
+			t.Fatalf("wireAgentMoongitRemote: %v", err)
+		}
+		if got, err := remoteURL(t, workDir, "moongit"); err == nil {
+			t.Errorf("expected no moongit remote, got %q", got)
 		}
 	})
 }
