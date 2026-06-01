@@ -1,7 +1,6 @@
 import { Link, useParams } from "react-router-dom"
 import { useCommitCIStatus, useInfiniteCommits, useRepo } from "../api/queries"
 import type { CIRun, Commit } from "../api/types"
-import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
 import Avatar from "../components/Avatar"
 import CommitCIStatus from "../components/CommitCIStatus"
@@ -29,7 +28,6 @@ export default function CommitsPage() {
 
   return (
     <div className="commits-page">
-      <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
       <OverviewCard owner={owner} repo={repo} path={path} summaries={{}} />
 
       <div className="commits-page__head">

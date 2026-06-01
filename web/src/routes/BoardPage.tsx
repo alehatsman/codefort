@@ -10,11 +10,10 @@ import {
 } from "@dnd-kit/core"
 import { useQueryClient } from "@tanstack/react-query"
 import { api } from "../api/client"
-import { keys, useIssues, useRepo } from "../api/queries"
+import { keys, useIssues } from "../api/queries"
 import { ISSUE_STATES, type Issue, type IssueState } from "../api/types"
 import BoardColumn from "../components/BoardColumn"
 import NewIssueForm from "../components/NewIssueForm"
-import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
 import IssuesViewSwitch from "../components/IssuesViewSwitch"
 
@@ -31,7 +30,6 @@ export default function BoardPage() {
   const { owner = "", repo = "" } = useParams()
   const qc = useQueryClient()
 
-  const repoQ = useRepo(owner, repo)
   // Fetch everything that hasn't been excluded by limit. No filters from
   // the page — the board IS the visualization.
   const issuesQ = useIssues(owner, repo, "limit=1000")
@@ -91,7 +89,6 @@ export default function BoardPage() {
 
   return (
     <div>
-      <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       <div className="issues__header">

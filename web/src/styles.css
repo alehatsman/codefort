@@ -284,14 +284,25 @@ pre {
 }
 .topbar {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
-  padding: var(--space-3) var(--space-5);
+  /* No vertical padding: the repo tabs stretch the full bar height so the
+     active tab's underline lands on the bar's bottom border (see .tab). The
+     brand and actions self-center via align-self. */
+  padding: 0 var(--space-5);
+  min-height: 52px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
 }
+/* Brand + repo tabs, left-aligned; actions sit at the far right. */
+.topbar__lead {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-5);
+}
 .brand {
+  align-self: center;
   font-weight: var(--weight-bold);
   font-size: var(--text-lg);
   color: var(--fg);
@@ -318,6 +329,7 @@ pre {
   border-color: var(--fg-muted);
 }
 .topbar__actions {
+  align-self: center;
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
@@ -362,36 +374,33 @@ pre {
 /* Repo identity (owner/repo) is no longer a standalone page heading; it leads
    the unified breadcrumb in .overview-card__head / .path-breadcrumb below. */
 
-/* Tab bar -------------------------------------------------------------- */
+/* Repo tab bar — lives inline in the top bar (.topbar__lead). Tabs stretch the
+   full bar height; the active tab is marked by an accent underline that lands
+   on the bar's bottom border (GitHub-style), so page content starts right
+   below the header with no separate tab strip. */
 .tabs {
   display: flex;
   gap: var(--space-1);
-  margin: 0 0 var(--space-4);
-  border-bottom: 1px solid var(--border);
+  align-items: stretch;
 }
 .tab {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: var(--radius) var(--radius) 0 0;
-  color: var(--fg);
+  padding: 0 var(--space-3);
+  /* Transparent slot for the active underline so hover/active don't shift. */
+  border-bottom: 2px solid transparent;
+  color: var(--fg-muted);
   font-weight: var(--weight-medium);
-  position: relative;
 }
 .tab:hover {
   text-decoration: none;
+  color: var(--fg);
   background: var(--bg-canvas);
 }
 .tab.is-active {
-  /* +1px offset lets the active tab's bg cover the strip's bottom border
-     so it visually merges with the page content below. Non-active tabs
-     stay flush so their hover bg can't hide the strip border. */
-  top: 1px;
-  border-color: var(--border);
-  background: var(--bg);
+  color: var(--fg);
+  border-bottom-color: var(--accent);
   font-weight: var(--weight-semibold);
 }
 .tab.is-disabled {
@@ -477,11 +486,6 @@ pre {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-}
-
-/* Repo page ------------------------------------------------------------ */
-.repo-header {
-  margin-bottom: var(--space-4);
 }
 
 /* Code browser --------------------------------------------------------- */

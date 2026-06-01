@@ -12,7 +12,6 @@ import {
   useTreeCommits,
   useWhoami,
 } from "../api/queries"
-import RepoHeader from "../components/RepoHeader"
 import BranchSelector from "../components/BranchSelector"
 import FileTree from "../components/FileTree"
 import LatestCommitBar from "../components/LatestCommitBar"
@@ -48,7 +47,6 @@ export default function RepoPage() {
 
   return (
     <div className="repo">
-      <RepoHeader owner={r.owner} repo={r.name} openIssues={r.open_issues} />
       <div className="repo-toolbar">
         <BranchSelector owner={r.owner} repo={r.name} />
       </div>

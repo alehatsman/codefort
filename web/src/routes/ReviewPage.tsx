@@ -1,8 +1,7 @@
 import clsx from "clsx"
 import { Link, useParams, useSearchParams } from "react-router-dom"
-import { useCodeComments, useRepo, useWhoami } from "../api/queries"
+import { useCodeComments, useWhoami } from "../api/queries"
 import { useDeleteCodeComment, useSetCodeCommentResolved } from "../api/mutations"
-import RepoHeader from "../components/RepoHeader"
 import BranchSelector from "../components/BranchSelector"
 import Avatar from "../components/Avatar"
 import type { CodeComment, CodeCommentState } from "../api/types"
@@ -32,7 +31,6 @@ export default function ReviewPage() {
   const gitRef = params.get("ref") ?? ""
   const state = (params.get("state") as CodeCommentState) || "open"
 
-  const repoQ = useRepo(owner, repo)
   const commentsQ = useCodeComments(owner, repo, { ref: gitRef, state })
   const whoamiQ = useWhoami()
 
@@ -61,7 +59,6 @@ export default function ReviewPage() {
 
   return (
     <div className="repo">
-      <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
       <div className="repo-toolbar">
         <BranchSelector owner={owner} repo={repo} />
         <div className="filter-row">

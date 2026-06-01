@@ -13,7 +13,6 @@ import { parseAnsi } from "../lib/ansi"
 import { useJobEventStream } from "../lib/ciEvents"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import type { CIEvent, CIJob, CIRun, CIRunDetail, CIRunExecutionModel, Repo } from "../api/types"
-import RepoHeader from "../components/RepoHeader"
 import CIStatusBadge from "../components/CIStatusBadge"
 
 // Pipelines tab. One component serves the runs list (/pipelines) and a single
@@ -37,7 +36,6 @@ export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
 
   return (
     <div className="repo">
-      <RepoHeader owner={r.owner} repo={r.name} openIssues={r.open_issues} />
       {runNumber !== null && Number.isFinite(runNumber) ? (
         <RunDetail owner={r.owner} repo={r.name} runNumber={runNumber} kind={kind} />
       ) : (

@@ -1,5 +1,7 @@
-import { Link } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom"
 import { clearToken } from "../api/client"
+import { useRepo } from "../api/queries"
+import RepoTabs from "./RepoTabs"
 import ThemeSelect from "./ThemeSelect"
 
 interface Props {
@@ -7,7 +9,21 @@ interface Props {
   onSignOut: () => void
 }
 
+// Derive the repo context from the URL. Repo routes are /:owner/:repo/…;
+// top-level routes (/, /settings) have no repo, so the tabs are hidden there.
+function repoFromPath(pathname: string): { owner: string; repo: string } | null {
+  const segs = pathname.split("/").filter(Boolean)
+  if (segs.length < 2) return null
+  return { owner: segs[0], repo: segs[1] }
+}
+
 export default function Layout({ children, onSignOut }: Props) {
+  const { pathname } = useLocation()
+  const ctx = repoFromPath(pathname)
+  // Shares the repos-list / repo cache key, so this never fires an extra
+  // request — it just reads the open-issue count the active page already loads.
+  const repoQ = useRepo(ctx?.owner ?? "", ctx?.repo ?? "")
+
   function signOut() {
     clearToken()
     onSignOut()
@@ -16,9 +32,14 @@ export default function Layout({ children, onSignOut }: Props) {
   return (
     <div className="app">
       <header className="topbar">
-        <Link to="/" className="brand">
-          moongit
-        </Link>
+        <div className="topbar__lead">
+          <Link to="/" className="brand">
+            moongit
+          </Link>
+          {ctx && (
+            <RepoTabs owner={ctx.owner} repo={ctx.repo} openIssues={repoQ.data?.open_issues} />
+          )}
+        </div>
         <div className="topbar__actions">
           <ThemeSelect />
           <Link to="/settings" className="topbar__signout" title="Settings">

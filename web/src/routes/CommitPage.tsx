@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { useCommit, useRepo } from "../api/queries"
-import RepoHeader from "../components/RepoHeader"
+import { useCommit } from "../api/queries"
 import OverviewCard from "../components/OverviewCard"
 import Avatar from "../components/Avatar"
 import BranchTag from "../components/BranchTag"
@@ -18,7 +17,6 @@ type Mode = "split" | "unified"
  */
 export default function CommitPage() {
   const { owner = "", repo = "", sha = "" } = useParams()
-  const repoQ = useRepo(owner, repo)
   const commitQ = useCommit(owner, repo, sha)
   const [mode, setMode] = useState<Mode>("split")
   const [copied, setCopied] = useState(false)
@@ -37,7 +35,6 @@ export default function CommitPage() {
 
   return (
     <div className="commit-page">
-      <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       {commitQ.isLoading ? (

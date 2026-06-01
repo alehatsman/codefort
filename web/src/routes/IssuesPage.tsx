@@ -1,10 +1,9 @@
 import clsx from "clsx"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
-import { useIssues, useRepo } from "../api/queries"
+import { useIssues } from "../api/queries"
 import { ISSUE_STATES, type IssueState } from "../api/types"
 import NewIssueForm from "../components/NewIssueForm"
-import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
 import StateIcon from "../components/StateIcon"
 import IssuesViewSwitch from "../components/IssuesViewSwitch"
@@ -56,8 +55,6 @@ export default function IssuesPage() {
     return () => clearTimeout(t)
   }, [search, committedQuery, setSearchParams])
 
-  const repoQ = useRepo(owner, repo)
-
   const query = new URLSearchParams()
   if (activeStates.length > 0) query.set("state", activeStates.join(","))
   if (assignee) query.set("assignee", assignee)
@@ -84,7 +81,7 @@ export default function IssuesPage() {
     return [...set].sort()
   }, [data, assignee])
 
-  // j/k select an issue row and Enter opens it. (h/l tab nav lives in RepoHeader.)
+  // j/k select an issue row and Enter opens it. (h/l tab nav lives in RepoTabs.)
   const { index } = useListNav({
     count: data?.length ?? 0,
     onActivate: (i) => {
@@ -109,7 +106,6 @@ export default function IssuesPage() {
 
   return (
     <div className="issues">
-      <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       <div className="issues__header">

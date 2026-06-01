@@ -3,7 +3,6 @@ import { Link, useParams } from "react-router-dom"
 import { useMutation, useQueries } from "@tanstack/react-query"
 import { api } from "../api/client"
 import { keys, useIntel, useIntelOverview, useIntelSummaries, useRepo } from "../api/queries"
-import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import type {
@@ -44,7 +43,6 @@ export default function ExplorePage() {
 
   return (
     <div className="explore-page">
-      <RepoHeader owner={r.owner} repo={r.name} openIssues={r.open_issues} />
       <OverviewCard owner={r.owner} repo={r.name} path="" summaries={{}} />
 
       {intelQ.isLoading && <div className="loading">Loading index status…</div>}

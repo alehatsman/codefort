@@ -1,8 +1,7 @@
 import { lazy, Suspense, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { useComments, useIssue, useIssueCommits, useRepo, useWhoami } from "../api/queries"
+import { useComments, useIssue, useIssueCommits, useWhoami } from "../api/queries"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
-import RepoHeader from "../components/RepoHeader"
 import OverviewCard from "../components/OverviewCard"
 import StateButtons from "../components/StateButtons"
 import AssigneeControl from "../components/AssigneeControl"
@@ -24,7 +23,6 @@ export default function IssuePage() {
   const num = Number(numStr)
 
   const me = useWhoami()
-  const repoQ = useRepo(owner, repo)
   const issueQ = useIssue(owner, repo, num)
   const commentsQ = useComments(owner, repo, num)
   const commitsQ = useIssueCommits(owner, repo, num)
@@ -39,7 +37,6 @@ export default function IssuePage() {
 
   return (
     <div>
-      <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       {!editing && (

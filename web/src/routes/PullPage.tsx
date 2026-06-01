@@ -2,11 +2,10 @@ import { lazy, Suspense, useState } from "react"
 import { useParams } from "react-router-dom"
 import { ApiError } from "../api/client"
 import { useMergePull, useUpdatePull } from "../api/mutations"
-import { usePull, useRepo } from "../api/queries"
+import { usePull } from "../api/queries"
 import type { MergeConflictResponse } from "../api/types"
 import CompareView from "../components/CompareView"
 import OverviewCard from "../components/OverviewCard"
-import RepoHeader from "../components/RepoHeader"
 
 const Markdown = lazy(() => import("../components/Markdown"))
 
@@ -24,7 +23,6 @@ export default function PullPage() {
   const { owner = "", repo = "", number = "" } = useParams()
   const n = Number(number)
 
-  const repoQ = useRepo(owner, repo)
   const pullQ = usePull(owner, repo, n)
   const mergePull = useMergePull(owner, repo, n)
   const updatePull = useUpdatePull(owner, repo, n)
@@ -39,7 +37,6 @@ export default function PullPage() {
 
   return (
     <div className="pull-page">
-      <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       {pullQ.isLoading ? (

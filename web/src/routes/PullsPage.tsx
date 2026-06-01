@@ -1,9 +1,8 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
-import { usePulls, useRepo } from "../api/queries"
+import { usePulls } from "../api/queries"
 import { PR_STATES, type PRState } from "../api/types"
 import OverviewCard from "../components/OverviewCard"
 import PRStateIcon from "../components/PRStateIcon"
-import RepoHeader from "../components/RepoHeader"
 
 const STATE_LABEL: Record<PRState, string> = {
   open: "open",
@@ -33,7 +32,6 @@ export default function PullsPage() {
           .map((s) => s.trim())
           .filter((s): s is PRState => PR_STATES.includes(s as PRState))
 
-  const repoQ = useRepo(owner, repo)
   // Empty selection => no state param => the server returns every state, the
   // same "no filter = all" behavior the issue list has.
   const { data, isLoading, error } = usePulls(owner, repo, activeStates.join(","))
@@ -56,7 +54,6 @@ export default function PullsPage() {
 
   return (
     <div className="pulls">
-      <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       <div className="issues__header">

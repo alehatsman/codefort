@@ -1,11 +1,10 @@
 import { useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { ApiError } from "../api/client"
-import { useCompare, useRefs, useRepo } from "../api/queries"
+import { useCompare, useRefs } from "../api/queries"
 import { useCreatePull } from "../api/mutations"
 import CompareView from "../components/CompareView"
 import OverviewCard from "../components/OverviewCard"
-import RepoHeader from "../components/RepoHeader"
 
 /**
  * Compare two branches: pick base + head, see the ahead/behind + three-dot diff,
@@ -17,7 +16,6 @@ export default function ComparePage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
 
-  const repoQ = useRepo(owner, repo)
   const refsQ = useRefs(owner, repo)
   const branches = refsQ.data?.branches ?? []
   const def = refsQ.data?.default ?? ""
@@ -58,7 +56,6 @@ export default function ComparePage() {
 
   return (
     <div className="compare">
-      <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       <div className="issues__header">

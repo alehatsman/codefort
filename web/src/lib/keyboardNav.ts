@@ -101,7 +101,7 @@ const TAB_SUFFIXES = ["", "/issues", "/explore", "/pipelines", "/agents"] as con
 
 /**
  * h/l (and ←/→) cycle between the repo tabs (Code / Issues / Explore /
- * Pipelines). The active tab is derived from the URL, matching `RepoHeader`'s
+ * Pipelines). The active tab is derived from the URL, matching `RepoTabs`'s
  * own logic — including the legacy /research and /summaries URLs that now land
  * on Explore.
  */
