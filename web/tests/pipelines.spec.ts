@@ -568,6 +568,89 @@ test("a failed mooncake step shows a ✗ row with its command + error inline", a
   await expect(transcript.locator(".agent-card .ci-step__head--failed")).toBeVisible()
 })
 
+test("a mooncake-agent run streams the planner's live output during the plan phase", async ({
+  page,
+}) => {
+  // mooncake #76 streams the planner's tokens as planner.delta between
+  // plan.generating and plan.loaded; the transcript must render that live
+  // content (text full-strength, thinking dimmed) instead of dead air (#171).
+  const mooncake = (seq: number, type: string, data: Record<string, unknown>) => ({
+    seq,
+    type: "agent.message",
+    time: 0,
+    data: { mooncake: { type, data } },
+  })
+  await mockApi(page, {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 1,
+        total_issues: 1,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 1,
+        kind: "agent",
+        issue_number: 6,
+        execution_model: "mooncake-agent",
+        commit_sha: "deadbeefcafe1234",
+        ref: "HEAD",
+        event: "agent",
+        trigger: "agent#17",
+        status: "success",
+        created_at: iso,
+        started_at: iso,
+        finished_at: iso,
+        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        events: {
+          agent: [
+            { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #6: do it" } },
+            mooncake(2, "plan.generating", { iteration: 1, provider: "anthropic-cli", model: "claude" }),
+            // A run of "thinking" deltas, then "text" deltas: each kind
+            // coalesces into one row (mutated in place), kind flips open a new
+            // row so the dim/normal styling tracks the kind.
+            mooncake(3, "planner.delta", { iteration: 1, text: "I should ", kind: "thinking" }),
+            mooncake(4, "planner.delta", { iteration: 1, text: "edit the changelog.", kind: "thinking" }),
+            mooncake(5, "planner.delta", { iteration: 1, text: "- write: ", kind: "text" }),
+            mooncake(6, "planner.delta", { iteration: 1, text: "CHANGELOG.md", kind: "text" }),
+            mooncake(7, "plan.loaded", { total_steps: 1 }),
+            mooncake(8, "step.started", { step_id: "s1", action: "file.write", name: "create CHANGELOG.md" }),
+            mooncake(9, "step.completed", { step_id: "s1", duration_ms: 1, result: { status: "changed" } }),
+            mooncake(10, "run.completed", { success_steps: 1, changed_steps: 1, failed_steps: 0, duration_ms: 5 }),
+            {
+              seq: 11,
+              type: "agent.turn.completed",
+              time: 0,
+              data: { turn: 1, status: "success", num_turns: 0, duration_ms: 0 },
+            },
+          ],
+        },
+      },
+    ],
+  })
+  await page.goto("/alice/demo/agents/1")
+
+  const transcript = page.locator(".agent-transcript")
+  await expect(transcript).toBeVisible()
+  // The planner's thinking coalesces into one dimmed (italic) row labeled
+  // "planning…"; the plan text coalesces into one full-strength row.
+  const thinking = transcript.locator(".agent-entry--thinking")
+  await expect(thinking).toContainText("I should edit the changelog.")
+  await expect(transcript.locator(".agent-entry--thinking .agent-entry__label")).toContainText("planning…")
+  await expect(transcript.locator(".agent-entry--planning")).toContainText("- write: CHANGELOG.md")
+  // plan.loaded still closes the phase with the step card; the live planner
+  // rows sit above it under the Turn card.
+  await expect(
+    transcript.locator(".agent-card .ci-step__head", { hasText: "plan · 1 steps" })
+  ).toBeVisible()
+  await expect(transcript.locator(".agent-step--changed", { hasText: "create CHANGELOG.md" })).toBeVisible()
+})
+
 test("a long agent log virtualizes (windowed cards) and auto-follows the bottom", async ({ page }) => {
   // Many turns → many cards. Each turn is a "Turn N" card + a "plan · 1 steps"
   // card, so the transcript is a tall stack that must window + auto-follow.

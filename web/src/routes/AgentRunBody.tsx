@@ -395,15 +395,16 @@ interface AgentEntry {
   // event's seq + a per-event sub-index. The fold helpers don't set it.
   id?: string
   kind:
-  | "step"
-  | "turn"
-  | "thinking"
-  | "assistant"
-  | "tool_use"
-  | "tool_result"
-  | "result"
-  | "system"
-  | "raw"
+    | "step"
+    | "turn"
+    | "thinking"
+    | "planning"
+    | "assistant"
+    | "tool_use"
+    | "tool_result"
+    | "result"
+    | "system"
+    | "raw"
   // status is set only on "step" entries; it's mutated in place when the step
   // resolves so the live row flips ▶ → ✓/~/✗ without spawning a second line.
   status?: StepStatus
@@ -470,6 +471,11 @@ interface MooncakeState {
   // line flips in place rather than appending a second row).
   steps: Map<string, { action?: string; name?: string; lines: string[]; index: number }>
   last?: string
+  // The in-flight planner entry during the plan phase (#171). mooncake #76
+  // streams the planner's output as planner.delta between plan.generating and
+  // plan.loaded; we accumulate a run of same-kind deltas into one row (mutated
+  // in place) and start a new row when the kind flips (text ⇄ thinking).
+  planner?: { index: number; kind: AgentEntry["kind"] }
 }
 
 // foldMooncakeEvent turns one mooncake NDJSON event (data.mooncake on a
@@ -489,7 +495,36 @@ function foldMooncakeEvent(
   const data = (m.data as Record<string, unknown>) ?? {}
 
   switch (type) {
+    case "plan.generating":
+      // The "started" bracket for the plan phase (#76). Open a fresh planner
+      // block; the deltas that follow stream into it. The turn header already
+      // brackets this above, so no row of its own — just reset the accumulator
+      // so a re-plan iteration starts a new run of rows.
+      mc.planner = undefined
+      return []
+    case "planner.delta": {
+      // Live planner output. kind is "text" (the plan being written) or
+      // "thinking" (reasoning, rendered dimmed). Append to the current row when
+      // the kind matches; otherwise open a new row so the dim/normal styling
+      // tracks the kind. The first row of the block carries the "planning…"
+      // label so the reader knows the agent is mid-plan.
+      const text = asString(data.text)
+      if (!text) return []
+      const kind: AgentEntry["kind"] = data.kind === "thinking" ? "thinking" : "planning"
+      if (mc.planner && mc.planner.kind === kind) {
+        out[mc.planner.index].text += text
+        return []
+      }
+      const index = out.length
+      const label = mc.planner ? undefined : "planning…"
+      out.push({ kind, label, text })
+      mc.planner = { index, kind }
+      return []
+    }
     case "plan.loaded": {
+      // The plan is final; close the planner block so any later delta (a
+      // re-plan iteration) opens a fresh row rather than appending here.
+      mc.planner = undefined
       const n = data.total_steps
       return [
         { kind: "system", label: typeof n === "number" ? `plan · ${n} steps` : "plan", text: "" },
