@@ -28,7 +28,24 @@ type Server struct {
 	// endpoint rejects and the hook short-circuits on the empty env var).
 	ciSecret string
 	ciURL    string
+
+	// agentCanceler is the in-process CI runner, wired in by main via
+	// SetAgentCanceler. It backs the force-stop endpoint (#146): the runner
+	// holds the in-memory turn handles needed to interrupt a live container,
+	// which a DB-only signal can't do. nil in tests that don't exercise cancel
+	// (and on the read pool path) — the handler then 503s.
+	agentCanceler AgentCanceler
 }
+
+// AgentCanceler force-stops a running agent run by id, returning true if the
+// run was non-terminal and is now canceled. Implemented by the CI runner; kept
+// as an interface here so internal/server doesn't depend on package main.
+type AgentCanceler interface {
+	CancelAgentRun(runID int64) bool
+}
+
+// SetAgentCanceler wires the runner-backed force-stop. Called once at startup.
+func (s *Server) SetAgentCanceler(c AgentCanceler) { s.agentCanceler = c }
 
 func New(cfg *config.Config, db, rdb *sql.DB, logger *slog.Logger) *Server {
 	secret := cfg.CISecret
@@ -150,6 +167,7 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/ci/runs/{number}/rerun", s.handleRerunCIRun)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/ci/runs/{number}/turns", s.handleCreateAgentTurn)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/ci/runs/{number}/finish", s.handleFinishAgentRun)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/ci/runs/{number}/cancel", s.handleCancelAgentRun)
 	mux.HandleFunc("GET /api/settings/agent", s.handleGetAgentSettings)
 	mux.HandleFunc("PUT /api/settings/agent", s.handleUpdateAgentSettings)
 

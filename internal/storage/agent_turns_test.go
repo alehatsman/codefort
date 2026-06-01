@@ -25,6 +25,60 @@ func parkedAgentRun(t *testing.T, db *sql.DB, repoID int64) CIRun {
 	return run
 }
 
+func TestCancelAgentRun(t *testing.T) {
+	t.Run("cancels a parked (awaiting_input) run", func(t *testing.T) {
+		db, repoID := seedRepo(t)
+		run := parkedAgentRun(t, db, repoID)
+		if err := CancelAgentRun(db, run.ID); err != nil {
+			t.Fatalf("CancelAgentRun: %v", err)
+		}
+		got, _ := GetRun(db, repoID, run.Number)
+		if got.Status != RunCanceled || got.FinishedAt == nil {
+			t.Errorf("status=%q finished=%v, want canceled + finished_at set", got.Status, got.FinishedAt)
+		}
+	})
+
+	t.Run("cancels a running run", func(t *testing.T) {
+		db, repoID := seedRepo(t)
+		n := 1
+		run, err := EnqueueRun(db, repoID, NewRun{Kind: RunKindAgent, IssueNumber: &n, CommitSHA: "a", Ref: "HEAD", Event: "agent"})
+		if err != nil {
+			t.Fatalf("EnqueueRun: %v", err)
+		}
+		if _, err := ClaimNextRunOfKind(db, RunKindAgent, time.Hour); err != nil { // queued -> running
+			t.Fatalf("claim: %v", err)
+		}
+		if err := CancelAgentRun(db, run.ID); err != nil {
+			t.Fatalf("CancelAgentRun: %v", err)
+		}
+		if got, _ := GetRun(db, repoID, run.Number); got.Status != RunCanceled {
+			t.Errorf("status = %q, want canceled", got.Status)
+		}
+	})
+
+	t.Run("already-terminal run is ErrNotFound", func(t *testing.T) {
+		db, repoID := seedRepo(t)
+		run := parkedAgentRun(t, db, repoID)
+		if err := FinishRun(db, run.ID, RunSuccess); err != nil {
+			t.Fatalf("FinishRun: %v", err)
+		}
+		if err := CancelAgentRun(db, run.ID); !errors.Is(err, ErrNotFound) {
+			t.Errorf("CancelAgentRun on terminal run = %v, want ErrNotFound", err)
+		}
+	})
+
+	t.Run("CI run is not cancelable via this path", func(t *testing.T) {
+		db, repoID := seedRepo(t)
+		run, err := EnqueueRun(db, repoID, NewRun{Kind: RunKindCI, CommitSHA: "a", Ref: "HEAD", Event: "push"})
+		if err != nil {
+			t.Fatalf("EnqueueRun: %v", err)
+		}
+		if err := CancelAgentRun(db, run.ID); !errors.Is(err, ErrNotFound) {
+			t.Errorf("CancelAgentRun on CI run = %v, want ErrNotFound (kind guard)", err)
+		}
+	})
+}
+
 func TestEnqueueTurnAllocatesSeq(t *testing.T) {
 	db, repoID := seedRepo(t)
 	n := 1

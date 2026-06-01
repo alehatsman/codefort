@@ -210,6 +210,48 @@ func (s *Server) handleFinishAgentRun(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, toAPIRun(run))
 }
 
+// handleCancelAgentRun force-stops a running agent run (#146). Unlike finish —
+// which only accepts a parked (awaiting_input) run and keeps the work — cancel
+// is valid from any non-terminal state (queued/running/awaiting_input/
+// finishing), interrupts an in-flight turn, and discards the workspace. A run
+// that's already terminal is a 409; a non-agent run is a 400.
+func (s *Server) handleCancelAgentRun(w http.ResponseWriter, r *http.Request) {
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+	num, ok := runNumberOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	run, err := storage.GetRun(s.db, repoID, num)
+	if errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "run not found")
+		return
+	}
+	if err != nil {
+		s.logger.Error("agent cancel get run", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if run.Kind != storage.RunKindAgent {
+		writeError(w, http.StatusBadRequest, "not an agent run")
+		return
+	}
+	if s.agentCanceler == nil {
+		writeError(w, http.StatusServiceUnavailable, "cancel unavailable (no runner)")
+		return
+	}
+	if !s.agentCanceler.CancelAgentRun(run.ID) {
+		writeError(w, http.StatusConflict, "run is already finished")
+		return
+	}
+
+	run.Status = storage.RunCanceled
+	writeJSON(w, http.StatusAccepted, toAPIRun(run))
+}
+
 func toAPITurn(t storage.AgentTurn) api.AgentTurn {
 	return api.AgentTurn{
 		Seq:        t.Seq,
