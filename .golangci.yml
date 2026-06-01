@@ -130,6 +130,16 @@ linters:
       - linters: [revive]
         text: 'package-comments: should have a package comment'
 
+      # repo deletion joins owner/repo path components onto ReposDir for the
+      # on-disk cleanup (os.RemoveAll/os.Remove). gosec's taint analysis flags
+      # these as G703 path traversal, but the components can't escape: they're
+      # validated at creation (validRepoComponent rejects "", ".", "..", "/" and
+      # caps length), and the delete only runs after LookupRepo confirms the
+      # repo is registered — so the join stays inside ReposDir.
+      - path: internal/server/repos.go
+        linters: [gosec]
+        text: 'G703'
+
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
