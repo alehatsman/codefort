@@ -53,10 +53,12 @@ type RepoSummary struct {
 	OpenIssues  int
 	TotalIssues int
 	CIEnabled   bool
-	// CIStatus is the status of the repo's most recent CI run (highest run
-	// number), empty when the repo has no runs. CINumber is that run's
-	// per-repo number, for linking to it. Surfaced so the repos list can show
-	// an at-a-glance CI icon without a per-repo follow-up query.
+	// CIStatus is the status of the repo's most recent CI-kind run (highest run
+	// number among kind='ci'), empty when the repo has no CI runs. Agent runs
+	// share the ci_runs table but are excluded so the icon tracks pipeline
+	// automation only. CINumber is that run's per-repo number, for linking to
+	// it. Surfaced so the repos list can show an at-a-glance CI icon without a
+	// per-repo follow-up query.
 	CIStatus string
 	CINumber int
 }
@@ -73,8 +75,8 @@ func ListRepos(db *sql.DB) ([]RepoSummary, error) {
 		  COALESCE(SUM(CASE WHEN issues.state IN ('todo','in_progress') THEN 1 ELSE 0 END), 0) AS open_issues,
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
 		  repos.ci_enabled,
-		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id ORDER BY cr.number DESC LIMIT 1) AS ci_status,
-		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id ORDER BY cr.number DESC LIMIT 1) AS ci_number
+		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_status,
+		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number
 		FROM repos
 		JOIN users ON users.id = repos.owner_id
 		LEFT JOIN issues ON issues.repo_id = repos.id
@@ -109,8 +111,8 @@ func GetRepoSummary(db *sql.DB, owner, name string) (RepoSummary, error) {
 		  COALESCE(SUM(CASE WHEN issues.state IN ('todo','in_progress') THEN 1 ELSE 0 END), 0) AS open_issues,
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
 		  repos.ci_enabled,
-		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id ORDER BY cr.number DESC LIMIT 1) AS ci_status,
-		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id ORDER BY cr.number DESC LIMIT 1) AS ci_number
+		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_status,
+		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number
 		FROM repos
 		JOIN users ON users.id = repos.owner_id
 		LEFT JOIN issues ON issues.repo_id = repos.id

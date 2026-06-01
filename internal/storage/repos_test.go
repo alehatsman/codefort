@@ -57,3 +57,51 @@ func TestRepoSummarySurfacesLatestRun(t *testing.T) {
 			repos[0].CIStatus, repos[0].CINumber, RunFailed, latest.Number)
 	}
 }
+
+// Agent runs share the ci_runs table but must not drive the repo's CI icon: a
+// newer agent run (higher number) must be ignored in favor of the latest
+// kind='ci' run, so the icon reflects pipeline automation only.
+func TestRepoSummaryIgnoresAgentRuns(t *testing.T) {
+	db, repoID := seedRepo(t)
+
+	ci, err := EnqueueRun(db, repoID, NewRun{CommitSHA: "a", Ref: "refs/heads/main", Event: "push"})
+	if err != nil {
+		t.Fatalf("EnqueueRun ci: %v", err)
+	}
+	if err := FinishRun(db, ci.ID, RunSuccess); err != nil {
+		t.Fatalf("FinishRun ci: %v", err)
+	}
+
+	// A later agent run gets a higher number but a different kind.
+	n := 1
+	agent, err := EnqueueRun(db, repoID, NewRun{
+		Kind: RunKindAgent, IssueNumber: &n, CommitSHA: "b", Ref: "HEAD", Event: "agent",
+	})
+	if err != nil {
+		t.Fatalf("EnqueueRun agent: %v", err)
+	}
+	if err := FinishRun(db, agent.ID, RunFailed); err != nil {
+		t.Fatalf("FinishRun agent: %v", err)
+	}
+
+	got, err := GetRepoSummary(db, "alice", "repo")
+	if err != nil {
+		t.Fatalf("GetRepoSummary: %v", err)
+	}
+	if got.CIStatus != string(RunSuccess) || got.CINumber != ci.Number {
+		t.Errorf("GetRepoSummary CI = (%q, %d), want (%q, %d) — agent run leaked into CI status",
+			got.CIStatus, got.CINumber, RunSuccess, ci.Number)
+	}
+
+	repos, err := ListRepos(db)
+	if err != nil {
+		t.Fatalf("ListRepos: %v", err)
+	}
+	if len(repos) != 1 {
+		t.Fatalf("ListRepos len = %d, want 1", len(repos))
+	}
+	if repos[0].CIStatus != string(RunSuccess) || repos[0].CINumber != ci.Number {
+		t.Errorf("ListRepos CI = (%q, %d), want (%q, %d) — agent run leaked into CI status",
+			repos[0].CIStatus, repos[0].CINumber, RunSuccess, ci.Number)
+	}
+}
