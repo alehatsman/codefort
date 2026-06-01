@@ -394,25 +394,26 @@ func TestCancelAgentRunInterruptsInFlightTurn(t *testing.T) {
 }
 
 // A turn that ran but reported an error result (not an executor failure) is
-// terminal: the run finalizes RunFailed (red, like a failed CI run) and tears
-// down, rather than parking — parking let a later Finish report green over a
-// failed session (#145).
-func TestExecuteAgentRunErrorResultFails(t *testing.T) {
+// NOT terminal: the run parks awaiting_input with its container left alive, so
+// the operator can Continue and course-correct. Only operator Stop or infra
+// death (execErr) ends a session (#178, reversing the terminal-fail of #145).
+func TestExecuteAgentRunErrorResultParks(t *testing.T) {
 	h := newAgentHarness(t, agentTestOpts{
 		lines: []string{`{"type":"result","subtype":"error_max_turns","is_error":true,"num_turns":5}`},
 	})
 	h.r.executeAgentRun(context.Background(), h.run)
-	if got := h.status(t); got != storage.RunFailed {
-		t.Errorf("run status = %q, want failed", got)
+	if got := h.status(t); got != storage.RunAwaitingInput {
+		t.Errorf("run status = %q, want awaiting_input (a failed turn parks, not terminal)", got)
 	}
-	if h.teardowns.Load() != 1 {
-		t.Errorf("teardowns = %d, want 1 (failed turn tears down)", h.teardowns.Load())
+	if h.teardowns.Load() != 0 {
+		t.Errorf("teardowns = %d, want 0 (a parked failed turn keeps its container)", h.teardowns.Load())
 	}
 }
 
-// A follow-up turn that reports an error result finalizes the run RunFailed and
-// marks the turn errored, rather than re-parking (#145).
-func TestDispatchTurnErrorResultFails(t *testing.T) {
+// A follow-up turn that reports an error result re-parks awaiting_input (turn
+// marked done), rather than finalizing the run — the session stays resumable
+// (#178).
+func TestDispatchTurnErrorResultReparks(t *testing.T) {
 	h := newAgentHarness(t, agentTestOpts{
 		lines:         successTurn, // turn 1 parks
 		followupLines: []string{`{"type":"result","subtype":"error_max_turns","is_error":true,"num_turns":5}`},
@@ -431,15 +432,15 @@ func TestDispatchTurnErrorResultFails(t *testing.T) {
 	}
 	h.r.dispatchTurn(context.Background(), turn, run)
 
-	if got := h.status(t); got != storage.RunFailed {
-		t.Errorf("run status after failed follow-up = %q, want failed", got)
+	if got := h.status(t); got != storage.RunAwaitingInput {
+		t.Errorf("run status after failed follow-up = %q, want awaiting_input (re-parked)", got)
 	}
-	if h.teardowns.Load() != 1 {
-		t.Errorf("teardowns = %d, want 1 (failed follow-up tears down)", h.teardowns.Load())
+	if h.teardowns.Load() != 0 {
+		t.Errorf("teardowns = %d, want 0 (a re-parked failed follow-up keeps its container)", h.teardowns.Load())
 	}
 	turns, _ := storage.ListTurns(h.r.db, h.run.ID)
-	if len(turns) != 1 || turns[0].Status != storage.TurnError {
-		t.Errorf("turns = %+v, want one errored turn", turns)
+	if len(turns) != 1 || turns[0].Status != storage.TurnDone {
+		t.Errorf("turns = %+v, want one done turn", turns)
 	}
 }
 

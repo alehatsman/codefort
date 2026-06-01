@@ -189,27 +189,14 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		r.failAgentRun(run.ID, job.ID, workDir)
 		return
 	}
-	// A turn that stalled (mooncake hit its iteration cap / stopped making
-	// progress, no step failed) is terminal but not a failure: finalize neutral
-	// RunStalled so the operator can tell "gave up" from "crashed" (#173). Like a
-	// failed turn it must not park — parking would let a later Finish report
-	// green over a session that gave up (#145).
-	if status == "stalled" {
-		log.Info("agent turn 1 stalled; finalizing", "status", status)
-		r.stallAgentRun(run, job.ID, workDir, "the agent stopped without making progress")
-		return
-	}
-	// A turn that ran but reported failure (mooncake execution_failed / claude error
-	// result) is terminal: finalize the run RunFailed (red) rather than parking
-	// it as a normal awaiting-input checkpoint — parking let a later Finish
-	// report green over a failed session (#145). Only a successful turn parks.
-	if status != "success" {
-		log.Info("agent turn 1 failed; finalizing", "status", status)
-		r.failAgentTurnRun(run, job.ID, workDir, fmt.Sprintf("the agent turn failed (%s)", status))
-		return
-	}
-	// Turn 1 succeeded: park awaiting input, leaving the container alive for an
-	// optional human follow-up.
+	// The turn ran to completion. Whatever its verdict — success, a soft stop
+	// (converged / no_progress), or a genuine step failure — park awaiting_input
+	// and leave the container alive so the operator can click Continue and
+	// resume from the persisted /work. Only an operator Stop (#146) or infra
+	// death (execErr, above) ends a session; a non-fatal stop must not lose it
+	// (#178, reversing the terminal stall/fail of #173/#145). The per-turn
+	// verdict rides the turn.completed event + stderr replay (#117), so the
+	// transcript still shows what happened.
 	if err := storage.MarkRunAwaitingInput(r.db, run.ID); err != nil {
 		log.Error("agent park awaiting_input", "err", err)
 	}
@@ -306,30 +293,19 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
 		return
 	}
-	// The follow-up turn stalled (soft stop, no failed step): terminal neutral
-	// RunStalled, same rationale as turn 1 (#173). The turn's own steps ran
-	// clean, so the turn record is TurnDone; only the run verdict is "stalled".
-	if status == "stalled" {
-		log.Info("agent turn stalled; finalizing", "turn", turn.Seq+1, "status", status)
-		_ = storage.FinishTurn(r.db, turn.ID, storage.TurnDone)
-		r.stallAgentRun(run, jobID, agentWorkDir(r.cfg.DataDir, run.ID), fmt.Sprintf("turn %d stopped without making progress", turn.Seq+1))
-		return
-	}
-	// The follow-up turn ran but reported failure: terminal, finalize RunFailed
-	// rather than re-parking (same rationale as turn 1, #145).
-	if status != "success" {
-		log.Info("agent turn failed; finalizing", "turn", turn.Seq+1, "status", status)
-		_ = storage.FinishTurn(r.db, turn.ID, storage.TurnError)
-		r.failAgentTurnRun(run, jobID, agentWorkDir(r.cfg.DataDir, run.ID), fmt.Sprintf("turn %d failed (%s)", turn.Seq+1, status))
-		return
-	}
+	// The follow-up turn ran to completion — success, a soft stop, or a genuine
+	// step failure. Mark the turn done and re-park awaiting_input, keeping the
+	// container alive so the operator can Continue again. A non-fatal stop must
+	// not end the session; only operator Stop or infra death (execErr, above)
+	// does (#178). The turn's verdict rides its turn.completed event + stderr
+	// replay (#117), so the transcript still shows what happened.
 	if err := storage.FinishTurn(r.db, turn.ID, storage.TurnDone); err != nil {
 		log.Error("agent finish turn", "err", err)
 	}
 	if err := storage.MarkRunAwaitingInput(r.db, run.ID); err != nil {
 		log.Error("agent re-park awaiting_input", "err", err)
 	}
-	log.Info("agent turn done; awaiting input")
+	log.Info("agent turn done; awaiting input", "status", status)
 }
 
 // runAgentTurn composes and runs one turn under a per-turn deadline via the
@@ -429,44 +405,6 @@ func (r *ciRunner) failAgentRun(runID, jobID int64, workDir string) {
 	// Agent runs don't surface on the CI feed (finish skips them by Kind), so a
 	// minimal run carrying just the id + kind is all finish needs here.
 	r.finish(storage.CIRun{ID: runID, Kind: storage.RunKindAgent}, storage.RunError)
-}
-
-// failAgentTurnRun finalizes an agent run whose turn *ran* but reported failure
-// (mooncake execution_failed / claude error result) — distinct from failAgentRun,
-// which is for infrastructure breakage (checkout/container/token). It marks the
-// run RunFailed and the job JobFailed so the Agents tab + repo CI badge show a
-// red "failed", like a failed CI run, instead of the old behavior of parking at
-// awaiting_input — which let a later Finish report green over a failed session
-// (#145). A failed turn is terminal: re-spawn (or, mid-run, force-stop) rather
-// than course-correct. Posts a failure comment and tears down before finishing,
-// taking the full run so the comment can resolve the issue.
-func (r *ciRunner) failAgentTurnRun(run storage.CIRun, jobID int64, workDir, reason string) {
-	r.commentAgentFailure(run, reason)
-	r.tearDownAgent(run.ID, jobID, workDir)
-	if jobID != 0 {
-		r.finishJob(jobID, storage.JobFailed, nil)
-	}
-	r.finish(run, storage.RunFailed)
-}
-
-// stallAgentRun finalizes an agent run whose turn ran to a *soft* stop — the
-// agent hit its iteration cap or stopped advancing without any step failing
-// (mooncake stop_reason max_iterations/no_progress/no_change). Unlike
-// failAgentTurnRun (a step errored → red RunFailed) it's a neutral RunStalled:
-// the work was clean, the agent just couldn't converge, so an operator can tell
-// "gave up" from "crashed" and rerun (#173). Like a failed turn it's terminal
-// and does not park awaiting_input — parking would let a later Finish report
-// green over a session that gave up (#145). The single job ran clean, so it
-// finishes JobSuccess; the verdict lives on the run. Comments + tears down like
-// a failed turn (the work is discarded — rerun rather than nudge).
-func (r *ciRunner) stallAgentRun(run storage.CIRun, jobID int64, workDir, reason string) {
-	r.commentAgentFailure(run, reason)
-	r.tearDownAgent(run.ID, jobID, workDir)
-	if jobID != 0 {
-		zero := 0
-		r.finishJob(jobID, storage.JobSuccess, &zero)
-	}
-	r.finish(run, storage.RunStalled)
 }
 
 // registerAgentTurn derives a cancelable context for one turn and records a
