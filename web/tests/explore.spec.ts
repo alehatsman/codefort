@@ -113,6 +113,8 @@ test("Explore: ask box defaults to Ask; Advanced reveals the mode picker", async
       body: JSON.stringify({
         status: "ok",
         hits: [],
+        answer: "Routing is wired up in internal/server/router.go via http.ServeMux.",
+        answer_model: "qwen2.5-coder:14b",
         next_action: "Read internal/server/router.go to see route wiring.",
         suggested_reads: [],
       }),
@@ -126,9 +128,12 @@ test("Explore: ask box defaults to Ask; Advanced reveals the mode picker", async
   await page.getByRole("button", { name: /Advanced search modes/ }).click()
   await expect(page.locator(".explore-ask__kind")).toBeVisible()
 
-  // Asking a question surfaces the next-action block.
+  // Asking a question leads with dex's synthesized answer (+ model
+  // attribution) and still surfaces the next-action block below it.
   await page.locator(".explore-ask__input").fill("how does routing work?")
   await page.getByRole("button", { name: "Ask" }).click()
+  await expect(page.locator(".ask__answer-body")).toContainText("http.ServeMux")
+  await expect(page.locator(".ask__answer-model")).toContainText("qwen2.5-coder:14b")
   await expect(page.locator(".ask__next-action")).toContainText("router.go")
 })
 

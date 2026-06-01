@@ -2649,6 +2649,25 @@ h3 {
 .ask__intent {
   margin-bottom: var(--space-3);
 }
+/* The synthesized prose answer — dex's headline, so it leads the view with
+   a touch more weight than the next-action/avoid callouts below it. */
+.ask__answer {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.ask__answer-body {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: var(--leading-relaxed);
+}
+.ask__answer-model {
+  display: block;
+  margin-top: var(--space-2);
+}
 .ask__next-action,
 .ask__avoid {
   background: var(--bg-card);

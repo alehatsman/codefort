@@ -107,13 +107,21 @@ type Hit struct {
 
 // SearchResult is the shared shape of dex's search/semantic and
 // search/symbol responses. For the `ask` kind it also carries the
-// richer fields dex's /ask returns — next_action, suggested_reads,
-// annotations — so the UI can render the same kind of summary the
-// `dex ask` CLI prints. Those fields are nil for non-ask kinds.
+// richer fields dex's /ask returns — the synthesized prose answer,
+// next_action, suggested_reads, annotations — so the UI can render
+// the same summary the `dex ask` CLI prints. Those fields are nil
+// for non-ask kinds.
 type SearchResult struct {
-	Status         string                `json:"status"`
-	Hint           string                `json:"hint,omitempty"`
-	Hits           []Hit                 `json:"hits"`
+	Status string `json:"status"`
+	Hint   string `json:"hint,omitempty"`
+	Hits   []Hit  `json:"hits"`
+	// Answer is dex's synthesized, citation-bearing prose response to an
+	// /ask question — the headline of the new /ask shape. AnswerModel names
+	// the chat model that produced it (rendered as attribution). Both are
+	// empty when dex's chat leg is unreachable (the response degrades to the
+	// evidence bundle below) and for non-ask kinds.
+	Answer         string                `json:"answer,omitempty"`
+	AnswerModel    string                `json:"answer_model,omitempty"`
 	NextAction     string                `json:"next_action,omitempty"`
 	Avoid          string                `json:"avoid,omitempty"`
 	SuggestedReads []SuggestedRead       `json:"suggested_reads,omitempty"`
@@ -204,10 +212,10 @@ func (c *Client) FindSymbol(ctx context.Context, projectID, name string, k int) 
 	return c.search(ctx, "/v1/projects/"+projectID+"/search/symbol", body)
 }
 
-// Ask sends a free-form question to dex's /ask endpoint. We flatten its
-// semantic_hits into the common Hit shape so the Intel tab can reuse the
-// existing renderer. The graph + suggested_reads sections of the response
-// are richer but need a different UI; they're discarded for now.
+// Ask sends a free-form question to dex's /ask endpoint. dex's headline is the
+// synthesized prose answer; we carry it through alongside the flattened
+// semantic_hits (mapped into the common Hit shape so the Intel tab reuses the
+// existing renderer) plus the graph + suggested_reads structure.
 func (c *Client) Ask(ctx context.Context, projectID, question string, k int) (*SearchResult, error) {
 	// /ask is an LLM generation — give it a generous budget instead of the
 	// cheap-call default (#127).
@@ -436,12 +444,13 @@ func (c *Client) do(ctx context.Context, method, path string, body any, out any)
 }
 
 // askEnvelope mirrors dex's /ask response shape. Only the fields the Intel
-// tab surfaces are unmarshaled; graph + suggested_reads are dropped on the
-// floor for now (different UX, separate slice).
+// tab surfaces are unmarshaled.
 type askEnvelope struct {
 	Status         string                `json:"status"`
 	Hint           string                `json:"hint,omitempty"`
 	Intent         string                `json:"intent,omitempty"`
+	Answer         string                `json:"answer,omitempty"`
+	AnswerModel    string                `json:"answer_model,omitempty"`
 	SemanticHits   []askHit              `json:"semantic_hits"`
 	NextAction     string                `json:"next_action,omitempty"`
 	Avoid          string                `json:"avoid,omitempty"`
@@ -464,6 +473,8 @@ func (a askEnvelope) toSearchResult() *SearchResult {
 	out := &SearchResult{
 		Status:         a.Status,
 		Hits:           make([]Hit, 0, len(a.SemanticHits)),
+		Answer:         a.Answer,
+		AnswerModel:    a.AnswerModel,
 		NextAction:     a.NextAction,
 		Avoid:          a.Avoid,
 		SuggestedReads: a.SuggestedReads,

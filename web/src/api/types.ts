@@ -536,6 +536,12 @@ export interface IntelSearchResult {
   status: string
   hint?: string
   hits: IntelHit[]
+  /** Only populated when kind="ask". `answer` is dex's synthesized,
+   *  citation-bearing prose response — the headline of the /ask shape;
+   *  `answer_model` names the chat model that produced it. Both are absent
+   *  when dex's chat leg is unreachable (degrades to the evidence below). */
+  answer?: string
+  answer_model?: string
   /** Only populated when kind="ask". The CLI prints these and they're more
    *  actionable than the raw semantic_hits. */
   next_action?: string

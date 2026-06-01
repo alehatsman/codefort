@@ -451,9 +451,10 @@ function IntelResult({
   repo: string
   result: IntelSearchResult
 }) {
-  // dex's /ask returns extra structure (next_action, suggested_reads,
-  // annotations). Render that CLI-style. Other kinds keep the flat list.
-  const isAsk = !!(result.next_action || result.suggested_reads?.length)
+  // dex's /ask returns extra structure (a synthesized answer, next_action,
+  // suggested_reads, annotations). Render that CLI-style. Other kinds keep
+  // the flat list.
+  const isAsk = !!(result.answer || result.next_action || result.suggested_reads?.length)
   if (isAsk) {
     return <AskView owner={owner} repo={repo} result={result} />
   }
@@ -481,6 +482,14 @@ function AskView({
   return (
     <div className="ask">
       {result.hint && <div className="ask__intent muted small">{result.hint}</div>}
+      {result.answer && (
+        <div className="ask__answer">
+          <p className="ask__answer-body">{result.answer}</p>
+          {result.answer_model && (
+            <span className="ask__answer-model muted small">— {result.answer_model}</span>
+          )}
+        </div>
+      )}
       {result.next_action && (
         <div className="ask__next-action">
           <span className="ask__label">Next action</span>
@@ -574,7 +583,8 @@ function AskView({
         </details>
       )}
 
-      {reads.length === 0 &&
+      {!result.answer &&
+        reads.length === 0 &&
         result.hits.length === 0 &&
         (!result.graph || result.graph.nodes.length === 0) && (
           <div className="empty">No matches.</div>

@@ -41,6 +41,48 @@ func TestAskGetsLongerBudgetThanCheapCalls(t *testing.T) {
 	}
 }
 
+// Ask carries dex's synthesized prose answer + model attribution through
+// (the headline of the new /ask shape) and flattens semantic_hits into the
+// common Hit shape so the existing renderer can reuse them.
+func TestAskParsesSynthesizedAnswer(t *testing.T) {
+	const payload = `{
+		"status": "ok",
+		"intent": "behavior_search",
+		"answer": "The dex client lives in internal/dex/client.go.",
+		"answer_model": "qwen2.5-coder:14b",
+		"next_action": "Read internal/dex/client.go lines 207-226.",
+		"semantic_hits": [
+			{"path": "internal/dex/client.go", "start_line": 207, "end_line": 226, "score": 0.6, "kind": "method", "reason": "Ask"}
+		]
+	}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(payload))
+	}))
+	defer srv.Close()
+
+	res, err := New(srv.URL, "").Ask(context.Background(), "proj", "where is the client?", 5)
+	if err != nil {
+		t.Fatalf("Ask: %v", err)
+	}
+	if res.Answer != "The dex client lives in internal/dex/client.go." {
+		t.Errorf("Answer not carried through, got %q", res.Answer)
+	}
+	if res.AnswerModel != "qwen2.5-coder:14b" {
+		t.Errorf("AnswerModel not carried through, got %q", res.AnswerModel)
+	}
+	if res.NextAction == "" {
+		t.Error("NextAction should be carried through")
+	}
+	if len(res.Hits) != 1 || res.Hits[0].Path != "internal/dex/client.go" {
+		t.Errorf("semantic_hits not flattened into Hits, got %+v", res.Hits)
+	}
+	// Intent + per-hit reason fold into the hit's Role for the renderer.
+	if res.Hits[0].Role != "behavior_search · Ask" {
+		t.Errorf("hit Role = %q, want %q", res.Hits[0].Role, "behavior_search · Ask")
+	}
+}
+
 // A deadline the caller already set is respected, not overridden by the
 // cheap-call default.
 func TestRespectsCallerDeadline(t *testing.T) {
