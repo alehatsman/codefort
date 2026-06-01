@@ -1086,6 +1086,17 @@ a.file-tree__commit:hover {
 .code-line:hover .code-line__text {
   background: var(--code-line-hl);
 }
+/* Lines covered by a saved review comment: a muted persistent tint + gutter bar
+   so the range a thread annotates stays visible. Declared before the deep-link
+   and active-selection rules so those (equal specificity, later) win when a
+   commented line is also linked or being selected. */
+.code-line.is-commented .code-line__num,
+.code-line.is-commented .code-line__text {
+  background: color-mix(in srgb, var(--state-done) 12%, transparent);
+}
+.code-line.is-commented .code-line__num {
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--state-done) 70%, transparent);
+}
 /* Deep-link target: a Research suggested-read opened the file at this block,
    so the #L<n> / #L<start>-L<end> range is tinted and barred down the gutter. */
 .code-line.is-highlighted .code-line__num,
@@ -1714,6 +1725,10 @@ a.file-tree__commit:hover {
   color: var(--fg-muted);
   font-weight: var(--weight-normal);
 }
+.issue-title__edit {
+  margin-left: var(--space-3);
+  vertical-align: middle;
+}
 .issue-subtitle {
   display: flex;
   align-items: center;
@@ -1724,6 +1739,14 @@ a.file-tree__commit:hover {
   padding-bottom: var(--space-4);
   margin-bottom: var(--space-4);
   border-bottom: 1px solid var(--border-muted);
+}
+
+/* Inline title/body editor, in place of the rendered body while editing. */
+.issue-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .body {

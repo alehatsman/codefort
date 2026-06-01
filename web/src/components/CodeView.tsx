@@ -1,3 +1,4 @@
+import clsx from "clsx"
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import { useLocation } from "react-router-dom"
@@ -98,6 +99,17 @@ export default function CodeView({
     return m
   }, [comments])
 
+  // Every line covered by a saved comment, so the range a thread annotates stays
+  // tinted after the transient drag selection clears (else, once the comment
+  // posts, nothing shows which lines it belongs to).
+  const commentedLines = useMemo(() => {
+    const s = new Set<number>()
+    for (const c of comments) {
+      for (let n = c.start_line; n <= c.end_line; n++) s.add(n)
+    }
+    return s
+  }, [comments])
+
   // Drag-to-select on the gutter (GitHub style): press a line number to anchor,
   // drag over others to extend live, release to finalize. Shift-press extends
   // an existing selection without a drag. preventDefault keeps the drag from
@@ -129,7 +141,11 @@ export default function CodeView({
     const n = i + 1
     const lit = from != null && n >= from && n <= (to ?? from)
     const selected = sel != null && n >= selStart && n <= selEnd
-    const cls = `code-line${lit ? " is-highlighted" : ""}${selected ? " is-selected" : ""}`
+    const cls = clsx("code-line", {
+      "is-highlighted": lit,
+      "is-selected": selected,
+      "is-commented": commentedLines.has(n),
+    })
     rows.push(
       <tr key={`L${n}`} id={`L${n}`} className={cls}>
         <td

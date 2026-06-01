@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react"
+import { lazy, Suspense, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { useComments, useIssue, useIssueCommits, useRepo, useWhoami } from "../api/queries"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
@@ -7,6 +7,7 @@ import OverviewCard from "../components/OverviewCard"
 import StateButtons from "../components/StateButtons"
 import AssigneeControl from "../components/AssigneeControl"
 import CommentForm from "../components/CommentForm"
+import EditIssueForm from "../components/EditIssueForm"
 import StateIcon from "../components/StateIcon"
 import Avatar from "../components/Avatar"
 import CommentItem from "../components/CommentItem"
@@ -27,6 +28,8 @@ export default function IssuePage() {
   const commentsQ = useComments(owner, repo, num)
   const commitsQ = useIssueCommits(owner, repo, num)
 
+  const [editing, setEditing] = useState(false)
+
   if (issueQ.isLoading) return <div className="loading">Loading…</div>
   if (issueQ.error) return <div className="error">{(issueQ.error as Error).message}</div>
   if (!issueQ.data) return null
@@ -38,9 +41,18 @@ export default function IssuePage() {
       <RepoHeader owner={owner} repo={repo} openIssues={repoQ.data?.open_issues} />
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
-      <h2 className="issue-title">
-        {iss.title} <span className="issue-title__num">#{iss.number}</span>
-      </h2>
+      {!editing && (
+        <h2 className="issue-title">
+          {iss.title} <span className="issue-title__num">#{iss.number}</span>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm issue-title__edit"
+            onClick={() => setEditing(true)}
+          >
+            Edit
+          </button>
+        </h2>
+      )}
       <div className="issue-subtitle">
         <span className={`badge badge--${iss.state}`}>
           <StateIcon state={iss.state} size={14} />
@@ -53,18 +65,29 @@ export default function IssuePage() {
 
       <div className="issue-detail">
         <div className="issue-main">
-          {iss.body && (
-            <div className="body">
-              <div className="body__head">
-                <Avatar name={iss.author} /> {iss.author} •{" "}
-                {new Date(iss.created_at).toLocaleString()}
+          {editing ? (
+            <EditIssueForm
+              owner={owner}
+              repo={repo}
+              number={iss.number}
+              initialTitle={iss.title}
+              initialBody={iss.body ?? ""}
+              onDone={() => setEditing(false)}
+            />
+          ) : (
+            iss.body && (
+              <div className="body">
+                <div className="body__head">
+                  <Avatar name={iss.author} /> {iss.author} •{" "}
+                  {new Date(iss.created_at).toLocaleString()}
+                </div>
+                <div className="body__content">
+                  <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
+                    <Markdown content={iss.body} owner={owner} repo={repo} basePath="" />
+                  </Suspense>
+                </div>
               </div>
-              <div className="body__content">
-                <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
-                  <Markdown content={iss.body} owner={owner} repo={repo} basePath="" />
-                </Suspense>
-              </div>
-            </div>
+            )
           )}
 
           {commentsQ.isLoading && <div className="loading">Loading comments…</div>}

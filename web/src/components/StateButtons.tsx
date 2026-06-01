@@ -1,5 +1,5 @@
 import clsx from "clsx"
-import { useSetIssueState } from "../api/mutations"
+import { useUpdateIssue } from "../api/mutations"
 import { ISSUE_STATES, type IssueState } from "../api/types"
 import StateIcon from "./StateIcon"
 
@@ -16,7 +16,7 @@ interface Props {
  * while the mutation is in flight or for the current value.
  */
 export default function StateButtons({ owner, repo, number, current }: Props) {
-  const mutation = useSetIssueState(owner, repo, number)
+  const mutation = useUpdateIssue(owner, repo, number)
 
   return (
     <div className="segmented">

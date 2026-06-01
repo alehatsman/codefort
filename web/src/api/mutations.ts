@@ -81,7 +81,9 @@ export function useCreateIssue(owner: string, repo: string) {
   })
 }
 
-export function useSetIssueState(owner: string, repo: string, n: number) {
+// Partial issue update — state, title, and/or body. Used both by the sidebar
+// state picker and the inline title/body editor.
+export function useUpdateIssue(owner: string, repo: string, n: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: UpdateIssueInput) => api.updateIssue(owner, repo, n, input),

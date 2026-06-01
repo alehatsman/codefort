@@ -274,6 +274,93 @@ test("issue body and comments render markdown", async ({ page }) => {
   await expect(link).toHaveAttribute("target", "_blank")
 })
 
+test("Ctrl+Enter in the comment box posts the comment", async ({ page }) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1,
+        number: 1,
+        title: "Discuss",
+        body: "",
+        author: "alice",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+  })
+  await page.goto("/alice/demo/issues/1")
+
+  const box = page.getByPlaceholder("Leave a comment")
+  await box.fill("posted via keyboard")
+  await box.press("Control+Enter")
+
+  await expect(page.getByText("posted via keyboard")).toBeVisible()
+})
+
+test("edit an issue's title and body via the UI", async ({ page }) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1,
+        number: 1,
+        title: "Old title",
+        body: "old body",
+        author: "alice",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+  })
+  await page.goto("/alice/demo/issues/1")
+  await expect(page.getByRole("heading", { name: /Old title/ })).toBeVisible()
+  await expect(page.getByText("old body")).toBeVisible()
+
+  // Open the inline editor, change both fields, save.
+  await page.getByRole("button", { name: "Edit" }).click()
+  await page.getByLabel("Title").fill("New title")
+  await page.getByLabel("Description").fill("new body text")
+  await page.getByRole("button", { name: "Save" }).click()
+
+  // The page re-renders with the updated content; the editor is gone.
+  await expect(page.getByRole("heading", { name: /New title/ })).toBeVisible()
+  await expect(page.getByText("new body text")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Save" })).toHaveCount(0)
+})
+
+test("editing an issue can be cancelled without saving", async ({ page }) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1,
+        number: 1,
+        title: "Keep me",
+        body: "unchanged",
+        author: "alice",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+  })
+  await page.goto("/alice/demo/issues/1")
+
+  await page.getByRole("button", { name: "Edit" }).click()
+  await page.getByLabel("Title").fill("Discarded edit")
+  await page.getByRole("button", { name: "Cancel" }).click()
+
+  // Original title stands; the discarded draft never shows.
+  await expect(page.getByRole("heading", { name: /Keep me/ })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /Discarded edit/ })).toHaveCount(0)
+})
+
 test("issue detail lists the commits referencing it", async ({ page }) => {
   const now = new Date().toISOString()
   await mockApi(page, {

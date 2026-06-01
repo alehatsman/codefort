@@ -556,8 +556,11 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
 
     if (req.method() === "GET") return json(route, 200, iss)
     if (req.method() === "PATCH") {
-      const body = req.postDataJSON() as { state: IssueState }
-      iss.state = body.state
+      // Partial update: only the provided fields change (mirrors the server).
+      const body = req.postDataJSON() as { state?: IssueState; title?: string; body?: string }
+      if (body.state !== undefined) iss.state = body.state
+      if (body.title !== undefined) iss.title = body.title
+      if (body.body !== undefined) iss.body = body.body
       iss.updated_at = nowIso()
       recountRepos(state)
       return json(route, 200, iss)

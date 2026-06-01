@@ -67,6 +67,14 @@ test("select a line range in the blob viewer and add an inline comment", async (
     end_line: 4,
     author: "test-user",
   })
+
+  // The transient selection clears, but the commented range stays tinted so it's
+  // visible which lines the thread belongs to (#104).
+  await expect(page.locator("#L2")).toHaveClass(/is-commented/)
+  await expect(page.locator("#L3")).toHaveClass(/is-commented/)
+  await expect(page.locator("#L4")).toHaveClass(/is-commented/)
+  await expect(page.locator("#L1")).not.toHaveClass(/is-commented/)
+  await expect(page.locator("#L5")).not.toHaveClass(/is-commented/)
 })
 
 test("shift-click still extends a selection without dragging", async ({ page }) => {

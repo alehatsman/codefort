@@ -61,8 +61,12 @@ export interface ClaimIssueInput {
   state?: IssueState
 }
 
+// Partial update: send only the fields that change. The backend treats each as
+// optional (state-only requests stay wire-compatible with older clients).
 export interface UpdateIssueInput {
-  state: IssueState
+  state?: IssueState
+  title?: string
+  body?: string
 }
 
 export interface Whoami {
