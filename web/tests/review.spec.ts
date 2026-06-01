@@ -77,6 +77,25 @@ test("select a line range in the blob viewer and add an inline comment", async (
   await expect(page.locator("#L5")).not.toHaveClass(/is-commented/)
 })
 
+test("Ctrl+Enter posts the inline code comment", async ({ page }) => {
+  const state = await mockApi(page)
+  await routeBlob(page)
+  await routeIntelOff(page)
+
+  await page.goto("/alice/demo/blob/src/app.ts")
+  await expect(page.locator("#L1 .code-line__text")).toContainText("la1")
+
+  // Select line 1, then post with Ctrl+Enter instead of the button.
+  await page.locator("#L1 .code-line__num").click()
+  const box = page.locator(".code-compose .textarea")
+  await box.fill("keyboard-posted review note")
+  await box.press("Control+Enter")
+
+  await expect(page.getByText("keyboard-posted review note")).toBeVisible()
+  expect(state.codeComments).toHaveLength(1)
+  expect(state.codeComments[0]).toMatchObject({ start_line: 1, end_line: 1 })
+})
+
 test("shift-click still extends a selection without dragging", async ({ page }) => {
   await mockApi(page)
   await routeBlob(page)

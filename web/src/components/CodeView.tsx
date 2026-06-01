@@ -298,7 +298,7 @@ function ComposeForm({
   const create = useCreateCodeComment(owner, repo)
   const range = endLine > startLine ? `lines ${startLine}–${endLine}` : `line ${startLine}`
 
-  function submit(e: React.FormEvent) {
+  function submit(e: React.SyntheticEvent) {
     e.preventDefault()
     const trimmed = body.trim()
     if (!trimmed || create.isPending) return
@@ -313,6 +313,11 @@ function ComposeForm({
     )
   }
 
+  // Ctrl/Cmd+Enter posts the comment; plain Enter still inserts a newline.
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit(e)
+  }
+
   return (
     <form className="comment-form code-compose" onSubmit={submit}>
       <div className="code-compose__head muted small">Commenting on {range}</div>
@@ -321,6 +326,7 @@ function ComposeForm({
         placeholder="Leave a comment on this code"
         value={body}
         onChange={(e) => setBody(e.target.value)}
+        onKeyDown={onKeyDown}
         rows={3}
       />
       {create.error && <div className="error">{(create.error as Error).message}</div>}
