@@ -138,16 +138,18 @@ function TreeView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   return (
     <>
       <OverviewCard owner={owner} repo={repo} path={path} summaries={summaries} />
-      <BranchSelector owner={owner} repo={repo} />
-      <LatestCommitBar
-        owner={owner}
-        repo={repo}
-        path={path}
-        latest={treeCommitsQ.data?.latest}
-        ciRun={ciStatusQ.data?.get(treeCommitsQ.data?.latest?.sha ?? "")}
-        total={treeCommitsQ.data?.total ?? 0}
-        loading={treeCommitsQ.isLoading}
-      />
+      <div className="branch-commit-row">
+        <BranchSelector owner={owner} repo={repo} />
+        <LatestCommitBar
+          owner={owner}
+          repo={repo}
+          path={path}
+          latest={treeCommitsQ.data?.latest}
+          ciRun={ciStatusQ.data?.get(treeCommitsQ.data?.latest?.sha ?? "")}
+          total={treeCommitsQ.data?.total ?? 0}
+          loading={treeCommitsQ.isLoading}
+        />
+      </div>
       <FileTree
         owner={owner}
         repo={repo}

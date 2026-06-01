@@ -634,6 +634,22 @@ a.file-tree__commit:hover {
   }
 }
 
+/* Branch picker + latest-commit bar share one row above the file tree. */
+.branch-commit-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.branch-commit-row .branch-select {
+  max-width: 100px;
+}
+.branch-commit-row .latest-commit-bar {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
 /* Latest-commit bar above the file tree. */
 .latest-commit-bar {
   display: flex;
@@ -1227,6 +1243,9 @@ a.file-tree__commit:hover {
   font: inherit;
   cursor: pointer;
   outline: none;
+  min-width: 0;
+  flex: 1;
+  text-overflow: ellipsis;
 }
 /* Review tab: comments grouped by file. */
 .review-file {
