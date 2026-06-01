@@ -138,6 +138,35 @@ func TestRunPRDispatch(t *testing.T) {
 	}
 }
 
+// TestRunRepoDispatch covers the `repo` argument-parsing and validation
+// branches that fire before any server round-trip (so no remote/token is
+// needed). A well-formed `delete <owner>/<name>` is omitted because it
+// proceeds to discoverTarget + an HTTP call.
+func TestRunRepoDispatch(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      []string
+		errSubstr string
+	}{
+		{"no subcommand", []string{}, "usage: moongit repo"},
+		{"unknown subcommand", []string{"frobnicate"}, "unknown repo subcommand"},
+		{"delete no arg", []string{"delete"}, "usage: moongit repo delete"},
+		{"delete extra args", []string{"delete", "a/b", "c"}, "unexpected extra args"},
+		{"delete not owner/repo", []string{"delete", "justname"}, "is not <owner>/<repo>"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := runRepo(tt.args)
+			if err == nil {
+				t.Fatalf("runRepo(%v) = nil, want error", tt.args)
+			}
+			if !strings.Contains(err.Error(), tt.errSubstr) {
+				t.Errorf("error %q missing substring %q", err.Error(), tt.errSubstr)
+			}
+		})
+	}
+}
+
 func TestParseLineSpec(t *testing.T) {
 	tests := []struct {
 		spec      string
