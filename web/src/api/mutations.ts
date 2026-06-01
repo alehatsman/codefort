@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "./client"
 import { keys } from "./queries"
 import type {
+  CIRunExecutionModel,
   ClaimIssueInput,
   UpdateAgentSettingsInput,
   CreateCodeCommentInput,
@@ -161,13 +162,15 @@ export function useRerunCIRun(owner: string, repo: string) {
   })
 }
 
-// useSpawnAgent starts a Claude agent run for an issue. The agent run shares
-// the ci_runs surface, so refresh the runs list once it's accepted (the run
-// view lives under Pipelines).
+// useSpawnAgent starts an agent run for an issue. The agent run shares the
+// ci_runs surface, so refresh the runs list once it's accepted (the run view
+// lives under Pipelines). The optional vars pick the base ref and execution
+// model; the server fills defaults for anything omitted.
 export function useSpawnAgent(owner: string, repo: string, n: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (ref?: string) => api.spawnAgent(owner, repo, n, ref),
+    mutationFn: (vars?: { ref?: string; model?: CIRunExecutionModel }) =>
+      api.spawnAgent(owner, repo, n, vars),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) }),
   })
 }

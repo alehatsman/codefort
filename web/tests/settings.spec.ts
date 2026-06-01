@@ -78,3 +78,21 @@ test("agent section sets and clears the global Claude token", async ({ page }) =
   await page.getByRole("button", { name: "Clear" }).click()
   await expect(page.getByText(/No Claude token configured/)).toBeVisible()
 })
+
+test("agent section sets the default execution model", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/settings")
+  await page.getByRole("button", { name: "Agent" }).click()
+
+  const select = page.getByLabel("Default execution model")
+  await expect(select).toHaveValue("") // server default
+
+  const putReq = page.waitForRequest(
+    (r) => r.url().includes("/api/settings/agent") && r.method() === "PUT",
+  )
+  await select.selectOption("mooncake-pilot")
+  expect((await putReq).postDataJSON()).toMatchObject({ execution_model: "mooncake-pilot" })
+
+  // The GET reflects the new default after the mutation settles.
+  await expect(select).toHaveValue("mooncake-pilot")
+})

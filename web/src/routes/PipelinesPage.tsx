@@ -11,7 +11,7 @@ import {
 } from "../api/mutations"
 import { useJobEventStream } from "../lib/ciEvents"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
-import type { CIEvent, CIJob, CIRun, CIRunDetail, Repo } from "../api/types"
+import type { CIEvent, CIJob, CIRun, CIRunDetail, CIRunExecutionModel, Repo } from "../api/types"
 import RepoHeader from "../components/RepoHeader"
 import CIStatusBadge from "../components/CIStatusBadge"
 
@@ -49,6 +49,17 @@ export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
 // runsBasePath is the route segment a kind's runs live under.
 function runsBasePath(kind: RunKind): string {
   return kind === "agent" ? "agents" : "pipelines"
+}
+
+// executionModelLabel is the human label for an agent run's execution model
+// (#110). Falls back to the default model when the field is absent (older runs).
+function executionModelLabel(model: CIRunExecutionModel | undefined): string {
+  switch (model) {
+    case "mooncake-pilot":
+      return "Mooncake pilot"
+    default:
+      return "Claude (edit)"
+  }
 }
 
 function RunList({ repo, kind }: { repo: Repo; kind: RunKind }) {
@@ -163,6 +174,11 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
                   <Link className="ci-runs__num" to={`/${owner}/${repo}/${base}/${run.number}`}>
                     #{run.number}
                   </Link>
+                  {isAgent && (
+                    <span className="ci-runs__model muted small">
+                      {executionModelLabel(run.execution_model)}
+                    </span>
+                  )}
                 </td>
                 <td>
                   <CIStatusBadge status={run.status} />
@@ -292,6 +308,12 @@ function RunDetail({
           <dt>Ref</dt>
           <dd>{shortRef(run.ref)}</dd>
         </div>
+        {isAgent && (
+          <div>
+            <dt>Model</dt>
+            <dd>{executionModelLabel(run.execution_model)}</dd>
+          </div>
+        )}
         <div>
           <dt>Trigger</dt>
           <dd>{run.trigger || "—"}</dd>

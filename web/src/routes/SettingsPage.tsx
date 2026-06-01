@@ -2,7 +2,7 @@ import clsx from "clsx"
 import { useState } from "react"
 import { useAgentSettings, useTokens, useWhoami } from "../api/queries"
 import { useCreateToken, useRevokeToken, useUpdateAgentSettings } from "../api/mutations"
-import type { CreatedToken, Token } from "../api/types"
+import type { CIRunExecutionModel, CreatedToken, Token } from "../api/types"
 
 // Sections of the settings surface. "tokens" and "agent" are backed; the
 // rest are placeholders until their backends exist (no per-user mgmt, no
@@ -145,6 +145,29 @@ function AgentSection() {
           )}
         </div>
       </form>
+
+      <div className="agent-default-model">
+        <label className="agent-default-model__label">
+          <span>Default execution model</span>
+          <select
+            className="select"
+            value={settingsQ.data?.execution_model ?? ""}
+            disabled={update.isPending || settingsQ.isLoading}
+            onChange={(e) =>
+              update.mutate({ execution_model: e.target.value as "" | CIRunExecutionModel })
+            }
+          >
+            <option value="">Server default (claude-edit)</option>
+            <option value="claude-edit">Claude (edit files)</option>
+            <option value="mooncake-pilot">Mooncake pilot (run actions)</option>
+          </select>
+        </label>
+        <p className="muted small">
+          The model new agent runs use when “Spawn agent” doesn’t pick one. Per-run choices at spawn
+          still win.
+        </p>
+      </div>
+
       {update.error && <div className="error inline">{(update.error as Error).message}</div>}
     </section>
   )

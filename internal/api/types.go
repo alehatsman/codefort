@@ -358,14 +358,18 @@ type CreateAgentTurnRequest struct {
 
 // AgentSettings is the operator-facing agent config. The Claude token is
 // write-only — the API reports only whether one is set, never its value.
+// ExecutionModel is the default model new agent runs use when they don't pick
+// one at spawn ("" means the server falls back to its built-in default).
 type AgentSettings struct {
-	ClaudeTokenSet bool `json:"claude_oauth_token_set"`
+	ClaudeTokenSet bool   `json:"claude_oauth_token_set"`
+	ExecutionModel string `json:"execution_model,omitempty"`
 }
 
-// UpdateAgentSettingsRequest sets the global agent Claude token. A nil pointer
-// leaves it unchanged; an empty string clears it; any other value sets it.
+// UpdateAgentSettingsRequest sets global agent config. A nil pointer leaves a
+// field unchanged; an empty string clears it; any other value sets it.
 type UpdateAgentSettingsRequest struct {
-	ClaudeToken *string `json:"claude_oauth_token"`
+	ClaudeToken    *string `json:"claude_oauth_token"`
+	ExecutionModel *string `json:"execution_model"`
 }
 
 // Token represents an API token's metadata. The plaintext token itself

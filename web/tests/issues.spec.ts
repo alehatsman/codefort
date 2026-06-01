@@ -288,10 +288,19 @@ test("spawn agent from an issue navigates to the new run", async ({ page }) => {
   })
   await page.goto("/alice/demo/issues/1")
 
+  // Pick the mooncake-pilot execution model, then spawn. The request must
+  // carry the chosen model (#110).
+  await page.getByLabel("Model").selectOption("mooncake-pilot")
+  const spawnReq = page.waitForRequest(
+    (r) => r.url().includes("/issues/1/agent") && r.method() === "POST",
+  )
   await page.getByRole("button", { name: "Spawn agent" }).click()
+  expect((await spawnReq).postDataJSON()).toMatchObject({ model: "mooncake-pilot" })
 
-  // Agent runs live under the Agents tab; we land on the new run's view.
+  // Agent runs live under the Agents tab; we land on the new run's view, which
+  // shows the chosen model.
   await expect(page).toHaveURL(/\/alice\/demo\/agents\/1$/)
+  await expect(page.getByText("Mooncake pilot").first()).toBeVisible()
 })
 
 test("a root-absolute link in a comment points at the app route, not a blob path", async ({

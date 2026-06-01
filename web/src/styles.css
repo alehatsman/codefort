@@ -1914,6 +1914,46 @@ a.file-tree__commit:hover {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-muted);
 }
+.select {
+  padding: 5px var(--space-3);
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+}
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+/* Spawn-agent: model picker sits inline with the spawn button (#110). */
+.spawn-agent {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.spawn-agent__model {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+/* Default-model picker in Settings → Agent. */
+.agent-default-model {
+  margin-top: var(--space-4);
+}
+.agent-default-model__label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 48ch;
+}
+/* Per-run model tag in the Agents run list. */
+.ci-runs__model {
+  display: block;
+}
 .row {
   display: flex;
   gap: var(--space-2);

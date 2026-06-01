@@ -5,6 +5,7 @@ import type {
   UpdateAgentSettingsInput,
   CIRun,
   CIRunDetail,
+  CIRunExecutionModel,
   ClaimIssueInput,
   CodeComment,
   CodeCommentState,
@@ -238,14 +239,23 @@ export const api = {
   rerunCIRun: (owner: string, repo: string, n: number) =>
     request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/rerun`, { method: "POST" }),
 
-  // spawnAgent starts a Claude agent run for an issue. ref pins the base the
-  // agent checks out (optional; the server defaults to the repo's HEAD). The
+  // spawnAgent starts an agent run for an issue. ref pins the base the agent
+  // checks out (optional; the server defaults to the repo's HEAD); model picks
+  // the execution model (optional; the server defaults from settings). The
   // resulting agent run shares the ci_runs surface, so it shows up under
   // Pipelines and streams over the same run/job event endpoints.
-  spawnAgent: (owner: string, repo: string, n: number, ref?: string) =>
+  spawnAgent: (
+    owner: string,
+    repo: string,
+    n: number,
+    opts?: { ref?: string; model?: CIRunExecutionModel }
+  ) =>
     request<CIRun>(`/api/repos/${owner}/${repo}/issues/${n}/agent`, {
       method: "POST",
-      body: ref ? { ref } : {},
+      body: {
+        ...(opts?.ref ? { ref: opts.ref } : {}),
+        ...(opts?.model ? { model: opts.model } : {}),
+      },
     }),
   // createAgentTurn queues a follow-up message on an agent run; the dispatch
   // loop resumes the session and streams the response onto the run's events.

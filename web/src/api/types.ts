@@ -333,10 +333,16 @@ export type CIJobStatus = "queued" | "running" | "success" | "failed" | "skipped
 // Mirrors storage.RunKind: a normal pipeline run vs. an issue-spawned agent run.
 export type CIRunKind = "ci" | "agent"
 
+// Agent execution model (#110): which strategy an agent run uses in its
+// container. claude-edit = Claude edits files directly; mooncake-pilot =
+// mooncake plans+applies actions (so commands run).
+export type CIRunExecutionModel = "claude-edit" | "mooncake-pilot"
+
 export interface CIRun {
   number: number
   kind: CIRunKind
   issue_number?: number
+  execution_model?: CIRunExecutionModel
   commit_sha: string
   commit_msg?: string
   commit_author?: string
@@ -358,16 +364,19 @@ export interface CIJob {
   finished_at: string | null
 }
 
-// AgentSettings mirrors api.AgentSettings — write-only: the token value is
-// never returned, only whether one is configured.
+// AgentSettings mirrors api.AgentSettings — the token is write-only (only
+// whether one is configured is returned); execution_model is the default model
+// new agent runs use ("" = server's built-in default).
 export interface AgentSettings {
   claude_oauth_token_set: boolean
+  execution_model?: CIRunExecutionModel | ""
 }
 
-// UpdateAgentSettingsInput sets the global agent Claude token: omit to leave
+// UpdateAgentSettingsInput sets global agent config: omit a field to leave it
 // unchanged, "" to clear, a value to set.
 export interface UpdateAgentSettingsInput {
   claude_oauth_token?: string
+  execution_model?: CIRunExecutionModel | ""
 }
 
 export type AgentTurnStatus = "pending" | "running" | "done" | "error"

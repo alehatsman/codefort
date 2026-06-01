@@ -71,6 +71,7 @@ export interface CIRun {
   number: number
   kind?: "ci" | "agent"
   issue_number?: number
+  execution_model?: "claude-edit" | "mooncake-pilot"
   turns?: AgentTurn[]
   commit_sha: string
   commit_msg?: string
@@ -149,6 +150,7 @@ export interface State {
   branches: string[]
   tokens: Token[]
   agentClaudeTokenSet: boolean
+  agentExecutionModel: "" | "claude-edit" | "mooncake-pilot"
   ciRuns: CIRun[]
   // Commit history (newest first) and per-sha diff detail, for the commit
   // diff view. Empty by default; specs that need them seed them.
@@ -182,6 +184,7 @@ function freshState(seed: Partial<State> = {}): State {
     branches: ["main"],
     tokens: [{ id: 1, name: "test-user", created_at: nowIso(), last_used_at: nowIso() }],
     agentClaudeTokenSet: false,
+    agentExecutionModel: "",
     ciRuns: [],
     commits: [],
     commitDetails: {},
@@ -407,16 +410,26 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
   // Whoami
   await page.route(/\/api\/whoami$/, (route) => json(route, 200, { name: state.identity }))
 
-  // Agent settings — write-only Claude token (GET reports set/unset; PUT sets/clears).
+  // Agent settings — write-only Claude token + default execution model (GET
+  // reports set/unset + model; PUT sets/clears each provided field).
   await page.route(/\/api\/settings\/agent$/, (route) => {
     const req = route.request()
     if (req.method() === "PUT") {
-      const body = req.postDataJSON() as { claude_oauth_token?: string }
+      const body = req.postDataJSON() as {
+        claude_oauth_token?: string
+        execution_model?: "" | "claude-edit" | "mooncake-pilot"
+      }
       if (typeof body.claude_oauth_token === "string") {
         state.agentClaudeTokenSet = body.claude_oauth_token.trim() !== ""
       }
+      if (typeof body.execution_model === "string") {
+        state.agentExecutionModel = body.execution_model
+      }
     }
-    return json(route, 200, { claude_oauth_token_set: state.agentClaudeTokenSet })
+    return json(route, 200, {
+      claude_oauth_token_set: state.agentClaudeTokenSet,
+      execution_model: state.agentExecutionModel,
+    })
   })
 
   // Tokens collection (GET list / POST create)
@@ -531,10 +544,13 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const n = Number(url.pathname.split("/")[url.pathname.split("/").length - 2])
     const iss = state.issues.find((i) => i.number === n)
     if (!iss) return json(route, 404, { error: "issue not found" })
+    const body = (route.request().postDataJSON() ?? {}) as { model?: "claude-edit" | "mooncake-pilot" }
+    const model = body.model || state.agentExecutionModel || "claude-edit"
     const next: CIRun = {
       number: state.ciRuns.length ? Math.max(...state.ciRuns.map((r) => r.number)) + 1 : 1,
       kind: "agent",
       issue_number: n,
+      execution_model: model,
       commit_sha: "feedface0000abcd",
       ref: "HEAD",
       event: "agent",
