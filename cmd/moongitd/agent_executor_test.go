@@ -1,8 +1,10 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/alehatsman/moongit/internal/api"
 	"github.com/alehatsman/moongit/internal/config"
 )
 
@@ -41,12 +43,32 @@ func TestClaudeExecutorDelegates(t *testing.T) {
 	if exec.Model() != agentModelClaudeEdit {
 		t.Errorf("Model() = %q, want %q", exec.Model(), agentModelClaudeEdit)
 	}
-	// Argv must match buildClaudeArgv for the same spec (the executor is a
-	// thin wrapper).
-	spec := turnSpec{sessionID: "sid", prompt: "do it", systemPrompt: "be good", mcpPath: "/work/mcp.json", resume: false}
-	got := exec.Argv(spec)
-	if !argvHas(got, "--session-id", "sid") || got[1] != "-p" || got[2] != "do it" {
-		t.Errorf("claudeExecutor.Argv didn't delegate to buildClaudeArgv: %v", got)
+	// First turn: Argv composes the claude invocation from the raw input —
+	// the issue is the -p goal, the session is set (not resumed), and a
+	// system prompt is appended.
+	turn1 := exec.Argv(turnInput{
+		sessionID: "sid",
+		owner:     "alice",
+		repo:      "repo",
+		issue:     api.Issue{Number: 7, Title: "Fix it"},
+		firstTurn: true,
+		mcpPath:   "/work/mcp.json",
+	})
+	if !argvHas(turn1, "--session-id", "sid") || turn1[1] != "-p" || !strings.Contains(turn1[2], "Fix it") {
+		t.Errorf("first turn didn't compose the claude turn from the issue: %v", turn1)
+	}
+	if !argvContains(turn1, "--append-system-prompt") {
+		t.Errorf("first turn must carry a system prompt: %v", turn1)
+	}
+	if !argvHas(turn1, "--mcp-config", "/work/mcp.json") {
+		t.Errorf("mcp config not wired: %v", turn1)
+	}
+
+	// Follow-up turn: resumes the session with the message as the goal, no
+	// system prompt (it's already in the resumed session).
+	follow := exec.Argv(turnInput{sessionID: "sid", message: "more", resume: true})
+	if !argvHas(follow, "--resume", "sid") || follow[2] != "more" || argvContains(follow, "--append-system-prompt") {
+		t.Errorf("follow-up turn must resume with the message and no system prompt: %v", follow)
 	}
 
 	// A result line distils into a turnResult; a non-result line doesn't.

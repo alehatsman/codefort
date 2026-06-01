@@ -157,15 +157,16 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		return
 	}
 
-	spec := turnSpec{
-		sessionID:    agentSessionID(run.ID),
-		prompt:       composeTurnPrompt(issue),
-		systemPrompt: composeAgentSystemPrompt(owner, name, issue),
-		mcpPath:      mcpPath,
-		resume:       false,
+	in := turnInput{
+		sessionID: agentSessionID(run.ID),
+		owner:     owner,
+		repo:      name,
+		issue:     issue,
+		firstTurn: true,
+		mcpPath:   mcpPath,
 	}
 	turnCtx, h := r.registerAgentTurn(run.ID, parent)
-	status, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, 1, spec)
+	status, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, 1, in)
 	r.unregisterAgentTurn(run.ID, h)
 	elog.Close()
 
@@ -257,21 +258,22 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 	}
 
 	// turn.Seq is the follow-up index (1-based); display number accounts for
-	// turn 1 being the issue body. Resume the session (claude); the system
-	// prompt is already in it, so it's omitted. The MCP config file persists
-	// in the workspace from turn 1.
+	// turn 1 being the issue body. A follow-up resumes the session (claude),
+	// so firstTurn is false: the executor omits the system prompt (already in
+	// the session) and uses the message as the goal. The MCP config file
+	// persists in the workspace from turn 1.
 	mcpPath := ""
 	if r.cfg.DexURL != "" {
 		mcpPath = "/work/" + dexMCPConfigName
 	}
-	spec := turnSpec{
+	in := turnInput{
 		sessionID: agentSessionID(run.ID),
-		prompt:    turn.Body,
+		message:   turn.Body,
 		mcpPath:   mcpPath,
 		resume:    true,
 	}
 	turnCtx, h := r.registerAgentTurn(run.ID, parent)
-	status, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, turn.Seq+1, spec)
+	status, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, turn.Seq+1, in)
 	r.unregisterAgentTurn(run.ID, h)
 	elog.Close()
 
@@ -313,7 +315,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 // cancelled), but does not itself finalize the run or job — the caller decides
 // whether to park or fail. The executor decides what runs (claude vs mooncake
 // pilot) and how to translate its output.
-func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession, elog *ci.EventLog, exec agentExecutor, turnNum int, spec turnSpec) (status string, execErr error) {
+func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession, elog *ci.EventLog, exec agentExecutor, turnNum int, in turnInput) (status string, execErr error) {
 	ctx := parent
 	if r.cfg.AgentTurnTimeout > 0 {
 		var cancel context.CancelFunc
@@ -321,8 +323,8 @@ func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession,
 		defer cancel()
 	}
 
-	argv := exec.Argv(spec)
-	r.emit(elog, ci.EventAgentTurnStarted, map[string]any{"turn": turnNum, "prompt": spec.prompt, "model": exec.Model()})
+	argv := exec.Argv(in)
+	r.emit(elog, ci.EventAgentTurnStarted, map[string]any{"turn": turnNum, "prompt": in.goal(), "model": exec.Model()})
 
 	var result *turnResult
 	var stderrLines []string
