@@ -129,10 +129,14 @@ func (*mooncakeExecutor) Translate(line []byte) (string, map[string]any, *turnRe
 }
 
 // mooncakeTurnResult distills an agent.completed event's Data into the
-// model-agnostic turnResult. The status field carries the iteration
-// outcome; a non-"success" status (or a "failed" stop_reason) marks the
-// turn failed. mooncake doesn't report claude's per-turn cost/num_turns, so
-// those stay zero.
+// model-agnostic turnResult. status carries the worst iteration outcome and
+// stop_reason carries why the loop stopped; both ride through so turnStatus can
+// distinguish a hard failure from a no-progress stall (moongit #173). IsError
+// means a step genuinely failed — a non-clean status (anything but success/
+// step_done, mooncake's two severity-0 outcomes) or an explicit "failed" stop.
+// A clean status with a soft stop (max_iterations/no_progress) is NOT an error
+// here; turnStatus maps it to "stalled". mooncake doesn't report claude's
+// per-turn cost/num_turns, so those stay zero.
 func mooncakeTurnResult(raw any) *turnResult {
 	res := &turnResult{}
 	data, ok := raw.(map[string]any)
@@ -142,6 +146,7 @@ func mooncakeTurnResult(raw any) *turnResult {
 	status, _ := data["status"].(string)
 	stop, _ := data["stop_reason"].(string)
 	res.Subtype = status
-	res.IsError = (status != "" && status != "success") || stop == "failed"
+	res.StopReason = stop
+	res.IsError = (status != "" && status != "success" && status != "step_done") || stop == "failed"
 	return res
 }

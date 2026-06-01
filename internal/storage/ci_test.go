@@ -308,3 +308,18 @@ func TestGetRunNotFound(t *testing.T) {
 		t.Errorf("GetRun(missing) = %v, want ErrNotFound", err)
 	}
 }
+
+func TestRunStatusTerminal(t *testing.T) {
+	terminal := []RunStatus{RunSuccess, RunFailed, RunCanceled, RunError, RunInterrupted, RunStalled}
+	for _, s := range terminal {
+		if !s.Terminal() {
+			t.Errorf("%q should be terminal", s)
+		}
+	}
+	nonTerminal := []RunStatus{RunQueued, RunRunning, RunAwaitingInput, RunFinishing}
+	for _, s := range nonTerminal {
+		if s.Terminal() {
+			t.Errorf("%q should not be terminal", s)
+		}
+	}
+}

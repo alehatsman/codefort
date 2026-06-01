@@ -7,7 +7,7 @@ import { useJobEventStream } from "../lib/ciEvents"
 import { formatDuration } from "./runHelpers"
 
 // Terminal agent-run statuses: no further turns, the message box closes.
-const TERMINAL = ["success", "failed", "canceled", "error", "interrupted"]
+const TERMINAL = ["success", "failed", "canceled", "error", "interrupted", "stalled"]
 
 // AgentRunBody renders an agent run's live transcript plus the follow-up
 // message box. A CI run renders CIRunBody (the job DAG) instead; both hang off
@@ -305,7 +305,11 @@ function AgentMessageBox({
     return (
       <div className="agent-msgbox agent-msgbox--done muted small">
         This agent run has finished
-        {run.status === "success" ? " — see the issue for the result branch." : "."}
+        {run.status === "success"
+          ? " — see the issue for the result branch."
+          : run.status === "stalled"
+            ? " — the agent stopped without making progress; refine the issue and start a new run."
+            : "."}
       </div>
     )
   }

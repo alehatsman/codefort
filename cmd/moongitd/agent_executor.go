@@ -59,8 +59,14 @@ func (in turnInput) goal() string {
 // "result" object, or mooncake's agent.completed event). Fields a given
 // model doesn't report stay zero.
 type turnResult struct {
-	IsError      bool
-	Subtype      string  // "success" | error subtype; "" when not reported
+	IsError bool
+	Subtype string // "success" | error subtype; "" when not reported
+	// StopReason is mooncake's loop stop_reason (max_iterations / no_progress /
+	// success / failed / …) when the executor reports one; "" for claude, which
+	// has no equivalent. A "soft" stop (the agent ran out of road without a
+	// failed step) is surfaced as a "stalled" turn rather than a failure — see
+	// turnStatus and moongit #173.
+	StopReason   string
 	NumTurns     int     // claude only
 	DurationMS   int     // claude only
 	TotalCostUSD float64 // claude only

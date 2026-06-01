@@ -44,17 +44,34 @@ func translateClaudeLine(line []byte) (eventType string, data map[string]any, re
 	return ci.EventAgentMessage, map[string]any{"claude": obj}, result
 }
 
+// softStopReasons are mooncake loop stop_reasons that end a run without a
+// verdict: the agent ran to completion but never converged — it hit its
+// iteration cap or kept re-planning without advancing — and no step actually
+// failed. They're surfaced as a "stalled" turn (neutral), distinct from a hard
+// failure. Mirrors mooncake/internal/agent.StopReason (moongit doesn't import
+// it); kept as literals like the "failed"/"success" checks elsewhere here.
+var softStopReasons = map[string]bool{
+	"max_iterations": true,
+	"no_progress":    true,
+	"no_change":      true,
+}
+
 // turnStatus maps a finished turn onto a CI-style status string for the
 // turn.completed event and run finalization. A missing result (the CLI died
 // before emitting a terminal record) or a non-zero exit is an error; an
-// is_error/non-success result is a failure; otherwise success. Operates on the
+// is_error/non-clean result is a failure; a clean result that stopped on a soft
+// stop_reason is "stalled" (the agent gave up without failing — moongit #173);
+// otherwise success. A genuine failure outranks a soft stop. "success" and
+// "step_done" are mooncake's two clean (severity-0) statuses. Operates on the
 // model-agnostic turnResult so it serves every executor.
 func turnStatus(result *turnResult, exitCode int, execErr error) string {
 	switch {
 	case execErr != nil || exitCode != 0 || result == nil:
 		return "error"
-	case result.IsError || (result.Subtype != "" && result.Subtype != "success"):
+	case result.IsError || (result.Subtype != "" && result.Subtype != "success" && result.Subtype != "step_done"):
 		return "failed"
+	case softStopReasons[result.StopReason]:
+		return "stalled"
 	default:
 		return "success"
 	}

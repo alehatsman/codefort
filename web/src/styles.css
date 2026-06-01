@@ -476,6 +476,9 @@ pre {
 .ci-icon--interrupted {
   color: var(--fg-muted);
 }
+.ci-icon--stalled {
+  color: var(--state-in_progress);
+}
 .card__meta {
   display: flex;
   gap: var(--space-4);
@@ -3107,6 +3110,12 @@ h3 {
 .ci-badge--interrupted {
   background: var(--neutral-muted);
   color: var(--fg-muted);
+}
+/* stalled: the agent gave up without converging — amber (attention), not red
+   (a failure) and not grey (a no-op like canceled/interrupted). */
+.ci-badge--stalled {
+  background: var(--state-in_progress-bg);
+  color: var(--state-in_progress);
 }
 
 /* Runs table */

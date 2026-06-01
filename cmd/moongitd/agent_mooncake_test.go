@@ -112,7 +112,7 @@ func TestMooncakeTranslate(t *testing.T) {
 		if res == nil {
 			t.Fatal("agent.completed returned nil result")
 		}
-		if res.IsError || res.Subtype != "success" {
+		if res.IsError || res.Subtype != "success" || res.StopReason != "success" {
 			t.Errorf("result = %+v, want success/no-error", res)
 		}
 	})
@@ -121,6 +121,39 @@ func TestMooncakeTranslate(t *testing.T) {
 		_, _, res := p.Translate([]byte(`{"type":"agent.completed","data":{"status":"failed","stop_reason":"failed"}}`))
 		if res == nil || !res.IsError {
 			t.Errorf("failed agent.completed should mark IsError: %+v", res)
+		}
+	})
+
+	// #173: a max_iterations / no_progress stall is a clean turn (no step
+	// failed) — IsError stays false and the soft stop_reason rides through so
+	// turnStatus can map it to "stalled" rather than green or red.
+	t.Run("agent.completed stall is clean but carries stop_reason", func(t *testing.T) {
+		for _, stop := range []string{"max_iterations", "no_progress", "no_change"} {
+			_, _, res := p.Translate([]byte(`{"type":"agent.completed","data":{"status":"success","stop_reason":"` + stop + `","iterations":3}}`))
+			if res == nil {
+				t.Fatalf("%s: agent.completed returned nil result", stop)
+			}
+			if res.IsError {
+				t.Errorf("%s: stall should not be IsError: %+v", stop, res)
+			}
+			if res.StopReason != stop {
+				t.Errorf("%s: StopReason = %q, want %q", stop, res.StopReason, stop)
+			}
+			if got := turnStatus(res, 0, nil); got != "stalled" {
+				t.Errorf("%s: turnStatus = %q, want stalled", stop, got)
+			}
+		}
+	})
+
+	// A run that hit max_iterations but whose worst iteration genuinely failed
+	// stays a failure — the failed step outranks the soft stop.
+	t.Run("agent.completed failed-step + soft stop is a failure", func(t *testing.T) {
+		_, _, res := p.Translate([]byte(`{"type":"agent.completed","data":{"status":"execution_failed","stop_reason":"no_progress"}}`))
+		if res == nil || !res.IsError {
+			t.Fatalf("failed-step stall should mark IsError: %+v", res)
+		}
+		if got := turnStatus(res, 0, nil); got != "failed" {
+			t.Errorf("turnStatus = %q, want failed", got)
 		}
 	})
 
