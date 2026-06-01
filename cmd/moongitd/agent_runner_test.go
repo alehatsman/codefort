@@ -50,10 +50,11 @@ func (f *fakeAgentSession) Close() error { return nil }
 
 // agentTestOpts configures the fake agent session newAgentTestRunner injects.
 type agentTestOpts struct {
-	sessionErr error    // make the (turn-1) session factory fail
-	lines      []string // claude stream-json lines the session replays
-	stderr     []string // stderr lines the session replays
-	exitCode   int      // claude's process exit code
+	sessionErr    error    // make the (turn-1) session factory fail
+	lines         []string // claude stream-json lines the session replays
+	followupLines []string // when set, follow-up turns (attachSession) replay these instead of lines
+	stderr        []string // stderr lines the session replays
+	exitCode      int      // claude's process exit code
 }
 
 // successTurn is a minimal, well-formed claude stream-json turn that ends ok.
@@ -143,6 +144,9 @@ func newAgentHarness(t *testing.T, opts agentTestOpts) agentHarness {
 		},
 		attachSession: func(_ context.Context, _ string) (jobSession, error) {
 			attached.Add(1)
+			if opts.followupLines != nil {
+				return &fakeAgentSession{lines: opts.followupLines, stderr: opts.stderr, exitCode: opts.exitCode, gotArgv: &gotArgv}, nil
+			}
 			return fake()
 		},
 		teardownContainer: func(string) { teardowns.Add(1) },
@@ -322,15 +326,53 @@ func TestReapExpiredAgents(t *testing.T) {
 	}
 }
 
-// claude reporting an error result (not an executor failure) still parks — the
-// human can course-correct in the next turn.
-func TestExecuteAgentRunErrorResultParks(t *testing.T) {
+// A turn that ran but reported an error result (not an executor failure) is
+// terminal: the run finalizes RunFailed (red, like a failed CI run) and tears
+// down, rather than parking — parking let a later Finish report green over a
+// failed session (#145).
+func TestExecuteAgentRunErrorResultFails(t *testing.T) {
 	h := newAgentHarness(t, agentTestOpts{
 		lines: []string{`{"type":"result","subtype":"error_max_turns","is_error":true,"num_turns":5}`},
 	})
 	h.r.executeAgentRun(context.Background(), h.run)
+	if got := h.status(t); got != storage.RunFailed {
+		t.Errorf("run status = %q, want failed", got)
+	}
+	if h.teardowns.Load() != 1 {
+		t.Errorf("teardowns = %d, want 1 (failed turn tears down)", h.teardowns.Load())
+	}
+}
+
+// A follow-up turn that reports an error result finalizes the run RunFailed and
+// marks the turn errored, rather than re-parking (#145).
+func TestDispatchTurnErrorResultFails(t *testing.T) {
+	h := newAgentHarness(t, agentTestOpts{
+		lines:         successTurn, // turn 1 parks
+		followupLines: []string{`{"type":"result","subtype":"error_max_turns","is_error":true,"num_turns":5}`},
+	})
+	h.r.executeAgentRun(context.Background(), h.run) // park after turn 1
 	if got := h.status(t); got != storage.RunAwaitingInput {
-		t.Errorf("run status = %q, want awaiting_input (recoverable)", got)
+		t.Fatalf("precondition: run status = %q, want awaiting_input", got)
+	}
+
+	if _, err := storage.EnqueueTurn(h.r.db, h.run.ID, "alice", "now do the next bit"); err != nil {
+		t.Fatalf("EnqueueTurn: %v", err)
+	}
+	turn, run, err := storage.ClaimNextTurn(h.r.db, time.Hour)
+	if err != nil {
+		t.Fatalf("ClaimNextTurn: %v", err)
+	}
+	h.r.dispatchTurn(context.Background(), turn, run)
+
+	if got := h.status(t); got != storage.RunFailed {
+		t.Errorf("run status after failed follow-up = %q, want failed", got)
+	}
+	if h.teardowns.Load() != 1 {
+		t.Errorf("teardowns = %d, want 1 (failed follow-up tears down)", h.teardowns.Load())
+	}
+	turns, _ := storage.ListTurns(h.r.db, h.run.ID)
+	if len(turns) != 1 || turns[0].Status != storage.TurnError {
+		t.Errorf("turns = %+v, want one errored turn", turns)
 	}
 }
 
