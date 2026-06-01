@@ -17,6 +17,10 @@ vars:
   data_dir:    "{{ home }}/.local/share/moongit"
   unit_path:   "{{ home }}/.config/systemd/user/moongit.service"
   backup_dir:  "{{ home }}/.local/share/moongit/backups"
+  # Sibling checkouts the container-image builds compile their static binaries
+  # from. Override per-box with `--vars '{mooncake_src: …, dex_src: …}'`.
+  mooncake_src: "{{ home }}/projects/mooncake"
+  dex_src:      "{{ home }}/projects/dex"
 
 # The Go quality gate (lint/vuln/scan/ai-lint/arch-snapshot/budget-status/dupl
 # + the fast/full CI gates) comes from the shared **go-quality** module
@@ -285,6 +289,57 @@ tasks:
     steps:
       - shell:
           cmd: "rm -rf bin"
+
+  # ---- CI / agent container images --------------------------------------
+  # moongitd runs every CI/agent job in a throwaway container (see
+  # cmd/moongitd/ci_runner.go), so these images must exist locally. They are
+  # local-only (never pushed to a registry) and not auto-built, so a fresh box
+  # or a `docker image prune` leaves them missing and the runner fails with
+  # `docker run … exit status 125 (pull access denied)`. These targets rebuild
+  # them from ci/ + agent/, compiling the git-ignored binary build inputs first.
+  # See ci/README.md and agent/README.md.
+  ci-images:
+    desc: Build the CI container images (moongit-ci + moongit-ci-dev) the runner needs
+    steps:
+      # ci/mooncake (git-ignored build input): the static mooncake the runner
+      # execs inside every CI container.
+      - shell:
+          cmd: |
+            set -eu
+            test -d "{{ mooncake_src }}" || { echo "mooncake checkout not found at {{ mooncake_src }} — pass --vars '{mooncake_src: /path/to/mooncake}'"; exit 1; }
+            CGO_ENABLED=0 go -C "{{ mooncake_src }}" build -o "{{ invocation_dir }}/ci/mooncake" ./cmd
+            echo "built ci/mooncake"
+      - cmd:
+          argv: ["docker", "build", "-t", "moongit-ci:latest", "ci/"]
+      - cmd:
+          argv: ["docker", "build", "-t", "moongit-ci-dev:latest", "-f", "ci/Dockerfile.dev", "ci/"]
+      - log:
+          msg: "built moongit-ci:latest + moongit-ci-dev:latest"
+
+  agent-image:
+    desc: Build the agent container image (moongit-agent:latest). Requires moongit-ci:latest — run `ci-images` first.
+    steps:
+      # agent/{mooncake,mgit,dex} (git-ignored build inputs, per agent/README.md):
+      # the runner execs mooncake/mgit/dex inside the agent container; the agent
+      # image derives FROM moongit-ci:latest, so that base must already exist.
+      - shell:
+          cmd: |
+            set -eu
+            docker image inspect moongit-ci:latest >/dev/null 2>&1 || { echo "moongit-ci:latest missing — run 'mooncake task ci-images' first (the agent image is FROM it)"; exit 1; }
+            test -d "{{ mooncake_src }}" || { echo "mooncake checkout not found at {{ mooncake_src }} — pass --vars '{mooncake_src: /path}'"; exit 1; }
+            test -d "{{ dex_src }}" || { echo "dex checkout not found at {{ dex_src }} — pass --vars '{dex_src: /path}'"; exit 1; }
+            CGO_ENABLED=0 go -C "{{ mooncake_src }}" build -o "{{ invocation_dir }}/agent/mooncake" ./cmd
+            CGO_ENABLED=0 go build -o "{{ invocation_dir }}/agent/mgit" ./cmd/moongit
+            # dex pulls in the sqlite-vec cgo bindings, so it needs CGO + the
+            # sqlite_fts5 tag (same as dex's own build); a CGO_ENABLED=0 build
+            # no longer compiles. The resulting binary is dynamically linked but
+            # runs in the debian-based image (host glibc <= image glibc).
+            CGO_ENABLED=1 go -C "{{ dex_src }}" build -tags sqlite_fts5 -o "{{ invocation_dir }}/agent/dex" ./cmd/dex
+            echo "built agent/{mooncake,mgit,dex} build inputs"
+      - cmd:
+          argv: ["docker", "build", "-t", "moongit-agent:latest", "agent/"]
+      - log:
+          msg: "built moongit-agent:latest"
 
   # ---- ops (work against the installed location) ------------------------
   create-repo:
