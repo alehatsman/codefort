@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { setToken } from "../api/client"
+import { setToken, verifyToken } from "../api/client"
 
 interface Props {
   onSet: () => void
@@ -8,12 +8,23 @@ interface Props {
 export default function TokenGate({ onSet }: Props) {
   const [value, setValue] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [checking, setChecking] = useState(false)
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = value.trim()
     if (!trimmed.startsWith("mgt_")) {
       setError("Tokens start with mgt_")
+      return
+    }
+    setError(null)
+    setChecking(true)
+    // Validate against the server before persisting, so an invalid token never
+    // lands in localStorage and traps the user in a broken authenticated shell.
+    const ok = await verifyToken(trimmed)
+    if (!ok) {
+      setChecking(false)
+      setError("That token was rejected. Check it and try again.")
       return
     }
     setToken(trimmed)
@@ -34,9 +45,12 @@ export default function TokenGate({ onSet }: Props) {
             placeholder="mgt_..."
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            disabled={checking}
           />
           {error && <div className="error">{error}</div>}
-          <button type="submit">Continue</button>
+          <button type="submit" disabled={checking}>
+            {checking ? "Checking…" : "Continue"}
+          </button>
         </form>
       </div>
     </div>

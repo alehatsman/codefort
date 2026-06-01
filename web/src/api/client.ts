@@ -56,6 +56,23 @@ export function setToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token)
 }
 
+/**
+ * verifyToken checks a candidate token against the server without persisting
+ * it, so the gate can reject an invalid token before it ever lands in
+ * localStorage. Returns true only on a 2xx /api/whoami; a 401 (or any other
+ * non-ok / network failure) returns false.
+ */
+export async function verifyToken(token: string): Promise<boolean> {
+  try {
+    const resp = await fetch("/api/whoami", {
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    })
+    return resp.ok
+  } catch {
+    return false
+  }
+}
+
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY)
 }
