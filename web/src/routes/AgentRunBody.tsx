@@ -97,12 +97,24 @@ function AgentTranscript({
     <div className="agent-transcript">
       {error && <div className="error inline">{error}</div>}
       {entries.length === 0 && !done && <div className="loading">Waiting for the agent…</div>}
-      {entries.map((e) => (
-        <div key={e.id} className={clsx("agent-entry", `agent-entry--${e.kind}`)}>
-          {e.label && <div className="agent-entry__label">{e.label}</div>}
-          <pre className="agent-entry__body">{e.text}</pre>
-        </div>
-      ))}
+      {entries.map((e) =>
+        e.kind === "step" ? (
+          <div key={e.id} className={clsx("agent-step", `agent-step--${e.status}`)}>
+            <div className="agent-step__line">
+              <span className="agent-step__glyph" aria-hidden="true">
+                {STEP_GLYPH[e.status ?? "running"]}
+              </span>
+              <span className="agent-step__name">{e.label}</span>
+            </div>
+            {e.text && <pre className="agent-step__detail">{e.text}</pre>}
+          </div>
+        ) : (
+          <div key={e.id} className={clsx("agent-entry", `agent-entry--${e.kind}`)}>
+            {e.label && <div className="agent-entry__label">{e.label}</div>}
+            {e.text && <pre className="agent-entry__body">{e.text}</pre>}
+          </div>
+        )
+      )}
       {phase && (
         <div className={clsx("agent-working", `agent-working--${phase}`)} aria-live="polite">
           <span className="agent-working__dot" aria-hidden="true" />
@@ -211,11 +223,35 @@ function AgentMessageBox({
   )
 }
 
+// Step status drives the terminal glyph (▶ running → ✓/~/✗/⊘) and color,
+// mirroring mooncake's own renderers (console_logger.go / agentd runs.go).
+type StepStatus = "running" | "ok" | "changed" | "failed" | "skipped"
+
+const STEP_GLYPH: Record<StepStatus, string> = {
+  running: "▶",
+  ok: "✓",
+  changed: "~",
+  failed: "✗",
+  skipped: "⊘",
+}
+
 interface AgentEntry {
   // id is a stable React key, assigned by foldAgentEvents from the source
   // event's seq + a per-event sub-index. The fold helpers don't set it.
   id?: string
-  kind: "turn" | "thinking" | "assistant" | "tool_use" | "tool_result" | "result" | "system" | "raw"
+  kind:
+    | "step"
+    | "turn"
+    | "thinking"
+    | "assistant"
+    | "tool_use"
+    | "tool_result"
+    | "result"
+    | "system"
+    | "raw"
+  // status is set only on "step" entries; it's mutated in place when the step
+  // resolves so the live row flips ▶ → ✓/~/✗ without spawning a second line.
+  status?: StepStatus
   label?: string
   text: string
 }
@@ -258,7 +294,7 @@ function foldAgentEvents(events: CIEvent[]): AgentEntry[] {
         break
       case "agent.message":
         if (d.mooncake) {
-          out.push(...foldMooncakeEvent(d.mooncake as Record<string, unknown>, pilot))
+          out.push(...foldMooncakeEvent(d.mooncake as Record<string, unknown>, pilot, out))
         } else {
           out.push(...foldClaudeMessage(d.claude as Record<string, unknown> | undefined))
         }
@@ -274,17 +310,26 @@ function foldAgentEvents(events: CIEvent[]): AgentEntry[] {
 // events, so we buffer it keyed by step_id (last = the step in flight, for
 // events like file.created that omit step_id).
 interface PilotState {
-  steps: Map<string, { action?: string; name?: string; lines: string[] }>
+  // index is the step's row position in the fold's `out` array, so a later
+  // step.completed mutates the same row the step.started pushed (the live ▶
+  // line flips in place rather than appending a second row).
+  steps: Map<string, { action?: string; name?: string; lines: string[]; index: number }>
   last?: string
 }
 
 // foldMooncakeEvent turns one mooncake NDJSON event (data.mooncake on a
-// mooncake-pilot run's agent.message) into zero or more transcript entries.
-// Step output streams across several events, so step.* are buffered and a
-// single entry is emitted when the step completes; run.completed gives the
-// real aggregate (the agent.turn.completed line reports 0 for pilot runs), and
-// pilot.completed surfaces the loop count when the pilot re-planned.
-function foldMooncakeEvent(m: Record<string, unknown>, pilot: PilotState): AgentEntry[] {
+// mooncake-pilot run's agent.message) into transcript entries, mirroring
+// mooncake's own terminal renderer: each step is one line whose glyph flips
+// ▶ → ✓/~/✗ in place. step.started pushes the live row into `out` and records
+// its index; the matching step.completed mutates that same row rather than
+// appending a second line. Output streams across step.stdout/file.* events and
+// is buffered, but kept only to surface under a *failed* step (success rows
+// show just the name). run.completed renders the mooncake RECAP line.
+function foldMooncakeEvent(
+  m: Record<string, unknown>,
+  pilot: PilotState,
+  out: AgentEntry[]
+): AgentEntry[] {
   const type = typeof m.type === "string" ? m.type : ""
   const data = (m.data as Record<string, unknown>) ?? {}
 
@@ -292,15 +337,21 @@ function foldMooncakeEvent(m: Record<string, unknown>, pilot: PilotState): Agent
     case "plan.loaded": {
       const n = data.total_steps
       return [
-        { kind: "system", label: "plan", text: typeof n === "number" ? `${n} steps` : "loaded" },
+        { kind: "system", label: typeof n === "number" ? `plan · ${n} steps` : "plan", text: "" },
       ]
     }
     case "step.started": {
       const id = asString(data.step_id)
+      const name = typeof data.name === "string" ? data.name : ""
+      // Push the live row now (▶) and remember where it sits so step.completed
+      // can flip it in place.
+      const index = out.length
+      out.push({ kind: "step", status: "running", label: name || id || "step", text: "" })
       pilot.steps.set(id, {
         action: typeof data.action === "string" ? data.action : undefined,
-        name: typeof data.name === "string" ? data.name : undefined,
+        name: name || undefined,
         lines: [],
+        index,
       })
       pilot.last = id
       return []
@@ -320,43 +371,48 @@ function foldMooncakeEvent(m: Record<string, unknown>, pilot: PilotState): Agent
       if (step) step.lines.push(`${type.slice("file.".length)} ${asString(data.path)}`)
       return []
     }
-    case "step.completed": {
+    case "step.completed":
+    case "step.failed":
+    case "step.skipped": {
       const id = asString(data.step_id)
       const tracked = pilot.steps.get(id)
       pilot.steps.delete(id)
       const result = (data.result as Record<string, unknown>) ?? {}
       const action = tracked?.action ?? (typeof data.action === "string" ? data.action : "")
-      const name = tracked?.name ?? (typeof data.name === "string" ? data.name : "")
-      const status =
-        typeof result.status === "string" ? result.status : result.failed ? "failed" : "ok"
-      const label = action ? `🔧 ${action}${name ? ` · ${name}` : ""}` : name || "step"
-      const dur = typeof data.duration_ms === "number" ? data.duration_ms : undefined
-      const footer = dur && dur > 0 ? `${status} · ${formatDuration(dur)}` : status
-      const lines: string[] = []
-      // For cmd/shell steps the executed command line rides result.target
-      // (mooncake sets it to the rendered argv); lead with it as a `$ …` line
-      // so the transcript records *what ran*, not just the plan's label. Other
-      // actions put a path/package/etc in target — not a command — so skip them.
-      const cmdline = action === "cmd" || action === "shell" ? asString(result.target) : ""
-      if (cmdline) lines.push(`$ ${cmdline}`)
-      lines.push(...(tracked?.lines ?? []))
-      const err = asString(result.error)
-      if (err) lines.push(err)
-      return [
-        {
-          kind: result.failed ? "tool_result" : "tool_use",
-          label,
-          text: [...lines, footer].join("\n"),
-        },
-      ]
+      // Resolve the terminal status from the event type or the result payload.
+      const status: StepStatus =
+        type === "step.failed" || result.failed || result.status === "failed"
+          ? "failed"
+          : type === "step.skipped" || result.status === "skipped"
+            ? "skipped"
+            : result.status === "changed"
+              ? "changed"
+              : "ok"
+      const row = tracked ? out[tracked.index] : undefined
+      if (!row) return []
+      row.status = status
+      // Details surface only on failure — keep the success log a clean list.
+      if (status === "failed") {
+        const lines: string[] = []
+        // For cmd/shell steps the executed command rides result.target (the
+        // rendered argv); lead with it as a `$ …` line so a failure shows what
+        // actually ran. Other actions put a path/package in target — skip it.
+        const cmdline = action === "cmd" || action === "shell" ? asString(result.target) : ""
+        if (cmdline) lines.push(`$ ${cmdline}`)
+        lines.push(...(tracked?.lines ?? []))
+        const err = asString(result.error) || asString(data.error_message)
+        if (err) lines.push(err)
+        row.text = lines.join("\n")
+      }
+      return []
     }
     case "run.completed": {
       const num = (k: string) => (typeof data[k] === "number" ? (data[k] as number) : 0)
-      const bits = [`${num("success_steps")} ok`, `${num("changed_steps")} changed`]
-      if (num("failed_steps") > 0) bits.push(`${num("failed_steps")} failed`)
-      if (num("skipped_steps") > 0) bits.push(`${num("skipped_steps")} skipped`)
+      const bits = [`ok=${num("success_steps")}`, `changed=${num("changed_steps")}`]
+      if (num("skipped_steps") > 0) bits.push(`skipped=${num("skipped_steps")}`)
+      bits.push(`failed=${num("failed_steps")}`)
       if (num("duration_ms") > 0) bits.push(formatDuration(num("duration_ms")))
-      return [{ kind: "result", label: "Run complete", text: bits.join(" · ") }]
+      return [{ kind: "result", label: "RECAP", text: bits.join("  ") }]
     }
     case "pilot.completed": {
       // The pilot wraps one or more plan/execute loops; status + stop_reason
@@ -410,7 +466,9 @@ function foldMessageContent(obj: Record<string, unknown>): AgentEntry[] {
         out.push({ kind: "thinking", label: "thinking", text: asString(b.thinking) })
         break
       case "tool_use":
-        out.push({ kind: "tool_use", label: `🔧 ${asString(b.name)}`, text: compactJSON(b.input) })
+        // Compact, like a terminal action line — the name is the signal; the
+        // input args are dropped to keep the log scannable (details-on-failure).
+        out.push({ kind: "tool_use", label: `🔧 ${asString(b.name)}`, text: "" })
         break
       case "tool_result":
         out.push({ kind: "tool_result", label: "result", text: asString(b.content) })
