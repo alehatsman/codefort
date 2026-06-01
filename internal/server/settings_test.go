@@ -115,3 +115,43 @@ func TestAgentSettingsEnvFallbackReported(t *testing.T) {
 		t.Error("API-key env present — fallback should be true")
 	}
 }
+
+// The LLM base URL is operator-set and NOT a secret — it's returned as-is; the
+// gateway auth token is write-only, reported only as set/unset like the Claude
+// token.
+func TestAgentSettingsGatewayFields(t *testing.T) {
+	s := newSettingsServer(t)
+
+	got := agentSettings(t, s)
+	if got.LLMBaseURL != "" || got.AuthTokenSet {
+		t.Fatalf("gateway fields should start empty/unset: %+v", got)
+	}
+
+	if rr := putAgentSettings(t, s, `{"llm_base_url":"http://gw.local","anthropic_auth_token":"sk-gw"}`); rr.Code != http.StatusOK {
+		t.Fatalf("set code = %d, body=%s", rr.Code, rr.Body.String())
+	}
+	got = agentSettings(t, s)
+	if got.LLMBaseURL != "http://gw.local" {
+		t.Errorf("base URL = %q, want it returned as-is", got.LLMBaseURL)
+	}
+	if !got.AuthTokenSet {
+		t.Error("auth token should report set")
+	}
+	// The auth token is stored (runner reads it) but never returned.
+	if v := storage.SettingValue(s.db, storage.SettingAgentAnthropicAuthToken); v != "sk-gw" {
+		t.Errorf("stored auth token = %q, want the set value", v)
+	}
+	raw, _ := json.Marshal(got)
+	if bytes.Contains(raw, []byte("sk-gw")) {
+		t.Errorf("GET leaked the auth token: %s", raw)
+	}
+
+	// Empty string clears each field.
+	if rr := putAgentSettings(t, s, `{"llm_base_url":"","anthropic_auth_token":""}`); rr.Code != http.StatusOK {
+		t.Fatalf("clear code = %d", rr.Code)
+	}
+	got = agentSettings(t, s)
+	if got.LLMBaseURL != "" || got.AuthTokenSet {
+		t.Errorf("gateway fields should be cleared: %+v", got)
+	}
+}

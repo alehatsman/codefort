@@ -1,5 +1,5 @@
 import clsx from "clsx"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useAgentSettings, useSSHKeys, useTokens, useWhoami } from "../api/queries"
 import {
   useAddSSHKey,
@@ -102,8 +102,16 @@ function AgentSection() {
   const settingsQ = useAgentSettings()
   const update = useUpdateAgentSettings()
   const [token, setToken] = useState("")
+  const [authToken, setAuthToken] = useState("")
+  const [baseUrl, setBaseUrl] = useState("")
   const configured = settingsQ.data?.claude_oauth_token_set ?? false
   const envFallback = settingsQ.data?.claude_token_env_fallback ?? false
+  const authConfigured = settingsQ.data?.anthropic_auth_token_set ?? false
+  const savedBaseUrl = settingsQ.data?.llm_base_url ?? ""
+
+  // The base URL is shown (not a secret), so seed the editable field from the
+  // server value — including after a save invalidates and refetches it.
+  useEffect(() => setBaseUrl(savedBaseUrl), [savedBaseUrl])
 
   function save(e: React.FormEvent) {
     e.preventDefault()
@@ -114,6 +122,18 @@ function AgentSection() {
 
   function clear() {
     update.mutate({ claude_oauth_token: "" })
+  }
+
+  function saveBaseUrl(e: React.FormEvent) {
+    e.preventDefault()
+    update.mutate({ llm_base_url: baseUrl.trim() })
+  }
+
+  function saveAuthToken(e: React.FormEvent) {
+    e.preventDefault()
+    const t = authToken.trim()
+    if (!t) return
+    update.mutate({ anthropic_auth_token: t }, { onSuccess: () => setAuthToken("") })
   }
 
   return (
@@ -189,6 +209,88 @@ function AgentSection() {
           The model new agent runs use when “Spawn agent” doesn’t pick one. Per-run choices at spawn
           still win.
         </p>
+      </div>
+
+      <div className="agent-endpoint">
+        <h3 className="settings__subtitle">Custom endpoint</h3>
+        <p className="muted small">
+          Point agent runs at an Anthropic-compatible gateway or local model. The base URL is
+          injected as <code>ANTHROPIC_BASE_URL</code> (overriding{" "}
+          <code>MOONGIT_AGENT_LLM_BASE_URL</code>
+          ); the auth token as <code>ANTHROPIC_AUTH_TOKEN</code>, which then becomes the agent's
+          auth (replacing the Claude token above). The token is stored write-only — it's never shown
+          again. Leave both blank to use Anthropic directly.
+        </p>
+
+        <form className="agent-token-form" onSubmit={saveBaseUrl}>
+          <input
+            className="input"
+            type="url"
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            placeholder="https://gateway.example.com"
+            aria-label="LLM base URL"
+            autoComplete="off"
+          />
+          <div className="agent-token-form__actions">
+            <button
+              type="submit"
+              className="btn btn--small btn--primary"
+              disabled={update.isPending || baseUrl.trim() === savedBaseUrl}
+            >
+              {update.isPending ? "Saving…" : "Save base URL"}
+            </button>
+            {savedBaseUrl !== "" && (
+              <button
+                type="button"
+                className="btn btn--small btn--danger"
+                onClick={() => update.mutate({ llm_base_url: "" })}
+                disabled={update.isPending}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </form>
+
+        <div className={clsx("agent-token-status", { "is-set": authConfigured })}>
+          {settingsQ.isLoading
+            ? "Checking…"
+            : authConfigured
+              ? "✓ A gateway auth token is configured."
+              : "No gateway auth token — runs authenticate with the Claude token above."}
+        </div>
+
+        <form className="agent-token-form" onSubmit={saveAuthToken}>
+          <input
+            className="input"
+            type="password"
+            value={authToken}
+            onChange={(e) => setAuthToken(e.target.value)}
+            placeholder={authConfigured ? "Replace auth token" : "Paste auth token"}
+            aria-label="Gateway auth token"
+            autoComplete="off"
+          />
+          <div className="agent-token-form__actions">
+            <button
+              type="submit"
+              className="btn btn--small btn--primary"
+              disabled={update.isPending || authToken.trim() === ""}
+            >
+              {update.isPending ? "Saving…" : "Save auth token"}
+            </button>
+            {authConfigured && (
+              <button
+                type="button"
+                className="btn btn--small btn--danger"
+                onClick={() => update.mutate({ anthropic_auth_token: "" })}
+                disabled={update.isPending}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </form>
       </div>
 
       {update.error && <div className="error inline">{(update.error as Error).message}</div>}

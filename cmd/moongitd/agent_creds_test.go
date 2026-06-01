@@ -18,7 +18,7 @@ func TestAgentContainerEnvOAuthAndDex(t *testing.T) {
 		DexToken:              "dt",
 		DexProject:            "p",
 	}
-	env := agentContainerEnv(cfg, "", "mgt_tok", "http://host.docker.internal:8080")
+	env := agentContainerEnv(cfg, agentSettingsOverride{}, "mgt_tok", "http://host.docker.internal:8080")
 	want := []string{
 		"CLAUDE_CODE_OAUTH_TOKEN=oauth",
 		"ANTHROPIC_BASE_URL=http://llm.local",
@@ -43,7 +43,7 @@ func TestAgentContainerEnvOAuthAndDex(t *testing.T) {
 
 func TestAgentContainerEnvAPIKeyFallbackNoDex(t *testing.T) {
 	cfg := &config.Config{AgentAnthropicAPIKey: "sk-xyz"} // no OAuth, no dex
-	env := agentContainerEnv(cfg, "", "tok", "url")
+	env := agentContainerEnv(cfg, agentSettingsOverride{}, "tok", "url")
 	if !contains(env, "ANTHROPIC_API_KEY=sk-xyz") {
 		t.Errorf("API-key fallback missing: %v", env)
 	}
@@ -57,7 +57,7 @@ func TestAgentContainerEnvAPIKeyFallbackNoDex(t *testing.T) {
 // An operator-set token (Settings, #106) wins over the env OAuth/API-key.
 func TestAgentContainerEnvOverrideWins(t *testing.T) {
 	cfg := &config.Config{AgentClaudeOAuthToken: "from-env", AgentAnthropicAPIKey: "sk-env"}
-	env := agentContainerEnv(cfg, "from-settings", "tok", "url")
+	env := agentContainerEnv(cfg, agentSettingsOverride{claudeToken: "from-settings"}, "tok", "url")
 	if !contains(env, "CLAUDE_CODE_OAUTH_TOKEN=from-settings") {
 		t.Errorf("override not used: %v", env)
 	}
@@ -65,6 +65,42 @@ func TestAgentContainerEnvOverrideWins(t *testing.T) {
 		if e == "CLAUDE_CODE_OAUTH_TOKEN=from-env" || strings.HasPrefix(e, "ANTHROPIC_API_KEY=") {
 			t.Errorf("env creds leaked past the override: %v", env)
 		}
+	}
+}
+
+// An operator-set base URL (Settings) overrides the env, and the gateway auth
+// token claims the auth slot alone — no OAuth/API-key alongside it.
+func TestAgentContainerEnvGatewayOverride(t *testing.T) {
+	cfg := &config.Config{
+		AgentClaudeOAuthToken: "from-env",
+		AgentLLMBaseURL:       "http://env.local",
+	}
+	env := agentContainerEnv(cfg, agentSettingsOverride{
+		llmBaseURL:         "http://gateway.local",
+		anthropicAuthToken: "sk-gw",
+	}, "tok", "url")
+	if !contains(env, "ANTHROPIC_BASE_URL=http://gateway.local") {
+		t.Errorf("base URL override not used: %v", env)
+	}
+	if !contains(env, "ANTHROPIC_AUTH_TOKEN=sk-gw") {
+		t.Errorf("gateway auth token missing: %v", env)
+	}
+	if contains(env, "ANTHROPIC_BASE_URL=http://env.local") {
+		t.Errorf("env base URL leaked past the override: %v", env)
+	}
+	for _, e := range env {
+		if strings.HasPrefix(e, "CLAUDE_CODE_OAUTH_TOKEN=") || strings.HasPrefix(e, "ANTHROPIC_API_KEY=") {
+			t.Errorf("auth slot should be the gateway token alone: %v", env)
+		}
+	}
+}
+
+// With no Settings base URL the env value still flows through.
+func TestAgentContainerEnvBaseURLEnvFallback(t *testing.T) {
+	cfg := &config.Config{AgentLLMBaseURL: "http://env.local"}
+	env := agentContainerEnv(cfg, agentSettingsOverride{}, "tok", "url")
+	if !contains(env, "ANTHROPIC_BASE_URL=http://env.local") {
+		t.Errorf("env base URL fallback missing: %v", env)
 	}
 }
 

@@ -124,10 +124,15 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		r.failAgentRun(run.ID, job.ID, workDir)
 		return
 	}
-	// Effective Claude token: operator-set Settings value wins over the env
-	// (#106), so spawning works without a moongitd restart.
-	claudeToken := storage.SettingValue(r.db, storage.SettingAgentClaudeToken)
-	env := agentContainerEnv(r.cfg, claudeToken, moongitToken, agentServerURL(r.cfg))
+	// Operator-set Settings values win over the env (#106), so spawning works
+	// without a moongitd restart — the Claude token, the LLM base URL, and the
+	// gateway auth token all override their MOONGIT_AGENT_* env counterparts.
+	override := agentSettingsOverride{
+		claudeToken:        storage.SettingValue(r.db, storage.SettingAgentClaudeToken),
+		llmBaseURL:         storage.SettingValue(r.db, storage.SettingAgentLLMBaseURL),
+		anthropicAuthToken: storage.SettingValue(r.db, storage.SettingAgentAnthropicAuthToken),
+	}
+	env := agentContainerEnv(r.cfg, override, moongitToken, agentServerURL(r.cfg))
 
 	// Generate the dex MCP config (if dex is configured) into the workspace.
 	mcpPath, _, err := writeDexMCPConfig(workDir, r.cfg)

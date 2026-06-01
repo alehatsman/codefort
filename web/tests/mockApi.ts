@@ -193,6 +193,8 @@ export interface State {
   agentClaudeTokenSet: boolean
   agentTokenEnvFallback: boolean
   agentExecutionModel: "" | "claude-edit" | "mooncake-pilot"
+  agentLLMBaseURL: string
+  agentAuthTokenSet: boolean
   ciRuns: CIRun[]
   // Commit history (newest first) and per-sha diff detail, for the commit
   // diff view. Empty by default; specs that need them seed them.
@@ -239,6 +241,8 @@ function freshState(seed: Partial<State> = {}): State {
     agentClaudeTokenSet: false,
     agentTokenEnvFallback: false,
     agentExecutionModel: "",
+    agentLLMBaseURL: "",
+    agentAuthTokenSet: false,
     ciRuns: [],
     commits: [],
     commitDetails: {},
@@ -524,14 +528,17 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
   // Whoami
   await page.route(/\/api\/whoami$/, (route) => json(route, 200, { name: state.identity }))
 
-  // Agent settings — write-only Claude token + default execution model (GET
-  // reports set/unset + model; PUT sets/clears each provided field).
+  // Agent settings — write-only Claude token + default execution model + custom
+  // endpoint (shown base URL, write-only gateway auth token). GET reports
+  // set/unset + values; PUT sets/clears each provided field.
   await page.route(/\/api\/settings\/agent$/, (route) => {
     const req = route.request()
     if (req.method() === "PUT") {
       const body = req.postDataJSON() as {
         claude_oauth_token?: string
         execution_model?: "" | "claude-edit" | "mooncake-pilot"
+        llm_base_url?: string
+        anthropic_auth_token?: string
       }
       if (typeof body.claude_oauth_token === "string") {
         state.agentClaudeTokenSet = body.claude_oauth_token.trim() !== ""
@@ -539,11 +546,19 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       if (typeof body.execution_model === "string") {
         state.agentExecutionModel = body.execution_model
       }
+      if (typeof body.llm_base_url === "string") {
+        state.agentLLMBaseURL = body.llm_base_url.trim()
+      }
+      if (typeof body.anthropic_auth_token === "string") {
+        state.agentAuthTokenSet = body.anthropic_auth_token.trim() !== ""
+      }
     }
     return json(route, 200, {
       claude_oauth_token_set: state.agentClaudeTokenSet,
       claude_token_env_fallback: state.agentTokenEnvFallback,
       execution_model: state.agentExecutionModel,
+      llm_base_url: state.agentLLMBaseURL,
+      anthropic_auth_token_set: state.agentAuthTokenSet,
     })
   })
 

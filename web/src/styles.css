@@ -2858,6 +2858,10 @@ h3 {
   margin: 0 0 var(--space-4);
   max-width: 60ch;
 }
+.settings__subtitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-md);
+}
 
 /* Agent settings: global Claude token (write-only). */
 .agent-token-status {
@@ -2881,6 +2885,15 @@ h3 {
 .agent-token-form__actions {
   display: flex;
   gap: var(--space-2);
+}
+/* Custom-endpoint (gateway) block in Settings → Agent. */
+.agent-endpoint {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+.agent-endpoint .agent-token-form {
+  margin-top: var(--space-2);
 }
 .settings__create {
   display: flex;

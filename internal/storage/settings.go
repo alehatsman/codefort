@@ -16,6 +16,18 @@ const (
 	// for agent runs that don't pick one at spawn ("claude-edit" |
 	// "mooncake-pilot"). Unset falls back to DefaultExecutionModel (#110).
 	SettingAgentExecutionModel = "agent.execution_model"
+
+	// SettingAgentLLMBaseURL is the operator-set LLM endpoint injected into
+	// agent containers as ANTHROPIC_BASE_URL (point claude at a gateway / local
+	// model). Not a secret — returned over the API. Overrides the
+	// MOONGIT_AGENT_LLM_BASE_URL env so it can be set without a restart.
+	SettingAgentLLMBaseURL = "agent.llm_base_url"
+
+	// SettingAgentAnthropicAuthToken is the operator-set bearer token injected
+	// as ANTHROPIC_AUTH_TOKEN — the auth for a custom ANTHROPIC_BASE_URL gateway.
+	// It's a secret — never return it over the API. When set it takes the agent
+	// container's auth slot, ahead of the OAuth/API-key paths.
+	SettingAgentAnthropicAuthToken = "agent.anthropic_auth_token"
 )
 
 // ValidExecutionModel reports whether m is a known agent execution model.
