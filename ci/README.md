@@ -45,10 +45,10 @@ pushed commit. Two on-demand paths exist for re-running or starting CI without
 a push:
 
 - **Re-run** a past run from the web UI (the Re-run button) or
-  `POST /api/repos/{owner}/{repo}/ci/runs/{number}/rerun` — re-enqueues that
+  `POST /api/repos/{owner}/{repo}/runs/{number}/rerun` — re-enqueues that
   run's exact commit.
 - **Manual trigger** for an arbitrary ref (branch, tag, or commit SHA):
-  `mgit ci run <ref>`, or `POST /api/repos/{owner}/{repo}/ci/runs` with body
+  `mgit ci run <ref>`, or `POST /api/repos/{owner}/{repo}/runs` with body
   `{"ref": "<ref>"}`. The server resolves the ref to a commit and enqueues a
   run with event `manual`. CI must be enabled for the repo, and the usual
   `mgitci.yml`-present gate still applies at run time.

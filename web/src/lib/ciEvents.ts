@@ -61,7 +61,7 @@ export function useJobEventStream(
     setError(null)
 
     async function run() {
-      const url = `/api/repos/${owner}/${repo}/ci/runs/${runNumber}/jobs/${encodeURIComponent(
+      const url = `/api/repos/${owner}/${repo}/runs/${runNumber}/jobs/${encodeURIComponent(
         job
       )}/events`
       // Reconnect while the run is live and we haven't been told the stream is

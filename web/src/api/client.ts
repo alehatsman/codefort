@@ -294,14 +294,14 @@ export const api = {
     if (limit) q.set("limit", String(limit))
     if (kind) q.set("kind", kind)
     const qs = q.toString()
-    return request<CIRun[]>(`/api/repos/${owner}/${repo}/ci/runs${qs ? `?${qs}` : ""}`)
+    return request<CIRun[]>(`/api/repos/${owner}/${repo}/runs${qs ? `?${qs}` : ""}`)
   },
   triggerCIRun: (owner: string, repo: string, ref: string) =>
-    request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs`, { method: "POST", body: { ref } }),
+    request<CIRun>(`/api/repos/${owner}/${repo}/runs`, { method: "POST", body: { ref } }),
   getCIRun: (owner: string, repo: string, n: number) =>
-    request<CIRunDetail>(`/api/repos/${owner}/${repo}/ci/runs/${n}`),
+    request<CIRunDetail>(`/api/repos/${owner}/${repo}/runs/${n}`),
   rerunCIRun: (owner: string, repo: string, n: number) =>
-    request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/rerun`, { method: "POST" }),
+    request<CIRun>(`/api/repos/${owner}/${repo}/runs/${n}/rerun`, { method: "POST" }),
 
   // spawnAgent starts an agent run for an issue. ref pins the base the agent
   // checks out (optional; the server defaults to the repo's HEAD); model picks
@@ -325,19 +325,19 @@ export const api = {
   // createAgentTurn queues a follow-up message on an agent run; the dispatch
   // loop resumes the session and streams the response onto the run's events.
   createAgentTurn: (owner: string, repo: string, n: number, text: string) =>
-    request<AgentTurn>(`/api/repos/${owner}/${repo}/ci/runs/${n}/turns`, {
+    request<AgentTurn>(`/api/repos/${owner}/${repo}/runs/${n}/turns`, {
       method: "POST",
       body: { text },
     }),
   // finishAgentRun accepts a parked agent run; the server hands off (branch +
   // summary comment) and finalizes it.
   finishAgentRun: (owner: string, repo: string, n: number) =>
-    request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/finish`, { method: "POST" }),
+    request<CIRun>(`/api/repos/${owner}/${repo}/runs/${n}/finish`, { method: "POST" }),
   // cancelAgentRun force-stops an agent run from any non-terminal state
   // (unlike finish, which needs a parked run): it interrupts an in-flight turn
   // and discards the workspace — no branch is handed off.
   cancelAgentRun: (owner: string, repo: string, n: number) =>
-    request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/cancel`, { method: "POST" }),
+    request<CIRun>(`/api/repos/${owner}/${repo}/runs/${n}/cancel`, { method: "POST" }),
 
   // Global agent settings (write-only Claude token).
   getAgentSettings: () => request<AgentSettings>("/api/settings/agent"),

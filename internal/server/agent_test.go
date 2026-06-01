@@ -90,7 +90,7 @@ func TestSpawnAgentUnknownIssue(t *testing.T) {
 func createTurn(t *testing.T, s *Server, num int, text string) *httptest.ResponseRecorder {
 	t.Helper()
 	body, _ := json.Marshal(api.CreateAgentTurnRequest{Text: text})
-	req := httptest.NewRequest(http.MethodPost, "/api/repos/alice/repo/ci/runs/"+strconv.Itoa(num)+"/turns", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/repos/alice/repo/runs/"+strconv.Itoa(num)+"/turns", bytes.NewReader(body))
 	req.SetPathValue("owner", "alice")
 	req.SetPathValue("repo", "repo")
 	req.SetPathValue("number", strconv.Itoa(num))
@@ -173,7 +173,7 @@ func TestCreateAgentTurnRejections(t *testing.T) {
 
 func finishRun(t *testing.T, s *Server, num int) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, "/api/repos/alice/repo/ci/runs/"+strconv.Itoa(num)+"/finish", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/repos/alice/repo/runs/"+strconv.Itoa(num)+"/finish", nil)
 	req.SetPathValue("owner", "alice")
 	req.SetPathValue("repo", "repo")
 	req.SetPathValue("number", strconv.Itoa(num))
@@ -185,7 +185,7 @@ func finishRun(t *testing.T, s *Server, num int) *httptest.ResponseRecorder {
 
 func cancelRun(t *testing.T, s *Server, num int) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, "/api/repos/alice/repo/ci/runs/"+strconv.Itoa(num)+"/cancel", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/repos/alice/repo/runs/"+strconv.Itoa(num)+"/cancel", nil)
 	req.SetPathValue("owner", "alice")
 	req.SetPathValue("repo", "repo")
 	req.SetPathValue("number", strconv.Itoa(num))
