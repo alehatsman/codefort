@@ -48,3 +48,38 @@ test("drag a card from todo to in_progress; state is PATCHed", async ({ page }) 
   // UI eventually shows the card under the new column.
   await expect(target.getByText("Movable task")).toBeVisible()
 })
+
+test("drag a card to done and back to todo; no crash, state PATCHes both ways", async ({
+  page,
+}) => {
+  // Guard the regression behind #148 ("page crashes when moving issue"): a drag
+  // to done and a drag back must both succeed without any uncaught page error.
+  const pageErrors: string[] = []
+  page.on("pageerror", (e) => pageErrors.push(String(e)))
+
+  const now = new Date().toISOString()
+  const state = await mockApi(page, {
+    issues: [
+      {
+        id: 1, number: 1, title: "Round trip", author: "alice", state: "todo",
+        assignee: null, created_at: now, updated_at: now,
+      },
+    ],
+  })
+
+  await page.goto("/alice/demo/issues/board")
+  const done = page.getByTestId("board-column-done")
+  const todo = page.getByTestId("board-column-todo")
+
+  // todo -> done
+  await dragCardOnto(page, page.locator(".board-card").first(), done)
+  await expect.poll(() => state.issues[0].state).toBe("done")
+  await expect(done.getByText("Round trip")).toBeVisible()
+
+  // done -> todo (the "dragging back" path from #148)
+  await dragCardOnto(page, done.locator(".board-card").first(), todo)
+  await expect.poll(() => state.issues[0].state).toBe("todo")
+  await expect(todo.getByText("Round trip")).toBeVisible()
+
+  expect(pageErrors, "drag round-trip must not crash the page").toEqual([])
+})

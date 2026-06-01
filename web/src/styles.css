@@ -2269,10 +2269,19 @@ a.file-tree__commit:hover {
   grid-template-columns: repeat(4, minmax(240px, 1fr));
   gap: var(--space-3);
   align-items: start;
+  /* The four columns have a 240px floor, so on windows narrower than ~1020px
+     they no longer fit. Scroll the board itself (with a little room for the
+     scrollbar) instead of letting the rightmost column spill off-screen behind
+     a whole-page horizontal scrollbar — that left `closed` unreachable as a
+     drop target. dnd-kit auto-scrolls this container while dragging near an
+     edge, so far columns stay reachable mid-drag. */
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
 }
 @media (max-width: 900px) {
   .board {
     grid-template-columns: 1fr;
+    overflow-x: visible;
   }
 }
 
