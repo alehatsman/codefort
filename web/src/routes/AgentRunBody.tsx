@@ -77,7 +77,23 @@ function AgentTranscript({
   // (prompt, steps, recap) is its body — so the transcript reads as a stack of
   // cards ("Turn 1" with the prompt, "plan · N steps" with its steps + recap),
   // matching the CI pipeline's step cards.
-  const cards = useMemo(() => buildCards(entries), [entries])
+  // Append a card per pending follow-up turn — a message the human sent that
+  // the agent hasn't picked up yet. A pending turn isn't in the event stream
+  // (it only enters as a "Turn N" card once it goes running), so without this
+  // the sent message is invisible between send and pickup. We render only
+  // pending turns, so there's no overlap with the transcript's turn cards.
+  const cards = useMemo(() => {
+    const built = buildCards(entries)
+    for (const t of (run.turns ?? []).filter((t) => t.status === "pending")) {
+      built.push({
+        id: `queued-${t.seq}`,
+        title: "You · queued",
+        queued: true,
+        body: [{ id: `queued-${t.seq}-body`, kind: "assistant", text: t.body }],
+      })
+    }
+    return built
+  }, [entries, run.turns])
 
   // A turn is in flight while its agent.turn.started has no matching
   // turn.completed. During that window the agent is busy but emits nothing
@@ -193,6 +209,11 @@ interface Card {
   // status drives the head dot / --failed tint, derived from the body's steps;
   // undefined for a card with no steps (e.g. a bare turn header).
   status?: "ok" | "failed" | "running"
+  // queued marks a human follow-up message that's been sent but not yet picked
+  // up by the agent (a pending turn). It renders with a distinct pending tint
+  // so the message stays visible in the log instead of vanishing until the
+  // agent's turn card appears.
+  queued?: boolean
   body: AgentEntry[]
 }
 
@@ -240,9 +261,15 @@ function buildCards(entries: AgentEntry[]): Card[] {
 // title) over a body of rendered entries.
 function renderCard(card: Card) {
   return (
-    <div className="ci-step agent-card">
+    <div className={clsx("ci-step agent-card", { "agent-card--queued": card.queued })}>
       <div className={clsx("ci-step__head", { "ci-step__head--failed": card.status === "failed" })}>
-        {card.status && <span className={`ci-step__status ci-step__status--${card.status}`} />}
+        {card.queued ? (
+          <span className="agent-card__queued-glyph" aria-hidden="true">
+            ◷
+          </span>
+        ) : (
+          card.status && <span className={`ci-step__status ci-step__status--${card.status}`} />
+        )}
         <span className="ci-step__cmd">{card.title}</span>
       </div>
       {card.body.length > 0 && (
@@ -299,7 +326,6 @@ function AgentMessageBox({
   const finish = useFinishAgentRun(owner, repo, runNumber)
   const cancel = useCancelAgentRun(owner, repo, runNumber)
   const terminal = TERMINAL.includes(run.status)
-  const queued = (run.turns ?? []).filter((t) => t.status === "pending" || t.status === "running")
 
   if (terminal) {
     return (
@@ -331,11 +357,6 @@ function AgentMessageBox({
 
   return (
     <form className="agent-msgbox" onSubmit={submit}>
-      {queued.length > 0 && (
-        <div className="muted small">
-          {queued.length} message{queued.length > 1 ? "s" : ""} queued…
-        </div>
-      )}
       <textarea
         className="input agent-msgbox__input"
         value={text}

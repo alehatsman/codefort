@@ -3551,6 +3551,21 @@ h3 {
   white-space: normal;
   line-height: 1.35;
 }
+/* A queued follow-up message: sent by the human, not yet picked up by the
+   agent. Dashed/muted so it reads as pending rather than part of the agent's
+   own transcript; it's replaced by the real "Turn N" card once the agent runs
+   it. */
+.agent-card--queued.ci-step {
+  border-style: dashed;
+  border-color: var(--border-muted);
+  background: var(--neutral-muted);
+}
+.agent-card--queued .ci-step__cmd {
+  color: var(--fg-muted);
+}
+.agent-card__queued-glyph {
+  color: var(--fg-muted);
+}
 /* "Jump to latest" — appears only when the user has scrolled up off the tail. */
 .agent-follow-btn {
   position: absolute;

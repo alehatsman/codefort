@@ -946,6 +946,13 @@ test("an awaiting-input agent run shows a message box and queues a follow-up", a
   await expect.poll(() => state.ciRuns[0].turns?.length ?? 0).toBe(1)
   expect(state.ciRuns[0].turns?.[0].body).toBe("please also add a test")
 
+  // The pending turn shows as a distinct queued card in the transcript (so the
+  // sent message stays visible until the agent picks it up), not just a counter.
+  const queuedCard = page.locator(".agent-card--queued")
+  await expect(queuedCard).toBeVisible()
+  await expect(queuedCard).toContainText("You · queued")
+  await expect(queuedCard).toContainText("please also add a test")
+
   // Finishing the run hands off; the box switches to the finishing note.
   await page.getByRole("button", { name: "Finish" }).click()
   await expect.poll(() => state.ciRuns[0].status).toBe("finishing")
