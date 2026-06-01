@@ -3503,41 +3503,25 @@ h3 {
   position: relative;
   width: 100%;
 }
+/* Each virtualized row is one CI-style card. The card spacing is padding on the
+   row (the virtualizer measures border-box, so margins would be ignored and the
+   cards would overlap). */
 .agent-transcript__row {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
+  padding-bottom: var(--space-2);
 }
-/* The plan header + its steps render as one card. Rows share side borders, so
-   the individually-virtualized rows stack into a continuous box; --start/--end
-   (or --solo) close the top/bottom. Padding is on the rows (measured by the
-   virtualizer); margins would be ignored and cause overlap. */
-.agent-grouped {
-  background: var(--bg-canvas);
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  padding-left: var(--space-2);
-  padding-right: var(--space-2);
+/* A transcript section reuses the CI step-card chrome (.ci-step / __head /
+   .ci-log); drop the CI margin since the row owns the gap. */
+.agent-card.ci-step {
+  margin-bottom: 0;
 }
-.agent-grouped--start,
-.agent-grouped--solo {
-  border-top: 1px solid var(--border);
-  border-top-left-radius: var(--radius);
-  border-top-right-radius: var(--radius);
-  padding-top: var(--space-1);
-}
-.agent-grouped--end,
-.agent-grouped--solo {
-  border-bottom: 1px solid var(--border);
-  border-bottom-left-radius: var(--radius);
-  border-bottom-right-radius: var(--radius);
-  padding-bottom: var(--space-1);
-}
-/* Plan header is the card's title row, not muted body text. */
-.agent-entry--system.agent-grouped .agent-entry__label {
-  color: var(--fg);
-  font-weight: var(--weight-medium);
+.agent-card__body {
+  /* tight terminal list inside the card body */
+  white-space: normal;
+  line-height: 1.35;
 }
 /* "Jump to latest" — appears only when the user has scrolled up off the tail. */
 .agent-follow-btn {
