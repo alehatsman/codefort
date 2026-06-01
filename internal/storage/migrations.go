@@ -286,6 +286,18 @@ var migrations = []string{
 	);
 	CREATE INDEX IF NOT EXISTS idx_events_repo ON events(repo_id);
 	`,
+
+	// 16: freeze a merged PR's compare endpoints. The PR detail diff is computed
+	// from the live base/head branch tips; once head is merged into base, head
+	// is contained in base, so merge-base(base, head) == head and the diff goes
+	// empty — a merged PR renders with no files/commits. Record the two branch
+	// tips at merge time so the detail endpoint can reproduce the exact pre-merge
+	// compare regardless of where the branches drift (or whether they're deleted)
+	// afterward. NULL on open/closed PRs and on PRs merged before this migration.
+	`
+	ALTER TABLE pull_requests ADD COLUMN merge_base_sha TEXT;
+	ALTER TABLE pull_requests ADD COLUMN merge_head_sha TEXT;
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

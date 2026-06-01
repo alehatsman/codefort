@@ -11,7 +11,7 @@ import (
 
 // pullColumns is the canonical select list, used everywhere so scanPull stays
 // in sync with INSERT/UPDATE RETURNING and SELECT.
-const pullColumns = "id, number, base_ref, head_ref, title, body, author, state, created_at, updated_at, merged_at"
+const pullColumns = "id, number, base_ref, head_ref, title, body, author, state, created_at, updated_at, merged_at, merge_base_sha, merge_head_sha"
 
 // CreatePull allocates the next per-repo PR number and inserts the row. The
 // (repo_id, number) UNIQUE constraint + SQLite's single-writer guarantee keep
@@ -112,11 +112,13 @@ func UpdatePull(db *sql.DB, repoID int64, number int, title, body *string, state
 	if state != nil {
 		sets = append(sets, "state = ?")
 		args = append(args, string(*state))
-		// Keep merged_at consistent with state in the same write.
+		// Keep merged_at consistent with state in the same write. Moving away
+		// from merged also clears the frozen compare SHAs (set by MarkMerged) so
+		// a reopened PR computes its compare from the live refs again.
 		if *state == api.PRMerged {
 			sets = append(sets, "merged_at = strftime('%s', 'now')")
 		} else {
-			sets = append(sets, "merged_at = NULL")
+			sets = append(sets, "merged_at = NULL", "merge_base_sha = NULL", "merge_head_sha = NULL")
 		}
 	}
 	if len(sets) == 1 {
@@ -137,14 +139,38 @@ func UpdatePull(db *sql.DB, repoID int64, number int, title, body *string, state
 	return pr, err
 }
 
+// MarkMerged stamps a PR merged in one write: state=merged, merged_at=now, and
+// the base/head branch tips frozen at merge time (baseSHA/headSHA) so the
+// detail endpoint can reproduce the pre-merge compare. The merge endpoint is
+// the only caller — UpdatePull rejects the merged transition. Returns
+// ErrNotFound if (repoID, number) doesn't exist.
+func MarkMerged(db *sql.DB, repoID int64, number int, baseSHA, headSHA string) (api.PullRequest, error) {
+	row := db.QueryRow(`
+		UPDATE pull_requests
+		   SET state = ?,
+		       updated_at = strftime('%s', 'now'),
+		       merged_at = strftime('%s', 'now'),
+		       merge_base_sha = ?,
+		       merge_head_sha = ?
+		 WHERE repo_id = ? AND number = ?
+		 RETURNING `+pullColumns+`
+	`, string(api.PRMerged), baseSHA, headSHA, repoID, number)
+	pr, err := scanPull(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return pr, ErrNotFound
+	}
+	return pr, err
+}
+
 func scanPull(s scanner) (api.PullRequest, error) {
 	var pr api.PullRequest
 	var body sql.NullString
 	var merged sql.NullInt64
+	var mergeBase, mergeHead sql.NullString
 	var created, updated int64
 	if err := s.Scan(
 		&pr.ID, &pr.Number, &pr.BaseRef, &pr.HeadRef, &pr.Title, &body, &pr.Author, &pr.State,
-		&created, &updated, &merged,
+		&created, &updated, &merged, &mergeBase, &mergeHead,
 	); err != nil {
 		return pr, err
 	}
@@ -155,5 +181,7 @@ func scanPull(s scanner) (api.PullRequest, error) {
 		ts := time.Unix(merged.Int64, 0).UTC()
 		pr.MergedAt = &ts
 	}
+	pr.MergeBaseSHA = mergeBase.String
+	pr.MergeHeadSHA = mergeHead.String
 	return pr, nil
 }

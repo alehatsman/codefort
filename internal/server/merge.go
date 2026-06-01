@@ -117,8 +117,10 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	merged := api.PRMerged
-	updated, err := storage.UpdatePull(s.db, repoID, num, nil, nil, &merged)
+	// Freeze the pre-merge base/head tips so the detail endpoint can reproduce
+	// the diff: post-merge head is contained in base, so a live-ref compare goes
+	// empty. baseTip/headTip are the tips resolved above, before the ref moved.
+	updated, err := storage.MarkMerged(s.db, repoID, num, baseTip, headTip)
 	if err != nil {
 		// The refs are already merged; report it but log the bookkeeping miss.
 		s.logger.Error("mark pull merged", "repo", repoDir, "pr", num, "err", err)
