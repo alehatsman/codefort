@@ -13,6 +13,7 @@ import CommentItem from "../components/CommentItem"
 import DeleteIssueButton from "../components/DeleteIssueButton"
 import BranchTag from "../components/BranchTag"
 import SpawnAgentButton from "../components/SpawnAgentButton"
+import NotFound from "../components/NotFound"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it only
 // when an issue with a body is actually shown.
@@ -28,6 +29,17 @@ export default function IssuePage() {
   const commitsQ = useIssueCommits(owner, repo, num)
 
   const [editing, setEditing] = useState(false)
+
+  // A non-numeric path segment (e.g. /issues/new, which isn't a route) lands
+  // here with num=NaN and the issue query idle — show NotFound, not a blank.
+  if (!Number.isInteger(num) || num <= 0) {
+    return (
+      <NotFound
+        title="Issue not found"
+        detail={`There is no issue “${numStr}” in ${owner}/${repo}.`}
+      />
+    )
+  }
 
   if (issueQ.isLoading) return <div className="loading">Loading…</div>
   if (issueQ.error) return <div className="error">{(issueQ.error as Error).message}</div>

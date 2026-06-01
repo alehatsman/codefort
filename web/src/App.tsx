@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Navigate, Route, Routes, useParams } from "react-router-dom"
 import Layout from "./components/Layout"
 import TokenGate from "./components/TokenGate"
+import NotFound from "./components/NotFound"
 import { getToken } from "./api/client"
 import ReposPage from "./routes/ReposPage"
 import RepoPage from "./routes/RepoPage"
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/:owner/:repo/agents" element={<PipelinesPage kind="agent" />} />
         <Route path="/:owner/:repo/agents/:number" element={<PipelinesPage kind="agent" />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="*" element={<NotFound detail="This page doesn’t exist." />} />
       </Routes>
     </Layout>
   )

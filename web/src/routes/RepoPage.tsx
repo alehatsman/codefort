@@ -19,6 +19,7 @@ import LatestCommitBar from "../components/LatestCommitBar"
 import CommitMeta from "../components/CommitMeta"
 import ReadmeCard from "../components/ReadmeCard"
 import OverviewCard from "../components/OverviewCard"
+import NotFound from "../components/NotFound"
 import { findReadme } from "../lib/readme"
 import { useListNav } from "../lib/keyboardNav"
 
@@ -41,7 +42,15 @@ export default function RepoPage() {
   const repoQ = useRepo(owner, repo)
 
   if (repoQ.isLoading) return <div className="loading">Loading…</div>
-  if (repoQ.error) return <div className="error">{(repoQ.error as Error).message}</div>
+  if (repoQ.error) {
+    const err = repoQ.error
+    if (err instanceof ApiError && err.status === 404) {
+      return (
+        <NotFound title="Repository not found" detail={`${owner}/${repo} isn’t registered here.`} />
+      )
+    }
+    return <div className="error">{(err as Error).message}</div>
+  }
   if (!repoQ.data) return null
 
   const r = repoQ.data
