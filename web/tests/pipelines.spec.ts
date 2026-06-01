@@ -335,6 +335,135 @@ test("agent run renders the claude transcript instead of the job DAG", async ({ 
   await expect(page.locator(".ci-dag")).toHaveCount(0)
 })
 
+test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ page }) => {
+  await mockApi(page, {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 1,
+        total_issues: 1,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 1,
+        kind: "agent",
+        issue_number: 6,
+        execution_model: "mooncake-pilot",
+        commit_sha: "deadbeefcafe1234",
+        ref: "HEAD",
+        event: "agent",
+        trigger: "agent#17",
+        status: "success",
+        created_at: iso,
+        started_at: iso,
+        finished_at: iso,
+        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        events: {
+          agent: [
+            { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #6: do it" } },
+            // Pilot events arrive under data.mooncake, not data.claude (#123).
+            {
+              seq: 2,
+              type: "agent.message",
+              time: 0,
+              data: { mooncake: { type: "plan.loaded", data: { total_steps: 2 } } },
+            },
+            {
+              seq: 3,
+              type: "agent.message",
+              time: 0,
+              data: {
+                mooncake: {
+                  type: "step.started",
+                  data: { step_id: "s1", action: "file.write", name: "create CHANGELOG.md" },
+                },
+              },
+            },
+            {
+              seq: 4,
+              type: "agent.message",
+              time: 0,
+              data: {
+                mooncake: {
+                  type: "step.completed",
+                  data: { step_id: "s1", duration_ms: 1, result: { status: "changed" } },
+                },
+              },
+            },
+            {
+              seq: 5,
+              type: "agent.message",
+              time: 0,
+              data: {
+                mooncake: {
+                  type: "step.started",
+                  data: { step_id: "s2", action: "cmd", name: "report progress" },
+                },
+              },
+            },
+            {
+              seq: 6,
+              type: "agent.message",
+              time: 0,
+              data: {
+                mooncake: {
+                  type: "step.stdout",
+                  data: { step_id: "s2", stream: "stdout", line: "commented on #6 by agent-run-9" },
+                },
+              },
+            },
+            {
+              seq: 7,
+              type: "agent.message",
+              time: 0,
+              data: {
+                mooncake: {
+                  type: "step.completed",
+                  data: { step_id: "s2", duration_ms: 18, result: { status: "changed" } },
+                },
+              },
+            },
+            {
+              seq: 8,
+              type: "agent.message",
+              time: 0,
+              data: {
+                mooncake: {
+                  type: "run.completed",
+                  data: { success_steps: 2, changed_steps: 2, failed_steps: 0, duration_ms: 1120 },
+                },
+              },
+            },
+            // num_turns/duration are 0 for pilot — must not render "0 steps · 0 ms".
+            {
+              seq: 9,
+              type: "agent.turn.completed",
+              time: 0,
+              data: { turn: 1, status: "success", num_turns: 0, duration_ms: 0 },
+            },
+          ],
+        },
+      },
+    ],
+  })
+  await page.goto("/alice/demo/agents/1")
+
+  const transcript = page.locator(".agent-transcript")
+  await expect(transcript).toBeVisible()
+  await expect(page.getByText("🔧 file.write · create CHANGELOG.md")).toBeVisible()
+  await expect(page.getByText("🔧 cmd · report progress")).toBeVisible()
+  // The shell step's stdout is surfaced under its step.
+  await expect(page.getByText("commented on #6 by agent-run-9")).toBeVisible()
+  // The real aggregate replaces the bogus "0 steps · 0 ms".
+  await expect(page.getByText("2 ok · 2 changed")).toBeVisible()
+  await expect(transcript).not.toContainText("0 steps")
+})
+
 test("an awaiting-input agent run shows a message box and queues a follow-up", async ({ page }) => {
   const state = await mockApi(page, {
     repos: [
