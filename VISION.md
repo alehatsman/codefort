@@ -67,7 +67,11 @@ or not the internet does.
 - **Trust is local.** A token names an identity; the data plane is intentionally
   open within a trusted network. moongit assumes a small group that already
   trusts each other, not an adversarial public internet — and is far simpler for
-  it.
+  it. This still leaves room for *lightweight* refinements on top of that base —
+  named user accounts, a handful of branch-protection rules — as conveniences
+  for a trusting team (avoiding mistakes, attributing work), not as a security
+  perimeter policing an adversary. The line is coarse-and-optional, not
+  fine-grained-and-load-bearing.
 - **Self-hosting is a first-class path, not a fallback.** The same binary you'd
   run "in production" is the one you run on your laptop. There is no hosted
   edition that the open one quietly trails behind.
@@ -82,7 +86,9 @@ will not:
 - adopt heavy frameworks on either the server or the web client when the
   standard library and a small SPA suffice;
 - add features that only make sense at a scale moongit is not built for (orgs of
-  thousands, public multi-tenant hosting, fine-grained RBAC matrices);
+  thousands, public multi-tenant hosting, fine-grained RBAC matrices — the *grid*
+  of per-user, per-resource permission rules, not coarse accounts or a few branch
+  rules, which the trust model above permits);
 - trade startup time, binary size, or operational simplicity for breadth of
   features.
 
