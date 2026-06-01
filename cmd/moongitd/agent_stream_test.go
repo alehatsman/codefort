@@ -63,6 +63,16 @@ func TestTurnStatus(t *testing.T) {
 		{"non-zero exit", &turnResult{Subtype: "success"}, 1, nil, "error"},
 		{"missing result", nil, 0, nil, "error"},
 		{"exec error", nil, 0, errTest("boom"), "error"},
+		// #173: a clean turn that stopped on a soft stop_reason is "stalled".
+		{"stalled max_iterations", &turnResult{Subtype: "success", StopReason: "max_iterations"}, 0, nil, "stalled"},
+		{"stalled no_progress", &turnResult{Subtype: "success", StopReason: "no_progress"}, 0, nil, "stalled"},
+		{"stalled no_change", &turnResult{Subtype: "success", StopReason: "no_change"}, 0, nil, "stalled"},
+		{"step_done is clean", &turnResult{Subtype: "step_done", StopReason: "step_done"}, 0, nil, "success"},
+		// A genuine failure outranks a soft stop (#71 repeated-failure: a step
+		// failed identically twice, loop stops with no_progress).
+		{"failure beats soft stop", &turnResult{Subtype: "execution_failed", IsError: true, StopReason: "no_progress"}, 0, nil, "failed"},
+		// A soft stop never overrides an infra error (CLI died / non-zero exit).
+		{"exit beats soft stop", &turnResult{Subtype: "success", StopReason: "max_iterations"}, 1, nil, "error"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -498,6 +498,75 @@ test("a mooncake-agent run renders its steps, not a blank transcript", async ({ 
   ).toBeVisible()
 })
 
+test("a stalled agent run reads neutral 'stalled', not red 'failed' (#173)", async ({ page }) => {
+  await mockApi(page, {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 1,
+        total_issues: 1,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 1,
+        kind: "agent",
+        issue_number: 6,
+        execution_model: "mooncake-agent",
+        commit_sha: "deadbeefcafe1234",
+        ref: "HEAD",
+        event: "agent",
+        trigger: "agent#17",
+        // The run hit its iteration cap without a failed step: mooncake reports
+        // status success + a soft stop_reason, which moongit finalizes RunStalled.
+        status: "stalled",
+        created_at: iso,
+        started_at: iso,
+        finished_at: iso,
+        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        events: {
+          agent: [
+            { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #6: do it" } },
+            {
+              seq: 2,
+              type: "agent.message",
+              time: 0,
+              data: {
+                mooncake: {
+                  type: "agent.completed",
+                  data: { status: "success", stop_reason: "max_iterations", iterations: 3 },
+                },
+              },
+            },
+            {
+              seq: 3,
+              type: "agent.turn.completed",
+              time: 0,
+              data: { turn: 1, status: "stalled", num_turns: 0, duration_ms: 0 },
+            },
+          ],
+        },
+      },
+    ],
+  })
+  await page.goto("/alice/demo/agents/1")
+
+  // The run verdict reads "stalled" with the neutral (amber) badge modifier —
+  // not the red ci-badge--failed.
+  const badge = page.locator(".ci-badge--stalled")
+  await expect(badge).toBeVisible()
+  await expect(badge).toHaveText("stalled")
+  await expect(page.locator(".ci-badge--failed")).toHaveCount(0)
+  // The stop_reason is legible in the transcript, and the closed message box
+  // explains the stall rather than implying a clean finish.
+  await expect(page.getByText("max_iterations")).toBeVisible()
+  await expect(page.locator(".agent-msgbox--done")).toContainText("without making progress")
+})
+
 test("a failed mooncake step shows a ✗ row with its command + error inline", async ({ page }) => {
   const mooncake = (seq: number, type: string, data: Record<string, unknown>) => ({
     seq,

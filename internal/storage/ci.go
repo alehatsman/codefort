@@ -34,12 +34,21 @@ const (
 	// for a gated run — CI off / no mgitci.yml — which is a different "didn't
 	// run" meaning.)
 	RunInterrupted RunStatus = "interrupted"
+	// RunStalled is an agent-only terminal state: the agent ran to completion
+	// but never converged — it hit its iteration cap or kept re-planning
+	// without making progress (mooncake stop_reason max_iterations/no_progress/
+	// no_change), with no step actually failing. Like RunInterrupted it's
+	// neutral, not red, and rerunnable; unlike it, the run wasn't cut short from
+	// outside — the agent gave up on its own. Distinct from RunFailed (a step
+	// errored) so an operator can tell "couldn't make progress" from "crashed".
+	// CI runs never enter it. See moongit #173 / mooncake #77.
+	RunStalled RunStatus = "stalled"
 )
 
 // Terminal reports whether the status is a final state (no further transitions).
 func (s RunStatus) Terminal() bool {
 	switch s {
-	case RunSuccess, RunFailed, RunCanceled, RunError, RunInterrupted:
+	case RunSuccess, RunFailed, RunCanceled, RunError, RunInterrupted, RunStalled:
 		return true
 	default:
 		return false

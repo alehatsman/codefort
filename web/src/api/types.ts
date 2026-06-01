@@ -433,6 +433,7 @@ export type CIRunStatus =
   | "canceled"
   | "error"
   | "interrupted" // runner went away mid-flight (shutdown/restart) — neutral, not a gate failure
+  | "stalled" // agent-only: ran to completion but never converged (max_iterations/no_progress) — neutral, not a failure
 
 // Mirrors storage.JobStatus.
 export type CIJobStatus =
