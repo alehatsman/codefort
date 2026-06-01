@@ -333,16 +333,61 @@ jobs:
 		t.Fatal("run() did not return after ctx cancel — shutdown would hang")
 	}
 
-	// The drain must have finalized the run against the open DB.
+	// The drain must have finalized the run against the open DB — and as
+	// interrupted, not error: a shutdown-cancelled run is operator-induced
+	// (deploy/restart), not a gate failure (#143).
 	got, err := storage.GetRun(r.db, run.RepoID, run.Number)
 	if err != nil {
 		t.Fatalf("GetRun: %v", err)
 	}
-	if got.Status == storage.RunQueued || got.Status == storage.RunRunning {
-		t.Errorf("run left non-terminal (%q) after shutdown — should be finalized", got.Status)
+	if got.Status != storage.RunInterrupted {
+		t.Errorf("run status = %q after shutdown, want interrupted", got.Status)
 	}
 	if got.FinishedAt == nil {
 		t.Error("run has no FinishedAt after shutdown drain")
+	}
+	jobs, _ := storage.ListJobs(r.db, run.ID)
+	for _, j := range jobs {
+		if j.Status != storage.JobInterrupted {
+			t.Errorf("job %q = %q after shutdown, want interrupted", j.Name, j.Status)
+		}
+	}
+}
+
+// TestRunTimeoutFinalizesError is the discriminator's other half (#143): a run
+// whose own CIRunTimeout fires (ctx.Err() == DeadlineExceeded) is a genuine
+// infrastructure failure and must finalize error — NOT interrupted, which is
+// reserved for a shutdown-cancelled context. The two share the "ctx.Err() != nil
+// while mid-step" code path, so this guards that they don't collapse together.
+func TestRunTimeoutFinalizesError(t *testing.T) {
+	pipeline := `
+version: "1"
+jobs:
+  build:
+    steps: [{run: echo build}]
+`
+	// A step that honors ctx and reports its cancellation, like parseStepResult.
+	blockingExec := func(ctx context.Context, _, _ string) (stepResult, error) {
+		<-ctx.Done()
+		return stepResult{}, ctx.Err()
+	}
+	r, run := newTestRunner(t, pipeline, true, blockingExec)
+	r.cfg.CIRunTimeout = 20 * time.Millisecond // fire the run timeout, not a shutdown
+
+	r.executeRun(context.Background(), run) // parent never cancelled — only the timeout fires
+
+	got, err := storage.GetRun(r.db, run.RepoID, run.Number)
+	if err != nil {
+		t.Fatalf("GetRun: %v", err)
+	}
+	if got.Status != storage.RunError {
+		t.Errorf("run status = %q after run-timeout, want error", got.Status)
+	}
+	jobs, _ := storage.ListJobs(r.db, run.ID)
+	for _, j := range jobs {
+		if j.Status != storage.JobError {
+			t.Errorf("job %q = %q after run-timeout, want error", j.Name, j.Status)
+		}
 	}
 }
 

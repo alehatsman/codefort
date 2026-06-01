@@ -487,10 +487,26 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 			}
 		}
 	}
-	// A run-timeout / shutdown can leave jobs pending; the run is errored below.
+	// A run-timeout / shutdown can leave jobs that never started still pending
+	// (queued in the DB). Finalize them so a terminal run has no dangling queued
+	// jobs: interrupted under a shutdown (Canceled), errored under a run-timeout.
+	if ctx.Err() != nil {
+		leftover := storage.JobError
+		if errors.Is(ctx.Err(), context.Canceled) {
+			leftover = storage.JobInterrupted
+		}
+		for jn := range pending {
+			r.finishJob(jobIDs[jn], leftover, nil)
+		}
+	}
 
+	// A shutdown (context.Canceled) cut the run short — operator-induced, so
+	// terminal-but-neutral (interrupted), not a red error. A run-timeout
+	// (DeadlineExceeded) is a genuine infrastructure failure (error).
 	final := storage.RunSuccess
 	switch {
+	case errors.Is(ctx.Err(), context.Canceled):
+		final = storage.RunInterrupted
 	case ctx.Err() != nil:
 		final = storage.RunError
 	case anyNotSuccess:
@@ -536,6 +552,16 @@ func (r *ciRunner) runJob(ctx context.Context, owner, repo string, runNum int, j
 	}
 	sess, err := r.newSession(ctx, containerName(jobID, jobName), workDir, image)
 	if err != nil {
+		// A shutdown mid-open cancels the session's context — interrupted, not a
+		// failure to provision the environment.
+		if errors.Is(ctx.Err(), context.Canceled) {
+			r.emit(elog, ci.EventStepStderr, map[string]any{
+				"step_id": "session", "stream": "stderr", "line": "session interrupted: runner shutting down", "line_number": 1,
+			})
+			r.finishJob(jobID, storage.JobInterrupted, nil)
+			log.Info("ci session interrupted by shutdown", "image", image)
+			return storage.JobInterrupted
+		}
 		r.emit(elog, ci.EventStepStderr, map[string]any{
 			"step_id": "session", "stream": "stderr", "line": err.Error(), "line_number": 1,
 		})
@@ -554,7 +580,22 @@ func (r *ciRunner) runJob(ctx context.Context, owner, repo string, runNum int, j
 
 		res, execErr := sess.Exec(ctx, step.YAML)
 		if execErr != nil {
-			// Couldn't run the step (mooncake missing, or ctx timeout/cancel).
+			// A graceful shutdown cancels the step's context — parent cancellation
+			// surfaces as context.Canceled, distinct from a run-timeout's
+			// DeadlineExceeded. That's operator-induced (a deploy/restart), not a
+			// gate failure, so finalize the job interrupted — neutral, not error.
+			if errors.Is(ctx.Err(), context.Canceled) {
+				r.emit(elog, ci.EventStepStderr, map[string]any{
+					"step_id": stepID, "stream": "stderr", "line": "step interrupted: runner shutting down", "line_number": 1,
+				})
+				r.emit(elog, ci.EventStepCompleted, map[string]any{
+					"step_id": stepID, "result": map[string]any{"rc": -1, "failed": true, "status": "interrupted"},
+				})
+				r.finishJob(jobID, storage.JobInterrupted, nil)
+				log.Info("ci step interrupted by shutdown", "step", stepID)
+				return storage.JobInterrupted
+			}
+			// Couldn't run the step (mooncake missing, or run-timeout).
 			r.emit(elog, ci.EventStepStderr, map[string]any{
 				"step_id": stepID, "stream": "stderr", "line": execErr.Error(), "line_number": 1,
 			})

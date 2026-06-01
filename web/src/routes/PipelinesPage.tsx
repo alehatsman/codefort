@@ -549,7 +549,7 @@ function AgentTranscript({
   // steps/output begin. Gated on the run's terminal status (not the stream's
   // `done`, which also closes on error) so a parked awaiting_input run — turn
   // already completed — correctly shows nothing.
-  const terminal = ["success", "failed", "canceled", "error"].includes(run.status)
+  const terminal = ["success", "failed", "canceled", "error", "interrupted"].includes(run.status)
   const phase = useMemo<"planning" | "working" | null>(() => {
     if (terminal || error) return null
     let started = 0
@@ -600,7 +600,7 @@ function AgentMessageBox({
   const [text, setText] = useState("")
   const send = useCreateAgentTurn(owner, repo, runNumber)
   const finish = useFinishAgentRun(owner, repo, runNumber)
-  const terminal = ["success", "failed", "canceled", "error"].includes(run.status)
+  const terminal = ["success", "failed", "canceled", "error", "interrupted"].includes(run.status)
   const queued = (run.turns ?? []).filter((t) => t.status === "pending" || t.status === "running")
 
   if (terminal) {

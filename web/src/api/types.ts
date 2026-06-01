@@ -432,9 +432,17 @@ export type CIRunStatus =
   | "failed"
   | "canceled"
   | "error"
+  | "interrupted" // runner went away mid-flight (shutdown/restart) — neutral, not a gate failure
 
 // Mirrors storage.JobStatus.
-export type CIJobStatus = "queued" | "running" | "success" | "failed" | "skipped" | "error"
+export type CIJobStatus =
+  | "queued"
+  | "running"
+  | "success"
+  | "failed"
+  | "skipped"
+  | "error"
+  | "interrupted"
 
 // Mirrors storage.RunKind: a normal pipeline run vs. an issue-spawned agent run.
 export type CIRunKind = "ci" | "agent"

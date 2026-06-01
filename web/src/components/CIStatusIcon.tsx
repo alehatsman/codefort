@@ -25,7 +25,7 @@ export default function CIStatusIcon({ status, size = 16, className = "" }: Prop
     "aria-label": `CI ${status}`,
   }
   // success: check-circle; failed/error: x-circle; running: clock;
-  // queued: open circle; canceled: circle-slash.
+  // queued: open circle; canceled: circle-slash; interrupted: pause-circle.
   switch (status) {
     case "success":
       return (
@@ -58,6 +58,15 @@ export default function CIStatusIcon({ status, size = 16, className = "" }: Prop
           <title>{`CI ${status}`}</title>
           <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z" />
           <path d="M4.97 4.97a.75.75 0 0 1 1.06 0l4.999 5a.75.75 0 0 1-1.06 1.06l-5-5a.75.75 0 0 1 0-1.06Z" />
+        </svg>
+      )
+    case "interrupted":
+      // pause-circle — work cut short by the runner going away, not a verdict.
+      return (
+        <svg {...svgProps}>
+          <title>{`CI ${status}`}</title>
+          <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z" />
+          <path d="M6.25 5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 6.25 5Zm3.5 0a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 9.75 5Z" />
         </svg>
       )
     default:

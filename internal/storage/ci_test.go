@@ -255,12 +255,14 @@ func TestReconcileOrphanRuns(t *testing.T) {
 		t.Fatalf("reconciled = %d, want 1", n)
 	}
 
+	// A restart-stranded run is interrupted (runner went away), not a gate
+	// error: its running and still-queued jobs all land interrupted too.
 	got, _ := GetRun(db, repoID, orphan.Number)
-	if got.Status != RunError || got.FinishedAt == nil {
-		t.Errorf("orphan run = %q finished=%v, want error + finished_at", got.Status, got.FinishedAt)
+	if got.Status != RunInterrupted || got.FinishedAt == nil {
+		t.Errorf("orphan run = %q finished=%v, want interrupted + finished_at", got.Status, got.FinishedAt)
 	}
 	jobs, _ := ListJobs(db, orphan.ID)
-	want := map[string]JobStatus{"build": JobError, "test": JobSkipped, "vet": JobSkipped}
+	want := map[string]JobStatus{"build": JobInterrupted, "test": JobInterrupted, "vet": JobInterrupted}
 	for _, j := range jobs {
 		if j.Status != want[j.Name] {
 			t.Errorf("job %q = %q, want %q", j.Name, j.Status, want[j.Name])

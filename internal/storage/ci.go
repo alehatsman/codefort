@@ -26,12 +26,20 @@ const (
 	RunFailed    RunStatus = "failed"
 	RunCanceled  RunStatus = "canceled"
 	RunError     RunStatus = "error" // infrastructure failure (checkout/parse), not a job's non-zero exit
+	// RunInterrupted is a run whose work was cut short by the runner going
+	// away — a graceful shutdown (deploy/restart) cancelled an in-flight step,
+	// or a crash left it orphaned. It is operator-induced, not a gate result,
+	// so it's terminal but distinct from RunError/RunFailed: the UI renders it
+	// neutral, not red, and the operator can rerun. (RunCanceled stays reserved
+	// for a gated run — CI off / no mgitci.yml — which is a different "didn't
+	// run" meaning.)
+	RunInterrupted RunStatus = "interrupted"
 )
 
 // Terminal reports whether the status is a final state (no further transitions).
 func (s RunStatus) Terminal() bool {
 	switch s {
-	case RunSuccess, RunFailed, RunCanceled, RunError:
+	case RunSuccess, RunFailed, RunCanceled, RunError, RunInterrupted:
 		return true
 	default:
 		return false
@@ -71,6 +79,10 @@ const (
 	JobFailed  JobStatus = "failed"
 	JobSkipped JobStatus = "skipped"
 	JobError   JobStatus = "error"
+	// JobInterrupted mirrors RunInterrupted at the job level: the job's step
+	// was cancelled by a runner shutdown, or it was still queued/running when
+	// the runner went away. Not a gate failure.
+	JobInterrupted JobStatus = "interrupted"
 )
 
 // ErrNoRunQueued is returned by ClaimNextRun when there is no claimable run.
@@ -300,10 +312,12 @@ func FinishRun(db *sql.DB, runID int64, status RunStatus) error {
 // at startup too). It must be called at startup, before the runner takes new
 // work, when no run can legitimately be in flight: every 'running' run — and
 // every agent run parked in 'awaiting_input', whose container the startup
-// sweep just removed — is therefore an orphan. Each is marked error, its
-// running job errored, its queued jobs skipped, and its un-finished turns
-// errored, so the UI shows a terminal result instead of something stuck
-// forever. Returns the number of runs reconciled.
+// sweep just removed — is therefore an orphan. Each is marked interrupted
+// (the runner went away mid-flight — operator-induced, not a gate failure),
+// its running and still-queued jobs likewise interrupted, and its un-finished
+// turns errored, so the UI shows a neutral terminal result instead of
+// something stuck forever — or a misleading red. Returns the number of runs
+// reconciled.
 func ReconcileOrphanRuns(db *sql.DB) (int, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -314,16 +328,13 @@ func ReconcileOrphanRuns(db *sql.DB) (int, error) {
 	// Orphans are runs left running or (agent-only) awaiting_input/finishing.
 	const orphanRuns = `SELECT id FROM ci_runs WHERE status IN ('running','awaiting_input','finishing')`
 
+	// A running or still-queued job in an orphaned run never reached a verdict —
+	// it was cut short, not failed or dependency-skipped — so both land
+	// interrupted.
 	if _, err := tx.Exec(`
 		UPDATE ci_jobs SET status = ?, finished_at = strftime('%s','now')
-		 WHERE status = ? AND run_id IN (`+orphanRuns+`)
-	`, string(JobError), string(JobRunning)); err != nil {
-		return 0, err
-	}
-	if _, err := tx.Exec(`
-		UPDATE ci_jobs SET status = ?, finished_at = strftime('%s','now')
-		 WHERE status = ? AND run_id IN (`+orphanRuns+`)
-	`, string(JobSkipped), string(JobQueued)); err != nil {
+		 WHERE status IN (?, ?) AND run_id IN (`+orphanRuns+`)
+	`, string(JobInterrupted), string(JobRunning), string(JobQueued)); err != nil {
 		return 0, err
 	}
 	// Error any pending/running turns of the orphaned agent runs.
@@ -336,7 +347,7 @@ func ReconcileOrphanRuns(db *sql.DB) (int, error) {
 	res, err := tx.Exec(`
 		UPDATE ci_runs SET status = ?, finished_at = strftime('%s','now')
 		 WHERE status IN ('running','awaiting_input','finishing')
-	`, string(RunError))
+	`, string(RunInterrupted))
 	if err != nil {
 		return 0, err
 	}

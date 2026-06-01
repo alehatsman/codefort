@@ -472,7 +472,8 @@ pre {
   color: var(--state-closed);
 }
 .ci-icon--queued,
-.ci-icon--canceled {
+.ci-icon--canceled,
+.ci-icon--interrupted {
   color: var(--fg-muted);
 }
 .card__meta {
@@ -3024,7 +3025,8 @@ h3 {
 }
 .ci-badge--queued,
 .ci-badge--canceled,
-.ci-badge--skipped {
+.ci-badge--skipped,
+.ci-badge--interrupted {
   background: var(--neutral-muted);
   color: var(--fg-muted);
 }
@@ -3148,7 +3150,8 @@ h3 {
 }
 .ci-dag__job--skipped,
 .ci-dag__job--queued,
-.ci-dag__job--canceled {
+.ci-dag__job--canceled,
+.ci-dag__job--interrupted {
   border-left-color: var(--border);
 }
 /* Selection is a ring, kept distinct from the status accent (the colored left
@@ -3210,6 +3213,9 @@ h3 {
 .ci-step__status--running {
   background: var(--state-in_progress);
   animation: ci-pulse 1.2s ease-in-out infinite;
+}
+.ci-step__status--interrupted {
+  background: var(--fg-muted);
 }
 @keyframes ci-pulse {
   50% {

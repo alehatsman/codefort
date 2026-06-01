@@ -162,9 +162,12 @@ func TestReconcileFinalizesAwaitingInput(t *testing.T) {
 	if cnt != 1 {
 		t.Errorf("reconciled = %d, want 1 (the awaiting_input agent run)", cnt)
 	}
+	// An orphaned (restart-stranded) run reconciles to interrupted, not error —
+	// the runner went away, it wasn't a gate failure (#143). Its un-finished
+	// turns still error (no interrupted turn state).
 	after, _ := GetRun(db, repoID, run.Number)
-	if after.Status != RunError {
-		t.Errorf("run status = %q, want error", after.Status)
+	if after.Status != RunInterrupted {
+		t.Errorf("run status = %q, want interrupted", after.Status)
 	}
 	turns, _ := ListTurns(db, run.ID)
 	if turns[0].Status != TurnError {
