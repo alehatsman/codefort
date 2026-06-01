@@ -156,7 +156,7 @@ function JobLog({
               )}
             </div>
             {step.lines.length > 0 && (
-              <pre className="ci-log">
+              <div className="ci-log">
                 {step.lines.map((l, i) => (
                   <span
                     // biome-ignore lint/suspicious/noArrayIndexKey: append-only log output, no stable id; line order never changes
@@ -169,7 +169,7 @@ function JobLog({
                     {"\n"}
                   </span>
                 ))}
-              </pre>
+              </div>
             )}
           </div>
         )
