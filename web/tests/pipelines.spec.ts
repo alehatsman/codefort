@@ -518,6 +518,13 @@ test("an awaiting-input agent run shows a message box and queues a follow-up", a
   await page.getByRole("button", { name: "Finish" }).click()
   await expect.poll(() => state.ciRuns[0].status).toBe("finishing")
   await expect(page.getByText(/Finishing/)).toBeVisible()
+
+  // The handoff settles server-side. Because "finishing" stays a live status,
+  // the detail poll keeps running and the UI transitions to the terminal note
+  // on its own — no manual reload (regression: #124).
+  state.ciRuns[0].status = "success"
+  state.ciRuns[0].finished_at = iso
+  await expect(page.getByText(/This agent run has finished/)).toBeVisible()
 })
 
 test("run detail surfaces commit context, the job DAG, and step commands", async ({ page }) => {

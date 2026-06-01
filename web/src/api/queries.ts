@@ -48,11 +48,14 @@ export const keys = {
   pull: (owner: string, repo: string, n: number) => ["pull", owner, repo, n] as const,
 }
 
-// A run is "live" (queued or running) until it reaches a terminal state. Lists
-// and detail views poll while anything is live so status/duration tick without
-// a manual refresh; once everything settles, polling stops.
+// A run is "live" until it reaches a terminal state. Lists and detail views
+// poll while anything is live so status/duration tick without a manual refresh;
+// once everything settles, polling stops. "finishing" is transient and
+// server-driven (branch + summary handoff → terminal), so it must keep polling;
+// "awaiting_input" is genuinely idle (the send-turn mutation drives it onward),
+// so it stays excluded.
 function isLiveStatus(status: CIRun["status"]): boolean {
-  return status === "queued" || status === "running"
+  return status === "queued" || status === "running" || status === "finishing"
 }
 
 export function useWhoami() {
