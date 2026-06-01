@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"strconv"
+	"time"
 
 	"github.com/alehatsman/moongit/internal/ci"
 	"github.com/alehatsman/moongit/internal/config"
@@ -34,6 +35,14 @@ type mooncakeExecutor struct {
 	denyActions  []string
 	denyNetwork  bool
 	maxRisk      int
+	// llmTimeout aligns mooncake's per-iteration plan-generation cap with our
+	// own per-turn budget (#176). mooncake's built-in default is 5m, which can
+	// SIGKILL a thinking-heavy planner ("claude CLI failed: signal: killed")
+	// long before our AgentTurnTimeout would fire. Passing AgentTurnTimeout as
+	// --llm-timeout makes mooncake's internal cap never stricter than ours, so
+	// our context deadline stays the real governor. Zero = don't pass the flag
+	// (keep mooncake's default).
+	llmTimeout time.Duration
 }
 
 // newMooncakeExecutor builds the mooncake executor from config. allowShell is the
@@ -49,6 +58,7 @@ func newMooncakeExecutor(cfg *config.Config, allowShell bool) *mooncakeExecutor 
 		p.denyActions = cfg.AgentMooncakeDenyActions
 		p.denyNetwork = cfg.AgentMooncakeDenyNetwork
 		p.maxRisk = cfg.AgentMooncakeMaxRisk
+		p.llmTimeout = cfg.AgentTurnTimeout
 	}
 	if allowShell {
 		p.denyActions = withoutShellCmd(p.denyActions)
@@ -86,6 +96,11 @@ func (p *mooncakeExecutor) Argv(in turnInput) []string {
 		"--auto-apply",
 		"--max-iterations", strconv.Itoa(p.maxIterations),
 		"--output-format", "json",
+	}
+	// Align mooncake's per-iteration plan-gen cap with our turn budget (#176)
+	// so its 5m default can't SIGKILL a long planner before AgentTurnTimeout.
+	if p.llmTimeout > 0 {
+		argv = append(argv, "--llm-timeout", p.llmTimeout.String())
 	}
 	// Policy flags (#11): re-establish the execution wall under mooncake's
 	// control. deny wins over allow; a denied/over-risk/egress step fails the

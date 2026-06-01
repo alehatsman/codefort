@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/alehatsman/moongit/internal/ci"
 	"github.com/alehatsman/moongit/internal/config"
@@ -14,6 +15,7 @@ func TestMooncakeExecutorArgv(t *testing.T) {
 		AgentMooncakeAllowActions:  []string{"file.write"},
 		AgentMooncakeDenyNetwork:   true,
 		AgentMooncakeMaxRisk:       6,
+		AgentTurnTimeout:           15 * time.Minute,
 	}, false)
 	if p.Model() != agentModelMooncakeAgent {
 		t.Fatalf("Model() = %q, want %q", p.Model(), agentModelMooncakeAgent)
@@ -49,6 +51,19 @@ func TestMooncakeExecutorArgv(t *testing.T) {
 	}
 	if !argvHas(argv, "--max-risk", "6") {
 		t.Errorf("missing --max-risk 6: %v", argv)
+	}
+	// AgentTurnTimeout threaded as --llm-timeout so mooncake's 5m default
+	// can't SIGKILL a long planner before our turn cap fires (#176).
+	if !argvHas(argv, "--llm-timeout", "15m0s") {
+		t.Errorf("AgentTurnTimeout not threaded as --llm-timeout: %v", argv)
+	}
+}
+
+func TestMooncakeExecutorArgvNoLLMTimeout(t *testing.T) {
+	// Zero AgentTurnTimeout (turn cap disabled) → no --llm-timeout flag, so
+	// mooncake keeps its own built-in default.
+	if argv := newMooncakeExecutor(&config.Config{}, false).Argv(turnInput{message: "g"}); argvContains(argv, "--llm-timeout") {
+		t.Errorf("zero AgentTurnTimeout should omit --llm-timeout: %v", argv)
 	}
 }
 
