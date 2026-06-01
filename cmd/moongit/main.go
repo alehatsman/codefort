@@ -939,6 +939,11 @@ func runRepoDelete(args []string) error {
 	if resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("repo not found: %s/%s", owner, repo)
 	}
+	// In-flight CI/agent runs block deletion; the server's message names the
+	// count, so surface it as-is rather than a bare status code.
+	if resp.StatusCode == http.StatusConflict {
+		return errors.New(decodeError(raw))
+	}
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
 	}

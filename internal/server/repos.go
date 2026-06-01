@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/moongit/internal/ci"
 	"github.com/alehatsman/moongit/internal/storage"
 )
 
@@ -218,6 +219,21 @@ func (s *Server) handleDeleteRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Refuse while runs are in flight. The cascade would delete the ci_runs
+	// rows out from under a live runner goroutine (whose status writes then
+	// no-op, leaving a container/workspace running until the next restart's
+	// sweep). 409 with a count so the caller cancels or waits, then retries.
+	if active, err := storage.CountActiveRuns(s.db, repoID); err != nil {
+		s.logger.Error("delete repo active runs", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	} else if active > 0 {
+		writeError(w, http.StatusConflict, fmt.Sprintf(
+			"repo %s/%s has %d in-flight run(s); cancel or wait for them to finish before deleting",
+			owner, repo, active))
+		return
+	}
+
 	if err := storage.DeleteRepo(s.db, repoID); err != nil {
 		s.logger.Error("delete repo", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -235,6 +251,17 @@ func (s *Server) handleDeleteRepo(w http.ResponseWriter, r *http.Request) {
 		// os.Remove only succeeds on an empty dir, which is exactly the prune
 		// we want; a non-empty owner dir (other repos) errors and is left be.
 		_ = os.Remove(filepath.Join(s.cfg.ReposDir, owner))
+	}
+
+	// Remove the repo's CI/agent event-log tree under the data dir too — it
+	// lives outside ReposDir (see ci.RepoLogDir), so the git-dir removal above
+	// doesn't touch it, and without this every run's logs would outlive the
+	// repo. Best-effort and same owner-dir prune as above.
+	logDir := ci.RepoLogDir(s.cfg.DataDir, owner, repo)
+	if err := os.RemoveAll(logDir); err != nil {
+		s.logger.Error("delete repo log dir", "dir", logDir, "err", err)
+	} else {
+		_ = os.Remove(filepath.Join(s.cfg.DataDir, "ci", owner))
 	}
 
 	// Emit the event without a repo_id: the repos row is gone and events
