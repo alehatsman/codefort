@@ -22,14 +22,27 @@ const pilotMaxIterationsDefault = 10
 // does, so the same server-side handoff materializes the branch.
 type pilotExecutor struct {
 	maxIterations int
+	// Policy (#110/#11): mooncake enforces these per run at preflight, so a
+	// denied step fails before any side effect. This is the execution wall
+	// that moving off Claude's managed Bash policy would otherwise lose.
+	allowActions []string
+	denyActions  []string
+	denyNetwork  bool
+	maxRisk      int
 }
 
 func newPilotExecutor(cfg *config.Config) *pilotExecutor {
-	iters := pilotMaxIterationsDefault
-	if cfg != nil && cfg.AgentPilotMaxIterations > 0 {
-		iters = cfg.AgentPilotMaxIterations
+	p := &pilotExecutor{maxIterations: pilotMaxIterationsDefault}
+	if cfg != nil {
+		if cfg.AgentPilotMaxIterations > 0 {
+			p.maxIterations = cfg.AgentPilotMaxIterations
+		}
+		p.allowActions = cfg.AgentPilotAllowActions
+		p.denyActions = cfg.AgentPilotDenyActions
+		p.denyNetwork = cfg.AgentPilotDenyNetwork
+		p.maxRisk = cfg.AgentPilotMaxRisk
 	}
-	return &pilotExecutor{maxIterations: iters}
+	return p
 }
 
 func (*pilotExecutor) Model() string { return agentModelMooncakePilot }
@@ -40,7 +53,7 @@ func (*pilotExecutor) Model() string { return agentModelMooncakePilot }
 // and sessionID/systemPrompt/resume are unused. --output-format json gives
 // the NDJSON event stream Translate parses; --auto-apply runs unattended.
 func (p *pilotExecutor) Argv(spec turnSpec) []string {
-	return []string{
+	argv := []string{
 		"mooncake", "pilot", "run",
 		"--goal", spec.prompt,
 		"--provider", "anthropic-cli",
@@ -49,6 +62,22 @@ func (p *pilotExecutor) Argv(spec turnSpec) []string {
 		"--max-iterations", strconv.Itoa(p.maxIterations),
 		"--output-format", "json",
 	}
+	// Policy flags (#11): re-establish the execution wall under mooncake's
+	// control. deny wins over allow; a denied/over-risk/egress step fails the
+	// run before any side effect.
+	for _, a := range p.allowActions {
+		argv = append(argv, "--allow-action", a)
+	}
+	for _, a := range p.denyActions {
+		argv = append(argv, "--deny-action", a)
+	}
+	if p.denyNetwork {
+		argv = append(argv, "--deny-network")
+	}
+	if p.maxRisk > 0 {
+		argv = append(argv, "--max-risk", strconv.Itoa(p.maxRisk))
+	}
+	return argv
 }
 
 // Translate maps one line of mooncake's NDJSON event stream onto an

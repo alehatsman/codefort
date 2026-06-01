@@ -8,7 +8,13 @@ import (
 )
 
 func TestPilotExecutorArgv(t *testing.T) {
-	p := newPilotExecutor(&config.Config{AgentPilotMaxIterations: 7})
+	p := newPilotExecutor(&config.Config{
+		AgentPilotMaxIterations: 7,
+		AgentPilotDenyActions:   []string{"shell", "cmd"},
+		AgentPilotAllowActions:  []string{"file.write"},
+		AgentPilotDenyNetwork:   true,
+		AgentPilotMaxRisk:       6,
+	})
 	if p.Model() != agentModelMooncakePilot {
 		t.Fatalf("Model() = %q, want %q", p.Model(), agentModelMooncakePilot)
 	}
@@ -30,6 +36,30 @@ func TestPilotExecutorArgv(t *testing.T) {
 	}
 	if !argvHas(argv, "--max-iterations", "7") {
 		t.Errorf("max-iterations not threaded from config: %v", argv)
+	}
+	// Policy flags (#11) threaded from config.
+	if !argvHas(argv, "--deny-action", "shell") || !argvHas(argv, "--deny-action", "cmd") {
+		t.Errorf("missing --deny-action shell/cmd: %v", argv)
+	}
+	if !argvHas(argv, "--allow-action", "file.write") {
+		t.Errorf("missing --allow-action file.write: %v", argv)
+	}
+	if !argvContains(argv, "--deny-network") {
+		t.Errorf("missing --deny-network: %v", argv)
+	}
+	if !argvHas(argv, "--max-risk", "6") {
+		t.Errorf("missing --max-risk 6: %v", argv)
+	}
+}
+
+func TestPilotExecutorArgvNoPolicy(t *testing.T) {
+	// No policy configured → no policy flags emitted (ungated, operator's
+	// explicit choice via empty deny list).
+	argv := newPilotExecutor(&config.Config{}).Argv(turnSpec{prompt: "g"})
+	for _, f := range []string{"--deny-action", "--allow-action", "--deny-network", "--max-risk"} {
+		if argvContains(argv, f) {
+			t.Errorf("unexpected %s with empty policy: %v", f, argv)
+		}
 	}
 }
 

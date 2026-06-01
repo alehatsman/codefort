@@ -120,6 +120,20 @@ type Config struct {
 	// MOONGIT_AGENT_PILOT_MAX_ITERATIONS.
 	AgentPilotMaxIterations int
 
+	// mooncake-pilot policy (#110/#11): mooncake enforces these per run at
+	// executor preflight, re-establishing the execution wall that moving off
+	// Claude's managed Bash policy loses. A denied step fails the run before
+	// any side effect. DenyActions defaults to {shell,cmd} (the agent uses
+	// typed actions, not a raw shell) and is cleared by setting an empty
+	// MOONGIT_AGENT_PILOT_DENY_ACTIONS. AllowActions is an optional allowlist
+	// (deny wins). DenyNetwork refuses egress steps; MaxRisk (1..10, 0=off)
+	// caps a step's estimated risk band. Set via MOONGIT_AGENT_PILOT_{ALLOW,
+	// DENY}_ACTIONS (comma-sep), _DENY_NETWORK, _MAX_RISK.
+	AgentPilotAllowActions []string
+	AgentPilotDenyActions  []string
+	AgentPilotDenyNetwork  bool
+	AgentPilotMaxRisk      int
+
 	// DexProject is the dex project id (keyed by the canonical repo root) the
 	// agent's dex MCP queries. Empty omits the dex MCP wiring. Set via
 	// MOONGIT_AGENT_DEX_PROJECT.
@@ -256,6 +270,21 @@ func Load() (*Config, error) {
 	}
 	cfg.AgentPilotMaxIterations = pilotIters
 
+	// Pilot policy. DenyActions defaults to {shell,cmd}; use LookupEnv (not
+	// envOr) so an explicit empty value clears the default to opt into shell.
+	denyRaw := "shell,cmd"
+	if v, ok := os.LookupEnv("MOONGIT_AGENT_PILOT_DENY_ACTIONS"); ok {
+		denyRaw = v
+	}
+	cfg.AgentPilotDenyActions = splitCSV(denyRaw)
+	cfg.AgentPilotAllowActions = splitCSV(os.Getenv("MOONGIT_AGENT_PILOT_ALLOW_ACTIONS"))
+	cfg.AgentPilotDenyNetwork = envOr("MOONGIT_AGENT_PILOT_DENY_NETWORK", "false") == "true"
+	pilotRisk, err := strconv.Atoi(envOr("MOONGIT_AGENT_PILOT_MAX_RISK", "0"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_AGENT_PILOT_MAX_RISK: %w", err)
+	}
+	cfg.AgentPilotMaxRisk = pilotRisk
+
 	return cfg, nil
 }
 
@@ -273,4 +302,17 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// splitCSV parses a comma-separated env value into a trimmed, empty-dropped
+// slice. Returns nil for an empty/blank input so callers can treat "unset" and
+// "no entries" the same.
+func splitCSV(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
