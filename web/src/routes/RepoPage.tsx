@@ -13,7 +13,6 @@ import {
   useTreeCommits,
   useWhoami,
 } from "../api/queries"
-import BranchSelector from "../components/BranchSelector"
 import FileTree from "../components/FileTree"
 import LatestCommitBar from "../components/LatestCommitBar"
 import CommitMeta from "../components/CommitMeta"
@@ -22,6 +21,7 @@ import OverviewCard from "../components/OverviewCard"
 import NotFound from "../components/NotFound"
 import { findReadme } from "../lib/readme"
 import { useListNav } from "../lib/keyboardNav"
+import BranchSelector from "../components/BranchSelector"
 
 // The highlighter grammars are heavy; load them only when a file is viewed.
 const CodeView = lazy(() => import("../components/CodeView"))
@@ -57,9 +57,6 @@ export default function RepoPage() {
 
   return (
     <div className="repo">
-      <div className="repo-toolbar">
-        <BranchSelector owner={r.owner} repo={r.name} />
-      </div>
       {isBlob ? (
         <BlobView
           owner={r.owner}
@@ -141,6 +138,7 @@ function TreeView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   return (
     <>
       <OverviewCard owner={owner} repo={repo} path={path} summaries={summaries} />
+      <BranchSelector owner={owner} repo={repo} />
       <LatestCommitBar
         owner={owner}
         repo={repo}
@@ -201,6 +199,7 @@ function BlobView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   return (
     <>
       <OverviewCard owner={owner} repo={repo} path={path} summaries={summaries} />
+      <BranchSelector owner={owner} repo={repo} />
       <div className="blob">
         {lastCommit && (
           <CommitMeta
