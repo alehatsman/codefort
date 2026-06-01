@@ -81,7 +81,7 @@ function AgentTranscript({
 
   // A turn is in flight while its agent.turn.started has no matching
   // turn.completed. During that window the agent is busy but emits nothing
-  // while it plans (mooncake-pilot runs Claude as a one-shot planner, then
+  // while it plans (mooncake-agent runs Claude as a one-shot planner, then
   // bursts the steps), so without a hint the silent gap reads as a hang.
   // "planning" until the turn produces its first entry, "working" once
   // steps/output begin. Gated on the run's terminal status (not the stream's
@@ -414,14 +414,14 @@ interface AgentEntry {
 // foldAgentEvents reduces the agent event stream into display entries. An
 // agent.message carries either a claude stream-json object under data.claude
 // (claude-edit runs) or a mooncake NDJSON event under data.mooncake
-// (mooncake-pilot runs); we fold each into human-meaningful entries and fall
+// (mooncake-agent runs); we fold each into human-meaningful entries and fall
 // back to compact JSON for anything unrecognized, so the transcript stays
 // faithful even as either schema evolves.
 function foldAgentEvents(events: CIEvent[]): AgentEntry[] {
   const out: AgentEntry[] = []
-  // mooncake-pilot streams each step as separate started/stdout/completed
+  // mooncake-agent streams each step as separate started/stdout/completed
   // events; accumulate per-step output to emit one entry per completed step.
-  const pilot: PilotState = { steps: new Map() }
+  const mc: MooncakeState = { steps: new Map() }
 
   for (const ev of events) {
     const d = ev.data ?? {}
@@ -449,7 +449,7 @@ function foldAgentEvents(events: CIEvent[]): AgentEntry[] {
         break
       case "agent.message":
         if (d.mooncake) {
-          out.push(...foldMooncakeEvent(d.mooncake as Record<string, unknown>, pilot, out))
+          out.push(...foldMooncakeEvent(d.mooncake as Record<string, unknown>, mc, out))
         } else {
           out.push(...foldClaudeMessage(d.claude as Record<string, unknown> | undefined))
         }
@@ -460,11 +460,11 @@ function foldAgentEvents(events: CIEvent[]): AgentEntry[] {
   return out
 }
 
-// PilotState carries the in-flight mooncake steps across the fold: a step's
+// MooncakeState carries the in-flight mooncake steps across the fold: a step's
 // output (stdout/stderr/file changes) streams between its started and completed
 // events, so we buffer it keyed by step_id (last = the step in flight, for
 // events like file.created that omit step_id).
-interface PilotState {
+interface MooncakeState {
   // index is the step's row position in the fold's `out` array, so a later
   // step.completed mutates the same row the step.started pushed (the live ▶
   // line flips in place rather than appending a second row).
@@ -473,7 +473,7 @@ interface PilotState {
 }
 
 // foldMooncakeEvent turns one mooncake NDJSON event (data.mooncake on a
-// mooncake-pilot run's agent.message) into transcript entries, mirroring
+// mooncake-agent run's agent.message) into transcript entries, mirroring
 // mooncake's own terminal renderer: each step is one line whose glyph flips
 // ▶ → ✓/~/✗ in place. step.started pushes the live row into `out` and records
 // its index; the matching step.completed mutates that same row rather than
@@ -482,7 +482,7 @@ interface PilotState {
 // show just the name). run.completed renders the mooncake RECAP line.
 function foldMooncakeEvent(
   m: Record<string, unknown>,
-  pilot: PilotState,
+  mc: MooncakeState,
   out: AgentEntry[]
 ): AgentEntry[] {
   const type = typeof m.type === "string" ? m.type : ""
@@ -502,19 +502,19 @@ function foldMooncakeEvent(
       // can flip it in place.
       const index = out.length
       out.push({ kind: "step", status: "running", label: name || id || "step", text: "" })
-      pilot.steps.set(id, {
+      mc.steps.set(id, {
         action: typeof data.action === "string" ? data.action : undefined,
         name: name || undefined,
         lines: [],
         index,
       })
-      pilot.last = id
+      mc.last = id
       return []
     }
     case "step.stdout":
     case "step.stderr": {
-      const id = data.step_id ? asString(data.step_id) : pilot.last
-      const step = id ? pilot.steps.get(id) : undefined
+      const id = data.step_id ? asString(data.step_id) : mc.last
+      const step = id ? mc.steps.get(id) : undefined
       if (step) step.lines.push(asString(data.line))
       return []
     }
@@ -522,7 +522,7 @@ function foldMooncakeEvent(
     case "file.modified":
     case "file.deleted": {
       // file.* carries no step_id; attach to the step in flight.
-      const step = pilot.last ? pilot.steps.get(pilot.last) : undefined
+      const step = mc.last ? mc.steps.get(mc.last) : undefined
       if (step) step.lines.push(`${type.slice("file.".length)} ${asString(data.path)}`)
       return []
     }
@@ -530,8 +530,8 @@ function foldMooncakeEvent(
     case "step.failed":
     case "step.skipped": {
       const id = asString(data.step_id)
-      const tracked = pilot.steps.get(id)
-      pilot.steps.delete(id)
+      const tracked = mc.steps.get(id)
+      mc.steps.delete(id)
       const result = (data.result as Record<string, unknown>) ?? {}
       const action = tracked?.action ?? (typeof data.action === "string" ? data.action : "")
       // Resolve the terminal status from the event type or the result payload.
@@ -569,18 +569,18 @@ function foldMooncakeEvent(
       if (num("duration_ms") > 0) bits.push(formatDuration(num("duration_ms")))
       return [{ kind: "result", label: "RECAP", text: bits.join("  ") }]
     }
-    case "pilot.completed": {
-      // The pilot wraps one or more plan/execute loops; status + stop_reason
-      // already ride the "Turn complete" line, but the iteration count is shown
-      // nowhere else. Surface it only when the pilot actually re-planned (>1) or
-      // stopped for a non-success reason — otherwise it's noise.
+    case "agent.completed": {
+      // The mooncake agent wraps one or more plan/execute loops; status +
+      // stop_reason already ride the "Turn complete" line, but the iteration
+      // count is shown nowhere else. Surface it only when it actually
+      // re-planned (>1) or stopped for a non-success reason — otherwise noise.
       const iterations = typeof data.iterations === "number" ? data.iterations : 0
       const stop = typeof data.stop_reason === "string" ? data.stop_reason : ""
       const bits: string[] = []
       if (iterations > 1) bits.push(`${iterations} iterations`)
       if (stop && stop !== "success") bits.push(stop)
       if (bits.length === 0) return []
-      return [{ kind: "system", label: "pilot", text: bits.join(" · ") }]
+      return [{ kind: "system", label: "mooncake", text: bits.join(" · ") }]
     }
     default:
       // run.started, etc — redundant with the above / the turn line.

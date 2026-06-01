@@ -17,7 +17,7 @@ func TestNewAgentExecutorSelection(t *testing.T) {
 	}{
 		{"", agentModelClaudeEdit, false}, // empty → default
 		{agentModelClaudeEdit, agentModelClaudeEdit, false},
-		{agentModelMooncakePilot, agentModelMooncakePilot, false},
+		{agentModelMooncakeAgent, agentModelMooncakeAgent, false},
 		{"bogus", "", true},
 	}
 	for _, c := range cases {

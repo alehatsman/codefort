@@ -177,11 +177,11 @@ test("agent section sets the default execution model", async ({ page }) => {
   const putReq = page.waitForRequest(
     (r) => r.url().includes("/api/settings/agent") && r.method() === "PUT",
   )
-  await select.selectOption("mooncake-pilot")
-  expect((await putReq).postDataJSON()).toMatchObject({ execution_model: "mooncake-pilot" })
+  await select.selectOption("mooncake-agent")
+  expect((await putReq).postDataJSON()).toMatchObject({ execution_model: "mooncake-agent" })
 
   // The GET reflects the new default after the mutation settles.
-  await expect(select).toHaveValue("mooncake-pilot")
+  await expect(select).toHaveValue("mooncake-agent")
 })
 
 test("agent section sets a custom endpoint base URL and gateway auth token", async ({ page }) => {

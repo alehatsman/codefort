@@ -115,8 +115,8 @@ func materializeAgentBranch(ctx context.Context, bareRepo, base, workDir, ref, a
 	if _, err := runGit(ctx, env, "read-tree", base); err != nil {
 		return "", false, fmt.Errorf("read-tree: %w", err)
 	}
-	// Snapshot the worktree, but exclude the mooncake-pilot scratch dir
-	// (.mooncake/pilot/iterations etc.) — it's per-run executor bookkeeping,
+	// Snapshot the worktree, but exclude the mooncake-agent scratch dir
+	// (.mooncake/agent/iterations etc.) — it's per-run executor bookkeeping,
 	// not part of the agent's change to the repo. (.git is skipped by git
 	// natively.)
 	if _, err := runGit(ctx, env, "add", "-A", "--", ".", ":(exclude).mooncake"); err != nil {
@@ -218,7 +218,7 @@ func runGit(ctx context.Context, env []string, args ...string) (string, error) {
 //
 // The workspace is a `git clone --local` of the server-side bare repo
 // (gitCheckout), so it's already a real repo with history detached at the base
-// commit — the mooncake-pilot model's git snapshot/diff/transaction steps work
+// commit — the mooncake-agent model's git snapshot/diff/transaction steps work
 // against it as-is. But clone sets `origin` to the bare repo's local filesystem
 // path (e.g. /…/repos/o/r.git), which mgit's parseRemote can't read — it has no
 // URL scheme, so every in-container mgit call failed with
@@ -228,7 +228,7 @@ func runGit(ctx context.Context, env []string, args ...string) (string, error) {
 //
 // remoteURL empty → no-op (claude-edit doesn't run mgit and needs no remote).
 // Idempotent: a re-park/retry that re-enters here just re-points the remote.
-// Best-effort — only the pilot/mgit path depends on it.
+// Best-effort — only the mooncake/mgit path depends on it.
 func wireAgentMoongitRemote(ctx context.Context, workDir, remoteURL string) error {
 	if remoteURL == "" {
 		return nil

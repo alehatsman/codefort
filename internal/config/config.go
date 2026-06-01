@@ -114,25 +114,25 @@ type Config struct {
 	// http://host.docker.internal:<port-of-Addr>. Set via MOONGIT_AGENT_SERVER_URL.
 	AgentServerURL string
 
-	// AgentPilotMaxIterations caps the plan→apply iterations a single
-	// mooncake-pilot turn runs (`mooncake pilot run --max-iterations`).
-	// Only used by the mooncake-pilot execution model (#110). Set via
-	// MOONGIT_AGENT_PILOT_MAX_ITERATIONS.
-	AgentPilotMaxIterations int
+	// AgentMooncakeMaxIterations caps the plan→apply iterations a single
+	// mooncake-agent turn runs (`mooncake agent run --max-iterations`).
+	// Only used by the mooncake-agent execution model (#110). Set via
+	// MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS.
+	AgentMooncakeMaxIterations int
 
-	// mooncake-pilot policy (#110/#11): mooncake enforces these per run at
+	// mooncake-agent policy (#110/#11): mooncake enforces these per run at
 	// executor preflight, re-establishing the execution wall that moving off
 	// Claude's managed Bash policy loses. A denied step fails the run before
 	// any side effect. DenyActions defaults to {shell,cmd} (the agent uses
 	// typed actions, not a raw shell) and is cleared by setting an empty
-	// MOONGIT_AGENT_PILOT_DENY_ACTIONS. AllowActions is an optional allowlist
+	// MOONGIT_AGENT_MOONCAKE_DENY_ACTIONS. AllowActions is an optional allowlist
 	// (deny wins). DenyNetwork refuses egress steps; MaxRisk (1..10, 0=off)
-	// caps a step's estimated risk band. Set via MOONGIT_AGENT_PILOT_{ALLOW,
+	// caps a step's estimated risk band. Set via MOONGIT_AGENT_MOONCAKE_{ALLOW,
 	// DENY}_ACTIONS (comma-sep), _DENY_NETWORK, _MAX_RISK.
-	AgentPilotAllowActions []string
-	AgentPilotDenyActions  []string
-	AgentPilotDenyNetwork  bool
-	AgentPilotMaxRisk      int
+	AgentMooncakeAllowActions []string
+	AgentMooncakeDenyActions  []string
+	AgentMooncakeDenyNetwork  bool
+	AgentMooncakeMaxRisk      int
 
 	// DexProject is the dex project id (keyed by the canonical repo root) the
 	// agent's dex MCP queries. Empty omits the dex MCP wiring. Set via
@@ -290,26 +290,26 @@ func Load() (*Config, error) {
 	}
 	cfg.AgentTurnTimeout = agentTurnTimeout
 
-	pilotIters, err := strconv.Atoi(envOr("MOONGIT_AGENT_PILOT_MAX_ITERATIONS", "3"))
+	mooncakeIters, err := strconv.Atoi(envOr("MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS", "3"))
 	if err != nil {
-		return nil, fmt.Errorf("MOONGIT_AGENT_PILOT_MAX_ITERATIONS: %w", err)
+		return nil, fmt.Errorf("MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS: %w", err)
 	}
-	cfg.AgentPilotMaxIterations = pilotIters
+	cfg.AgentMooncakeMaxIterations = mooncakeIters
 
-	// Pilot policy. DenyActions defaults to {shell,cmd}; use LookupEnv (not
+	// Mooncake policy. DenyActions defaults to {shell,cmd}; use LookupEnv (not
 	// envOr) so an explicit empty value clears the default to opt into shell.
 	denyRaw := "shell,cmd"
-	if v, ok := os.LookupEnv("MOONGIT_AGENT_PILOT_DENY_ACTIONS"); ok {
+	if v, ok := os.LookupEnv("MOONGIT_AGENT_MOONCAKE_DENY_ACTIONS"); ok {
 		denyRaw = v
 	}
-	cfg.AgentPilotDenyActions = splitCSV(denyRaw)
-	cfg.AgentPilotAllowActions = splitCSV(os.Getenv("MOONGIT_AGENT_PILOT_ALLOW_ACTIONS"))
-	cfg.AgentPilotDenyNetwork = envOr("MOONGIT_AGENT_PILOT_DENY_NETWORK", "false") == "true"
-	pilotRisk, err := strconv.Atoi(envOr("MOONGIT_AGENT_PILOT_MAX_RISK", "0"))
+	cfg.AgentMooncakeDenyActions = splitCSV(denyRaw)
+	cfg.AgentMooncakeAllowActions = splitCSV(os.Getenv("MOONGIT_AGENT_MOONCAKE_ALLOW_ACTIONS"))
+	cfg.AgentMooncakeDenyNetwork = envOr("MOONGIT_AGENT_MOONCAKE_DENY_NETWORK", "false") == "true"
+	mooncakeRisk, err := strconv.Atoi(envOr("MOONGIT_AGENT_MOONCAKE_MAX_RISK", "0"))
 	if err != nil {
-		return nil, fmt.Errorf("MOONGIT_AGENT_PILOT_MAX_RISK: %w", err)
+		return nil, fmt.Errorf("MOONGIT_AGENT_MOONCAKE_MAX_RISK: %w", err)
 	}
-	cfg.AgentPilotMaxRisk = pilotRisk
+	cfg.AgentMooncakeMaxRisk = mooncakeRisk
 
 	return cfg, nil
 }

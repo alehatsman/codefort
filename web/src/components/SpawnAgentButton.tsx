@@ -17,15 +17,15 @@ const MODELS: { value: CIRunExecutionModel; label: string; hint: string }[] = [
     hint: "Claude edits files directly. Can't run commands.",
   },
   {
-    value: "mooncake-pilot",
-    label: "Mooncake pilot (run actions)",
+    value: "mooncake-agent",
+    label: "Mooncake agent (run actions)",
     hint: "Claude plans; mooncake applies the actions, so commands run.",
   },
 ]
 
 /**
  * Spawns a containerized agent to work this issue. The execution model is
- * chosen here (claude-edit vs mooncake-pilot, #110) and sent with the spawn;
+ * chosen here (claude-edit vs mooncake-agent, #110) and sent with the spawn;
  * the agent run shares the CI run surface, so on success we navigate to its
  * run view under Pipelines, where the transcript streams live. The base
  * defaults to the repo's HEAD (the server resolves it).
@@ -42,11 +42,11 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
   const [picked, setPicked] = useState<CIRunExecutionModel | null>(null)
   const model = picked ?? serverDefault
   const [allowShell, setAllowShell] = useState(false)
-  const isPilot = model === "mooncake-pilot"
+  const isMooncake = model === "mooncake-agent"
 
   function onSpawn() {
     spawn.mutate(
-      { model, allowShell: isPilot && allowShell },
+      { model, allowShell: isMooncake && allowShell },
       { onSuccess: (run) => navigate(`/${owner}/${repo}/agents/${run.number}`) }
     )
   }
@@ -80,7 +80,7 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
           {spawn.isPending ? "Spawning…" : "Spawn agent"}
         </button>
       </div>
-      {isPilot && (
+      {isMooncake && (
         <label className="spawn-agent__shell">
           <input
             type="checkbox"

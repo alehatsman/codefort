@@ -50,7 +50,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 
 	// Select the execution model up front so an unknown model fails before
 	// we spend a workspace + container on it (#110).
-	exec, err := newAgentExecutor(run.ExecutionModel, r.cfg, run.PilotAllowShell)
+	exec, err := newAgentExecutor(run.ExecutionModel, r.cfg, run.MooncakeAllowShell)
 	if err != nil {
 		log.Error("agent executor", "model", run.ExecutionModel, "err", err)
 		r.finish(run, storage.RunError)
@@ -78,12 +78,12 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 
 	// gitCheckout cloned the bare repo into /work, so it's already a real repo
-	// (history detached at the base commit) that the mooncake-pilot model's git
+	// (history detached at the base commit) that the mooncake-agent model's git
 	// snapshot/diff steps run against; claude-edit ignores it. Clone's `origin`
 	// is the bare repo's local path, which mgit can't parse, so wire a `moongit`
 	// remote at the server URL — mgit prefers it over origin — letting the agent
 	// claim/comment/set-state on its issue (#144). Best-effort: a failure here
-	// only matters for the pilot/mgit path, which surfaces its own error.
+	// only matters for the mooncake/mgit path, which surfaces its own error.
 	moongitURL := agentServerURL(r.cfg) + "/" + owner + "/" + name + ".git"
 	if err := wireAgentMoongitRemote(parent, workDir, moongitURL); err != nil {
 		log.Warn("agent wire moongit remote", "err", err)
@@ -189,7 +189,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		r.failAgentRun(run.ID, job.ID, workDir)
 		return
 	}
-	// A turn that ran but reported failure (pilot execution_failed / claude error
+	// A turn that ran but reported failure (mooncake execution_failed / claude error
 	// result) is terminal: finalize the run RunFailed (red) rather than parking
 	// it as a normal awaiting-input checkpoint — parking let a later Finish
 	// report green over a failed session (#145). Only a successful turn parks.
@@ -252,7 +252,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 		return
 	}
 
-	exec, err := newAgentExecutor(run.ExecutionModel, r.cfg, run.PilotAllowShell)
+	exec, err := newAgentExecutor(run.ExecutionModel, r.cfg, run.MooncakeAllowShell)
 	if err != nil {
 		r.emit(elog, ci.EventRunFailed, map[string]any{"error": err.Error()})
 		elog.Close()
@@ -319,7 +319,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 // returns the turn status and any executor error (couldn't run the CLI /
 // cancelled), but does not itself finalize the run or job — the caller decides
 // whether to park or fail. The executor decides what runs (claude vs mooncake
-// pilot) and how to translate its output.
+// agent) and how to translate its output.
 func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession, elog *ci.EventLog, exec agentExecutor, turnNum int, in turnInput) (status string, execErr error) {
 	ctx := parent
 	if r.cfg.AgentTurnTimeout > 0 {
@@ -413,7 +413,7 @@ func (r *ciRunner) failAgentRun(runID, jobID int64, workDir string) {
 }
 
 // failAgentTurnRun finalizes an agent run whose turn *ran* but reported failure
-// (pilot execution_failed / claude error result) — distinct from failAgentRun,
+// (mooncake execution_failed / claude error result) — distinct from failAgentRun,
 // which is for infrastructure breakage (checkout/container/token). It marks the
 // run RunFailed and the job JobFailed so the Agents tab + repo CI badge show a
 // red "failed", like a failed CI run, instead of the old behavior of parking at

@@ -335,7 +335,7 @@ test("agent run renders the claude transcript instead of the job DAG", async ({ 
   await expect(page.locator(".ci-dag")).toHaveCount(0)
 })
 
-test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ page }) => {
+test("a mooncake-agent run renders its steps, not a blank transcript", async ({ page }) => {
   await mockApi(page, {
     repos: [
       {
@@ -353,7 +353,7 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
         number: 1,
         kind: "agent",
         issue_number: 6,
-        execution_model: "mooncake-pilot",
+        execution_model: "mooncake-agent",
         commit_sha: "deadbeefcafe1234",
         ref: "HEAD",
         event: "agent",
@@ -366,7 +366,7 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
         events: {
           agent: [
             { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #6: do it" } },
-            // Pilot events arrive under data.mooncake, not data.claude (#123).
+            // Mooncake events arrive under data.mooncake, not data.claude (#123).
             {
               seq: 2,
               type: "agent.message",
@@ -444,19 +444,19 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
                 },
               },
             },
-            // The pilot looped 3 times before settling — surfaced only because >1.
+            // The mooncake agent looped 3 times before settling — surfaced only because >1.
             {
               seq: 9,
               type: "agent.message",
               time: 0,
               data: {
                 mooncake: {
-                  type: "pilot.completed",
+                  type: "agent.completed",
                   data: { status: "success", stop_reason: "success", iterations: 3 },
                 },
               },
             },
-            // num_turns/duration are 0 for pilot — must not render "0 steps · 0 ms".
+            // num_turns/duration are 0 for mooncake — must not render "0 steps · 0 ms".
             {
               seq: 10,
               type: "agent.turn.completed",
@@ -483,7 +483,7 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
   await expect(page.getByText(/RECAP/)).toBeVisible()
   await expect(page.getByText("ok=2  changed=2  failed=0  1s")).toBeVisible()
   await expect(transcript).not.toContainText("0 steps")
-  // The pilot loop count (otherwise invisible) is surfaced because it re-planned.
+  // The mooncake loop count (otherwise invisible) is surfaced because it re-planned.
   await expect(page.getByText("3 iterations")).toBeVisible()
   // The transcript is a stack of CI-style cards: a "Turn 1" card and a
   // "plan · 2 steps" card whose body holds the steps + recap.
@@ -522,7 +522,7 @@ test("a failed mooncake step shows a ✗ row with its command + error inline", a
         number: 1,
         kind: "agent",
         issue_number: 6,
-        execution_model: "mooncake-pilot",
+        execution_model: "mooncake-agent",
         commit_sha: "deadbeefcafe1234",
         ref: "HEAD",
         event: "agent",
@@ -606,7 +606,7 @@ test("a long agent log virtualizes (windowed cards) and auto-follows the bottom"
         number: 1,
         kind: "agent",
         issue_number: 6,
-        execution_model: "mooncake-pilot",
+        execution_model: "mooncake-agent",
         commit_sha: "deadbeefcafe1234",
         ref: "HEAD",
         event: "agent",
@@ -664,7 +664,7 @@ test("an in-flight agent turn shows a planning/working indicator; a parked run s
   const runBase = {
     kind: "agent" as const,
     issue_number: 6,
-    execution_model: "mooncake-pilot" as const,
+    execution_model: "mooncake-agent" as const,
     commit_sha: "deadbeefcafe1234",
     ref: "HEAD",
     event: "agent",

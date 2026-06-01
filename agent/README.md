@@ -67,11 +67,11 @@ The runner reads these (see `internal/config/config.go`):
 | `MOONGIT_AGENT_ANTHROPIC_API_KEY` | — | alternate API-key auth → `ANTHROPIC_API_KEY`. |
 | `MOONGIT_AGENT_LLM_BASE_URL` | — | optional `ANTHROPIC_BASE_URL` override (a local model later). |
 | `MOONGIT_AGENT_DEX_PROJECT` | — | dex project id the agent's MCP queries (empty omits dex). |
-| `MOONGIT_AGENT_PILOT_MAX_ITERATIONS` | `3` | plan→apply iterations cap per `mooncake-pilot` turn (`mooncake pilot run --max-iterations`). Kept low: the pilot re-runs the whole plan on a failure, so a high cap just re-fails a deterministic step. |
-| `MOONGIT_AGENT_PILOT_DENY_ACTIONS` | `shell,cmd` | comma-sep mooncake action types the pilot may **not** use (`--deny-action`); deny wins over allow. Set empty to allow shell. |
-| `MOONGIT_AGENT_PILOT_ALLOW_ACTIONS` | — | comma-sep allowlist (`--allow-action`); empty = any action not denied. |
-| `MOONGIT_AGENT_PILOT_DENY_NETWORK` | `false` | refuse pilot steps that declare network egress (`--deny-network`). |
-| `MOONGIT_AGENT_PILOT_MAX_RISK` | `0` | refuse pilot steps over this risk band 1..10 (`--max-risk`); 0 = no cap. |
+| `MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS` | `3` | plan→apply iterations cap per `mooncake-agent` turn (`mooncake agent run --max-iterations`). Kept low: the agent re-runs the whole plan on a failure, so a high cap just re-fails a deterministic step. |
+| `MOONGIT_AGENT_MOONCAKE_DENY_ACTIONS` | `shell,cmd` | comma-sep mooncake action types the agent may **not** use (`--deny-action`); deny wins over allow. Set empty to allow shell. |
+| `MOONGIT_AGENT_MOONCAKE_ALLOW_ACTIONS` | — | comma-sep allowlist (`--allow-action`); empty = any action not denied. |
+| `MOONGIT_AGENT_MOONCAKE_DENY_NETWORK` | `false` | refuse agent steps that declare network egress (`--deny-network`). |
+| `MOONGIT_AGENT_MOONCAKE_MAX_RISK` | `0` | refuse agent steps over this risk band 1..10 (`--max-risk`); 0 = no cap. |
 
 **Settings → Agent overrides (#106, no restart):** the operator can set these in
 the UI (persisted in `settings`), and they win over the env per run —
@@ -93,19 +93,19 @@ worktree identically — they differ only in *what runs each turn*:
   with its file tools. Under subscription auth its **Bash/execution tools are
   policy-gated** and not reliably unlockable headlessly, so it **can't run
   commands** (tests, git, mgit). Best for pure code edits.
-- **`mooncake-pilot`** — runs `mooncake pilot run --provider anthropic-cli
+- **`mooncake-agent`** — runs `mooncake agent run --provider anthropic-cli
   --auto-apply --output-format json`. Claude is used **only as a planner**
   (it emits a mooncake plan as text); **mooncake validates and applies** the
   plan, so shell/git/test actions execute under mooncake's control rather than
   claude's gated tool-use. Consumes mooncake's NDJSON event stream (mooncake
-  #48). Iterations are capped by `MOONGIT_AGENT_PILOT_MAX_ITERATIONS`.
+  #48). Iterations are capped by `MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS`.
 
   **Policy (#110/#11):** moving execution into mooncake loses the wall Claude's
   managed Bash policy gave for free, so the runner passes a mooncake per-run
   policy (`--deny-action`/`--allow-action`/`--deny-network`/`--max-risk`) that
   mooncake enforces at preflight — a denied step fails the run *before any side
   effect*. The **default denies `shell` and `cmd`** (the agent uses typed
-  actions, not a raw shell); set `MOONGIT_AGENT_PILOT_DENY_ACTIONS=` empty to
+  actions, not a raw shell); set `MOONGIT_AGENT_MOONCAKE_DENY_ACTIONS=` empty to
   opt into shell (e.g. to let the agent run tests). See the env table above.
 
 ## What the image carries
@@ -124,11 +124,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
 - `dex` — the stdio→REST MCP shim, wired via a generated `--mcp-config` (#77).
 - `mgit` — the moongit issue client (`MOONGIT_TOKEN`/`MOONGIT_SERVER` are
   injected per run). Under **`claude-edit`** Claude can't invoke it (headless
-  Bash is policy-gated, #110); under **`mooncake-pilot`** a plan can shell out
+  Bash is policy-gated, #110); under **`mooncake-agent`** a plan can shell out
   to it, since mooncake — not claude — runs the commands. Drop a static `mgit`
   into `agent/mgit` (git-ignored build input):
   `CGO_ENABLED=0 go build -o agent/mgit ./cmd/moongit`.
-- `mooncake` — the executor for the `mooncake-pilot` model (`mooncake pilot
+- `mooncake` — the executor for the `mooncake-agent` model (`mooncake agent
   run`). It must carry `--output-format json` (mooncake #48) **and** the
   permissions-as-contract policy flags (`--deny-action` etc., mooncake #11),
   both now on mooncake `main`. Drop a static build into `agent/mooncake`
@@ -136,7 +136,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
   `CGO_ENABLED=0 go build -o agent/mooncake ./cmd`. (The base image's inherited
   mooncake may be older — this COPY overrides it.)
 - `git` — inherited from `moongit-ci:latest`; also used to init the workspace
-  repo the pilot model needs.
+  repo the agent model needs.
 
 ## Runtime notes
 

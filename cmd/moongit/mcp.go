@@ -175,8 +175,8 @@ func (m *mcpServer) newServer() *sdk.Server {
 	sdk.AddTool(srv, &sdk.Tool{
 		Name: "agent_spawn",
 		Description: "Spawn an agent run to work an issue in a container. Optionally pin the base ref " +
-			"(defaults to repo HEAD), pick the execution model (claude-edit|mooncake-pilot; empty uses the " +
-			"server default), and allow shell for the mooncake-pilot model. Returns the queued run.",
+			"(defaults to repo HEAD), pick the execution model (claude-edit|mooncake-agent; empty uses the " +
+			"server default), and allow shell for the mooncake-agent model. Returns the queued run.",
 	}, m.agentSpawn)
 	sdk.AddTool(srv, &sdk.Tool{
 		Name: "agent_turn",
@@ -558,8 +558,8 @@ func (m *mcpServer) pipelineGet(_ context.Context, _ *sdk.CallToolRequest, in pi
 type agentSpawnInput struct {
 	IssueNumber int    `json:"issue_number" jsonschema:"the issue the agent should work (required)"`
 	Ref         string `json:"ref,omitempty" jsonschema:"base ref to check out (defaults to repo HEAD)"`
-	Model       string `json:"model,omitempty" jsonschema:"execution model: claude-edit | mooncake-pilot (empty uses the server default)"`
-	AllowShell  bool   `json:"allow_shell,omitempty" jsonschema:"for mooncake-pilot, allow the plan to run shell/cmd actions"`
+	Model       string `json:"model,omitempty" jsonschema:"execution model: claude-edit | mooncake-agent (empty uses the server default)"`
+	AllowShell  bool   `json:"allow_shell,omitempty" jsonschema:"for mooncake-agent, allow the plan to run shell/cmd actions"`
 }
 
 func (m *mcpServer) agentSpawn(_ context.Context, _ *sdk.CallToolRequest, in agentSpawnInput) (*sdk.CallToolResult, runOutput, error) {

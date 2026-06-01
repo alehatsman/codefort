@@ -457,21 +457,21 @@ test("spawn agent from an issue navigates to the new run", async ({ page }) => {
   })
   await page.goto("/alice/demo/issues/1")
 
-  // Pick the mooncake-pilot execution model — that reveals the allow-shell
+  // Pick the mooncake-agent execution model — that reveals the allow-shell
   // checkbox (hidden for claude-edit). Check it, then spawn. The request must
   // carry the chosen model + allow_shell (#110).
-  await page.getByLabel("Model").selectOption("mooncake-pilot")
+  await page.getByLabel("Model").selectOption("mooncake-agent")
   await page.getByLabel(/Allow shell commands/).check()
   const spawnReq = page.waitForRequest(
     (r) => r.url().includes("/issues/1/agent") && r.method() === "POST",
   )
   await page.getByRole("button", { name: "Spawn agent" }).click()
-  expect((await spawnReq).postDataJSON()).toMatchObject({ model: "mooncake-pilot", allow_shell: true })
+  expect((await spawnReq).postDataJSON()).toMatchObject({ model: "mooncake-agent", allow_shell: true })
 
   // Agent runs live under the Agents tab; we land on the new run's view, which
   // shows the chosen model and that shell is allowed.
   await expect(page).toHaveURL(/\/alice\/demo\/agents\/1$/)
-  await expect(page.getByText("Mooncake pilot").first()).toBeVisible()
+  await expect(page.getByText("Mooncake agent").first()).toBeVisible()
   await expect(page.getByText(/shell allowed/)).toBeVisible()
 })
 
@@ -499,9 +499,9 @@ test("allow-shell checkbox is hidden for the claude-edit model", async ({ page }
 test("spawn model selector defaults to the operator's configured default", async ({ page }) => {
   const now = new Date().toISOString()
   await mockApi(page, {
-    // Operator's default is mooncake-pilot — the selector must reflect it, not
+    // Operator's default is mooncake-agent — the selector must reflect it, not
     // the hard-coded claude-edit fallback.
-    agentExecutionModel: "mooncake-pilot",
+    agentExecutionModel: "mooncake-agent",
     issues: [
       {
         id: 1,
@@ -518,7 +518,7 @@ test("spawn model selector defaults to the operator's configured default", async
   await page.goto("/alice/demo/issues/1")
 
   // Selector follows the configured default, which reveals the shell checkbox.
-  await expect(page.getByLabel("Model")).toHaveValue("mooncake-pilot")
+  await expect(page.getByLabel("Model")).toHaveValue("mooncake-agent")
   await expect(page.getByLabel(/Allow shell commands/)).toBeVisible()
 })
 
