@@ -1,5 +1,5 @@
 import clsx from "clsx"
-import { Fragment, useMemo, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useCIRun, useCIRuns, useRefs, useRepo } from "../api/queries"
 import {
@@ -516,7 +516,29 @@ function AgentTranscript({
   runNumber: number
   run: CIRunDetail
 }) {
-  const { events, done, error } = useJobEventStream(owner, repo, runNumber, "agent", true)
+  // The server ends the event stream when a turn parks at awaiting_input (so the
+  // response is finite and flushes through a buffering proxy/tunnel). When the
+  // run resumes for another turn (awaiting_input -> running/finishing), bump the
+  // resubscribe key to re-open the stream and append the new turn. useCIRun
+  // polls run.status, so this fires within a poll of the resume.
+  const [resumeKey, setResumeKey] = useState(0)
+  const prevStatus = useRef(run.status)
+  useEffect(() => {
+    const prev = prevStatus.current
+    prevStatus.current = run.status
+    if (prev === "awaiting_input" && (run.status === "running" || run.status === "finishing")) {
+      setResumeKey((k) => k + 1)
+    }
+  }, [run.status])
+
+  const { events, done, error } = useJobEventStream(
+    owner,
+    repo,
+    runNumber,
+    "agent",
+    true,
+    resumeKey
+  )
   const entries = useMemo(() => foldAgentEvents(events), [events])
 
   // A turn is in flight while its agent.turn.started has no matching

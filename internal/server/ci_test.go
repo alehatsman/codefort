@@ -290,6 +290,62 @@ func TestJobEventsSkippedJobClosesEmpty(t *testing.T) {
 	}
 }
 
+// An agent run parked at awaiting_input is non-terminal but won't emit again
+// until the next turn. The stream must drain the turn's events and CLOSE — a
+// finite response flushes through a buffering proxy/SSH tunnel, whereas an
+// indefinitely-open stream delivers nothing to a viewer behind one (#140).
+func TestJobEventsAwaitingInputDrainsAndCloses(t *testing.T) {
+	s, repoID := newCIReadServer(t)
+	n := 1
+	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
+		Kind: storage.RunKindAgent, IssueNumber: &n, CommitSHA: "a", Ref: "HEAD", Event: "agent",
+	})
+	if err != nil {
+		t.Fatalf("EnqueueRun: %v", err)
+	}
+	// queued -> running (claim) is the precondition for parking.
+	if _, err := storage.ClaimNextRunOfKind(s.db, storage.RunKindAgent, 0); err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	if _, err := storage.CreateJob(s.db, run.ID, "agent", nil); err != nil {
+		t.Fatal(err)
+	}
+	elog, err := ci.OpenEventLog(s.cfg.DataDir, "alice", "repo", run.Number, "agent")
+	if err != nil {
+		t.Fatalf("OpenEventLog: %v", err)
+	}
+	for _, ty := range []string{ci.EventRunStarted, ci.EventRunCompleted} {
+		if _, err := elog.Append(ty, map[string]any{"k": "v"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	elog.Close()
+	if err := storage.MarkRunAwaitingInput(s.db, run.ID); err != nil {
+		t.Fatalf("park: %v", err)
+	}
+
+	// If the handler tailed an awaiting_input run forever, the synchronous
+	// recorder would never return; receiving on done proves the stream closed.
+	done := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		done <- ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/agent/events", "")
+	}()
+	select {
+	case rr := <-done:
+		if rr.Code != http.StatusOK {
+			t.Fatalf("code = %d, want 200", rr.Code)
+		}
+		body := rr.Body.String()
+		for _, want := range []string{"id: 1", "id: 2", "event: " + ci.EventRunStarted, "event: " + ci.EventRunCompleted} {
+			if !strings.Contains(body, want) {
+				t.Errorf("stream missing %q\n--- body ---\n%s", want, body)
+			}
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("stream did not close for an awaiting_input run (hung)")
+	}
+}
+
 func TestUpdateRepoCIEnabled(t *testing.T) {
 	s, repoID := newCIReadServer(t)
 

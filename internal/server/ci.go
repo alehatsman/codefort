@@ -315,13 +315,22 @@ func (s *Server) handleCIJobEvents(w http.ResponseWriter, r *http.Request) {
 		}
 		flusher.Flush()
 
-		// Terminal check: once the run has finished, drain whatever is left and
-		// stop. A skipped job writes no file at all, so the DB status — not the
-		// stream — is the authoritative end signal.
+		// Resting check: close the stream once the run can't produce more events
+		// for now. A terminal run is done for good; a run parked at
+		// awaiting_input has finished its turn and stays idle until a *new* turn
+		// is dispatched. Holding the connection open across that idle window
+		// (awaiting_input is non-terminal) is what breaks viewers behind a
+		// buffering hop — an SSH tunnel or reverse proxy only forwards the body
+		// when the response ends, so an indefinitely-open stream delivers nothing
+		// — and it leaks a connection per viewer. Closing makes the response
+		// finite and flushable; the client re-subscribes when the run resumes
+		// (awaiting_input -> running/finishing). queued/running/finishing stay
+		// open since they still emit. A skipped job writes no file at all, so the
+		// DB status — not the stream — is the authoritative end signal.
 		fresh, err := storage.GetRun(s.rdb, repoID, num)
-		if err == nil && fresh.Status.Terminal() {
+		if err == nil && (fresh.Status.Terminal() || fresh.Status == storage.RunAwaitingInput) {
 			// One final drain to catch anything flushed between the read above
-			// and the status going terminal.
+			// and the status settling.
 			tail, _, terr := ci.ReadEvents(path, offset)
 			if terr == nil {
 				for _, ev := range tail {

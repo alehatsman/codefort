@@ -26,7 +26,13 @@ export function useJobEventStream(
   repo: string,
   runNumber: number,
   job: string,
-  enabled: boolean
+  enabled: boolean,
+  // Bumping resubscribeKey (same run+job) re-opens a stream the server closed at
+  // a resting point — an agent run parks at awaiting_input between turns, where
+  // the server ends the response (so it flushes through buffering proxies), and
+  // the next turn needs a fresh connection. A resume, not a reset: we keep the
+  // rendered transcript and pick up from the last seq.
+  resubscribeKey = 0
 ): JobEvents {
   const [events, setEvents] = useState<CIEvent[]>([])
   const [done, setDone] = useState(false)
@@ -34,14 +40,23 @@ export function useJobEventStream(
   // Highest seq seen, for resume across reconnects. A ref so the reconnect
   // loop reads the latest value without re-subscribing.
   const lastSeq = useRef(0)
+  // Identity of the current subscription. A resubscribeKey bump on the same
+  // identity resumes; any identity change is a fresh subscription (reset).
+  const identity = useRef("")
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resubscribeKey isn't read in the effect body — bumping it is the intentional signal to tear down the stream and re-open it for the next turn.
   useEffect(() => {
     if (!enabled || !owner || !repo || !job || !Number.isFinite(runNumber)) return
 
+    const id = `${owner}/${repo}/${runNumber}/${job}`
+    if (identity.current !== id) {
+      identity.current = id
+      lastSeq.current = 0
+      setEvents([])
+    }
+
     const ctrl = new AbortController()
     let cancelled = false
-    lastSeq.current = 0
-    setEvents([])
     setDone(false)
     setError(null)
 
@@ -101,7 +116,7 @@ export function useJobEventStream(
       cancelled = true
       ctrl.abort()
     }
-  }, [owner, repo, runNumber, job, enabled])
+  }, [owner, repo, runNumber, job, enabled, resubscribeKey])
 
   return { events, done, error }
 }
