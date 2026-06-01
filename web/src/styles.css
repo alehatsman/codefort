@@ -3106,7 +3106,7 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  justify-content: center;
+  justify-content: flex-start;
 }
 .ci-dag__arrow {
   display: flex;
@@ -3122,15 +3122,35 @@ h3 {
   gap: 2px;
   min-width: 140px;
   padding: var(--space-2) var(--space-3);
-  background: var(--bg-card);
+  /* A status-colored left accent (set per --<status> below) makes pass/fail
+     scannable without reading each pill. */
   border: 1px solid var(--border);
+  border-left: 3px solid var(--fg-muted);
   border-radius: var(--radius);
+  background: var(--bg-card);
   cursor: pointer;
   color: var(--fg);
   text-align: left;
 }
+.ci-dag__job--success {
+  border-left-color: var(--state-todo);
+}
+.ci-dag__job--running {
+  border-left-color: var(--state-in_progress);
+}
+.ci-dag__job--failed,
+.ci-dag__job--error {
+  border-left-color: var(--state-closed);
+}
+.ci-dag__job--skipped,
+.ci-dag__job--queued,
+.ci-dag__job--canceled {
+  border-left-color: var(--border);
+}
+/* Selection is a ring, kept distinct from the status accent (the colored left
+   border) so the two signals don't collide. */
 .ci-dag__job.is-active {
-  border-color: var(--accent-muted);
+  box-shadow: 0 0 0 2px var(--accent);
 }
 .ci-dag__name {
   font-weight: var(--weight-medium);
@@ -3141,22 +3161,30 @@ h3 {
   font-family: var(--font-mono);
 }
 
-/* Step timeline + log viewer */
+/* Step timeline + log viewer — header and its log body are one bound card so
+   they read as a unit, not a floating bar over a borderless block. */
 .ci-step {
   margin-bottom: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 .ci-step__head {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+/* A step that produced no output is header-only — drop the divider. */
+.ci-step__head:last-child {
+  border-bottom: none;
 }
 /* A failed step is the one place red belongs — flag the header, not the log. */
 .ci-step__head--failed {
-  padding: var(--space-1) var(--space-2);
   border-left: 3px solid var(--state-closed);
   background: var(--state-closed-bg);
-  border-radius: var(--radius-sm);
 }
 .ci-step__head--failed .ci-step__cmd {
   color: var(--state-closed);
@@ -3164,6 +3192,7 @@ h3 {
 .ci-step__status {
   width: 8px;
   height: 8px;
+  flex-shrink: 0;
   border-radius: var(--radius-circle);
   background: var(--fg-muted);
 }
@@ -3176,6 +3205,12 @@ h3 {
 }
 .ci-step__status--running {
   background: var(--state-in_progress);
+  animation: ci-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ci-pulse {
+  50% {
+    opacity: 0.3;
+  }
 }
 .ci-step__cmd {
   font-family: var(--font-mono);
@@ -3189,11 +3224,10 @@ h3 {
   flex-shrink: 0;
 }
 .ci-log {
-  margin: var(--space-1) 0 0;
+  margin: 0;
   padding: var(--space-2) var(--space-3);
   background: var(--code-bg);
   color: var(--code-fg);
-  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   overflow-x: auto;

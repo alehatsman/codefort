@@ -402,7 +402,9 @@ function JobDag({
                 <button
                   type="button"
                   key={j.name}
-                  className={clsx("ci-dag__job", { "is-active": active === j.name })}
+                  className={clsx("ci-dag__job", `ci-dag__job--${j.status}`, {
+                    "is-active": active === j.name,
+                  })}
                   onClick={() => onSelect(j.name)}
                   title={needs.length > 0 ? `needs: ${needs.join(", ")}` : "no dependencies"}
                 >

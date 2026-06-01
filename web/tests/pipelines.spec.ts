@@ -212,6 +212,16 @@ test("a failed step flags its header, leaving the log body neutral", async ({ pa
   await expect(failedHead).toContainText("go test ./...")
 })
 
+test("DAG job carries its status as a class so pass/fail is scannable", async ({ page }) => {
+  await mockApi(page, enabledSeed())
+  await page.goto("/alice/demo/pipelines/1")
+
+  // Both jobs succeeded → both buttons carry the success status modifier, and
+  // the open job is flagged active.
+  await expect(page.locator(".ci-dag__job--success")).toHaveCount(2)
+  await expect(page.locator(".ci-dag__job.is-active")).toHaveCount(1)
+})
+
 test("disabled repo shows the enable prompt, and enabling reveals the runs list", async ({
   page,
 }) => {
