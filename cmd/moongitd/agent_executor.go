@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/alehatsman/moongit/internal/api"
 	"github.com/alehatsman/moongit/internal/config"
 	"github.com/alehatsman/moongit/internal/storage"
 )
@@ -25,16 +26,32 @@ const (
 	agentModelMooncakePilot = storage.ExecModelMooncakePilot
 )
 
-// turnSpec is the per-turn input an executor turns into a command. The
-// same struct serves both models; an executor ignores the fields that
-// don't apply to it (pilot ignores sessionID/systemPrompt/resume — it
-// has no resumable session and builds its own prompt from the goal).
-type turnSpec struct {
-	sessionID    string // claude session UUID (claude-edit only)
-	prompt       string // the turn's user message / goal (issue body on turn 1)
-	systemPrompt string // moongit-authored framing (claude-edit, turn 1 only)
-	mcpPath      string // dex MCP config path, "" to omit
-	resume       bool   // follow-up turn: resume the session (claude-edit only)
+// turnInput is the raw, model-agnostic context for one turn; the executor
+// composes its own command from it. The runner fills it with facts (whose
+// issue, which follow-up message, the session id) and stays out of prompt
+// composition — so a model-specific prompt never has to be computed for a
+// model that won't use it. claude-edit frames a system prompt and drives a
+// resumable session; mooncake-pilot uses the goal text and ignores
+// sessionID/resume.
+type turnInput struct {
+	sessionID string    // claude session UUID (claude-edit; pilot ignores)
+	owner     string    // repo identity, for an executor's framing
+	repo      string    // repo identity, for an executor's framing
+	issue     api.Issue // the run's issue — the task on the first turn
+	message   string    // the follow-up human message; empty on the first turn
+	firstTurn bool      // first turn works the issue; later turns work message
+	mcpPath   string    // dex MCP config path, "" to omit
+	resume    bool      // follow-up turn resumes the session (claude-edit; pilot ignores)
+}
+
+// goal is the turn's user message / goal text: the issue title+body on the
+// first turn, the human follow-up message thereafter. Both executors build
+// their command on it.
+func (in turnInput) goal() string {
+	if in.firstTurn {
+		return composeTurnPrompt(in.issue)
+	}
+	return in.message
 }
 
 // turnResult is the model-agnostic outcome of one turn, distilled from
@@ -55,8 +72,9 @@ type turnResult struct {
 type agentExecutor interface {
 	// Model returns the execution-model identifier this executor serves.
 	Model() string
-	// Argv builds the argv to exec inside the agent container for one turn.
-	Argv(spec turnSpec) []string
+	// Argv builds the argv to exec inside the agent container for one turn,
+	// composing whatever prompt(s) the model needs from the turn input.
+	Argv(in turnInput) []string
 	// Translate maps one raw output line onto an agent event. eventType
 	// "" signals "skip this line". A non-nil result marks the terminal
 	// record the caller uses to finalize the turn.
@@ -79,14 +97,21 @@ func newAgentExecutor(model string, cfg *config.Config, allowShell bool) (agentE
 	}
 }
 
-// claudeExecutor is the claude-edit model: it wraps the existing claude
-// argv builder and stream-json translator behind the executor seam.
+// claudeExecutor is the claude-edit model: it composes the claude invocation
+// (issue/message as the user turn, a moongit-authored system prompt on the
+// first turn) and translates its stream-json output behind the executor seam.
 type claudeExecutor struct{}
 
 func (claudeExecutor) Model() string { return agentModelClaudeEdit }
 
-func (claudeExecutor) Argv(spec turnSpec) []string {
-	return buildClaudeArgv(spec.sessionID, spec.prompt, spec.systemPrompt, spec.mcpPath, spec.resume)
+func (claudeExecutor) Argv(in turnInput) []string {
+	var sys string
+	if in.firstTurn {
+		// The system prompt orients claude for the whole session, so it rides
+		// only the first turn; a --resume turn already carries it.
+		sys = composeAgentSystemPrompt(in.owner, in.repo, in.issue)
+	}
+	return buildClaudeArgv(in.sessionID, in.goal(), sys, in.mcpPath, in.resume)
 }
 
 func (claudeExecutor) Translate(line []byte) (string, map[string]any, *turnResult) {

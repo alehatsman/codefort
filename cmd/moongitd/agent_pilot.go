@@ -71,15 +71,16 @@ func withoutShellCmd(deny []string) []string {
 
 func (*pilotExecutor) Model() string { return agentModelMooncakePilot }
 
-// Argv builds the pilot invocation for a turn. spec.prompt (the issue body
-// on turn 1, a follow-up message thereafter) is the goal; pilot has no
-// resumable session, so the persisted /work checkout is the carried state
-// and sessionID/systemPrompt/resume are unused. --output-format json gives
-// the NDJSON event stream Translate parses; --auto-apply runs unattended.
-func (p *pilotExecutor) Argv(spec turnSpec) []string {
+// Argv builds the pilot invocation for a turn. in.goal() (the issue body on
+// turn 1, a follow-up message thereafter) is the goal; pilot has no resumable
+// session, so the persisted /work checkout is the carried state and
+// sessionID/resume are unused (and no system prompt is composed for it).
+// --output-format json gives the NDJSON event stream Translate parses;
+// --auto-apply runs unattended.
+func (p *pilotExecutor) Argv(in turnInput) []string {
 	argv := []string{
 		"mooncake", "pilot", "run",
-		"--goal", spec.prompt,
+		"--goal", in.goal(),
 		"--provider", "anthropic-cli",
 		"--style", "plan",
 		"--auto-apply",
