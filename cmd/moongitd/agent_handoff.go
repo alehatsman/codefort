@@ -212,37 +212,34 @@ func runGit(ctx context.Context, env []string, args ...string) (string, error) {
 	return strings.TrimSpace(stdout.String()), nil
 }
 
-// initAgentGitRepo turns a freshly-extracted workspace (a git-archive tree with
-// no .git) into a real git repo with one base commit, so the mooncake-pilot
-// model's git-based snapshot/diff/transaction steps work inside /work. The base
-// commit is the extracted tree as-is (no .mooncake scratch exists yet).
-// claude-edit doesn't touch git, so this is a harmless no-op for it. The branch
-// the agent's work lands on is still materialized server-side from the worktree
-// by materializeAgentBranch — this local repo is just the in-container scratch
-// pilot needs.
+// wireAgentMoongitRemote adds a `moongit` remote to the agent workspace so
+// in-container `mgit` can resolve owner/repo and claim/comment/set-state on its
+// issue exactly like a human checkout.
 //
-// originURL, when non-empty, is wired as the `origin` remote so in-container
-// `mgit` can resolve owner/repo (it reads the `moongit`/`origin` remote;
-// MOONGIT_SERVER only overrides the host, not the repo). With it the agent can
-// claim/comment/set-state on its issue exactly like a normal checkout (#120).
-func initAgentGitRepo(ctx context.Context, workDir, originURL string) error {
+// The workspace is a `git clone --local` of the server-side bare repo
+// (gitCheckout), so it's already a real repo with history detached at the base
+// commit — the mooncake-pilot model's git snapshot/diff/transaction steps work
+// against it as-is. But clone sets `origin` to the bare repo's local filesystem
+// path (e.g. /…/repos/o/r.git), which mgit's parseRemote can't read — it has no
+// URL scheme, so every in-container mgit call failed with
+// `unsupported remote scheme ""` (#144). discoverTarget prefers a dedicated
+// `moongit` remote over `origin` (cmd/moongit/main.go), so adding one with the
+// server URL fixes resolution while leaving the clone's `origin` untouched.
+//
+// remoteURL empty → no-op (claude-edit doesn't run mgit and needs no remote).
+// Idempotent: a re-park/retry that re-enters here just re-points the remote.
+// Best-effort — only the pilot/mgit path depends on it.
+func wireAgentMoongitRemote(ctx context.Context, workDir, remoteURL string) error {
+	if remoteURL == "" {
+		return nil
+	}
 	env := append(os.Environ(),
 		"GIT_DIR="+filepath.Join(workDir, ".git"),
 		"GIT_WORK_TREE="+workDir,
-		"GIT_AUTHOR_NAME="+agentCommentAuthor, "GIT_AUTHOR_EMAIL=agent@moongit.local",
-		"GIT_COMMITTER_NAME="+agentCommentAuthor, "GIT_COMMITTER_EMAIL=agent@moongit.local",
 	)
-	if _, err := runGit(ctx, env, "init", "-q", "-b", "main"); err != nil {
-		return err
-	}
-	if _, err := runGit(ctx, env, "add", "-A"); err != nil {
-		return err
-	}
-	if _, err := runGit(ctx, env, "commit", "-q", "--no-gpg-sign", "-m", "agent base"); err != nil {
-		return err
-	}
-	if originURL != "" {
-		if _, err := runGit(ctx, env, "remote", "add", "origin", originURL); err != nil {
+	if _, err := runGit(ctx, env, "remote", "add", "moongit", remoteURL); err != nil {
+		// Already present (re-park/retry): point it at the current URL instead.
+		if _, err2 := runGit(ctx, env, "remote", "set-url", "moongit", remoteURL); err2 != nil {
 			return err
 		}
 	}
