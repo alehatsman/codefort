@@ -132,6 +132,18 @@ test("agent section sets and clears the global Claude token", async ({ page }) =
   await expect(page.getByText(/No Claude token configured/)).toBeVisible()
 })
 
+test("agent section reports the env fallback instead of 'no token' (#129)", async ({ page }) => {
+  // DB token unset, but the server has MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN /
+  // _ANTHROPIC_API_KEY — runs authenticate via the env, so the status must not
+  // claim runs "can't authenticate yet".
+  await mockApi(page, { agentTokenEnvFallback: true })
+  await page.goto("/settings")
+  await page.getByRole("button", { name: "Agent" }).click()
+
+  await expect(page.getByText(/Authenticating via the server's environment fallback/)).toBeVisible()
+  await expect(page.getByText(/No Claude token configured/)).toHaveCount(0)
+})
+
 test("agent section sets the default execution model", async ({ page }) => {
   await mockApi(page)
   await page.goto("/settings")

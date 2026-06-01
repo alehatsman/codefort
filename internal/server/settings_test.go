@@ -94,3 +94,24 @@ func TestAgentSettingsLifecycle(t *testing.T) {
 		t.Error("token should be cleared")
 	}
 }
+
+// The env fallback (MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN / _ANTHROPIC_API_KEY) is
+// reported independently of the DB token, so the UI can tell "authenticating
+// via env" from "no auth at all".
+func TestAgentSettingsEnvFallbackReported(t *testing.T) {
+	s := newSettingsServer(t)
+	if agentSettings(t, s).EnvFallbackSet {
+		t.Fatal("no env credential configured — fallback should be false")
+	}
+
+	s.cfg.AgentClaudeOAuthToken = "from-env"
+	if !agentSettings(t, s).EnvFallbackSet {
+		t.Error("OAuth env token present — fallback should be true")
+	}
+
+	s.cfg.AgentClaudeOAuthToken = ""
+	s.cfg.AgentAnthropicAPIKey = "sk-env"
+	if !agentSettings(t, s).EnvFallbackSet {
+		t.Error("API-key env present — fallback should be true")
+	}
+}

@@ -11,8 +11,9 @@ import (
 )
 
 // handleGetAgentSettings reports the operator-facing agent config: whether a
-// global Claude token is configured (write-only — never the token itself) and
-// the default execution model.
+// global Claude token is configured (write-only — never the token itself),
+// whether a server-env credential fallback is present, and the default
+// execution model.
 func (s *Server) handleGetAgentSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.agentSettings())
 }
@@ -59,6 +60,7 @@ func (s *Server) setOrClearSetting(key, value string) error {
 func (s *Server) agentSettings() api.AgentSettings {
 	return api.AgentSettings{
 		ClaudeTokenSet: s.agentClaudeTokenSet(),
+		EnvFallbackSet: s.cfg.AgentClaudeOAuthToken != "" || s.cfg.AgentAnthropicAPIKey != "",
 		ExecutionModel: storage.SettingValue(s.rdb, storage.SettingAgentExecutionModel),
 	}
 }

@@ -472,10 +472,13 @@ export interface CIJob {
 }
 
 // AgentSettings mirrors api.AgentSettings — the token is write-only (only
-// whether one is configured is returned); execution_model is the default model
-// new agent runs use ("" = server's built-in default).
+// whether one is configured is returned); claude_token_env_fallback reports
+// whether a server-env credential (MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN /
+// _ANTHROPIC_API_KEY) backs runs when no Settings token is set; execution_model
+// is the default model new agent runs use ("" = server's built-in default).
 export interface AgentSettings {
   claude_oauth_token_set: boolean
+  claude_token_env_fallback: boolean
   execution_model?: CIRunExecutionModel | ""
 }
 

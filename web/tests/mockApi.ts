@@ -191,6 +191,7 @@ export interface State {
   tokens: Token[]
   sshKeys: SSHKey[]
   agentClaudeTokenSet: boolean
+  agentTokenEnvFallback: boolean
   agentExecutionModel: "" | "claude-edit" | "mooncake-pilot"
   ciRuns: CIRun[]
   // Commit history (newest first) and per-sha diff detail, for the commit
@@ -236,6 +237,7 @@ function freshState(seed: Partial<State> = {}): State {
     tokens: [{ id: 1, name: "test-user", created_at: nowIso(), last_used_at: nowIso() }],
     sshKeys: [],
     agentClaudeTokenSet: false,
+    agentTokenEnvFallback: false,
     agentExecutionModel: "",
     ciRuns: [],
     commits: [],
@@ -526,6 +528,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     }
     return json(route, 200, {
       claude_oauth_token_set: state.agentClaudeTokenSet,
+      claude_token_env_fallback: state.agentTokenEnvFallback,
       execution_model: state.agentExecutionModel,
     })
   })

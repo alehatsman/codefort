@@ -83,6 +83,7 @@ function AgentSection() {
   const update = useUpdateAgentSettings()
   const [token, setToken] = useState("")
   const configured = settingsQ.data?.claude_oauth_token_set ?? false
+  const envFallback = settingsQ.data?.claude_token_env_fallback ?? false
 
   function save(e: React.FormEvent) {
     e.preventDefault()
@@ -105,12 +106,14 @@ function AgentSection() {
         restarting the server. Stored write-only — it's never shown again.
       </p>
 
-      <div className={clsx("agent-token-status", { "is-set": configured })}>
+      <div className={clsx("agent-token-status", { "is-set": configured || envFallback })}>
         {settingsQ.isLoading
           ? "Checking…"
           : configured
-            ? "✓ A Claude token is configured."
-            : "No Claude token configured — agent runs can't authenticate yet."}
+            ? "✓ A Claude token is configured here."
+            : envFallback
+              ? "✓ Authenticating via the server's environment fallback. Set a token here to override it."
+              : "No Claude token configured — agent runs can't authenticate yet."}
       </div>
 
       <form className="agent-token-form" onSubmit={save}>
