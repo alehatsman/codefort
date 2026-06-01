@@ -44,6 +44,14 @@ RUN chmod +x /usr/local/bin/dex
 COPY mgit /usr/local/bin/mgit
 RUN chmod +x /usr/local/bin/mgit
 
+# mooncake — the executor for the `mooncake-pilot` execution model (#110):
+# `mooncake pilot run --output-format json` (mooncake #48). Overrides the
+# mooncake inherited from moongit-ci:latest with a build carrying the JSON
+# event stream the runner parses. A static build dropped in like dex/mgit
+# (agent/mooncake is a git-ignored build input).
+COPY mooncake /usr/local/bin/mooncake
+RUN chmod +x /usr/local/bin/mooncake
+
 # The agent runs as an arbitrary uid:gid with no passwd entry, so point HOME at
 # a world-writable dir for claude's config/cache/logs (auth itself comes from
 # CLAUDE_CODE_OAUTH_TOKEN in the env, not a config file). /tmp is ephemeral,

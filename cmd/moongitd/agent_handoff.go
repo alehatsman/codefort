@@ -115,7 +115,11 @@ func materializeAgentBranch(ctx context.Context, bareRepo, base, workDir, ref, a
 	if _, err := runGit(ctx, env, "read-tree", base); err != nil {
 		return "", false, fmt.Errorf("read-tree: %w", err)
 	}
-	if _, err := runGit(ctx, env, "add", "-A"); err != nil {
+	// Snapshot the worktree, but exclude the mooncake-pilot scratch dir
+	// (.mooncake/pilot/iterations etc.) — it's per-run executor bookkeeping,
+	// not part of the agent's change to the repo. (.git is skipped by git
+	// natively.)
+	if _, err := runGit(ctx, env, "add", "-A", "--", ".", ":(exclude).mooncake"); err != nil {
 		return "", false, fmt.Errorf("add: %w", err)
 	}
 	tree, err := runGit(ctx, env, "write-tree")
@@ -206,6 +210,33 @@ func runGit(ctx context.Context, env []string, args ...string) (string, error) {
 		return "", fmt.Errorf("git %s: %v (%s)", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+// initAgentGitRepo turns a freshly-extracted workspace (a git-archive tree with
+// no .git) into a real git repo with one base commit, so the mooncake-pilot
+// model's git-based snapshot/diff/transaction steps work inside /work. The base
+// commit is the extracted tree as-is (no .mooncake scratch exists yet).
+// claude-edit doesn't touch git, so this is a harmless no-op for it. The branch
+// the agent's work lands on is still materialized server-side from the worktree
+// by materializeAgentBranch — this local repo is just the in-container scratch
+// pilot needs.
+func initAgentGitRepo(ctx context.Context, workDir string) error {
+	env := append(os.Environ(),
+		"GIT_DIR="+filepath.Join(workDir, ".git"),
+		"GIT_WORK_TREE="+workDir,
+		"GIT_AUTHOR_NAME="+agentCommentAuthor, "GIT_AUTHOR_EMAIL=agent@moongit.local",
+		"GIT_COMMITTER_NAME="+agentCommentAuthor, "GIT_COMMITTER_EMAIL=agent@moongit.local",
+	)
+	if _, err := runGit(ctx, env, "init", "-q", "-b", "main"); err != nil {
+		return err
+	}
+	if _, err := runGit(ctx, env, "add", "-A"); err != nil {
+		return err
+	}
+	if _, err := runGit(ctx, env, "commit", "-q", "--no-gpg-sign", "-m", "agent base"); err != nil {
+		return err
+	}
+	return nil
 }
 
 // hashRef is a tiny stable hash of a ref, to keep concurrent index files

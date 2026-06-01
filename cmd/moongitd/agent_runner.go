@@ -74,6 +74,14 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		return
 	}
 
+	// The checkout is a git-archive extract with no .git. The mooncake-pilot
+	// model runs `git` (snapshot/diff) inside /work, so make it a real repo at
+	// the base commit; claude-edit just ignores it. Best-effort — a failure
+	// here only matters for pilot, which will surface its own error.
+	if err := initAgentGitRepo(parent, workDir); err != nil {
+		log.Warn("agent git init", "err", err)
+	}
+
 	// One synthetic job carries the whole agent session, so the run-detail UI,
 	// event stream, and retention treat it like a CI job. It stays 'running'
 	// across turns and is finalized only when the session ends.
