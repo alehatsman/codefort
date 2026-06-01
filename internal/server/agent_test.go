@@ -183,6 +183,97 @@ func finishRun(t *testing.T, s *Server, num int) *httptest.ResponseRecorder {
 	return rr
 }
 
+func cancelRun(t *testing.T, s *Server, num int) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/repos/alice/repo/ci/runs/"+strconv.Itoa(num)+"/cancel", nil)
+	req.SetPathValue("owner", "alice")
+	req.SetPathValue("repo", "repo")
+	req.SetPathValue("number", strconv.Itoa(num))
+	req = req.WithContext(context.WithValue(req.Context(), tokenCtxKey{}, api.Token{Name: "alice"}))
+	rr := httptest.NewRecorder()
+	s.handleCancelAgentRun(rr, req)
+	return rr
+}
+
+// fakeCanceler stands in for the runner-backed AgentCanceler in handler tests.
+type fakeCanceler struct {
+	ret    bool
+	gotID  int64
+	called bool
+}
+
+func (f *fakeCanceler) CancelAgentRun(id int64) bool {
+	f.called, f.gotID = true, id
+	return f.ret
+}
+
+func TestCancelAgentRun(t *testing.T) {
+	enqueueAgent := func(t *testing.T, s *Server, repoID int64) storage.CIRun {
+		t.Helper()
+		n := 1
+		run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
+			Kind: storage.RunKindAgent, IssueNumber: &n, CommitSHA: "a", Ref: "HEAD", Event: "agent",
+		})
+		if err != nil {
+			t.Fatalf("EnqueueRun: %v", err)
+		}
+		return run
+	}
+
+	t.Run("cancels a running agent run -> 202", func(t *testing.T) {
+		s, repoID := newCITriggerServer(t)
+		run := enqueueAgent(t, s, repoID)
+		fc := &fakeCanceler{ret: true}
+		s.SetAgentCanceler(fc)
+
+		rr := cancelRun(t, s, run.Number)
+		if rr.Code != http.StatusAccepted {
+			t.Fatalf("code = %d, want 202; body=%s", rr.Code, rr.Body.String())
+		}
+		if !fc.called || fc.gotID != run.ID {
+			t.Errorf("canceler called=%v id=%d, want true id=%d", fc.called, fc.gotID, run.ID)
+		}
+		var got api.CIRun
+		if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if got.Status != "canceled" {
+			t.Errorf("status = %q, want canceled", got.Status)
+		}
+	})
+
+	t.Run("already-terminal -> 409", func(t *testing.T) {
+		s, repoID := newCITriggerServer(t)
+		run := enqueueAgent(t, s, repoID)
+		s.SetAgentCanceler(&fakeCanceler{ret: false}) // CAS found nothing to cancel
+		if rr := cancelRun(t, s, run.Number); rr.Code != http.StatusConflict {
+			t.Errorf("code = %d, want 409", rr.Code)
+		}
+	})
+
+	t.Run("no canceler wired -> 503", func(t *testing.T) {
+		s, repoID := newCITriggerServer(t)
+		run := enqueueAgent(t, s, repoID)
+		if rr := cancelRun(t, s, run.Number); rr.Code != http.StatusServiceUnavailable {
+			t.Errorf("code = %d, want 503", rr.Code)
+		}
+	})
+
+	t.Run("non-agent run -> 400", func(t *testing.T) {
+		s, repoID := newCITriggerServer(t)
+		s.SetAgentCanceler(&fakeCanceler{ret: true})
+		run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
+			Kind: storage.RunKindCI, CommitSHA: "a", Ref: "HEAD", Event: "push",
+		})
+		if err != nil {
+			t.Fatalf("EnqueueRun: %v", err)
+		}
+		if rr := cancelRun(t, s, run.Number); rr.Code != http.StatusBadRequest {
+			t.Errorf("code = %d, want 400", rr.Code)
+		}
+	})
+}
+
 // Finishing a parked agent run transitions it to finishing; finishing a run
 // that isn't awaiting input is a 409.
 func TestFinishAgentRun(t *testing.T) {

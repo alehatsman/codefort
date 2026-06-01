@@ -164,9 +164,17 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		mcpPath:      mcpPath,
 		resume:       false,
 	}
-	status, execErr := r.runAgentTurn(parent, stream, elog, exec, 1, spec)
+	turnCtx, h := r.registerAgentTurn(run.ID, parent)
+	status, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, 1, spec)
+	r.unregisterAgentTurn(run.ID, h)
 	elog.Close()
 
+	if h.canceled.Load() {
+		// Operator force-stopped this turn (#146): CancelAgentRun already marked
+		// the run RunCanceled and tore down. Don't re-finalize as an infra error.
+		log.Info("agent run canceled by operator", "turn", 1)
+		return
+	}
 	if execErr != nil {
 		// Infra failure (couldn't run claude / ctx cancel): the container is
 		// likely unusable — finalize and tear down.
@@ -262,9 +270,18 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 		mcpPath:   mcpPath,
 		resume:    true,
 	}
-	status, execErr := r.runAgentTurn(parent, stream, elog, exec, turn.Seq+1, spec)
+	turnCtx, h := r.registerAgentTurn(run.ID, parent)
+	status, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, turn.Seq+1, spec)
+	r.unregisterAgentTurn(run.ID, h)
 	elog.Close()
 
+	if h.canceled.Load() {
+		// Operator force-stopped this turn (#146): CancelAgentRun owns the
+		// terminal state + teardown. Just mark the turn errored and stop.
+		log.Info("agent turn canceled by operator", "turn", turn.Seq+1)
+		_ = storage.FinishTurn(r.db, turn.ID, storage.TurnError)
+		return
+	}
 	if execErr != nil {
 		log.Error("agent turn exec", "err", execErr)
 		_ = storage.FinishTurn(r.db, turn.ID, storage.TurnError)
@@ -404,6 +421,52 @@ func (r *ciRunner) failAgentTurnRun(run storage.CIRun, jobID int64, workDir, rea
 		r.finishJob(jobID, storage.JobFailed, nil)
 	}
 	r.finish(run, storage.RunFailed)
+}
+
+// registerAgentTurn derives a cancelable context for one turn and records a
+// handle so CancelAgentRun can interrupt it (#146). Returns the context to run
+// the turn under and the handle to check/unregister afterwards.
+func (r *ciRunner) registerAgentTurn(runID int64, parent context.Context) (context.Context, *agentTurnHandle) {
+	ctx, cancel := context.WithCancel(parent)
+	h := &agentTurnHandle{cancel: cancel}
+	r.agentTurns.Store(runID, h)
+	return ctx, h
+}
+
+// unregisterAgentTurn drops the turn handle and releases its context. Safe to
+// call once per registerAgentTurn; a concurrent CancelAgentRun that already
+// loaded the handle still cancels correctly.
+func (r *ciRunner) unregisterAgentTurn(runID int64, h *agentTurnHandle) {
+	r.agentTurns.Delete(runID)
+	h.cancel()
+}
+
+// CancelAgentRun force-stops an agent run (#146): it CAS-cancels the run in the
+// DB from any non-terminal state, interrupts an in-flight turn's blocking
+// ExecStream if one is running (so the turn goroutine unwinds and, seeing the
+// canceled flag, skips its own finalize), and tears down the container +
+// workspace + token. Discard semantics: /work is dropped and no branch is
+// materialized — Finish stays the keep-the-work path. Returns true if the run
+// was non-terminal and is now canceled, false if it was already terminal.
+func (r *ciRunner) CancelAgentRun(runID int64) bool {
+	// CAS to canceled first so it's authoritative: a turn goroutine racing to
+	// park (MarkRunAwaitingInput, also a CAS) then no-ops, and vice versa.
+	if err := storage.CancelAgentRun(r.db, runID); err != nil {
+		return false // already terminal (ErrNotFound) or a write error
+	}
+	// Unblock an in-flight turn, if any, and flag it so its goroutine doesn't
+	// re-finalize over the RunCanceled we just wrote.
+	if v, ok := r.agentTurns.Load(runID); ok {
+		h := v.(*agentTurnHandle)
+		h.canceled.Store(true)
+		h.cancel()
+	}
+	jobID, _ := r.agentJobID(runID)
+	if jobID != 0 {
+		r.finishJob(jobID, storage.JobInterrupted, nil)
+	}
+	r.tearDownAgent(runID, jobID, agentWorkDir(r.cfg.DataDir, runID))
+	return true
 }
 
 // tearDownAgent releases a finished agent run's resources: remove the container

@@ -271,6 +271,16 @@ export function useFinishAgentRun(owner: string, repo: string, n: number) {
   })
 }
 
+// useCancelAgentRun force-stops a running agent run; once accepted, refresh the
+// run so it shows canceled.
+export function useCancelAgentRun(owner: string, repo: string, n: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.cancelAgentRun(owner, repo, n),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRun(owner, repo, n) }),
+  })
+}
+
 // useTriggerCIRun starts a run for an arbitrary ref without a push; like a
 // rerun, the fresh run tops the list, so refresh it once accepted.
 export function useTriggerCIRun(owner: string, repo: string) {

@@ -333,6 +333,11 @@ export const api = {
   // summary comment) and finalizes it.
   finishAgentRun: (owner: string, repo: string, n: number) =>
     request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/finish`, { method: "POST" }),
+  // cancelAgentRun force-stops an agent run from any non-terminal state
+  // (unlike finish, which needs a parked run): it interrupts an in-flight turn
+  // and discards the workspace — no branch is handed off.
+  cancelAgentRun: (owner: string, repo: string, n: number) =>
+    request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/cancel`, { method: "POST" }),
 
   // Global agent settings (write-only Claude token).
   getAgentSettings: () => request<AgentSettings>("/api/settings/agent"),

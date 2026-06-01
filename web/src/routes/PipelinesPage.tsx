@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useCIRun, useCIRuns, useRefs, useRepo } from "../api/queries"
 import {
+  useCancelAgentRun,
   useCreateAgentTurn,
   useFinishAgentRun,
   useRerunCIRun,
@@ -600,6 +601,7 @@ function AgentMessageBox({
   const [text, setText] = useState("")
   const send = useCreateAgentTurn(owner, repo, runNumber)
   const finish = useFinishAgentRun(owner, repo, runNumber)
+  const cancel = useCancelAgentRun(owner, repo, runNumber)
   const terminal = ["success", "failed", "canceled", "error", "interrupted"].includes(run.status)
   const queued = (run.turns ?? []).filter((t) => t.status === "pending" || t.status === "running")
 
@@ -657,6 +659,15 @@ function AgentMessageBox({
           {finish.isPending ? "Finishing…" : "Finish"}
         </button>
         <button
+          type="button"
+          className="btn btn--small btn--danger"
+          onClick={() => cancel.mutate()}
+          disabled={cancel.isPending}
+          title="Force-stop the run now: interrupt the agent and discard the workspace (no branch is handed off)"
+        >
+          {cancel.isPending ? "Stopping…" : "Stop"}
+        </button>
+        <button
           type="submit"
           className="btn btn--small btn--primary"
           disabled={send.isPending || text.trim() === ""}
@@ -666,6 +677,7 @@ function AgentMessageBox({
       </div>
       {send.error && <div className="error inline">{(send.error as Error).message}</div>}
       {finish.error && <div className="error inline">{(finish.error as Error).message}</div>}
+      {cancel.error && <div className="error inline">{(cancel.error as Error).message}</div>}
     </form>
   )
 }

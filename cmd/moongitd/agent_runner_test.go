@@ -24,15 +24,20 @@ type fakeAgentSession struct {
 	stderr   []string // lines the tool writes to stderr
 	exitCode int
 	gotArgv  *[]string
+	block    bool // when set, ExecStream blocks until ctx is cancelled (force-stop tests)
 }
 
 func (f *fakeAgentSession) Exec(context.Context, string) (stepResult, error) {
 	return stepResult{}, nil
 }
 
-func (f *fakeAgentSession) ExecStream(_ context.Context, argv []string, onLine, onStderr func([]byte)) (int, error) {
+func (f *fakeAgentSession) ExecStream(ctx context.Context, argv []string, onLine, onStderr func([]byte)) (int, error) {
 	if f.gotArgv != nil {
 		*f.gotArgv = argv
+	}
+	if f.block {
+		<-ctx.Done() // an operator force-stop cancels the turn ctx; mimic an aborted exec
+		return -1, ctx.Err()
 	}
 	for _, ln := range f.lines {
 		onLine([]byte(ln + "\n"))
@@ -50,11 +55,12 @@ func (f *fakeAgentSession) Close() error { return nil }
 
 // agentTestOpts configures the fake agent session newAgentTestRunner injects.
 type agentTestOpts struct {
-	sessionErr    error    // make the (turn-1) session factory fail
-	lines         []string // claude stream-json lines the session replays
-	followupLines []string // when set, follow-up turns (attachSession) replay these instead of lines
-	stderr        []string // stderr lines the session replays
-	exitCode      int      // claude's process exit code
+	sessionErr       error    // make the (turn-1) session factory fail
+	lines            []string // claude stream-json lines the session replays
+	followupLines    []string // when set, follow-up turns (attachSession) replay these instead of lines
+	stderr           []string // stderr lines the session replays
+	exitCode         int      // claude's process exit code
+	blockUntilCancel bool     // turn-1 ExecStream blocks until ctx cancel (force-stop tests)
 }
 
 // successTurn is a minimal, well-formed claude stream-json turn that ends ok.
@@ -114,7 +120,7 @@ func newAgentHarness(t *testing.T, opts agentTestOpts) agentHarness {
 	var opened, attached, teardowns atomic.Int32
 	var gotArgv, gotEnv []string
 	fake := func() (jobSession, error) {
-		return &fakeAgentSession{lines: opts.lines, stderr: opts.stderr, exitCode: opts.exitCode, gotArgv: &gotArgv}, nil
+		return &fakeAgentSession{lines: opts.lines, stderr: opts.stderr, exitCode: opts.exitCode, gotArgv: &gotArgv, block: opts.blockUntilCancel}, nil
 	}
 	r := &ciRunner{
 		db: db,
@@ -323,6 +329,67 @@ func TestReapExpiredAgents(t *testing.T) {
 	}
 	if h.teardowns.Load() != 1 {
 		t.Errorf("teardowns = %d, want 1", h.teardowns.Load())
+	}
+}
+
+// CancelAgentRun force-stops a parked run: marks it canceled and tears down the
+// container it was holding (no turn in flight) (#146).
+func TestCancelAgentRunParked(t *testing.T) {
+	h := newAgentHarness(t, agentTestOpts{lines: successTurn})
+	h.r.executeAgentRun(context.Background(), h.run) // park (container left up)
+	if got := h.status(t); got != storage.RunAwaitingInput {
+		t.Fatalf("precondition: status = %q, want awaiting_input", got)
+	}
+
+	if !h.r.CancelAgentRun(h.run.ID) {
+		t.Fatal("CancelAgentRun returned false for a parked run")
+	}
+	if got := h.status(t); got != storage.RunCanceled {
+		t.Errorf("status = %q, want canceled", got)
+	}
+	if h.teardowns.Load() != 1 {
+		t.Errorf("teardowns = %d, want 1 (cancel tears down the parked container)", h.teardowns.Load())
+	}
+	// A second cancel is a no-op: already terminal.
+	if h.r.CancelAgentRun(h.run.ID) {
+		t.Error("CancelAgentRun returned true for an already-canceled run")
+	}
+}
+
+// CancelAgentRun interrupts an in-flight turn: it unblocks the turn's ExecStream
+// and the turn goroutine, seeing the canceled flag, skips its own finalize — so
+// the run ends RunCanceled (not RunError from the aborted exec) (#146).
+func TestCancelAgentRunInterruptsInFlightTurn(t *testing.T) {
+	h := newAgentHarness(t, agentTestOpts{blockUntilCancel: true})
+	done := make(chan struct{})
+	go func() {
+		h.r.executeAgentRun(context.Background(), h.run)
+		close(done)
+	}()
+
+	// Wait until the turn registers its cancel handle (it's now blocked in exec).
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, ok := h.r.agentTurns.Load(h.run.ID); ok {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("turn never registered an in-flight handle")
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+
+	if !h.r.CancelAgentRun(h.run.ID) {
+		t.Fatal("CancelAgentRun returned false for a running run")
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("executeAgentRun did not return after cancel (turn not interrupted)")
+	}
+
+	if got := h.status(t); got != storage.RunCanceled {
+		t.Errorf("status = %q, want canceled (not error from the aborted exec)", got)
 	}
 }
 

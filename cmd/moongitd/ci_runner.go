@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alehatsman/moongit/internal/ci"
@@ -104,6 +105,21 @@ type ciRunner struct {
 	newAgentSession   func(ctx context.Context, name, workDir, image string, env []string) (jobSession, error)
 	attachSession     func(ctx context.Context, name string) (jobSession, error)
 	teardownContainer func(name string)
+
+	// agentTurns tracks in-flight agent turns so an operator force-stop (#146)
+	// can interrupt the otherwise-blocking ExecStream. Keyed by run ID, the
+	// value is *agentTurnHandle; registered for the duration of a turn and
+	// deleted when it returns.
+	agentTurns sync.Map
+}
+
+// agentTurnHandle lets CancelAgentRun interrupt an in-flight turn: cancel
+// unblocks the turn's ExecStream, and the canceled flag tells the turn
+// goroutine that the operator (not an infra error) ended it, so it skips its
+// own finalize — CancelAgentRun owns the terminal state + teardown.
+type agentTurnHandle struct {
+	cancel   context.CancelFunc
+	canceled atomic.Bool
 }
 
 func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner {
@@ -147,8 +163,8 @@ func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner 
 // runCIRunner launches the in-process CI runner beside the reapers. It claims
 // and dispatches up to CIRunConcurrency runs at a time (default 1). Runs until
 // ctx is cancelled.
-func runCIRunner(ctx context.Context, db *sql.DB, cfg *config.Config, logger *slog.Logger) {
-	newCIRunner(db, cfg, logger).run(ctx)
+func runCIRunner(ctx context.Context, r *ciRunner) {
+	r.run(ctx)
 }
 
 func (r *ciRunner) run(ctx context.Context) {

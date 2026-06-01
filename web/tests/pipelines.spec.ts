@@ -643,6 +643,53 @@ test("an awaiting-input agent run shows a message box and queues a follow-up", a
   await expect(page.getByText(/This agent run has finished/)).toBeVisible()
 })
 
+test("a running agent run can be force-stopped while Finish is disabled (#146)", async ({ page }) => {
+  const state = await mockApi(page, {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 1,
+        total_issues: 1,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 1,
+        kind: "agent",
+        issue_number: 5,
+        status: "running",
+        commit_sha: "deadbeefcafe1234",
+        ref: "HEAD",
+        event: "agent",
+        trigger: "agent#17",
+        created_at: iso,
+        started_at: iso,
+        finished_at: null,
+        jobs: [{ name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+        events: {
+          agent: [{ seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #5: do it" } }],
+        },
+      },
+    ],
+  })
+  await page.goto("/alice/demo/pipelines/1")
+
+  // Mid-turn: Finish is disabled (it needs a parked run), but Stop is available.
+  await expect(page.getByRole("button", { name: "Finish" })).toBeDisabled()
+  const stop = page.getByRole("button", { name: "Stop" })
+  await expect(stop).toBeEnabled()
+
+  await stop.click()
+
+  // The run is canceled server-side and the box switches to the terminal note.
+  await expect.poll(() => state.ciRuns[0].status).toBe("canceled")
+  await expect(page.getByText(/This agent run has finished/)).toBeVisible()
+})
+
 test("run detail surfaces commit context, the job DAG, and step commands", async ({ page }) => {
   await mockApi(page, enabledSeed())
   await page.goto("/alice/demo/pipelines/1")

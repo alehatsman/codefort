@@ -128,6 +128,12 @@ func runServe(logger *slog.Logger) error {
 	}
 
 	srv := server.New(cfg, db, rdb, logger)
+	// The in-process CI runner is created here (not inside its goroutine) so the
+	// server can share it: it backs the agent force-stop endpoint (#146), holding
+	// the in-memory turn handles needed to interrupt a live container — something
+	// a DB-only signal can't do.
+	runner := newCIRunner(db, cfg, logger)
+	srv.SetAgentCanceler(runner)
 	httpSrv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           srv.Handler(),
@@ -155,7 +161,7 @@ func runServe(logger *slog.Logger) error {
 	ciDone := make(chan struct{})
 	go func() {
 		defer close(ciDone)
-		runCIRunner(ciCtx, db, cfg, logger)
+		runCIRunner(ciCtx, runner)
 	}()
 
 	listenErr := make(chan error, 1)

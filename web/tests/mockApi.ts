@@ -462,6 +462,20 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const { jobs: _j, events: _e, ...out } = run
     return json(route, 202, out)
   })
+  // Force-stop an agent run from any non-terminal state -> canceled.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/cancel$/, (route) => {
+    const parts = new URL(route.request().url()).pathname.split("/")
+    const n = Number(parts[parts.length - 2])
+    const run = state.ciRuns.find((r) => r.number === n)
+    if (!run) return json(route, 404, { error: "run not found" })
+    if (run.kind !== "agent") return json(route, 400, { error: "not an agent run" })
+    const terminal = ["success", "failed", "canceled", "error", "interrupted"].includes(run.status)
+    if (terminal) return json(route, 409, { error: "run is already finished" })
+    run.status = "canceled"
+    run.finished_at = new Date().toISOString()
+    const { jobs: _j, events: _e, ...out } = run
+    return json(route, 202, out)
+  })
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/rerun$/, (route) => {
     const parts = new URL(route.request().url()).pathname.split("/")
     const n = Number(parts[parts.length - 2])

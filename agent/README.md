@@ -144,3 +144,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
   reaps leftover `moongit-agent-*` containers from a prior crash.
 - Per-run credentials are injected as env at container creation and revoked on
   finalize; the ephemeral moongit token is `agent-run-<runID>`.
+- **Force-stop** (`POST /api/repos/{o}/{r}/ci/runs/{n}/cancel`, #146): cancels a
+  run from any non-terminal state — unlike Finish, which only accepts a parked
+  (`awaiting_input`) run and hands off the work. Cancel interrupts an in-flight
+  turn (the runner holds an in-memory cancel handle that unblocks the turn's
+  exec), marks the run `canceled`, and **discards** `/work` — no branch is
+  materialized. The runner is wired into the API server via `SetAgentCanceler`.

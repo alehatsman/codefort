@@ -201,6 +201,22 @@ func MarkRunFinishing(db *sql.DB, runID int64) error {
 	return affected(res, err)
 }
 
+// CancelAgentRun force-cancels an agent run from ANY non-terminal state
+// (queued/running/awaiting_input/finishing) — the operator force-stop (#146),
+// unlike MarkRunFinishing which only accepts a parked run. Stamps finished_at so
+// it's terminal immediately. ErrNotFound means the run was already terminal (or
+// not an agent run): nothing to cancel. The CAS makes it safe against a runner
+// concurrently claiming/parking the same run — whichever write lands first, the
+// other no-ops, and the run ends terminal either way.
+func CancelAgentRun(db *sql.DB, runID int64) error {
+	res, err := db.Exec(`
+		UPDATE ci_runs SET status = ?, finished_at = strftime('%s','now')
+		 WHERE id = ? AND kind = 'agent'
+		   AND status IN ('queued','running','awaiting_input','finishing')
+	`, string(RunCanceled), runID)
+	return affected(res, err)
+}
+
 // ClaimNextFinishingRun atomically claims one agent run in the finishing state
 // for handoff, flipping it finishing -> running so a second runner pass won't
 // double-process it (the run goes terminal once handoff completes). Returns
