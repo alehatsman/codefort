@@ -6,11 +6,13 @@
     <title>moongit</title>
     <script>
       // Apply the saved theme before first paint (no flash of default theme).
-      // Mirror of theme.ts: github is the base; monokai sets data-theme.
-      // "monokai-web" is the legacy id from the earlier 3-scheme selector.
+      // Mirror of theme.ts: monokai is the default; github is the base scheme,
+      // rendered with no data-theme. So an unset (or non-github) preference
+      // resolves to monokai. "monokai-web"/"monokai-code" are legacy ids from
+      // the earlier 3-scheme selector (the latter mapped to github/base).
       try {
         var t = localStorage.getItem("moongit:theme")
-        if (t === "monokai" || t === "monokai-web") {
+        if (t !== "github" && t !== "monokai-code") {
           document.documentElement.setAttribute("data-theme", "monokai")
         }
       } catch (e) {}

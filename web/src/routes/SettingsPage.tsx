@@ -9,11 +9,12 @@ import {
   useUpdateAgentSettings,
 } from "../api/mutations"
 import type { CIRunExecutionModel, CreatedToken, SSHKey, Token } from "../api/types"
+import ThemeSelect from "../components/ThemeSelect"
 
-// Sections of the settings surface. "tokens", "agent", and "ssh" are backed;
-// "users" and "branches" stay placeholders until their backends exist (no
-// per-user mgmt, no branch-protection enforcement yet).
-type Section = "tokens" | "agent" | "users" | "ssh" | "branches"
+// Sections of the settings surface. "tokens", "agent", "ssh", and "appearance"
+// are backed; "users" and "branches" stay placeholders until their backends
+// exist (no per-user mgmt, no branch-protection enforcement yet).
+type Section = "tokens" | "agent" | "users" | "ssh" | "branches" | "appearance"
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: "tokens", label: "API tokens" },
@@ -21,6 +22,7 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: "users", label: "Users" },
   { id: "ssh", label: "SSH keys" },
   { id: "branches", label: "Branch rules" },
+  { id: "appearance", label: "Appearance" },
 ]
 
 export default function SettingsPage() {
@@ -59,8 +61,23 @@ export default function SettingsPage() {
               isn't built yet. Rules will appear here once the server enforces them."
           />
         )}
+        {section === "appearance" && <AppearanceSection />}
       </div>
     </div>
+  )
+}
+
+// AppearanceSection hosts the color-scheme picker. The choice is browser-local
+// (localStorage), so there's nothing to save server-side.
+function AppearanceSection() {
+  return (
+    <section className="settings__section">
+      <h2 className="settings__title">Appearance</h2>
+      <p className="muted settings__lead">
+        Color scheme for the UI chrome and code view. Saved to this browser.
+      </p>
+      <ThemeSelect />
+    </section>
   )
 }
 

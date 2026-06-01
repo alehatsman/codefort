@@ -2,7 +2,6 @@ import { Link, useLocation } from "react-router-dom"
 import { clearToken } from "../api/client"
 import { useRepo } from "../api/queries"
 import RepoTabs from "./RepoTabs"
-import ThemeSelect from "./ThemeSelect"
 
 interface Props {
   children: React.ReactNode
@@ -41,7 +40,6 @@ export default function Layout({ children, onSignOut }: Props) {
           )}
         </div>
         <div className="topbar__actions">
-          <ThemeSelect />
           <Link to="/settings" className="topbar__signout" title="Settings">
             settings
           </Link>

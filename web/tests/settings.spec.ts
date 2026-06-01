@@ -113,6 +113,26 @@ test("remove an SSH key clears it from the list", async ({ page }) => {
   await expect(page.getByText("No SSH keys yet.", { exact: false })).toBeVisible()
 })
 
+test("appearance section hosts the theme picker (moved out of the header)", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/settings")
+
+  // The picker no longer lives in the topbar.
+  await expect(page.getByRole("combobox", { name: "Color scheme" })).toHaveCount(0)
+
+  await page.getByRole("button", { name: "Appearance" }).click()
+  await expect(page.getByRole("heading", { name: "Appearance" })).toBeVisible()
+
+  const select = page.getByRole("combobox", { name: "Color scheme" })
+  // Default is Monokai (data-theme set on <html>).
+  await expect(select).toHaveValue("monokai")
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "monokai")
+
+  // Switching to GitHub is the base scheme — the attribute comes off.
+  await select.selectOption("github")
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", /.+/)
+})
+
 test("agent section sets and clears the global Claude token", async ({ page }) => {
   await mockApi(page)
   await page.goto("/settings")

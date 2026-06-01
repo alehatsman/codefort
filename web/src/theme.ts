@@ -9,7 +9,12 @@ export const THEMES = [
 
 export type ThemeId = (typeof THEMES)[number]["id"]
 
-export const DEFAULT_THEME: ThemeId = "github"
+// What an unset preference renders as.
+export const DEFAULT_THEME: ThemeId = "monokai"
+
+// The scheme baked into styles.css with no overrides — rendered by leaving the
+// data-theme attribute off. Every other theme layers on top via data-theme.
+const BASE_THEME: ThemeId = "github"
 
 const STORAGE_KEY = "moongit:theme"
 
@@ -32,7 +37,7 @@ export function getTheme(): ThemeId {
 
 export function applyTheme(theme: ThemeId): void {
   // github is the base scheme (no overrides) — leave the attribute off.
-  if (theme === DEFAULT_THEME) {
+  if (theme === BASE_THEME) {
     document.documentElement.removeAttribute("data-theme")
   } else {
     document.documentElement.setAttribute("data-theme", theme)
