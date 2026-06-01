@@ -37,6 +37,7 @@ func (s *Server) handleCreateIssue(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	s.emit("issue.created", repoID, iss.Author, map[string]any{"number": iss.Number, "title": iss.Title})
 	writeJSON(w, http.StatusCreated, iss)
 }
 
@@ -132,6 +133,14 @@ func (s *Server) handleUpdateIssue(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	// A state transition is the fleet-relevant signal (todo→in_progress→done);
+	// a title/body edit is a plainer "updated".
+	actor := identityFromContext(r)
+	if req.State != nil {
+		s.emit("issue.state_changed", repoID, actor, map[string]any{"number": iss.Number, "state": string(iss.State)})
+	} else {
+		s.emit("issue.updated", repoID, actor, map[string]any{"number": iss.Number})
+	}
 	writeJSON(w, http.StatusOK, iss)
 }
 
@@ -200,6 +209,7 @@ func (s *Server) handleClaimIssue(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	s.emit("issue.claimed", repoID, req.Assignee, map[string]any{"number": iss.Number, "state": string(iss.State)})
 	writeJSON(w, http.StatusOK, iss)
 }
 
@@ -228,6 +238,7 @@ func (s *Server) handleUnclaimIssue(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	s.emit("issue.unclaimed", repoID, identityFromContext(r), map[string]any{"number": iss.Number})
 	writeJSON(w, http.StatusOK, iss)
 }
 

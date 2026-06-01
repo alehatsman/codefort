@@ -359,7 +359,7 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	owner, name, err := storage.RepoIdent(r.db, run.RepoID)
 	if err != nil {
 		log.Error("ci resolve repo", "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	log = log.With("repo", owner+"/"+name)
@@ -368,32 +368,32 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	enabled, err := storage.RepoCIEnabled(r.db, run.RepoID)
 	if err != nil {
 		log.Error("ci enabled check", "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	bareRepo := filepath.Join(r.cfg.ReposDir, owner, name+".git")
 	raw, ok, err := r.readPipeline(bareRepo, run.CommitSHA)
 	if err != nil {
 		log.Error("ci read mgitci.yml", "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	if !enabled || !ok {
 		log.Info("ci run skipped (gated)", "enabled", enabled, "has_pipeline", ok)
-		r.finish(run.ID, storage.RunCanceled)
+		r.finish(run, storage.RunCanceled)
 		return
 	}
 
 	pipeline, err := ci.Parse(raw)
 	if err != nil {
 		log.Error("ci parse mgitci.yml", "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	order, err := pipeline.TopoOrder()
 	if err != nil {
 		log.Error("ci topo order", "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 
@@ -401,12 +401,12 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	workDir := filepath.Join(r.cfg.DataDir, "ci", "work", strconv.FormatInt(run.ID, 10))
 	if err := os.RemoveAll(workDir); err != nil {
 		log.Error("ci workspace", "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	if err := os.MkdirAll(workDir, 0o755); err != nil {
 		log.Error("ci workspace", "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	defer func() { _ = os.RemoveAll(workDir) }()
@@ -420,7 +420,7 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 
 	if err := r.checkout(ctx, bareRepo, run.CommitSHA, workDir); err != nil {
 		log.Error("ci checkout", "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 
@@ -430,7 +430,7 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 		job, err := storage.CreateJob(r.db, run.ID, jn, pipeline.Jobs[jn].Needs)
 		if err != nil {
 			log.Error("ci create job", "job", jn, "err", err)
-			r.finish(run.ID, storage.RunError)
+			r.finish(run, storage.RunError)
 			return
 		}
 		jobIDs[jn] = job.ID
@@ -492,7 +492,7 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	case anyNotSuccess:
 		final = storage.RunFailed
 	}
-	r.finish(run.ID, final)
+	r.finish(run, final)
 	log.Info("ci run finished", "status", final)
 }
 
@@ -670,9 +670,26 @@ func emitLines(r *ciRunner, elog *ci.EventLog, stepID, eventType, stream, output
 	}
 }
 
-func (r *ciRunner) finish(runID int64, status storage.RunStatus) {
-	if err := storage.FinishRun(r.db, runID, status); err != nil {
-		r.logger.Error("ci finish run", "run_id", runID, "status", status, "err", err)
+func (r *ciRunner) finish(run storage.CIRun, status storage.RunStatus) {
+	if err := storage.FinishRun(r.db, run.ID, status); err != nil {
+		r.logger.Error("ci finish run", "run_id", run.ID, "status", status, "err", err)
+	}
+	// Mirror the terminal status onto the outbound fleet feed (#73), the
+	// counterpart to the server's ci.run.queued. Only CI runs surface here —
+	// agent runs reuse this spine but aren't CI, so emitting ci.run.finished for
+	// them would be misleading. Best-effort: a feed write must not mask the
+	// run's real outcome.
+	if run.Kind == storage.RunKindAgent {
+		return
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"number": run.Number,
+		"status": string(status),
+		"ref":    run.Ref,
+		"sha":    run.CommitSHA,
+	})
+	if _, err := storage.AppendEvent(r.db, "ci.run.finished", run.RepoID, run.Trigger, string(payload)); err != nil {
+		r.logger.Error("ci finished event", "run_id", run.ID, "err", err)
 	}
 }
 

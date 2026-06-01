@@ -28,7 +28,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	owner, name, err := storage.RepoIdent(r.db, run.RepoID)
 	if err != nil {
 		log.Error("agent resolve repo", "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	log = log.With("repo", owner+"/"+name)
@@ -36,13 +36,13 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	// Gate: an agent run must serve a real issue — the issue is the work.
 	if run.IssueNumber == nil {
 		log.Error("agent run has no issue")
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	issue, err := storage.GetIssue(r.db, run.RepoID, *run.IssueNumber)
 	if err != nil {
 		log.Error("agent get issue", "issue", *run.IssueNumber, "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	log = log.With("issue", issue.Number)
@@ -52,7 +52,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	exec, err := newAgentExecutor(run.ExecutionModel, r.cfg, run.PilotAllowShell)
 	if err != nil {
 		log.Error("agent executor", "model", run.ExecutionModel, "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	log = log.With("model", exec.Model())
@@ -63,14 +63,14 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 	if err != nil {
 		log.Error("agent workspace", "err", err)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 
 	if err := r.checkout(parent, filepath.Join(r.cfg.ReposDir, owner, name+".git"), run.CommitSHA, workDir); err != nil {
 		log.Error("agent checkout", "err", err)
 		os.RemoveAll(workDir)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 
@@ -89,7 +89,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	if err != nil {
 		log.Error("agent create job", "err", err)
 		os.RemoveAll(workDir)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	if err := storage.StartJob(r.db, job.ID); err != nil {
@@ -186,7 +186,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 	if err != nil {
 		log.Error("agent turn resolve repo", "err", err)
 		storage.FinishTurn(r.db, turn.ID, storage.TurnError)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 	jobID, ok := r.agentJobID(run.ID)
@@ -331,7 +331,7 @@ func (r *ciRunner) reapExpiredAgents(ctx context.Context) {
 		r.tearDownAgent(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
 		zero := 0
 		r.finishJob(jobID, storage.JobSuccess, &zero)
-		r.finish(run.ID, storage.RunCanceled)
+		r.finish(run, storage.RunCanceled)
 		r.commentAgentFailure(run, "idle/lifetime timeout")
 		log.Info("agent run reaped (lifetime cap)")
 	}
@@ -344,7 +344,9 @@ func (r *ciRunner) failAgentRun(runID, jobID int64, workDir string) {
 	if jobID != 0 {
 		r.finishJob(jobID, storage.JobError, nil)
 	}
-	r.finish(runID, storage.RunError)
+	// Agent runs don't surface on the CI feed (finish skips them by Kind), so a
+	// minimal run carrying just the id + kind is all finish needs here.
+	r.finish(storage.CIRun{ID: runID, Kind: storage.RunKindAgent}, storage.RunError)
 }
 
 // tearDownAgent releases a finished agent run's resources: remove the container

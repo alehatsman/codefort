@@ -146,6 +146,12 @@ type Config struct {
 	// disables retention.
 	CIRetainRuns int
 
+	// EventRetain caps how many of the most recent outbound feed events (#73)
+	// are kept: a periodic reaper prunes older rows, bounding the events table.
+	// Set via MOONGIT_EVENT_RETAIN (default 10000); zero or negative disables
+	// retention.
+	EventRetain int
+
 	// DexURL is the base URL of a dex `serve` daemon (e.g.
 	// http://127.0.0.1:8080). Empty disables the Intel tab. DexToken is
 	// the bearer token dex was started with (DEX_SERVE_TOKEN); empty when
@@ -242,6 +248,12 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("MOONGIT_CI_RETAIN_RUNS: %w", err)
 	}
 	cfg.CIRetainRuns = retainRuns
+
+	eventRetain, err := strconv.Atoi(envOr("MOONGIT_EVENT_RETAIN", "10000"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_EVENT_RETAIN: %w", err)
+	}
+	cfg.EventRetain = eventRetain
 
 	cfg.CISecret = envOr("MOONGIT_CI_SECRET", "")
 

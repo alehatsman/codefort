@@ -43,6 +43,8 @@ func run(args []string) error {
 		return runPR(args[1:])
 	case "ci":
 		return runCI(args[1:])
+	case "events":
+		return runEvents(args[1:])
 	case "help", "-h", "--help":
 		printUsage(os.Stdout)
 		return nil
@@ -78,6 +80,9 @@ USAGE:
 
     moongit ci validate  [path]   (defaults to ./mgitci.yml)
     moongit ci run       <ref>    (trigger a run for a branch/tag/sha)
+
+    moongit events                (tail the fleet event feed; Ctrl-C to stop)
+        [--repo owner/name] [--types a,b] [--since <seq>] [--once]
 
 Identity: the server stamps author/assignee from the name of the token
 in MOONGIT_TOKEN. Mint a token with "moongitd token create <name>" and

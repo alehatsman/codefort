@@ -69,7 +69,7 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 			run.Number, r.runLink(owner, name, run.Number), err.Error()))
 		r.tearDownAgent(run.ID, jobID, workDir)
 		r.finishJob(jobID, storage.JobError, nil)
-		r.finish(run.ID, storage.RunError)
+		r.finish(run, storage.RunError)
 		return
 	}
 
@@ -92,7 +92,7 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 		r.finishJob(jobID, storage.JobSuccess, &zero)
 	}
 	r.tearDownAgent(run.ID, jobID, workDir)
-	r.finish(run.ID, storage.RunSuccess)
+	r.finish(run, storage.RunSuccess)
 	log.Info("agent run finished", "branch", branch, "changed", changed)
 }
 

@@ -50,6 +50,12 @@ func (s *Server) handleCreateComment(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	// Mirror to the fleet feed. lookupIssueOrFail validated the path already, so
+	// the repo resolves; a miss here just skips the (best-effort) event.
+	if repoID, lerr := storage.LookupRepo(s.rdb, r.PathValue("owner"), strings.TrimSuffix(r.PathValue("repo"), ".git")); lerr == nil {
+		num, _ := strconv.Atoi(r.PathValue("number"))
+		s.emit("issue.commented", repoID, c.Author, map[string]any{"number": num, "comment_id": c.ID})
+	}
 	writeJSON(w, http.StatusCreated, c)
 }
 

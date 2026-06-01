@@ -95,6 +95,8 @@ func (s *Server) apiHandler() http.Handler {
 
 	mux.HandleFunc("GET /api/whoami", s.handleWhoami)
 
+	mux.HandleFunc("GET /api/events", s.handleEvents)
+
 	mux.HandleFunc("GET /api/tokens", s.handleListTokens)
 	mux.HandleFunc("POST /api/tokens", s.handleCreateToken)
 	mux.HandleFunc("DELETE /api/tokens/{id}", s.handleRevokeToken)
