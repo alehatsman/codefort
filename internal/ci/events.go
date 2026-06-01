@@ -50,7 +50,7 @@ const (
 const (
 	EventAgentTurnStarted   = "agent.turn.started"   // {turn, prompt}
 	EventAgentMessage       = "agent.message"        // {claude: <stream-json object>}
-	EventAgentRaw           = "agent.raw"            // {line} — unparseable stdout
+	EventAgentRaw           = "agent.raw"            // {line} — unparseable stdout, or tool stderr replayed on a failed turn
 	EventAgentTurnCompleted = "agent.turn.completed" // {turn, status, num_turns, duration_ms, cost_usd}
 )
 

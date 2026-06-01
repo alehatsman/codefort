@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -61,17 +62,20 @@ type jobSession interface {
 // streamingSession is the agent counterpart to jobSession.Exec: it runs a
 // command in the session's environment and streams its stdout to onLine one
 // line at a time (each line keeping its trailing newline), returning the
-// process exit code. It's a separate capability — CI's per-step JSON contract
-// is buffered, while a live agent transcript must surface each claude
-// stream-json line as it's written. Both concrete sessions implement it; the
-// agent executor type-asserts for it.
+// process exit code. onStderr receives the command's stderr lines (after stdout
+// is fully drained), so a turn whose tool logs diagnostics only to stderr — like
+// mooncake — is never rendered blank on failure (#117); pass nil to ignore it.
+// It's a separate capability — CI's per-step JSON contract is buffered, while a
+// live agent transcript must surface each claude stream-json line as it's
+// written. Both concrete sessions implement it; the agent executor type-asserts
+// for it.
 type streamingSession interface {
-	ExecStream(ctx context.Context, argv []string, onLine func(line []byte)) (exitCode int, err error)
+	ExecStream(ctx context.Context, argv []string, onLine, onStderr func(line []byte)) (exitCode int, err error)
 }
 
 // streamExecutor backs hostSession.ExecStream — the injection point that lets
 // agent executor tests feed canned claude stream-json without a real binary.
-type streamExecutor func(ctx context.Context, workDir string, argv []string, onLine func(line []byte)) (int, error)
+type streamExecutor func(ctx context.Context, workDir string, argv []string, onLine, onStderr func(line []byte)) (int, error)
 
 // sessionFactory opens a jobSession for one job. name is a stable
 // docker-safe container name; workDir is the checked-out (bind-mountable)
@@ -714,11 +718,11 @@ func (h *hostSession) Exec(ctx context.Context, stepYAML string) (stepResult, er
 
 // ExecStream runs an agent command on the host. nil stream means this session
 // wasn't built for agent work (the CI host path) — agent runs require docker.
-func (h *hostSession) ExecStream(ctx context.Context, argv []string, onLine func(line []byte)) (int, error) {
+func (h *hostSession) ExecStream(ctx context.Context, argv []string, onLine, onStderr func(line []byte)) (int, error) {
 	if h.stream == nil {
 		return -1, errors.New("host session does not support streaming exec")
 	}
-	return h.stream(ctx, h.workDir, argv, onLine)
+	return h.stream(ctx, h.workDir, argv, onLine, onStderr)
 }
 
 func (h *hostSession) Close() error { return nil }
@@ -793,9 +797,9 @@ func (d *dockerSession) Exec(ctx context.Context, stepYAML string) (stepResult, 
 
 // ExecStream runs an agent command in the container and streams its stdout
 // line-by-line — the live claude transcript path.
-func (d *dockerSession) ExecStream(ctx context.Context, argv []string, onLine func(line []byte)) (int, error) {
+func (d *dockerSession) ExecStream(ctx context.Context, argv []string, onLine, onStderr func(line []byte)) (int, error) {
 	cmd := exec.CommandContext(ctx, "docker", append([]string{"exec", d.name}, argv...)...)
-	return streamCommand(ctx, cmd, onLine)
+	return streamCommand(ctx, cmd, onLine, onStderr)
 }
 
 // streamCommand starts cmd and forwards each stdout line (newline kept) to
@@ -805,16 +809,31 @@ func (d *dockerSession) ExecStream(ctx context.Context, argv []string, onLine fu
 // exit is returned as the code with a nil error (the caller maps exit/result
 // onto run status); only a failure to start or run the process, or a cancelled
 // context, is an executor error.
-func streamCommand(ctx context.Context, cmd *exec.Cmd, onLine func(line []byte)) (int, error) {
+//
+// stderr is drained concurrently (so a full pipe can't deadlock the child) and,
+// once stdout is exhausted, replayed line-by-line to onStderr — after every
+// onLine call, so both callbacks run on this one goroutine and the caller never
+// has to synchronize its event log. onStderr may be nil.
+func streamCommand(ctx context.Context, cmd *exec.Cmd, onLine, onStderr func(line []byte)) (int, error) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return -1, err
 	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return -1, err
+	}
 	if err := cmd.Start(); err != nil {
 		return -1, err
 	}
+	// Accumulate stderr off-goroutine; we replay it after stdout below.
+	var stderr bytes.Buffer
+	var stderrDone sync.WaitGroup
+	stderrDone.Add(1)
+	go func() {
+		defer stderrDone.Done()
+		_, _ = io.Copy(&stderr, stderrPipe)
+	}()
 	r := bufio.NewReader(stdout)
 	for {
 		line, rerr := r.ReadBytes('\n')
@@ -823,6 +842,17 @@ func streamCommand(ctx context.Context, cmd *exec.Cmd, onLine func(line []byte))
 		}
 		if rerr != nil {
 			break // EOF (process closing stdout) or read error; Wait reports the real outcome
+		}
+	}
+	stderrDone.Wait()
+	// Surface the tool's stderr (where mooncake and most CLIs write diagnostics)
+	// after the stdout transcript. SplitAfter keeps the buffer intact for the
+	// exec-error message below.
+	if onStderr != nil && stderr.Len() > 0 {
+		for _, line := range bytes.SplitAfter(stderr.Bytes(), []byte{'\n'}) {
+			if len(line) > 0 {
+				onStderr(line)
+			}
 		}
 	}
 	werr := cmd.Wait()
@@ -863,13 +893,13 @@ func removeContainer(logger *slog.Logger, name string) {
 // runClaudeStreamHost runs the agent command on the host (the CIIsolation=none
 // path), streaming stdout line-by-line. Agent runs normally use docker; this
 // exists so the host session isn't missing the capability.
-func runClaudeStreamHost(ctx context.Context, workDir string, argv []string, onLine func(line []byte)) (int, error) {
+func runClaudeStreamHost(ctx context.Context, workDir string, argv []string, onLine, onStderr func(line []byte)) (int, error) {
 	if len(argv) == 0 {
 		return -1, errors.New("empty agent command")
 	}
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = workDir
-	return streamCommand(ctx, cmd, onLine)
+	return streamCommand(ctx, cmd, onLine, onStderr)
 }
 
 // sweepOrphanContainers removes any moongit-ci-* or moongit-agent-* containers

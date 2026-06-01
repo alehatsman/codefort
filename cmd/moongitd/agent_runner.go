@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/alehatsman/moongit/internal/ci"
 	"github.com/alehatsman/moongit/internal/storage"
@@ -284,6 +285,7 @@ func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession,
 	r.emit(elog, ci.EventAgentTurnStarted, map[string]any{"turn": turnNum, "prompt": spec.prompt, "model": exec.Model()})
 
 	var result *turnResult
+	var stderrLines []string
 	exitCode, execErr := stream.ExecStream(ctx, argv, func(line []byte) {
 		et, data, res := exec.Translate(line)
 		if et == "" {
@@ -293,9 +295,23 @@ func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession,
 		if res != nil {
 			result = res
 		}
+	}, func(line []byte) {
+		if s := strings.TrimRight(string(line), "\r\n"); s != "" {
+			stderrLines = append(stderrLines, s)
+		}
 	})
 
 	status = turnStatus(result, exitCode, execErr)
+	// A failed turn must never be blank. The executor translates the tool's
+	// stdout; a tool that writes its diagnostics to stderr (mooncake's planner
+	// errors, a crash trace) would otherwise leave nothing in the transcript to
+	// explain the failure. On any non-success turn, replay that stderr as
+	// agent.raw so the operator can see why (#117); the happy path stays clean.
+	if status != "success" {
+		for _, line := range stderrLines {
+			r.emit(elog, ci.EventAgentRaw, map[string]any{"line": line})
+		}
+	}
 	turnData := map[string]any{"turn": turnNum, "status": status}
 	if result != nil {
 		turnData["num_turns"] = result.NumTurns

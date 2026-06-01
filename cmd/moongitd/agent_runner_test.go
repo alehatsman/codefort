@@ -20,7 +20,8 @@ import (
 // claude stream-json lines instead of execing a real binary. It records the
 // argv of the last call so launch-context composition can be asserted.
 type fakeAgentSession struct {
-	lines    []string // NDJSON lines claude would print
+	lines    []string // NDJSON lines claude would print on stdout
+	stderr   []string // lines the tool writes to stderr
 	exitCode int
 	gotArgv  *[]string
 }
@@ -29,12 +30,18 @@ func (f *fakeAgentSession) Exec(context.Context, string) (stepResult, error) {
 	return stepResult{}, nil
 }
 
-func (f *fakeAgentSession) ExecStream(_ context.Context, argv []string, onLine func([]byte)) (int, error) {
+func (f *fakeAgentSession) ExecStream(_ context.Context, argv []string, onLine, onStderr func([]byte)) (int, error) {
 	if f.gotArgv != nil {
 		*f.gotArgv = argv
 	}
 	for _, ln := range f.lines {
 		onLine([]byte(ln + "\n"))
+	}
+	// streamCommand replays stderr after stdout is drained; mirror that order.
+	for _, ln := range f.stderr {
+		if onStderr != nil {
+			onStderr([]byte(ln + "\n"))
+		}
 	}
 	return f.exitCode, nil
 }
@@ -45,6 +52,7 @@ func (f *fakeAgentSession) Close() error { return nil }
 type agentTestOpts struct {
 	sessionErr error    // make the (turn-1) session factory fail
 	lines      []string // claude stream-json lines the session replays
+	stderr     []string // stderr lines the session replays
 	exitCode   int      // claude's process exit code
 }
 
@@ -105,7 +113,7 @@ func newAgentHarness(t *testing.T, opts agentTestOpts) agentHarness {
 	var opened, attached, teardowns atomic.Int32
 	var gotArgv, gotEnv []string
 	fake := func() (jobSession, error) {
-		return &fakeAgentSession{lines: opts.lines, exitCode: opts.exitCode, gotArgv: &gotArgv}, nil
+		return &fakeAgentSession{lines: opts.lines, stderr: opts.stderr, exitCode: opts.exitCode, gotArgv: &gotArgv}, nil
 	}
 	r := &ciRunner{
 		db: db,
@@ -323,6 +331,54 @@ func TestExecuteAgentRunErrorResultParks(t *testing.T) {
 	h.r.executeAgentRun(context.Background(), h.run)
 	if got := h.status(t); got != storage.RunAwaitingInput {
 		t.Errorf("run status = %q, want awaiting_input (recoverable)", got)
+	}
+}
+
+// A failed turn whose tool wrote its diagnostics only to stderr (mooncake's
+// planner errors, a crash trace) must not render blank: the stderr is replayed
+// as agent.raw so the operator can see why it failed (#117).
+func TestAgentTurnSurfacesStderrOnFailure(t *testing.T) {
+	h := newAgentHarness(t, agentTestOpts{
+		// No stdout result line + a non-zero exit => the turn is an error.
+		exitCode: 1,
+		stderr: []string{
+			"planner setup failed: failed to build plan",
+			"  line 3: cannot unmarshal !!str into config.AssertFile",
+		},
+	})
+	h.r.executeAgentRun(context.Background(), h.run)
+
+	var raw []string
+	for _, ev := range h.events(t) {
+		if ev.Type == ci.EventAgentRaw {
+			if line, _ := ev.Data["line"].(string); line != "" {
+				raw = append(raw, line)
+			}
+		}
+	}
+	want := []string{
+		"planner setup failed: failed to build plan",
+		"  line 3: cannot unmarshal !!str into config.AssertFile",
+	}
+	if len(raw) != len(want) {
+		t.Fatalf("agent.raw lines = %v, want %v; all events: %v", raw, want, eventTypes(h.events(t)))
+	}
+	for i, w := range want {
+		if raw[i] != w {
+			t.Errorf("agent.raw[%d] = %q, want %q", i, raw[i], w)
+		}
+	}
+}
+
+// A successful turn keeps the transcript clean — stderr is not replayed.
+func TestAgentTurnHidesStderrOnSuccess(t *testing.T) {
+	h := newAgentHarness(t, agentTestOpts{
+		lines:  successTurn,
+		stderr: []string{"some noisy warning on stderr"},
+	})
+	h.r.executeAgentRun(context.Background(), h.run)
+	if hasEventType(h.events(t), ci.EventAgentRaw) {
+		t.Errorf("a successful turn must not surface stderr as agent.raw; got %v", eventTypes(h.events(t)))
 	}
 }
 
