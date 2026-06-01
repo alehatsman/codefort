@@ -380,7 +380,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
   })
 
   // CI: runs list (GET) / manual trigger (POST) / detail / rerun / events (SSE)
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs(\?.*)?$/, (route) => {
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/runs(\?.*)?$/, (route) => {
     const req = route.request()
     if (req.method() === "POST") {
       const ref = ((req.postDataJSON() as { ref?: string }).ref ?? "").trim()
@@ -420,7 +420,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
         .map(({ jobs: _jobs, events: _events, ...run }) => run)
     )
   })
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+$/, (route) => {
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/runs\/\d+$/, (route) => {
     const n = Number(new URL(route.request().url()).pathname.split("/").pop())
     const run = state.ciRuns.find((r) => r.number === n)
     if (!run) return json(route, 404, { error: "run not found" })
@@ -428,7 +428,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     return json(route, 200, detail)
   })
   // Agent follow-up turn: queue a message on an agent run.
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/turns$/, (route) => {
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/runs\/\d+\/turns$/, (route) => {
     const parts = new URL(route.request().url()).pathname.split("/")
     const n = Number(parts[parts.length - 2])
     const run = state.ciRuns.find((r) => r.number === n)
@@ -449,7 +449,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     return json(route, 202, turn)
   })
   // Finish an agent run: park -> finishing (the runner would then hand off).
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/finish$/, (route) => {
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/runs\/\d+\/finish$/, (route) => {
     const parts = new URL(route.request().url()).pathname.split("/")
     const n = Number(parts[parts.length - 2])
     const run = state.ciRuns.find((r) => r.number === n)
@@ -463,7 +463,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     return json(route, 202, out)
   })
   // Force-stop an agent run from any non-terminal state -> canceled.
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/cancel$/, (route) => {
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/runs\/\d+\/cancel$/, (route) => {
     const parts = new URL(route.request().url()).pathname.split("/")
     const n = Number(parts[parts.length - 2])
     const run = state.ciRuns.find((r) => r.number === n)
@@ -476,7 +476,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const { jobs: _j, events: _e, ...out } = run
     return json(route, 202, out)
   })
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/rerun$/, (route) => {
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/runs\/\d+\/rerun$/, (route) => {
     const parts = new URL(route.request().url()).pathname.split("/")
     const n = Number(parts[parts.length - 2])
     const src = state.ciRuns.find((r) => r.number === n)
@@ -494,7 +494,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const { jobs: _j, events: _e, ...run } = next
     return json(route, 202, run)
   })
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/jobs\/[^/]+\/events$/, (route) => {
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/runs\/\d+\/jobs\/[^/]+\/events$/, (route) => {
     const parts = new URL(route.request().url()).pathname.split("/")
     const job = parts[parts.length - 2]
     const n = Number(parts[parts.length - 4])
