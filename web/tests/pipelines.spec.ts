@@ -439,9 +439,21 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
                 },
               },
             },
-            // num_turns/duration are 0 for pilot — must not render "0 steps · 0 ms".
+            // The pilot looped 3 times before settling — surfaced only because >1.
             {
               seq: 9,
+              type: "agent.message",
+              time: 0,
+              data: {
+                mooncake: {
+                  type: "pilot.completed",
+                  data: { status: "success", stop_reason: "success", iterations: 3 },
+                },
+              },
+            },
+            // num_turns/duration are 0 for pilot — must not render "0 steps · 0 ms".
+            {
+              seq: 10,
               type: "agent.turn.completed",
               time: 0,
               data: { turn: 1, status: "success", num_turns: 0, duration_ms: 0 },
@@ -462,6 +474,8 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
   // The real aggregate replaces the bogus "0 steps · 0 ms".
   await expect(page.getByText("2 ok · 2 changed")).toBeVisible()
   await expect(transcript).not.toContainText("0 steps")
+  // The pilot loop count (otherwise invisible) is surfaced because it re-planned.
+  await expect(page.getByText("3 iterations")).toBeVisible()
 })
 
 test("an awaiting-input agent run shows a message box and queues a follow-up", async ({ page }) => {

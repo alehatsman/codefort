@@ -521,8 +521,8 @@ function AgentTranscript({
     <div className="agent-transcript">
       {error && <div className="error inline">{error}</div>}
       {entries.length === 0 && !done && <div className="loading">Waiting for the agent…</div>}
-      {entries.map((e, i) => (
-        <div key={i} className={clsx("agent-entry", `agent-entry--${e.kind}`)}>
+      {entries.map((e) => (
+        <div key={e.id} className={clsx("agent-entry", `agent-entry--${e.kind}`)}>
           {e.label && <div className="agent-entry__label">{e.label}</div>}
           <pre className="agent-entry__body">{e.text}</pre>
         </div>
@@ -619,6 +619,9 @@ function AgentMessageBox({
 }
 
 interface AgentEntry {
+  // id is a stable React key, assigned by foldAgentEvents from the source
+  // event's seq + a per-event sub-index. The fold helpers don't set it.
+  id?: string
   kind: "turn" | "thinking" | "assistant" | "tool_use" | "tool_result" | "result" | "system" | "raw"
   label?: string
   text: string
@@ -638,6 +641,9 @@ function foldAgentEvents(events: CIEvent[]): AgentEntry[] {
 
   for (const ev of events) {
     const d = ev.data ?? {}
+    // Tag every entry this event produces with a key stable across appends and
+    // deterministic re-folds: the event seq plus its position within the event.
+    const start = out.length
     switch (ev.type) {
       case "agent.turn.started": {
         const turn = typeof d.turn === "number" ? d.turn : "?"
@@ -665,6 +671,7 @@ function foldAgentEvents(events: CIEvent[]): AgentEntry[] {
         }
         break
     }
+    for (let i = start; i < out.length; i++) out[i].id = `${ev.seq}.${i - start}`
   }
   return out
 }
@@ -682,7 +689,8 @@ interface PilotState {
 // mooncake-pilot run's agent.message) into zero or more transcript entries.
 // Step output streams across several events, so step.* are buffered and a
 // single entry is emitted when the step completes; run.completed gives the
-// real aggregate (the agent.turn.completed line reports 0 for pilot runs).
+// real aggregate (the agent.turn.completed line reports 0 for pilot runs), and
+// pilot.completed surfaces the loop count when the pilot re-planned.
 function foldMooncakeEvent(m: Record<string, unknown>, pilot: PilotState): AgentEntry[] {
   const type = typeof m.type === "string" ? m.type : ""
   const data = (m.data as Record<string, unknown>) ?? {}
@@ -750,8 +758,21 @@ function foldMooncakeEvent(m: Record<string, unknown>, pilot: PilotState): Agent
       if (num("duration_ms") > 0) bits.push(formatDuration(num("duration_ms")))
       return [{ kind: "result", label: "Run complete", text: bits.join(" · ") }]
     }
+    case "pilot.completed": {
+      // The pilot wraps one or more plan/execute loops; status + stop_reason
+      // already ride the "Turn complete" line, but the iteration count is shown
+      // nowhere else. Surface it only when the pilot actually re-planned (>1) or
+      // stopped for a non-success reason — otherwise it's noise.
+      const iterations = typeof data.iterations === "number" ? data.iterations : 0
+      const stop = typeof data.stop_reason === "string" ? data.stop_reason : ""
+      const bits: string[] = []
+      if (iterations > 1) bits.push(`${iterations} iterations`)
+      if (stop && stop !== "success") bits.push(stop)
+      if (bits.length === 0) return []
+      return [{ kind: "system", label: "pilot", text: bits.join(" · ") }]
+    }
     default:
-      // run.started, pilot.completed, etc — redundant with the above / the turn line.
+      // run.started, etc — redundant with the above / the turn line.
       return []
   }
 }
