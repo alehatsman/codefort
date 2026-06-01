@@ -1,7 +1,11 @@
 import type {
+  AgentSettings,
+  AgentTurn,
   Blob,
+  UpdateAgentSettingsInput,
   CIRun,
   CIRunDetail,
+  CIRunExecutionModel,
   ClaimIssueInput,
   CodeComment,
   CodeCommentState,
@@ -268,12 +272,53 @@ export const api = {
   mergePull: (owner: string, repo: string, n: number, body: MergeRequestInput) =>
     request<MergeResult>(`/api/repos/${owner}/${repo}/pulls/${n}/merge`, { method: "POST", body }),
 
-  listCIRuns: (owner: string, repo: string, limit = 0) =>
-    request<CIRun[]>(`/api/repos/${owner}/${repo}/ci/runs${limit ? `?limit=${limit}` : ""}`),
+  listCIRuns: (owner: string, repo: string, limit = 0, kind = "") => {
+    const q = new URLSearchParams()
+    if (limit) q.set("limit", String(limit))
+    if (kind) q.set("kind", kind)
+    const qs = q.toString()
+    return request<CIRun[]>(`/api/repos/${owner}/${repo}/ci/runs${qs ? `?${qs}` : ""}`)
+  },
   triggerCIRun: (owner: string, repo: string, ref: string) =>
     request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs`, { method: "POST", body: { ref } }),
   getCIRun: (owner: string, repo: string, n: number) =>
     request<CIRunDetail>(`/api/repos/${owner}/${repo}/ci/runs/${n}`),
   rerunCIRun: (owner: string, repo: string, n: number) =>
     request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/rerun`, { method: "POST" }),
+
+  // spawnAgent starts an agent run for an issue. ref pins the base the agent
+  // checks out (optional; the server defaults to the repo's HEAD); model picks
+  // the execution model (optional; the server defaults from settings). The
+  // resulting agent run shares the ci_runs surface, so it shows up under
+  // Pipelines and streams over the same run/job event endpoints.
+  spawnAgent: (
+    owner: string,
+    repo: string,
+    n: number,
+    opts?: { ref?: string; model?: CIRunExecutionModel; allowShell?: boolean }
+  ) =>
+    request<CIRun>(`/api/repos/${owner}/${repo}/issues/${n}/agent`, {
+      method: "POST",
+      body: {
+        ...(opts?.ref ? { ref: opts.ref } : {}),
+        ...(opts?.model ? { model: opts.model } : {}),
+        ...(opts?.allowShell ? { allow_shell: true } : {}),
+      },
+    }),
+  // createAgentTurn queues a follow-up message on an agent run; the dispatch
+  // loop resumes the session and streams the response onto the run's events.
+  createAgentTurn: (owner: string, repo: string, n: number, text: string) =>
+    request<AgentTurn>(`/api/repos/${owner}/${repo}/ci/runs/${n}/turns`, {
+      method: "POST",
+      body: { text },
+    }),
+  // finishAgentRun accepts a parked agent run; the server hands off (branch +
+  // summary comment) and finalizes it.
+  finishAgentRun: (owner: string, repo: string, n: number) =>
+    request<CIRun>(`/api/repos/${owner}/${repo}/ci/runs/${n}/finish`, { method: "POST" }),
+
+  // Global agent settings (write-only Claude token).
+  getAgentSettings: () => request<AgentSettings>("/api/settings/agent"),
+  updateAgentSettings: (body: UpdateAgentSettingsInput) =>
+    request<AgentSettings>("/api/settings/agent", { method: "PUT", body }),
 }

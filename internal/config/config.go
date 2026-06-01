@@ -74,6 +74,71 @@ type Config struct {
 	// Set via MOONGIT_CI_DEFAULT_IMAGE.
 	CIDefaultImage string
 
+	// AgentRunConcurrency caps how many agent runs (kind=agent) execute at
+	// once, independent of CIRunConcurrency so a burst of issue-spawned agents
+	// never starves pipeline CI (and vice versa). Set via
+	// MOONGIT_AGENT_RUN_CONCURRENCY (default 1); values < 1 are treated as 1.
+	AgentRunConcurrency int
+
+	// AgentRunTimeout is the whole-session lifetime cap for an agent run: a run
+	// parked in awaiting_input is reaped (container torn down, run finalized)
+	// once it's older than this, so an abandoned session can't hold a container
+	// forever. Set via MOONGIT_AGENT_RUN_TIMEOUT (default 60m). Zero or negative
+	// disables the reaper.
+	AgentRunTimeout time.Duration
+
+	// AgentTurnTimeout is the per-turn wall-clock limit: one claude invocation
+	// (turn 1 or a follow-up) runs under this deadline; an overrunning turn is
+	// killed and the turn errored. Set via MOONGIT_AGENT_TURN_TIMEOUT (default
+	// 15m). Zero or negative disables the per-turn deadline.
+	AgentTurnTimeout time.Duration
+
+	// AgentDefaultImage is the container image an agent run executes in: the CI
+	// base image plus the Claude CLI and the dex MCP shim (#75). Set via
+	// MOONGIT_AGENT_DEFAULT_IMAGE. Only used when CIIsolation="docker".
+	AgentDefaultImage string
+
+	// Agent credentials, injected per-run into the container env — never baked
+	// into the image (#77). AgentClaudeOAuthToken is the subscription token from
+	// `claude setup-token` (CLAUDE_CODE_OAUTH_TOKEN); AgentAnthropicAPIKey is the
+	// alternate API-key path (ANTHROPIC_API_KEY); exactly one is needed for the
+	// agent to authenticate headlessly. AgentLLMBaseURL optionally overrides the
+	// LLM endpoint (ANTHROPIC_BASE_URL — Anthropic now, a local GPU model later).
+	// Set via MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN / _ANTHROPIC_API_KEY / _LLM_BASE_URL.
+	AgentClaudeOAuthToken string
+	AgentAnthropicAPIKey  string
+	AgentLLMBaseURL       string
+
+	// AgentServerURL is how the in-container agent reaches this moongitd (for
+	// mgit / git over the host gateway). Empty defaults to
+	// http://host.docker.internal:<port-of-Addr>. Set via MOONGIT_AGENT_SERVER_URL.
+	AgentServerURL string
+
+	// AgentPilotMaxIterations caps the plan→apply iterations a single
+	// mooncake-pilot turn runs (`mooncake pilot run --max-iterations`).
+	// Only used by the mooncake-pilot execution model (#110). Set via
+	// MOONGIT_AGENT_PILOT_MAX_ITERATIONS.
+	AgentPilotMaxIterations int
+
+	// mooncake-pilot policy (#110/#11): mooncake enforces these per run at
+	// executor preflight, re-establishing the execution wall that moving off
+	// Claude's managed Bash policy loses. A denied step fails the run before
+	// any side effect. DenyActions defaults to {shell,cmd} (the agent uses
+	// typed actions, not a raw shell) and is cleared by setting an empty
+	// MOONGIT_AGENT_PILOT_DENY_ACTIONS. AllowActions is an optional allowlist
+	// (deny wins). DenyNetwork refuses egress steps; MaxRisk (1..10, 0=off)
+	// caps a step's estimated risk band. Set via MOONGIT_AGENT_PILOT_{ALLOW,
+	// DENY}_ACTIONS (comma-sep), _DENY_NETWORK, _MAX_RISK.
+	AgentPilotAllowActions []string
+	AgentPilotDenyActions  []string
+	AgentPilotDenyNetwork  bool
+	AgentPilotMaxRisk      int
+
+	// DexProject is the dex project id (keyed by the canonical repo root) the
+	// agent's dex MCP queries. Empty omits the dex MCP wiring. Set via
+	// MOONGIT_AGENT_DEX_PROJECT.
+	DexProject string
+
 	// CIRetainRuns caps how many of a repo's most recent CI runs are kept: a
 	// periodic reaper prunes terminal runs beyond this many (and their on-disk
 	// event logs), keeping disk + DB bounded. queued/running runs are never
@@ -188,6 +253,52 @@ func Load() (*Config, error) {
 	}
 	cfg.CIDefaultImage = envOr("MOONGIT_CI_DEFAULT_IMAGE", "moongit-ci:latest")
 
+	agentConc, err := strconv.Atoi(envOr("MOONGIT_AGENT_RUN_CONCURRENCY", "1"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_AGENT_RUN_CONCURRENCY: %w", err)
+	}
+	cfg.AgentRunConcurrency = agentConc
+
+	agentTimeout, err := time.ParseDuration(envOr("MOONGIT_AGENT_RUN_TIMEOUT", "60m"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_AGENT_RUN_TIMEOUT: %w", err)
+	}
+	cfg.AgentRunTimeout = agentTimeout
+
+	cfg.AgentDefaultImage = envOr("MOONGIT_AGENT_DEFAULT_IMAGE", "moongit-agent:latest")
+	cfg.AgentClaudeOAuthToken = envOr("MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN", "")
+	cfg.AgentAnthropicAPIKey = envOr("MOONGIT_AGENT_ANTHROPIC_API_KEY", "")
+	cfg.AgentLLMBaseURL = envOr("MOONGIT_AGENT_LLM_BASE_URL", "")
+	cfg.AgentServerURL = envOr("MOONGIT_AGENT_SERVER_URL", "")
+	cfg.DexProject = envOr("MOONGIT_AGENT_DEX_PROJECT", "")
+
+	agentTurnTimeout, err := time.ParseDuration(envOr("MOONGIT_AGENT_TURN_TIMEOUT", "15m"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_AGENT_TURN_TIMEOUT: %w", err)
+	}
+	cfg.AgentTurnTimeout = agentTurnTimeout
+
+	pilotIters, err := strconv.Atoi(envOr("MOONGIT_AGENT_PILOT_MAX_ITERATIONS", "10"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_AGENT_PILOT_MAX_ITERATIONS: %w", err)
+	}
+	cfg.AgentPilotMaxIterations = pilotIters
+
+	// Pilot policy. DenyActions defaults to {shell,cmd}; use LookupEnv (not
+	// envOr) so an explicit empty value clears the default to opt into shell.
+	denyRaw := "shell,cmd"
+	if v, ok := os.LookupEnv("MOONGIT_AGENT_PILOT_DENY_ACTIONS"); ok {
+		denyRaw = v
+	}
+	cfg.AgentPilotDenyActions = splitCSV(denyRaw)
+	cfg.AgentPilotAllowActions = splitCSV(os.Getenv("MOONGIT_AGENT_PILOT_ALLOW_ACTIONS"))
+	cfg.AgentPilotDenyNetwork = envOr("MOONGIT_AGENT_PILOT_DENY_NETWORK", "false") == "true"
+	pilotRisk, err := strconv.Atoi(envOr("MOONGIT_AGENT_PILOT_MAX_RISK", "0"))
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_AGENT_PILOT_MAX_RISK: %w", err)
+	}
+	cfg.AgentPilotMaxRisk = pilotRisk
+
 	return cfg, nil
 }
 
@@ -205,4 +316,17 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// splitCSV parses a comma-separated env value into a trimmed, empty-dropped
+// slice. Returns nil for an empty/blank input so callers can treat "unset" and
+// "no entries" the same.
+func splitCSV(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

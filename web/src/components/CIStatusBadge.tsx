@@ -7,5 +7,7 @@ import type { CIJobStatus, CIRunStatus } from "../api/types"
 // No conditional here — clsx is used for the shared BEM-modifier convention,
 // not because it removes any artifact (see StateButtons for the real win).
 export default function CIStatusBadge({ status }: { status: CIRunStatus | CIJobStatus }) {
-  return <span className={clsx("ci-badge", `ci-badge--${status}`)}>{status}</span>
+  return (
+    <span className={clsx("ci-badge", `ci-badge--${status}`)}>{status.replace(/_/g, " ")}</span>
+  )
 }

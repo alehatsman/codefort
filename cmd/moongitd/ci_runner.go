@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"database/sql"
@@ -57,6 +58,21 @@ type jobSession interface {
 	Close() error
 }
 
+// streamingSession is the agent counterpart to jobSession.Exec: it runs a
+// command in the session's environment and streams its stdout to onLine one
+// line at a time (each line keeping its trailing newline), returning the
+// process exit code. It's a separate capability — CI's per-step JSON contract
+// is buffered, while a live agent transcript must surface each claude
+// stream-json line as it's written. Both concrete sessions implement it; the
+// agent executor type-asserts for it.
+type streamingSession interface {
+	ExecStream(ctx context.Context, argv []string, onLine func(line []byte)) (exitCode int, err error)
+}
+
+// streamExecutor backs hostSession.ExecStream — the injection point that lets
+// agent executor tests feed canned claude stream-json without a real binary.
+type streamExecutor func(ctx context.Context, workDir string, argv []string, onLine func(line []byte)) (int, error)
+
 // sessionFactory opens a jobSession for one job. name is a stable
 // docker-safe container name; workDir is the checked-out (bind-mountable)
 // workspace; image is the resolved container image (ignored by the host
@@ -75,6 +91,15 @@ type ciRunner struct {
 	newSession   sessionFactory
 	checkout     checkoutFunc
 	readPipeline pipelineReader
+
+	// Agent turn loop: newAgentSession opens the turn-1 container with the
+	// per-run env (creds) injected and host reachability; attachSession binds to
+	// that already-running container (no docker run) so a follow-up turn can
+	// resume the session; teardownContainer removes a finalized agent container.
+	// All injected so the turn-loop tests run without docker.
+	newAgentSession   func(ctx context.Context, name, workDir, image string, env []string) (jobSession, error)
+	attachSession     func(ctx context.Context, name string) (jobSession, error)
+	teardownContainer func(name string)
 }
 
 func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner {
@@ -88,13 +113,29 @@ func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner 
 	if cfg.CIIsolation == "none" {
 		// Legacy path: steps run on the host as the moongitd user.
 		r.newSession = func(_ context.Context, _, workDir, _ string) (jobSession, error) {
-			return &hostSession{workDir: workDir, exec: runMooncakeStep}, nil
+			return &hostSession{workDir: workDir, exec: runMooncakeStep, stream: runClaudeStreamHost}, nil
 		}
+		r.newAgentSession = func(_ context.Context, _, workDir, _ string, _ []string) (jobSession, error) {
+			return &hostSession{workDir: workDir, exec: runMooncakeStep, stream: runClaudeStreamHost}, nil
+		}
+		r.attachSession = func(_ context.Context, _ string) (jobSession, error) {
+			return nil, errors.New("agent turn resume requires docker isolation")
+		}
+		r.teardownContainer = func(string) {}
 	} else {
 		// Default: one throwaway container per job, steps run via docker exec.
 		r.newSession = func(ctx context.Context, name, workDir, image string) (jobSession, error) {
 			return openDockerSession(ctx, logger, name, workDir, image)
 		}
+		// The agent's turn-1 container carries the per-run env + host reachability.
+		r.newAgentSession = func(ctx context.Context, name, workDir, image string, env []string) (jobSession, error) {
+			return openAgentDockerSession(ctx, logger, name, workDir, image, env)
+		}
+		// Resume binds to the still-running agent container by name.
+		r.attachSession = func(_ context.Context, name string) (jobSession, error) {
+			return &dockerSession{name: name, logger: logger}, nil
+		}
+		r.teardownContainer = func(name string) { removeContainer(logger, name) }
 	}
 	return r
 }
@@ -112,7 +153,8 @@ func (r *ciRunner) run(ctx context.Context) {
 		interval = 5 * time.Second
 	}
 	runConc := max(r.cfg.CIRunConcurrency, 1)
-	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout, "isolation", r.cfg.CIIsolation, "run_concurrency", runConc)
+	agentConc := max(r.cfg.AgentRunConcurrency, 1)
+	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout, "isolation", r.cfg.CIIsolation, "run_concurrency", runConc, "agent_concurrency", agentConc)
 
 	// A restart can strand runs mid-flight: their status writes never committed,
 	// so they sit 'running' with no goroutine driving them. Nothing can be
@@ -124,59 +166,146 @@ func (r *ciRunner) run(ctx context.Context) {
 		r.logger.Info("ci reconciled orphaned runs", "count", n)
 	}
 
+	// Ephemeral agent-run tokens are revoked on finalize; a crash can strand
+	// some valid. Their runs were just reconciled, so none should still be
+	// live — revoke any leftovers before taking new work.
+	if n, err := storage.RevokeAgentRunTokens(r.db); err != nil {
+		r.logger.Error("agent revoke leftover tokens", "err", err)
+	} else if n > 0 {
+		r.logger.Info("agent revoked leftover run tokens", "count", n)
+	}
+
 	// A crashed runner can leave job containers behind; reap them before
 	// taking new work so they don't accumulate.
 	if r.cfg.CIIsolation == "docker" {
 		sweepOrphanContainers(ctx, r.logger)
 	}
 
-	// At most runConc runs execute at once. We take a slot *before* claiming so
-	// we never hold a claimed run we can't yet execute (its lease would tick
-	// while it waited). wg tracks in-flight runs so shutdown drains them:
-	// run() returns only once every dispatched executeRun has finalized its run
-	// against the still-open DB (the restart-drain contract — see
-	// cmd/moongitd/main.go).
-	sem := make(chan struct{}, runConc)
+	// CI and agent runs drain from independent pools so a burst of one kind
+	// never starves the other. wg tracks in-flight runs across both pools so
+	// shutdown drains them: run() returns only once every dispatched
+	// executeRun has finalized its run against the still-open DB (the
+	// restart-drain contract — see cmd/moongitd/main.go).
+	ciSem := make(chan struct{}, runConc)
+	agentSem := make(chan struct{}, agentConc)
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
-		// Dispatch every claimable run before sleeping, bounded by the slots.
-		for {
-			// Once shutdown starts, stop claiming new work; in-flight runs
-			// drain via the deferred wg.Wait. Guarding here also keeps us from
-			// claiming a queued run only to immediately error it.
-			if ctx.Err() != nil {
-				return
-			}
-			select {
-			case sem <- struct{}{}:
-			case <-ctx.Done():
-				return
-			}
-			run, err := storage.ClaimNextRun(r.db, r.runLease())
-			if err != nil {
-				<-sem // release the unused slot
-				if errors.Is(err, storage.ErrNoRunQueued) {
-					break
-				}
-				r.logger.Error("ci claim", "err", err)
-				break
-			}
-			wg.Add(1)
-			go func(run storage.CIRun) {
-				defer wg.Done()
-				defer func() { <-sem }()
-				r.executeRun(ctx, run)
-			}(run)
+		// Dispatch every claimable run of each kind before sleeping.
+		r.drainKind(ctx, &wg, ciSem, storage.RunKindCI, r.runLease())
+		r.drainKind(ctx, &wg, agentSem, storage.RunKindAgent, r.agentLease())
+		// Reap lifetime-expired parked agent sessions, then dispatch any
+		// queued follow-up turns. Turns share the agent pool: a parked run
+		// holds no slot, and dispatching its next turn briefly takes one.
+		r.reapExpiredAgents(ctx)
+		r.drainTurns(ctx, &wg, agentSem)
+		r.drainFinishing(ctx, &wg, agentSem)
+		if ctx.Err() != nil {
+			return
 		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
 		}
+	}
+}
+
+// drainTurns claims and dispatches every currently-dispatchable follow-up turn
+// (a parked run's next pending message), bounded by the agent pool, returning
+// when nothing more is claimable or the context is cancelled. Mirrors drainKind.
+func (r *ciRunner) drainTurns(ctx context.Context, wg *sync.WaitGroup, sem chan struct{}) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			return
+		}
+		turn, run, err := storage.ClaimNextTurn(r.db, r.turnLease())
+		if err != nil {
+			<-sem
+			if !errors.Is(err, storage.ErrNoTurnPending) {
+				r.logger.Error("agent claim turn", "err", err)
+			}
+			return
+		}
+		wg.Add(1)
+		go func(turn storage.AgentTurn, run storage.CIRun) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			r.dispatchTurn(ctx, turn, run)
+		}(turn, run)
+	}
+}
+
+// drainFinishing claims and dispatches every agent run the human has accepted
+// (state finishing), bounded by the agent pool, performing handoff for each.
+// Mirrors drainKind/drainTurns.
+func (r *ciRunner) drainFinishing(ctx context.Context, wg *sync.WaitGroup, sem chan struct{}) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			return
+		}
+		run, err := storage.ClaimNextFinishingRun(r.db)
+		if err != nil {
+			<-sem
+			if !errors.Is(err, storage.ErrNoRunQueued) {
+				r.logger.Error("agent claim finishing", "err", err)
+			}
+			return
+		}
+		wg.Add(1)
+		go func(run storage.CIRun) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			r.finishAgentRun(ctx, run)
+		}(run)
+	}
+}
+
+// drainKind claims and dispatches every currently-claimable run of one kind,
+// bounded by its pool's slots, returning when nothing more is claimable or the
+// context is cancelled. A slot is taken *before* claiming so a claimed run is
+// never held without a slot to execute it (its lease would tick while it
+// waited). Each dispatched run is tracked on wg for the shutdown drain.
+func (r *ciRunner) drainKind(ctx context.Context, wg *sync.WaitGroup, sem chan struct{}, kind storage.RunKind, lease time.Duration) {
+	for {
+		// Once shutdown starts, stop claiming new work; in-flight runs drain
+		// via the caller's wg.Wait. Guarding here also keeps us from claiming a
+		// queued run only to immediately error it.
+		if ctx.Err() != nil {
+			return
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			return
+		}
+		run, err := storage.ClaimNextRunOfKind(r.db, kind, lease)
+		if err != nil {
+			<-sem // release the unused slot
+			if !errors.Is(err, storage.ErrNoRunQueued) {
+				r.logger.Error("ci claim", "kind", kind, "err", err)
+			}
+			return
+		}
+		wg.Add(1)
+		go func(run storage.CIRun) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			r.executeRun(ctx, run)
+		}(run)
 	}
 }
 
@@ -191,10 +320,40 @@ func (r *ciRunner) runLease() time.Duration {
 	return r.cfg.CIRunTimeout + 5*time.Minute
 }
 
+// agentLease is the claim lease for agent runs, derived from AgentRunTimeout
+// the same way runLease derives from CIRunTimeout: long enough that a live run
+// is never stolen, short enough that a crashed runner's 'running' agent row
+// eventually expires and re-runs.
+func (r *ciRunner) agentLease() time.Duration {
+	if r.cfg.AgentRunTimeout <= 0 {
+		return 0
+	}
+	return r.cfg.AgentRunTimeout + 5*time.Minute
+}
+
+// turnLease is the claim lease for follow-up turns, derived from the per-turn
+// timeout: long enough that a live dispatch is never stolen, short enough that
+// a crashed dispatch's 'running' turn eventually re-dispatches.
+func (r *ciRunner) turnLease() time.Duration {
+	if r.cfg.AgentTurnTimeout <= 0 {
+		return 0
+	}
+	return r.cfg.AgentTurnTimeout + 2*time.Minute
+}
+
 // executeRun runs one claimed run end-to-end: gate, checkout, per-job step
 // execution emitting the event stream, status mirroring, and workspace
 // cleanup.
 func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
+	// An agent run reuses this same claim/lease/drain spine but executes a
+	// containerized Claude session against an issue instead of a translated
+	// mgitci.yml. Branch here so everything upstream (claiming, concurrency,
+	// reconcile, retention) stays shared.
+	if run.Kind == storage.RunKindAgent {
+		r.executeAgentRun(parent, run)
+		return
+	}
+
 	log := r.logger.With("run_id", run.ID, "run", run.Number, "sha", short(run.CommitSHA))
 
 	owner, name, err := storage.RepoIdent(r.db, run.RepoID)
@@ -529,10 +688,20 @@ func (r *ciRunner) finishJob(jobID int64, status storage.JobStatus, exitCode *in
 type hostSession struct {
 	workDir string
 	exec    stepExecutor
+	stream  streamExecutor
 }
 
 func (h *hostSession) Exec(ctx context.Context, stepYAML string) (stepResult, error) {
 	return h.exec(ctx, h.workDir, stepYAML)
+}
+
+// ExecStream runs an agent command on the host. nil stream means this session
+// wasn't built for agent work (the CI host path) — agent runs require docker.
+func (h *hostSession) ExecStream(ctx context.Context, argv []string, onLine func(line []byte)) (int, error) {
+	if h.stream == nil {
+		return -1, errors.New("host session does not support streaming exec")
+	}
+	return h.stream(ctx, h.workDir, argv, onLine)
 }
 
 func (h *hostSession) Close() error { return nil }
@@ -568,6 +737,34 @@ func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, 
 	return &dockerSession{name: name, logger: logger}, nil
 }
 
+// openAgentDockerSession starts the agent's container like openDockerSession but
+// injects the per-run env (creds, scoped token, dex wiring) and gives it host
+// reachability (host.docker.internal -> the host gateway), so the in-container
+// claude/mgit/dex shim can reach moongitd, the LLM endpoint, and the hot dex
+// index. The container stays alive (sleep infinity) across turns; teardown is
+// explicit (it is not removed when a turn's session handle is dropped).
+func openAgentDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, image string, env []string) (jobSession, error) {
+	args := []string{
+		"run", "-d", "--rm",
+		"--name", name,
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+		"-v", workDir + ":/work",
+		"-w", "/work",
+		// Reach the host's moongitd / dex / LLM endpoint. WSL2 maps
+		// host-gateway to the host, same as Docker Desktop.
+		"--add-host", "host.docker.internal:host-gateway",
+	}
+	for _, e := range env {
+		args = append(args, "-e", e)
+	}
+	args = append(args, "--entrypoint", "sleep", image, "infinity")
+	out, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("docker run %s: %v (%s)", image, err, strings.TrimSpace(string(out)))
+	}
+	return &dockerSession{name: name, logger: logger}, nil
+}
+
 func (d *dockerSession) Exec(ctx context.Context, stepYAML string) (stepResult, error) {
 	cmd := exec.CommandContext(ctx, "docker", "exec", d.name, "mooncake", "step", stepYAML)
 	var stdout, stderr bytes.Buffer
@@ -577,22 +774,94 @@ func (d *dockerSession) Exec(ctx context.Context, stepYAML string) (stepResult, 
 	return parseStepResult(ctx, stdout.Bytes(), stderr.Bytes(), runErr)
 }
 
+// ExecStream runs an agent command in the container and streams its stdout
+// line-by-line — the live claude transcript path.
+func (d *dockerSession) ExecStream(ctx context.Context, argv []string, onLine func(line []byte)) (int, error) {
+	cmd := exec.CommandContext(ctx, "docker", append([]string{"exec", d.name}, argv...)...)
+	return streamCommand(ctx, cmd, onLine)
+}
+
+// streamCommand starts cmd and forwards each stdout line (newline kept) to
+// onLine as it arrives, returning the process exit code once it exits. A
+// ReadBytes loop (not bufio.Scanner) avoids the 64 KB line cap, since a single
+// claude stream-json object — a big tool result — can exceed it. A non-zero
+// exit is returned as the code with a nil error (the caller maps exit/result
+// onto run status); only a failure to start or run the process, or a cancelled
+// context, is an executor error.
+func streamCommand(ctx context.Context, cmd *exec.Cmd, onLine func(line []byte)) (int, error) {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return -1, err
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return -1, err
+	}
+	r := bufio.NewReader(stdout)
+	for {
+		line, rerr := r.ReadBytes('\n')
+		if len(line) > 0 {
+			onLine(line)
+		}
+		if rerr != nil {
+			break // EOF (process closing stdout) or read error; Wait reports the real outcome
+		}
+	}
+	werr := cmd.Wait()
+	if ctx.Err() != nil {
+		return -1, fmt.Errorf("agent exec cancelled: %w", ctx.Err())
+	}
+	if werr != nil {
+		var ee *exec.ExitError
+		if errors.As(werr, &ee) {
+			return ee.ExitCode(), nil
+		}
+		return -1, fmt.Errorf("agent exec: %v (%s)", werr, strings.TrimSpace(stderr.String()))
+	}
+	return 0, nil
+}
+
 // Close removes the container. It uses a fresh background context with a short
 // timeout so teardown still runs after a run-timeout has cancelled the parent
 // context — otherwise the detached container would leak.
 func (d *dockerSession) Close() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if out, err := exec.CommandContext(ctx, "docker", "rm", "-f", d.name).CombinedOutput(); err != nil {
-		d.logger.Error("ci container cleanup", "name", d.name, "err", err, "out", strings.TrimSpace(string(out)))
-	}
+	removeContainer(d.logger, d.name)
 	return nil
 }
 
-// sweepOrphanContainers removes any moongit-ci-* containers left behind by a
-// crashed runner. Best-effort: failures are logged, not fatal.
+// removeContainer force-removes a container by name, best-effort. It uses a
+// fresh short-lived context so teardown still runs after the parent context was
+// cancelled (a run timeout) — otherwise a detached agent container would leak.
+// It backs both dockerSession.Close and the agent turn-loop teardown (where the
+// container outlives any single session handle).
+func removeContainer(logger *slog.Logger, name string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "docker", "rm", "-f", name).CombinedOutput(); err != nil {
+		logger.Error("container cleanup", "name", name, "err", err, "out", strings.TrimSpace(string(out)))
+	}
+}
+
+// runClaudeStreamHost runs the agent command on the host (the CIIsolation=none
+// path), streaming stdout line-by-line. Agent runs normally use docker; this
+// exists so the host session isn't missing the capability.
+func runClaudeStreamHost(ctx context.Context, workDir string, argv []string, onLine func(line []byte)) (int, error) {
+	if len(argv) == 0 {
+		return -1, errors.New("empty agent command")
+	}
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd.Dir = workDir
+	return streamCommand(ctx, cmd, onLine)
+}
+
+// sweepOrphanContainers removes any moongit-ci-* or moongit-agent-* containers
+// left behind by a crashed runner. The two name filters are OR'd by docker, so
+// both CI job containers and agent containers are reaped. Best-effort:
+// failures are logged, not fatal.
 func sweepOrphanContainers(ctx context.Context, logger *slog.Logger) {
-	out, err := exec.CommandContext(ctx, "docker", "ps", "-aq", "--filter", "name=moongit-ci-").Output()
+	out, err := exec.CommandContext(ctx, "docker", "ps", "-aq",
+		"--filter", "name=moongit-ci-", "--filter", "name=moongit-agent-").Output()
 	if err != nil {
 		logger.Warn("ci orphan container scan", "err", err)
 		return

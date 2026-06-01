@@ -423,17 +423,33 @@ type MergeConflictResponse struct {
 // CIRun is the public view of a CI run. Number is the per-repo run number
 // (the address clients use); the internal DB id is not exposed.
 type CIRun struct {
-	Number       int        `json:"number"`
-	CommitSHA    string     `json:"commit_sha"`
-	CommitMsg    string     `json:"commit_msg,omitempty"`
-	CommitAuthor string     `json:"commit_author,omitempty"`
-	Ref          string     `json:"ref"`
-	Event        string     `json:"event"`
-	Trigger      string     `json:"trigger,omitempty"`
-	Status       string     `json:"status"`
-	CreatedAt    time.Time  `json:"created_at"`
-	StartedAt    *time.Time `json:"started_at"`
-	FinishedAt   *time.Time `json:"finished_at"`
+	Number          int        `json:"number"`
+	Kind            string     `json:"kind"`                        // "ci" | "agent"
+	IssueNumber     *int       `json:"issue_number,omitempty"`      // the issue an agent run serves
+	ExecutionModel  string     `json:"execution_model,omitempty"`   // agent model: "claude-edit" | "mooncake-pilot"
+	PilotAllowShell bool       `json:"pilot_allow_shell,omitempty"` // mooncake-pilot run allowed to use shell/cmd (#110)
+	CommitSHA       string     `json:"commit_sha"`
+	CommitMsg       string     `json:"commit_msg,omitempty"`
+	CommitAuthor    string     `json:"commit_author,omitempty"`
+	Ref             string     `json:"ref"`
+	Event           string     `json:"event"`
+	Trigger         string     `json:"trigger,omitempty"`
+	Status          string     `json:"status"`
+	CreatedAt       time.Time  `json:"created_at"`
+	StartedAt       *time.Time `json:"started_at"`
+	FinishedAt      *time.Time `json:"finished_at"`
+}
+
+// SpawnAgentRequest starts an agent run for an issue. Ref is the base the agent
+// checks out and branches from (optional; defaults to the repo's HEAD). Model
+// selects the execution model ("claude-edit" | "mooncake-pilot"); empty uses
+// the server's configured default (#110).
+type SpawnAgentRequest struct {
+	Ref   string `json:"ref,omitempty"`
+	Model string `json:"model,omitempty"`
+	// AllowShell, for the mooncake-pilot model, drops the default shell/cmd
+	// denial for this run so the agent's plan may run shell commands (#110).
+	AllowShell bool `json:"allow_shell,omitempty"`
 }
 
 // TriggerCIRunRequest starts a CI run for an arbitrary ref (branch, tag, or
@@ -454,10 +470,47 @@ type CIJob struct {
 	FinishedAt *time.Time `json:"finished_at"`
 }
 
-// CIRunDetail is a run plus its jobs, for the run-detail view.
+// CIRunDetail is a run plus its jobs, for the run-detail view. For an agent run
+// it also carries the conversation's follow-up turns (the issue body is turn 1
+// and isn't listed here), so the UI can show queued/in-flight messages that
+// haven't reached the event stream yet.
 type CIRunDetail struct {
 	CIRun
-	Jobs []CIJob `json:"jobs"`
+	Jobs  []CIJob     `json:"jobs"`
+	Turns []AgentTurn `json:"turns,omitempty"`
+}
+
+// AgentTurn is one human follow-up message in an agent run's conversation.
+type AgentTurn struct {
+	Seq        int        `json:"seq"`
+	Author     string     `json:"author"`
+	Body       string     `json:"body"`
+	Status     string     `json:"status"` // pending | running | done | error
+	CreatedAt  time.Time  `json:"created_at"`
+	FinishedAt *time.Time `json:"finished_at"`
+}
+
+// CreateAgentTurnRequest queues a follow-up turn (a message to the agent) on an
+// agent run that's awaiting input (or running — it queues behind the current
+// turn).
+type CreateAgentTurnRequest struct {
+	Text string `json:"text"`
+}
+
+// AgentSettings is the operator-facing agent config. The Claude token is
+// write-only — the API reports only whether one is set, never its value.
+// ExecutionModel is the default model new agent runs use when they don't pick
+// one at spawn ("" means the server falls back to its built-in default).
+type AgentSettings struct {
+	ClaudeTokenSet bool   `json:"claude_oauth_token_set"`
+	ExecutionModel string `json:"execution_model,omitempty"`
+}
+
+// UpdateAgentSettingsRequest sets global agent config. A nil pointer leaves a
+// field unchanged; an empty string clears it; any other value sets it.
+type UpdateAgentSettingsRequest struct {
+	ClaudeToken    *string `json:"claude_oauth_token"`
+	ExecutionModel *string `json:"execution_model"`
 }
 
 // Token represents an API token's metadata. The plaintext token itself

@@ -58,8 +58,22 @@ export interface CIJob {
   finished_at: string | null
 }
 
+export interface AgentTurn {
+  seq: number
+  author: string
+  body: string
+  status: "pending" | "running" | "done" | "error"
+  created_at: string
+  finished_at: string | null
+}
+
 export interface CIRun {
   number: number
+  kind?: "ci" | "agent"
+  issue_number?: number
+  execution_model?: "claude-edit" | "mooncake-pilot"
+  pilot_allow_shell?: boolean
+  turns?: AgentTurn[]
   commit_sha: string
   commit_msg?: string
   commit_author?: string
@@ -176,6 +190,8 @@ export interface State {
   branches: string[]
   tokens: Token[]
   sshKeys: SSHKey[]
+  agentClaudeTokenSet: boolean
+  agentExecutionModel: "" | "claude-edit" | "mooncake-pilot"
   ciRuns: CIRun[]
   // Commit history (newest first) and per-sha diff detail, for the commit
   // diff view. Empty by default; specs that need them seed them.
@@ -219,6 +235,8 @@ function freshState(seed: Partial<State> = {}): State {
     branches: ["main"],
     tokens: [{ id: 1, name: "test-user", created_at: nowIso(), last_used_at: nowIso() }],
     sshKeys: [],
+    agentClaudeTokenSet: false,
+    agentExecutionModel: "",
     ciRuns: [],
     commits: [],
     commitDetails: {},
@@ -389,11 +407,15 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       const { jobs: _j, events: _e, ...run } = next
       return json(route, 202, run)
     }
-    // GET: strip jobs from the list view, matching the server's list shape.
+    // GET: strip jobs from the list view, matching the server's list shape;
+    // honor the optional ?kind=ci|agent filter (kind defaults to "ci").
+    const kind = new URL(route.request().url()).searchParams.get("kind")
     return json(
       route,
       200,
-      state.ciRuns.map(({ jobs: _jobs, events: _events, ...run }) => run)
+      state.ciRuns
+        .filter((r) => !kind || (r.kind ?? "ci") === kind)
+        .map(({ jobs: _jobs, events: _events, ...run }) => run)
     )
   })
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+$/, (route) => {
@@ -402,6 +424,41 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     if (!run) return json(route, 404, { error: "run not found" })
     const { events: _events, ...detail } = run
     return json(route, 200, detail)
+  })
+  // Agent follow-up turn: queue a message on an agent run.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/turns$/, (route) => {
+    const parts = new URL(route.request().url()).pathname.split("/")
+    const n = Number(parts[parts.length - 2])
+    const run = state.ciRuns.find((r) => r.number === n)
+    if (!run) return json(route, 404, { error: "run not found" })
+    if (run.kind !== "agent") return json(route, 400, { error: "not an agent run" })
+    const text = ((route.request().postDataJSON() as { text?: string }).text ?? "").trim()
+    if (!text) return json(route, 400, { error: "text is required" })
+    run.turns = run.turns ?? []
+    const turn: AgentTurn = {
+      seq: run.turns.length + 1,
+      author: state.identity,
+      body: text,
+      status: "pending",
+      created_at: nowIso(),
+      finished_at: null,
+    }
+    run.turns.push(turn)
+    return json(route, 202, turn)
+  })
+  // Finish an agent run: park -> finishing (the runner would then hand off).
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/finish$/, (route) => {
+    const parts = new URL(route.request().url()).pathname.split("/")
+    const n = Number(parts[parts.length - 2])
+    const run = state.ciRuns.find((r) => r.number === n)
+    if (!run) return json(route, 404, { error: "run not found" })
+    if (run.kind !== "agent") return json(route, 400, { error: "not an agent run" })
+    if (run.status !== "awaiting_input") {
+      return json(route, 409, { error: "run is not awaiting input" })
+    }
+    run.status = "finishing"
+    const { jobs: _j, events: _e, ...out } = run
+    return json(route, 202, out)
   })
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/ci\/runs\/\d+\/rerun$/, (route) => {
     const parts = new URL(route.request().url()).pathname.split("/")
@@ -450,6 +507,28 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
 
   // Whoami
   await page.route(/\/api\/whoami$/, (route) => json(route, 200, { name: state.identity }))
+
+  // Agent settings — write-only Claude token + default execution model (GET
+  // reports set/unset + model; PUT sets/clears each provided field).
+  await page.route(/\/api\/settings\/agent$/, (route) => {
+    const req = route.request()
+    if (req.method() === "PUT") {
+      const body = req.postDataJSON() as {
+        claude_oauth_token?: string
+        execution_model?: "" | "claude-edit" | "mooncake-pilot"
+      }
+      if (typeof body.claude_oauth_token === "string") {
+        state.agentClaudeTokenSet = body.claude_oauth_token.trim() !== ""
+      }
+      if (typeof body.execution_model === "string") {
+        state.agentExecutionModel = body.execution_model
+      }
+    }
+    return json(route, 200, {
+      claude_oauth_token_set: state.agentClaudeTokenSet,
+      execution_model: state.agentExecutionModel,
+    })
+  })
 
   // Tokens collection (GET list / POST create)
   await page.route(/\/api\/tokens$/, async (route) => {
@@ -598,6 +677,39 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     iss.assignee = null
     iss.updated_at = nowIso()
     return json(route, 200, iss)
+  })
+
+  // Spawn agent — enqueues a kind=agent run linked to the issue, like the
+  // server's POST /issues/{n}/agent. Mirrors the trigger mock's run shape.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/issues\/\d+\/agent$/, (route) => {
+    const url = new URL(route.request().url())
+    const n = Number(url.pathname.split("/")[url.pathname.split("/").length - 2])
+    const iss = state.issues.find((i) => i.number === n)
+    if (!iss) return json(route, 404, { error: "issue not found" })
+    const body = (route.request().postDataJSON() ?? {}) as {
+      model?: "claude-edit" | "mooncake-pilot"
+      allow_shell?: boolean
+    }
+    const model = body.model || state.agentExecutionModel || "claude-edit"
+    const next: CIRun = {
+      number: state.ciRuns.length ? Math.max(...state.ciRuns.map((r) => r.number)) + 1 : 1,
+      kind: "agent",
+      issue_number: n,
+      execution_model: model,
+      pilot_allow_shell: model === "mooncake-pilot" && body.allow_shell === true,
+      commit_sha: "feedface0000abcd",
+      ref: "HEAD",
+      event: "agent",
+      trigger: state.identity,
+      status: "queued",
+      created_at: nowIso(),
+      started_at: null,
+      finished_at: null,
+      jobs: [],
+    }
+    state.ciRuns.unshift(next)
+    const { jobs: _j, events: _e, ...run } = next
+    return json(route, 202, run)
   })
 
   // Comments collection

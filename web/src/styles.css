@@ -1986,6 +1986,56 @@ a.file-tree__commit:hover {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-muted);
 }
+.select {
+  padding: 5px var(--space-3);
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+}
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+/* Spawn-agent: model picker sits inline with the spawn button (#110). */
+.spawn-agent {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.spawn-agent__model {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.spawn-agent__shell {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  cursor: pointer;
+}
+.spawn-agent__shell input {
+  margin-top: 3px;
+}
+/* Default-model picker in Settings → Agent. */
+.agent-default-model {
+  margin-top: var(--space-4);
+}
+.agent-default-model__label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 48ch;
+}
+/* Per-run model tag in the Agents run list. */
+.ci-runs__model {
+  display: block;
+}
 .row {
   display: flex;
   gap: var(--space-2);
@@ -2794,6 +2844,30 @@ h3 {
   margin: 0 0 var(--space-4);
   max-width: 60ch;
 }
+
+/* Agent settings: global Claude token (write-only). */
+.agent-token-status {
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--neutral-muted);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+.agent-token-status.is-set {
+  background: var(--state-todo-bg);
+  color: var(--state-todo);
+}
+.agent-token-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 48ch;
+}
+.agent-token-form__actions {
+  display: flex;
+  gap: var(--space-2);
+}
 .settings__create {
   display: flex;
   gap: var(--space-2);
@@ -2933,7 +3007,9 @@ h3 {
   background: var(--state-todo-bg);
   color: var(--state-todo);
 }
-.ci-badge--running {
+.ci-badge--running,
+.ci-badge--awaiting_input,
+.ci-badge--finishing {
   background: var(--state-in_progress-bg);
   color: var(--state-in_progress);
 }
@@ -3247,4 +3323,86 @@ h3 {
 .pull-merge__conflicts {
   margin: var(--space-1) 0 0;
   padding-left: var(--space-5);
+}
+
+/* Agent run transcript — the live claude conversation, folded from the
+   agent.* event stream into typed entries. */
+.agent-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.agent-entry {
+  border-left: 3px solid var(--border);
+  padding: var(--space-1) var(--space-3);
+}
+.agent-entry__label {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  font-weight: var(--weight-medium);
+  margin-bottom: 2px;
+}
+.agent-entry__body {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* A turn header opens each turn; the issue prompt sits under it. */
+.agent-entry--turn {
+  border-left-color: var(--state-in_progress);
+  margin-top: var(--space-2);
+}
+.agent-entry--turn .agent-entry__label {
+  color: var(--fg);
+  font-weight: var(--weight-bold);
+}
+.agent-entry--assistant {
+  border-left-color: var(--accent, var(--state-in_progress));
+}
+/* Tool use + results are the agent's actions; thinking is de-emphasized. */
+.agent-entry--tool_use,
+.agent-entry--tool_result {
+  border-left-color: var(--state-todo);
+}
+.agent-entry--thinking {
+  opacity: 0.7;
+}
+.agent-entry--thinking .agent-entry__body {
+  font-style: italic;
+}
+.agent-entry--system,
+.agent-entry--raw {
+  color: var(--fg-muted);
+}
+.agent-entry--result {
+  border-left-color: var(--state-todo);
+}
+.agent-entry--result .agent-entry__label {
+  color: var(--fg);
+  font-weight: var(--weight-medium);
+}
+
+/* Message box for sending the agent follow-up turns. */
+.agent-msgbox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.agent-msgbox--done {
+  border-top: 1px solid var(--border);
+}
+.agent-msgbox__input {
+  width: 100%;
+  font-family: inherit;
+  resize: vertical;
+}
+.agent-msgbox__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
 }

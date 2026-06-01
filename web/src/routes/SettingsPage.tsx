@@ -1,16 +1,23 @@
 import clsx from "clsx"
 import { useState } from "react"
-import { useSSHKeys, useTokens, useWhoami } from "../api/queries"
-import { useAddSSHKey, useCreateToken, useDeleteSSHKey, useRevokeToken } from "../api/mutations"
-import type { CreatedToken, SSHKey, Token } from "../api/types"
+import { useAgentSettings, useSSHKeys, useTokens, useWhoami } from "../api/queries"
+import {
+  useAddSSHKey,
+  useCreateToken,
+  useDeleteSSHKey,
+  useRevokeToken,
+  useUpdateAgentSettings,
+} from "../api/mutations"
+import type { CIRunExecutionModel, CreatedToken, SSHKey, Token } from "../api/types"
 
-// Sections of the settings surface. "tokens" and "ssh" are backed; "users"
-// and "branches" stay placeholders until their backends exist (no per-user
-// mgmt, no branch-protection enforcement yet).
-type Section = "tokens" | "users" | "ssh" | "branches"
+// Sections of the settings surface. "tokens", "agent", and "ssh" are backed;
+// "users" and "branches" stay placeholders until their backends exist (no
+// per-user mgmt, no branch-protection enforcement yet).
+type Section = "tokens" | "agent" | "users" | "ssh" | "branches"
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: "tokens", label: "API tokens" },
+  { id: "agent", label: "Agent" },
   { id: "users", label: "Users" },
   { id: "ssh", label: "SSH keys" },
   { id: "branches", label: "Branch rules" },
@@ -36,6 +43,7 @@ export default function SettingsPage() {
 
       <div className="settings__content">
         {section === "tokens" && <TokensSection />}
+        {section === "agent" && <AgentSection />}
         {section === "users" && (
           <Placeholder
             title="Users"
@@ -63,6 +71,104 @@ function Placeholder({ title, note }: { title: string; note: string }) {
       <div className="empty">
         <strong>Coming soon.</strong> {note}
       </div>
+    </section>
+  )
+}
+
+// AgentSection sets the global Claude token agent runs authenticate with. The
+// token is write-only: the API reports only whether one is configured, so the
+// field is always blank and submitting replaces it.
+function AgentSection() {
+  const settingsQ = useAgentSettings()
+  const update = useUpdateAgentSettings()
+  const [token, setToken] = useState("")
+  const configured = settingsQ.data?.claude_oauth_token_set ?? false
+
+  function save(e: React.FormEvent) {
+    e.preventDefault()
+    const t = token.trim()
+    if (!t) return
+    update.mutate({ claude_oauth_token: t }, { onSuccess: () => setToken("") })
+  }
+
+  function clear() {
+    update.mutate({ claude_oauth_token: "" })
+  }
+
+  return (
+    <section className="settings__section">
+      <h2 className="settings__title">Agent</h2>
+      <p className="muted small">
+        The Claude token agent runs authenticate with (a value from <code>claude setup-token</code>
+        ), injected into each agent container as <code>CLAUDE_CODE_OAUTH_TOKEN</code>. It overrides
+        the <code>MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN</code> env, so you can set it here without
+        restarting the server. Stored write-only — it's never shown again.
+      </p>
+
+      <div className={clsx("agent-token-status", { "is-set": configured })}>
+        {settingsQ.isLoading
+          ? "Checking…"
+          : configured
+            ? "✓ A Claude token is configured."
+            : "No Claude token configured — agent runs can't authenticate yet."}
+      </div>
+
+      <form className="agent-token-form" onSubmit={save}>
+        <input
+          className="input"
+          type="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder={
+            configured ? "Replace token (sk-ant-oat01-…)" : "Paste token (sk-ant-oat01-…)"
+          }
+          aria-label="Claude token"
+          autoComplete="off"
+        />
+        <div className="agent-token-form__actions">
+          <button
+            type="submit"
+            className="btn btn--small btn--primary"
+            disabled={update.isPending || token.trim() === ""}
+          >
+            {update.isPending ? "Saving…" : "Save token"}
+          </button>
+          {configured && (
+            <button
+              type="button"
+              className="btn btn--small btn--danger"
+              onClick={clear}
+              disabled={update.isPending}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </form>
+
+      <div className="agent-default-model">
+        <label className="agent-default-model__label">
+          <span>Default execution model</span>
+          <select
+            className="select"
+            value={settingsQ.data?.execution_model ?? ""}
+            disabled={update.isPending || settingsQ.isLoading}
+            onChange={(e) =>
+              update.mutate({ execution_model: e.target.value as "" | CIRunExecutionModel })
+            }
+          >
+            <option value="">Server default (claude-edit)</option>
+            <option value="claude-edit">Claude (edit files)</option>
+            <option value="mooncake-pilot">Mooncake pilot (run actions)</option>
+          </select>
+        </label>
+        <p className="muted small">
+          The model new agent runs use when “Spawn agent” doesn’t pick one. Per-run choices at spawn
+          still win.
+        </p>
+      </div>
+
+      {update.error && <div className="error inline">{(update.error as Error).message}</div>}
     </section>
   )
 }

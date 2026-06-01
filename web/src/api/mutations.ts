@@ -2,7 +2,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "./client"
 import { keys } from "./queries"
 import type {
+  CIRunExecutionModel,
   ClaimIssueInput,
+  UpdateAgentSettingsInput,
   CreateCodeCommentInput,
   CreateCommentInput,
   CreateIssueInput,
@@ -224,6 +226,48 @@ export function useRerunCIRun(owner: string, repo: string) {
   return useMutation({
     mutationFn: (n: number) => api.rerunCIRun(owner, repo, n),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) }),
+  })
+}
+
+// useSpawnAgent starts an agent run for an issue. The agent run shares the
+// ci_runs surface, so refresh the runs list once it's accepted (the run view
+// lives under Pipelines). The optional vars pick the base ref and execution
+// model; the server fills defaults for anything omitted.
+export function useSpawnAgent(owner: string, repo: string, n: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars?: { ref?: string; model?: CIRunExecutionModel; allowShell?: boolean }) =>
+      api.spawnAgent(owner, repo, n, vars),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) }),
+  })
+}
+
+// useCreateAgentTurn queues a follow-up message on an agent run; once accepted,
+// refresh the run so the queued turn shows and the transcript starts tailing.
+export function useCreateAgentTurn(owner: string, repo: string, n: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (text: string) => api.createAgentTurn(owner, repo, n, text),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRun(owner, repo, n) }),
+  })
+}
+
+// useUpdateAgentSettings sets/clears the global agent Claude token.
+export function useUpdateAgentSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpdateAgentSettingsInput) => api.updateAgentSettings(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.agentSettings() }),
+  })
+}
+
+// useFinishAgentRun accepts a parked agent run; once accepted, refresh the run
+// so it shows finishing/finished.
+export function useFinishAgentRun(owner: string, repo: string, n: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.finishAgentRun(owner, repo, n),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRun(owner, repo, n) }),
   })
 }
 

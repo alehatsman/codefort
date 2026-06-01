@@ -438,3 +438,94 @@ test("issue with no referencing commits hides the Commits section", async ({ pag
   await expect(page.getByRole("heading", { name: /Lonely issue/ })).toBeVisible()
   await expect(page.locator(".issue-commits")).toHaveCount(0)
 })
+
+test("spawn agent from an issue navigates to the new run", async ({ page }) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1,
+        number: 1,
+        title: "Wire the thing",
+        author: "test-user",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+  })
+  await page.goto("/alice/demo/issues/1")
+
+  // Pick the mooncake-pilot execution model — that reveals the allow-shell
+  // checkbox (hidden for claude-edit). Check it, then spawn. The request must
+  // carry the chosen model + allow_shell (#110).
+  await page.getByLabel("Model").selectOption("mooncake-pilot")
+  await page.getByLabel(/Allow shell commands/).check()
+  const spawnReq = page.waitForRequest(
+    (r) => r.url().includes("/issues/1/agent") && r.method() === "POST",
+  )
+  await page.getByRole("button", { name: "Spawn agent" }).click()
+  expect((await spawnReq).postDataJSON()).toMatchObject({ model: "mooncake-pilot", allow_shell: true })
+
+  // Agent runs live under the Agents tab; we land on the new run's view, which
+  // shows the chosen model and that shell is allowed.
+  await expect(page).toHaveURL(/\/alice\/demo\/agents\/1$/)
+  await expect(page.getByText("Mooncake pilot").first()).toBeVisible()
+  await expect(page.getByText(/shell allowed/)).toBeVisible()
+})
+
+test("allow-shell checkbox is hidden for the claude-edit model", async ({ page }) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1,
+        number: 1,
+        title: "Wire the thing",
+        author: "test-user",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+  })
+  await page.goto("/alice/demo/issues/1")
+  // Default model is claude-edit → no shell checkbox.
+  await expect(page.getByLabel(/Allow shell commands/)).toHaveCount(0)
+})
+
+test("a root-absolute link in a comment points at the app route, not a blob path", async ({
+  page,
+}) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1,
+        number: 1,
+        title: "Linked",
+        author: "test-user",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+    comments: [
+      {
+        id: 1,
+        issue_id: 1,
+        author: "moongit-agent",
+        body: "Finished — see [run #1](/alice/demo/pipelines/1).",
+        created_at: now,
+      },
+    ],
+  })
+  await page.goto("/alice/demo/issues/1")
+
+  const link = page.locator(".comment__body a", { hasText: "run #1" })
+  // The run link resolves to the app route verbatim — not rewritten under /blob.
+  await expect(link).toHaveAttribute("href", "/alice/demo/pipelines/1")
+})

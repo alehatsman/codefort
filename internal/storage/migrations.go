@@ -200,6 +200,71 @@ var migrations = []string{
 	);
 	CREATE INDEX IF NOT EXISTS idx_ssh_keys_token ON ssh_keys(token_id);
 	`,
+
+	// 10: agent runs. An issue-spawned Claude agent reuses the entire CI run
+	// spine (event log, SSE, container isolation, lifecycle), modeled as a
+	// synthetic single-job run. kind distinguishes a normal pipeline run
+	// ('ci', the default for every pre-existing row) from an agent run
+	// ('agent'); issue_number links an agent run to the issue it works (NULL
+	// for CI runs). See #74.
+	`
+	ALTER TABLE ci_runs ADD COLUMN kind         TEXT NOT NULL DEFAULT 'ci';
+	ALTER TABLE ci_runs ADD COLUMN issue_number INTEGER;
+	CREATE INDEX IF NOT EXISTS idx_ci_runs_kind ON ci_runs(kind);
+	`,
+
+	// 11: agent turns. An agent run is a conversation: turn 1 is the issue body
+	// (executed inline, not stored), and each later human message is a row here
+	// dispatched as its own claude --resume turn while the run sits in
+	// awaiting_input between turns. seq is per-run and monotonic. status mirrors
+	// the dispatch lifecycle; claimed_at is the dispatcher lease so a crashed
+	// dispatch can be retried, same pattern as ci_runs. See #76.
+	`
+	CREATE TABLE IF NOT EXISTS agent_turns (
+	    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	    run_id      INTEGER NOT NULL REFERENCES ci_runs(id) ON DELETE CASCADE,
+	    seq         INTEGER NOT NULL,
+	    author      TEXT NOT NULL,
+	    body        TEXT NOT NULL,
+	    status      TEXT NOT NULL DEFAULT 'pending',
+	    claimed_at  INTEGER,
+	    created_at  INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+	    started_at  INTEGER,
+	    finished_at INTEGER,
+	    UNIQUE (run_id, seq)
+	);
+	CREATE INDEX IF NOT EXISTS idx_agent_turns_run    ON agent_turns(run_id);
+	CREATE INDEX IF NOT EXISTS idx_agent_turns_status ON agent_turns(status);
+	`,
+
+	// 12: server settings — a generic key/value store for operator-set config
+	// that shouldn't require a restart (e.g. the global agent Claude token,
+	// #106). Values may be secrets; the API surface that reads them must be
+	// write-only (never echo a secret back).
+	`
+	CREATE TABLE IF NOT EXISTS settings (
+	    key        TEXT PRIMARY KEY,
+	    value      TEXT NOT NULL,
+	    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+	);
+	`,
+
+	// 13: per-run agent execution model (#110). An agent run executes via
+	// one of the pluggable execution models ('claude-edit' = claude edits
+	// files directly; 'mooncake-pilot' = mooncake plans+applies actions).
+	// Chosen at spawn, stored here. CI runs ignore it; the default keeps
+	// existing rows on the original model.
+	`
+	ALTER TABLE ci_runs ADD COLUMN execution_model TEXT NOT NULL DEFAULT 'claude-edit';
+	`,
+
+	// 14: per-run "allow shell" override for the mooncake-pilot model (#110).
+	// The default policy denies shell/cmd; checking "allow shell" at spawn
+	// drops that denial for this run only. 0 = deny (safe default), 1 = allow.
+	// Ignored by claude-edit and CI runs.
+	`
+	ALTER TABLE ci_runs ADD COLUMN pilot_allow_shell INTEGER NOT NULL DEFAULT 0;
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

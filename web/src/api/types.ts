@@ -423,13 +423,33 @@ export interface IntelSummaries {
 // --- CI (moongitci) ---
 
 // Mirrors storage.RunStatus. queued -> running -> a terminal state.
-export type CIRunStatus = "queued" | "running" | "success" | "failed" | "canceled" | "error"
+export type CIRunStatus =
+  | "queued"
+  | "running"
+  | "awaiting_input" // agent-only: parked between turns
+  | "finishing" // agent-only: handing off (branch + summary)
+  | "success"
+  | "failed"
+  | "canceled"
+  | "error"
 
 // Mirrors storage.JobStatus.
 export type CIJobStatus = "queued" | "running" | "success" | "failed" | "skipped" | "error"
 
+// Mirrors storage.RunKind: a normal pipeline run vs. an issue-spawned agent run.
+export type CIRunKind = "ci" | "agent"
+
+// Agent execution model (#110): which strategy an agent run uses in its
+// container. claude-edit = Claude edits files directly; mooncake-pilot =
+// mooncake plans+applies actions (so commands run).
+export type CIRunExecutionModel = "claude-edit" | "mooncake-pilot"
+
 export interface CIRun {
   number: number
+  kind: CIRunKind
+  issue_number?: number
+  execution_model?: CIRunExecutionModel
+  pilot_allow_shell?: boolean
   commit_sha: string
   commit_msg?: string
   commit_author?: string
@@ -451,8 +471,37 @@ export interface CIJob {
   finished_at: string | null
 }
 
+// AgentSettings mirrors api.AgentSettings — the token is write-only (only
+// whether one is configured is returned); execution_model is the default model
+// new agent runs use ("" = server's built-in default).
+export interface AgentSettings {
+  claude_oauth_token_set: boolean
+  execution_model?: CIRunExecutionModel | ""
+}
+
+// UpdateAgentSettingsInput sets global agent config: omit a field to leave it
+// unchanged, "" to clear, a value to set.
+export interface UpdateAgentSettingsInput {
+  claude_oauth_token?: string
+  execution_model?: CIRunExecutionModel | ""
+}
+
+export type AgentTurnStatus = "pending" | "running" | "done" | "error"
+
+// AgentTurn is one human follow-up message in an agent run's conversation.
+export interface AgentTurn {
+  seq: number
+  author: string
+  body: string
+  status: AgentTurnStatus
+  created_at: string
+  finished_at: string | null
+}
+
 export interface CIRunDetail extends CIRun {
   jobs: CIJob[]
+  // Follow-up turns for an agent run (issue body is turn 1, not listed).
+  turns?: AgentTurn[]
 }
 
 // CIEvent mirrors internal/ci.Event — one entry in a job's append-only event

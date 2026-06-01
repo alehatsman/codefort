@@ -125,6 +125,7 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/claim", s.handleClaimIssue)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/unclaim", s.handleUnclaimIssue)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues/{number}/commits", s.handleIssueCommits)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/agent", s.handleSpawnAgent)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleListComments)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleCreateComment)
 	mux.HandleFunc("DELETE /api/repos/{owner}/{repo}/issues/{number}/comments/{comment_id}", s.handleDeleteComment)
@@ -145,6 +146,10 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/ci/runs/{number}", s.handleGetCIRun)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/ci/runs/{number}/jobs/{job}/events", s.handleCIJobEvents)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/ci/runs/{number}/rerun", s.handleRerunCIRun)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/ci/runs/{number}/turns", s.handleCreateAgentTurn)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/ci/runs/{number}/finish", s.handleFinishAgentRun)
+	mux.HandleFunc("GET /api/settings/agent", s.handleGetAgentSettings)
+	mux.HandleFunc("PUT /api/settings/agent", s.handleUpdateAgentSettings)
 
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel", s.handleIntel)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/overview", s.handleIntelOverview)

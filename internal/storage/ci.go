@@ -12,12 +12,20 @@ import (
 type RunStatus string
 
 const (
-	RunQueued   RunStatus = "queued"
-	RunRunning  RunStatus = "running"
-	RunSuccess  RunStatus = "success"
-	RunFailed   RunStatus = "failed"
-	RunCanceled RunStatus = "canceled"
-	RunError    RunStatus = "error" // infrastructure failure (checkout/parse), not a job's non-zero exit
+	RunQueued  RunStatus = "queued"
+	RunRunning RunStatus = "running"
+	// RunAwaitingInput is an agent-only non-terminal state: a turn finished and
+	// the run is holding its container open, waiting for the next human turn
+	// (or a finish / idle-timeout). CI runs never enter it.
+	RunAwaitingInput RunStatus = "awaiting_input"
+	// RunFinishing is an agent-only non-terminal state: the human accepted the
+	// run, and the runner is performing handoff (materializing the branch +
+	// posting the summary) before the run goes terminal.
+	RunFinishing RunStatus = "finishing"
+	RunSuccess   RunStatus = "success"
+	RunFailed    RunStatus = "failed"
+	RunCanceled  RunStatus = "canceled"
+	RunError     RunStatus = "error" // infrastructure failure (checkout/parse), not a job's non-zero exit
 )
 
 // Terminal reports whether the status is a final state (no further transitions).
@@ -29,6 +37,29 @@ func (s RunStatus) Terminal() bool {
 		return false
 	}
 }
+
+// RunKind distinguishes a normal pipeline run from an agent run. An agent run
+// reuses the entire CI run spine but, instead of executing a translated
+// mgitci.yml, works an issue via a containerized Claude session (see #74). The
+// zero value is treated as RunKindCI so pre-kind rows and callers that don't
+// set it keep the historical behavior.
+type RunKind string
+
+const (
+	RunKindCI    RunKind = "ci"
+	RunKindAgent RunKind = "agent"
+)
+
+// Agent execution models (#110): the pluggable strategy an agent run uses
+// inside its container. Canonical here so storage (default), the server
+// (validation), and the runner (executor selection) share one vocabulary.
+const (
+	ExecModelClaudeEdit    = "claude-edit"
+	ExecModelMooncakePilot = "mooncake-pilot"
+	// DefaultExecutionModel seeds runs that don't specify one (and the
+	// column default for pre-#110 / CI rows).
+	DefaultExecutionModel = ExecModelClaudeEdit
+)
 
 // JobStatus is the lifecycle state of a single job within a run.
 type JobStatus string
@@ -48,20 +79,30 @@ var ErrNoRunQueued = errors.New("no run queued")
 
 // CIRun is one pipeline execution for a repo, identified per-repo by Number.
 type CIRun struct {
-	ID           int64
-	RepoID       int64
-	Number       int
-	CommitSHA    string
-	CommitMsg    string // commit subject, frozen at enqueue (may be empty)
-	CommitAuthor string // commit author name, frozen at enqueue (may be empty)
-	Ref          string
-	Event        string
-	Trigger      string
-	Status       RunStatus
-	ClaimedAt    *time.Time
-	CreatedAt    time.Time
-	StartedAt    *time.Time
-	FinishedAt   *time.Time
+	ID          int64
+	RepoID      int64
+	Number      int
+	Kind        RunKind // ci (default) | agent
+	IssueNumber *int    // the issue an agent run serves; nil for CI runs
+	// ExecutionModel is the agent run's pluggable execution model
+	// ('claude-edit' | 'mooncake-pilot'); 'claude-edit' for CI rows by
+	// the column default, unused by CI (#110).
+	ExecutionModel string
+	// PilotAllowShell, when set at spawn, drops the default shell/cmd denial
+	// from the mooncake-pilot policy for this run only (#110). Ignored by
+	// claude-edit / CI.
+	PilotAllowShell bool
+	CommitSHA       string
+	CommitMsg       string // commit subject, frozen at enqueue (may be empty)
+	CommitAuthor    string // commit author name, frozen at enqueue (may be empty)
+	Ref             string
+	Event           string
+	Trigger         string
+	Status          RunStatus
+	ClaimedAt       *time.Time
+	CreatedAt       time.Time
+	StartedAt       *time.Time
+	FinishedAt      *time.Time
 }
 
 // CIJob is one job within a run, identified within the run by Name.
@@ -78,14 +119,23 @@ type CIJob struct {
 }
 
 // NewRun holds the fields needed to enqueue a run. Number, status, and
-// timestamps are assigned by EnqueueRun.
+// timestamps are assigned by EnqueueRun. Kind defaults to RunKindCI when empty;
+// IssueNumber is set only for agent runs.
 type NewRun struct {
-	CommitSHA    string
-	CommitMsg    string
-	CommitAuthor string
-	Ref          string
-	Event        string
-	Trigger      string
+	Kind        RunKind
+	IssueNumber *int
+	// ExecutionModel is the agent execution model; empty falls back to the
+	// column default ('claude-edit'). Set only for agent runs (#110).
+	ExecutionModel string
+	// PilotAllowShell overrides the default shell/cmd denial for this
+	// mooncake-pilot run (#110). Set only for agent runs.
+	PilotAllowShell bool
+	CommitSHA       string
+	CommitMsg       string
+	CommitAuthor    string
+	Ref             string
+	Event           string
+	Trigger         string
 }
 
 // EnqueueRun allocates the next per-repo run number and inserts a queued run.
@@ -105,11 +155,23 @@ func EnqueueRun(db *sql.DB, repoID int64, r NewRun) (CIRun, error) {
 		return CIRun{}, err
 	}
 
+	kind := r.Kind
+	if kind == "" {
+		kind = RunKindCI
+	}
+	execModel := r.ExecutionModel
+	if execModel == "" {
+		execModel = DefaultExecutionModel
+	}
+	allowShell := 0
+	if r.PilotAllowShell {
+		allowShell = 1
+	}
 	run, err := scanRun(tx.QueryRow(`
-		INSERT INTO ci_runs(repo_id, number, commit_sha, commit_msg, commit_author, ref, event, trigger, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO ci_runs(repo_id, number, kind, issue_number, execution_model, pilot_allow_shell, commit_sha, commit_msg, commit_author, ref, event, trigger, status)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING `+runColumns+`
-	`, repoID, next, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued)))
+	`, repoID, next, string(kind), r.IssueNumber, execModel, allowShell, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued)))
 	if err != nil {
 		return CIRun{}, err
 	}
@@ -156,25 +218,34 @@ func ListRuns(db *sql.DB, repoID int64, limit int) ([]CIRun, error) {
 	return runs, rows.Err()
 }
 
-// ClaimNextRun atomically claims the oldest claimable run for execution,
-// transitioning it queued|expired-running -> running and stamping the lease.
-// A 'running' run whose claimed_at is older than lease is treated as orphaned
-// (crashed runner) and re-claimable; a non-positive lease disables that steal,
-// so only queued runs are claimed. Returns ErrNoRunQueued when nothing is
-// claimable. The compare-and-set WHERE clause is the lock, mirroring Claim —
-// correct even if the single-writer guarantee is ever relaxed.
+// ClaimNextRun atomically claims the oldest claimable CI run. It is the
+// kind-defaulting entry point; agent runs are claimed via ClaimNextRunOfKind so
+// the runner can pool the two kinds under separate concurrency caps.
 func ClaimNextRun(db *sql.DB, lease time.Duration) (CIRun, error) {
+	return ClaimNextRunOfKind(db, RunKindCI, lease)
+}
+
+// ClaimNextRunOfKind atomically claims the oldest claimable run of the given
+// kind for execution, transitioning it queued|expired-running -> running and
+// stamping the lease. A 'running' run whose claimed_at is older than lease is
+// treated as orphaned (crashed runner) and re-claimable; a non-positive lease
+// disables that steal, so only queued runs are claimed. Scoping by kind lets
+// agent and CI runs drain from independent pools — a flood of one kind never
+// starves the other. Returns ErrNoRunQueued when nothing is claimable. The
+// compare-and-set WHERE clause is the lock, mirroring Claim — correct even if
+// the single-writer guarantee is ever relaxed.
+func ClaimNextRunOfKind(db *sql.DB, kind RunKind, lease time.Duration) (CIRun, error) {
 	tx, err := db.Begin()
 	if err != nil {
 		return CIRun{}, err
 	}
 	defer tx.Rollback()
 
-	// "claimable" = queued, or running but past its lease.
-	claimable := "status = 'queued'"
-	selArgs := []any{}
+	// "claimable" = right kind, and queued or running-but-past-its-lease.
+	claimable := "kind = ? AND status = 'queued'"
+	selArgs := []any{string(kind)}
 	if lease > 0 {
-		claimable = "(status = 'queued' OR (status = 'running' AND claimed_at <= strftime('%s','now') - ?))"
+		claimable = "kind = ? AND (status = 'queued' OR (status = 'running' AND claimed_at <= strftime('%s','now') - ?))"
 		selArgs = append(selArgs, int64(lease.Seconds()))
 	}
 
@@ -223,13 +294,16 @@ func FinishRun(db *sql.DB, runID int64, status RunStatus) error {
 	return affected(res, err)
 }
 
-// ReconcileOrphanRuns finalizes runs left 'running' with no live runner — the
-// classic orphan a moongitd restart strands mid-run (the in-flight goroutine
-// dies before its status writes commit). It must be called at startup, before
-// the runner takes new work, when no run can legitimately be in flight: every
-// 'running' run is therefore an orphan. Each is marked error, its running job
-// errored and its queued jobs skipped, so the UI shows a terminal result
-// instead of a job stuck forever. Returns the number of runs reconciled.
+// ReconcileOrphanRuns finalizes runs left in flight with no live runner — the
+// classic orphan a moongitd restart strands (the in-flight goroutine dies
+// before its status writes commit; an agent run's detached container is swept
+// at startup too). It must be called at startup, before the runner takes new
+// work, when no run can legitimately be in flight: every 'running' run — and
+// every agent run parked in 'awaiting_input', whose container the startup
+// sweep just removed — is therefore an orphan. Each is marked error, its
+// running job errored, its queued jobs skipped, and its un-finished turns
+// errored, so the UI shows a terminal result instead of something stuck
+// forever. Returns the number of runs reconciled.
 func ReconcileOrphanRuns(db *sql.DB) (int, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -237,21 +311,32 @@ func ReconcileOrphanRuns(db *sql.DB) (int, error) {
 	}
 	defer tx.Rollback()
 
+	// Orphans are runs left running or (agent-only) awaiting_input/finishing.
+	const orphanRuns = `SELECT id FROM ci_runs WHERE status IN ('running','awaiting_input','finishing')`
+
 	if _, err := tx.Exec(`
 		UPDATE ci_jobs SET status = ?, finished_at = strftime('%s','now')
-		 WHERE status = ? AND run_id IN (SELECT id FROM ci_runs WHERE status = ?)
-	`, string(JobError), string(JobRunning), string(RunRunning)); err != nil {
+		 WHERE status = ? AND run_id IN (`+orphanRuns+`)
+	`, string(JobError), string(JobRunning)); err != nil {
 		return 0, err
 	}
 	if _, err := tx.Exec(`
 		UPDATE ci_jobs SET status = ?, finished_at = strftime('%s','now')
-		 WHERE status = ? AND run_id IN (SELECT id FROM ci_runs WHERE status = ?)
-	`, string(JobSkipped), string(JobQueued), string(RunRunning)); err != nil {
+		 WHERE status = ? AND run_id IN (`+orphanRuns+`)
+	`, string(JobSkipped), string(JobQueued)); err != nil {
+		return 0, err
+	}
+	// Error any pending/running turns of the orphaned agent runs.
+	if _, err := tx.Exec(`
+		UPDATE agent_turns SET status = ?, finished_at = strftime('%s','now')
+		 WHERE status IN ('pending','running') AND run_id IN (`+orphanRuns+`)
+	`, string(TurnError)); err != nil {
 		return 0, err
 	}
 	res, err := tx.Exec(`
-		UPDATE ci_runs SET status = ?, finished_at = strftime('%s','now') WHERE status = ?
-	`, string(RunError), string(RunRunning))
+		UPDATE ci_runs SET status = ?, finished_at = strftime('%s','now')
+		 WHERE status IN ('running','awaiting_input','finishing')
+	`, string(RunError))
 	if err != nil {
 		return 0, err
 	}
@@ -447,19 +532,26 @@ func affected(res sql.Result, err error) error {
 	return nil
 }
 
-const runColumns = "id, repo_id, number, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at"
+const runColumns = "id, repo_id, number, kind, issue_number, execution_model, pilot_allow_shell, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at"
 
 func scanRun(s scanner) (CIRun, error) {
 	var r CIRun
-	var status string
-	var claimed, started, finished sql.NullInt64
+	var kind, status string
+	var issueNum, claimed, started, finished sql.NullInt64
 	var created int64
+	var allowShell int
 	if err := s.Scan(
-		&r.ID, &r.RepoID, &r.Number, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
+		&r.ID, &r.RepoID, &r.Number, &kind, &issueNum, &r.ExecutionModel, &allowShell, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
 		&r.Ref, &r.Event, &r.Trigger,
 		&status, &claimed, &created, &started, &finished,
 	); err != nil {
 		return r, err
+	}
+	r.Kind = RunKind(kind)
+	r.PilotAllowShell = allowShell != 0
+	if issueNum.Valid {
+		n := int(issueNum.Int64)
+		r.IssueNumber = &n
 	}
 	r.Status = RunStatus(status)
 	r.CreatedAt = time.Unix(created, 0).UTC()
