@@ -160,6 +160,27 @@ func RepoIdent(db *sql.DB, repoID int64) (owner, name string, err error) {
 	return owner, name, err
 }
 
+// DeleteRepo hard-deletes a repo by id. Every child table references repos(id)
+// ON DELETE CASCADE — issues (and their comments, transitively), ci_runs,
+// code_comments, pull_requests, and events — so a single DELETE removes the
+// whole tree. The connection pool opens every handle with foreign_keys(1) (see
+// Open), so the cascade is always in effect. Returns ErrNotFound when no repo
+// with that id exists. The caller removes the on-disk bare git dir afterwards.
+func DeleteRepo(db *sql.DB, repoID int64) error {
+	res, err := db.Exec(`DELETE FROM repos WHERE id = ?`, repoID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // LookupRepo returns the repo id or ErrNotFound when the owner/name pair is
 // unknown.
 func LookupRepo(db *sql.DB, owner, name string) (int64, error) {

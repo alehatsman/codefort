@@ -43,6 +43,8 @@ func run(args []string) error {
 		return runPR(args[1:])
 	case "ci":
 		return runCI(args[1:])
+	case "repo":
+		return runRepo(args[1:])
 	case "events":
 		return runEvents(args[1:])
 	case "help", "-h", "--help":
@@ -80,6 +82,8 @@ USAGE:
 
     moongit ci validate  [path]   (defaults to ./mgitci.yml)
     moongit ci run       <ref>    (trigger a run for a branch/tag/sha)
+
+    moongit repo delete  <owner>/<name> [--yes]   (irreversible)
 
     moongit events                (tail the fleet event feed; Ctrl-C to stop)
         [--repo owner/name] [--types a,b] [--since <seq>] [--once]
@@ -867,6 +871,78 @@ func runCIValidate(args []string) error {
 			"so this fails at run time with %q not found; set image: to one carrying %s (see ci/Dockerfile.dev)\n",
 			h.Job, h.Tool, h.Tool, h.Tool)
 	}
+	return nil
+}
+
+// runRepo dispatches `moongit repo <subcommand>`. Repo-level operations target
+// a repo by its explicit <owner>/<name>, not the current checkout's remote —
+// you typically delete a repo other than the one you're standing in.
+func runRepo(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: moongit repo <delete>")
+	}
+	switch args[0] {
+	case "delete":
+		return runRepoDelete(args[1:])
+	default:
+		return fmt.Errorf("unknown repo subcommand: %s", args[0])
+	}
+}
+
+// runRepoDelete deletes a repo and everything under it — issues, runs,
+// comments, pulls, and the on-disk git data. Irreversible, so it confirms
+// interactively unless --yes is given. The target repo is the explicit
+// <owner>/<name> argument; only the server URL is derived from the local
+// remote (or MOONGIT_SERVER), so it works from any checkout.
+func runRepoDelete(args []string) error {
+	// The <owner>/<name> positional comes first; flags are parsed from what
+	// follows it. (Go's flag package stops at the first non-flag arg, so a
+	// trailing --yes would otherwise be left unparsed.)
+	if len(args) < 1 {
+		return errors.New("usage: moongit repo delete <owner>/<name> [--yes]")
+	}
+	owner, repo, err := splitOwnerRepo(args[0])
+	if err != nil {
+		return err
+	}
+
+	fs := flag.NewFlagSet("repo delete", flag.ContinueOnError)
+	yes := fs.Bool("yes", false, "skip the confirmation prompt")
+	fs.BoolVar(yes, "y", false, "skip the confirmation prompt (shorthand)")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("unexpected extra args: %v", fs.Args())
+	}
+
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+
+	if !*yes {
+		fmt.Printf("Delete repo %s/%s and ALL its issues, runs, comments, and git data? This cannot be undone. [y/N]: ", owner, repo)
+		var answer string
+		_, _ = fmt.Scanln(&answer)
+		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
+			fmt.Println("aborted")
+			return nil
+		}
+	}
+
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s", target.server, owner, repo)
+	resp, raw, err := httpDo(http.MethodDelete, endpoint, nil, "application/json")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("repo not found: %s/%s", owner, repo)
+	}
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	fmt.Printf("%s/%s  deleted\n", owner, repo)
 	return nil
 }
 

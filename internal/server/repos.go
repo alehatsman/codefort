@@ -192,3 +192,58 @@ func (s *Server) handleUpdateRepo(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, toAPIRepo(row))
 }
+
+// handleDeleteRepo removes a repo entirely: its database row (cascading to all
+// issues, runs, comments, pulls, and events) and its on-disk bare git dir.
+// Destructive and irreversible. The DB row goes first so a half-failure leaves
+// no dangling registration pointing at a missing git dir; the git dir is then
+// removed best-effort. Returns 204 on success, 404 if the repo isn't
+// registered.
+//
+// Auth posture matches the rest of the data plane (create/update/delete issue):
+// any valid token may delete. The /api withAuth middleware already gates this
+// on a valid token.
+func (s *Server) handleDeleteRepo(w http.ResponseWriter, r *http.Request) {
+	owner := r.PathValue("owner")
+	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
+
+	repoID, err := storage.LookupRepo(s.db, owner, repo)
+	if errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "repo not registered: "+owner+"/"+repo)
+		return
+	}
+	if err != nil {
+		s.logger.Error("delete repo lookup", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if err := storage.DeleteRepo(s.db, repoID); err != nil {
+		s.logger.Error("delete repo", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Remove the bare git dir, then prune the now-orphaned owner namespace dir
+	// if it's empty. Both are best-effort: the DB row (the source of truth for
+	// what's registered) is already gone, so a leftover dir is cosmetic and
+	// must not turn a successful delete into a 500.
+	repoDir := filepath.Join(s.cfg.ReposDir, owner, repo+".git")
+	if err := os.RemoveAll(repoDir); err != nil {
+		s.logger.Error("delete repo git dir", "dir", repoDir, "err", err)
+	} else {
+		// os.Remove only succeeds on an empty dir, which is exactly the prune
+		// we want; a non-empty owner dir (other repos) errors and is left be.
+		_ = os.Remove(filepath.Join(s.cfg.ReposDir, owner))
+	}
+
+	// Emit the event without a repo_id: the repos row is gone and events
+	// reference repos(id) ON DELETE CASCADE, so a repo-scoped event would be
+	// cascade-deleted along with it. owner/name in the payload identify it.
+	s.emit("repo.deleted", 0, identityFromContext(r), map[string]any{
+		"owner": owner,
+		"name":  repo,
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
