@@ -55,6 +55,26 @@ The runner reads these (see `internal/config/config.go`):
 | `MOONGIT_AGENT_ANTHROPIC_API_KEY` | — | alternate API-key auth → `ANTHROPIC_API_KEY`. |
 | `MOONGIT_AGENT_LLM_BASE_URL` | — | optional `ANTHROPIC_BASE_URL` override (a local model later). |
 | `MOONGIT_AGENT_DEX_PROJECT` | — | dex project id the agent's MCP queries (empty omits dex). |
+| `MOONGIT_AGENT_PILOT_MAX_ITERATIONS` | `10` | plan→apply iterations cap per `mooncake-pilot` turn (`mooncake pilot run --max-iterations`). |
+
+## Execution models (#110)
+
+An agent run executes via one of two **pluggable execution models**, chosen
+per run at spawn (a selector on the “Spawn agent” button; the default is set in
+Settings → Agent or `agent.execution_model`). Both run in this same image and
+edit `/work`, so the server-side handoff materializes `agent/issue-N` from the
+worktree identically — they differ only in *what runs each turn*:
+
+- **`claude-edit`** (default) — runs `claude -p` directly. Claude edits files
+  with its file tools. Under subscription auth its **Bash/execution tools are
+  policy-gated** and not reliably unlockable headlessly, so it **can't run
+  commands** (tests, git, mgit). Best for pure code edits.
+- **`mooncake-pilot`** — runs `mooncake pilot run --provider anthropic-cli
+  --auto-apply --output-format json`. Claude is used **only as a planner**
+  (it emits a mooncake plan as text); **mooncake validates and applies** the
+  plan, so shell/git/test actions execute under mooncake's control rather than
+  claude's gated tool-use. Consumes mooncake's NDJSON event stream (mooncake
+  #48). Iterations are capped by `MOONGIT_AGENT_PILOT_MAX_ITERATIONS`.
 
 ## What the image carries
 
@@ -71,12 +91,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
   the container env per run (#77), never baked in.
 - `dex` — the stdio→REST MCP shim, wired via a generated `--mcp-config` (#77).
 - `mgit` — the moongit issue client (`MOONGIT_TOKEN`/`MOONGIT_SERVER` are
-  injected per run). **Note:** Claude can't invoke it today — headless Bash is
-  policy-gated under subscription auth (#110), so the agent only edits files;
-  command execution (incl. mgit) belongs to a future moongit/mooncake-controlled
-  executor. The binary is kept for that. Drop a static `mgit` into `agent/mgit`
-  (git-ignored build input): `CGO_ENABLED=0 go build -o agent/mgit ./cmd/moongit`.
-- `mooncake`, `git` — inherited from `moongit-ci:latest`.
+  injected per run). Under **`claude-edit`** Claude can't invoke it (headless
+  Bash is policy-gated, #110); under **`mooncake-pilot`** a plan can shell out
+  to it, since mooncake — not claude — runs the commands. Drop a static `mgit`
+  into `agent/mgit` (git-ignored build input):
+  `CGO_ENABLED=0 go build -o agent/mgit ./cmd/moongit`.
+- `mooncake`, `git` — inherited from `moongit-ci:latest`. mooncake is the
+  executor for the `mooncake-pilot` model (`mooncake pilot run`), so it must
+  carry the `--output-format json` support from mooncake #48 — rebuild
+  `agent/mooncake` from a checkout that has it if the base image's is older.
 
 ## Runtime notes
 
