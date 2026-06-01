@@ -47,6 +47,8 @@ func run(args []string) error {
 		return runRepo(args[1:])
 	case "events":
 		return runEvents(args[1:])
+	case "mcp":
+		return runMCP(args[1:])
 	case "help", "-h", "--help":
 		printUsage(os.Stdout)
 		return nil
@@ -87,6 +89,8 @@ USAGE:
 
     moongit events                (tail the fleet event feed; Ctrl-C to stop)
         [--repo owner/name] [--types a,b] [--since <seq>] [--once]
+
+    moongit mcp                   (serve the toolset over stdio as an MCP server)
 
 Identity: the server stamps author/assignee from the name of the token
 in MOONGIT_TOKEN. Mint a token with "moongitd token create <name>" and
