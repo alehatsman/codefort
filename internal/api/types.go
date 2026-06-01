@@ -460,6 +460,21 @@ type CIRunDetail struct {
 	Jobs []CIJob `json:"jobs"`
 }
 
+// Event is one entry in the outbound fleet event feed (#73), as streamed by the
+// GET /api/events SSE endpoint. Seq is the global monotonic id echoed back as
+// Last-Event-ID on reconnect; Time is unix milliseconds (matching ci.Event).
+// Type is dotted (e.g. "issue.claimed", "ci.run.finished", "push"). Repo is the
+// "owner/name" slug, empty for non-repo events. Actor is the token name (or
+// pusher) that caused it. Data is the type-specific detail payload.
+type Event struct {
+	Seq   int64          `json:"seq"`
+	Type  string         `json:"type"`
+	Time  int64          `json:"time"`
+	Repo  string         `json:"repo,omitempty"`
+	Actor string         `json:"actor,omitempty"`
+	Data  map[string]any `json:"data,omitempty"`
+}
+
 // Token represents an API token's metadata. The plaintext token itself
 // is never returned over the API except once, in CreatedToken at creation
 // time — list/lookup never expose it.

@@ -138,6 +138,11 @@ func (s *Server) handleCIEvents(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown repo", http.StatusNotFound)
 		return
 	}
+
+	// Surface the push on the fleet feed before the CI gate, so pushes to
+	// CI-disabled repos still notify subscribers.
+	s.emit("push", repoID, req.Pusher, map[string]any{"ref": req.Ref, "before": req.Old, "after": req.New})
+
 	enabled, err := storage.RepoCIEnabled(s.db, repoID)
 	if err != nil {
 		s.logger.Error("ci events: enabled check", "err", err)
@@ -161,6 +166,7 @@ func (s *Server) handleCIEvents(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error", http.StatusInternalServerError)
 		return
 	}
+	s.emitRunQueued(repoID, run)
 	s.logger.Info("ci run enqueued", "repo", req.Repo, "run", run.Number, "ref", req.Ref)
 
 	w.Header().Set("Content-Type", "application/json")

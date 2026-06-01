@@ -200,6 +200,27 @@ var migrations = []string{
 	);
 	CREATE INDEX IF NOT EXISTS idx_ssh_keys_token ON ssh_keys(token_id);
 	`,
+
+	// 10: outbound event feed (#73). A single append-only log of fleet-visible
+	// events — pushes, issue/claim changes, CI run lifecycle — that the
+	// GET /api/events SSE endpoint replays + live-tails. id is the global
+	// monotonic seq (the SSE event id): gap-tolerant and resume-friendly via
+	// Last-Event-ID, the same trick ci_runs.number uses but server-wide instead
+	// of per-repo. repo_id is nullable (room for non-repo events) and cascades
+	// so a deleted repo drops its events. payload is an opaque JSON blob whose
+	// shape depends on type; actor is the token name (or pusher) that caused it.
+	// Bounded by the event retention reaper, mirroring CI run retention.
+	`
+	CREATE TABLE IF NOT EXISTS events (
+	    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	    type       TEXT NOT NULL,
+	    repo_id    INTEGER REFERENCES repos(id) ON DELETE CASCADE,
+	    actor      TEXT NOT NULL DEFAULT '',
+	    payload    TEXT NOT NULL DEFAULT '{}',
+	    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+	);
+	CREATE INDEX IF NOT EXISTS idx_events_repo ON events(repo_id);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

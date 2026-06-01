@@ -140,6 +140,7 @@ func runServe(logger *slog.Logger) error {
 	go runClaimReaper(ctx, db, cfg.ClaimLease, logger)
 	go runTokenReaper(ctx, db, cfg.AgentTokenTTL, logger)
 	go runCIRetentionReaper(ctx, db, cfg, logger)
+	go runEventRetentionReaper(ctx, db, cfg, logger)
 
 	// The CI runner can be mid-run when shutdown fires. Cancelling its context
 	// aborts the in-flight steps and it finalizes the run to a terminal status —
@@ -328,6 +329,44 @@ func sweepCIRetention(db *sql.DB, cfg *config.Config, logger *slog.Logger) {
 	}
 	if len(pruned) > 0 {
 		logger.Info("ci retention pruned runs", "count", len(pruned))
+	}
+}
+
+// runEventRetentionReaper periodically bounds the outbound event feed (#73) to
+// the newest cfg.EventRetain rows via storage.PruneEvents. It sweeps once at
+// startup, then on the same unhurried cadence as CI retention. No-op when
+// retention is disabled. Runs until ctx is cancelled, on the single writer pool
+// — same discipline as the other reapers.
+func runEventRetentionReaper(ctx context.Context, db *sql.DB, cfg *config.Config, logger *slog.Logger) {
+	if cfg.EventRetain <= 0 {
+		logger.Info("event retention reaper disabled (retain <= 0)")
+		return
+	}
+	logger.Info("event retention reaper started", "retain", cfg.EventRetain, "interval", ciRetentionInterval)
+
+	sweepEventRetention(db, cfg, logger) // initial pass so a restart promptly clears any backlog
+
+	ticker := time.NewTicker(ciRetentionInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sweepEventRetention(db, cfg, logger)
+		}
+	}
+}
+
+// sweepEventRetention runs one event-feed retention pass.
+func sweepEventRetention(db *sql.DB, cfg *config.Config, logger *slog.Logger) {
+	n, err := storage.PruneEvents(db, cfg.EventRetain)
+	if err != nil {
+		logger.Error("event retention prune", "err", err)
+		return
+	}
+	if n > 0 {
+		logger.Info("event retention pruned events", "count", n)
 	}
 }
 

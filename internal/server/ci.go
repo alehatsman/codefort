@@ -131,6 +131,7 @@ func (s *Server) handleRerunCIRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	s.emitRunQueued(repoID, run)
 	writeJSON(w, http.StatusAccepted, toAPIRun(run))
 }
 
@@ -202,6 +203,7 @@ func (s *Server) handleTriggerCIRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	s.emitRunQueued(repoID, run)
 	s.logger.Info("ci run triggered", "repo", owner+"/"+repo, "run", run.Number, "ref", req.Ref)
 	writeJSON(w, http.StatusAccepted, toAPIRun(run))
 }
