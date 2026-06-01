@@ -78,7 +78,7 @@ func newCITriggerServer(t *testing.T) (*Server, int64) {
 func trigger(t *testing.T, s *Server, ref string) *httptest.ResponseRecorder {
 	t.Helper()
 	b, _ := json.Marshal(api.TriggerCIRunRequest{Ref: ref})
-	req := httptest.NewRequest(http.MethodPost, "/api/repos/alice/repo/ci/runs", bytes.NewReader(b))
+	req := httptest.NewRequest(http.MethodPost, "/api/repos/alice/repo/runs", bytes.NewReader(b))
 	req.SetPathValue("owner", "alice")
 	req.SetPathValue("repo", "repo")
 	req = req.WithContext(context.WithValue(req.Context(), tokenCtxKey{}, api.Token{Name: "agent#17"}))

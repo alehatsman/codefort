@@ -50,7 +50,7 @@ func enqueue(t *testing.T, s *Server, repoID int64, sha, ref string) storage.CIR
 
 func TestListCIRunsEmpty(t *testing.T) {
 	s, _ := newCIReadServer(t)
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs", "")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs", "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("code = %d, want 200; body=%s", rr.Code, rr.Body.String())
 	}
@@ -65,7 +65,7 @@ func TestListCIRunsNewestFirst(t *testing.T) {
 	enqueue(t, s, repoID, "bbb", "refs/heads/main")
 	enqueue(t, s, repoID, "ccc", "refs/heads/feat")
 
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs", "")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs", "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("code = %d, want 200; body=%s", rr.Code, rr.Body.String())
 	}
@@ -89,14 +89,14 @@ func TestListCIRunsLimit(t *testing.T) {
 	for range 5 {
 		enqueue(t, s, repoID, "sha", "refs/heads/main")
 	}
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs?limit=2", "")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs?limit=2", "")
 	var runs []api.CIRun
 	json.Unmarshal(rr.Body.Bytes(), &runs)
 	if len(runs) != 2 {
 		t.Fatalf("runs = %d, want 2 (limit)", len(runs))
 	}
 
-	rr = ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs?limit=-1", "")
+	rr = ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs?limit=-1", "")
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("negative limit: code = %d, want 400", rr.Code)
 	}
@@ -117,7 +117,7 @@ func TestGetCIRunDetail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/1", "")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs/1", "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("code = %d, want 200; body=%s", rr.Code, rr.Body.String())
 	}
@@ -141,7 +141,7 @@ func TestGetCIRunDetail(t *testing.T) {
 
 func TestGetCIRunNotFound(t *testing.T) {
 	s, _ := newCIReadServer(t)
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/99", "")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs/99", "")
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("code = %d, want 404", rr.Code)
 	}
@@ -149,7 +149,7 @@ func TestGetCIRunNotFound(t *testing.T) {
 
 func TestGetCIRunBadNumber(t *testing.T) {
 	s, _ := newCIReadServer(t)
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/abc", "")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs/abc", "")
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("code = %d, want 400", rr.Code)
 	}
@@ -160,7 +160,7 @@ func TestRerunEnqueuesNewRun(t *testing.T) {
 	storage.SetRepoCIEnabled(s.db, repoID, true)
 	enqueue(t, s, repoID, "cafef00d", "refs/heads/main")
 
-	rr := ciReq(t, s, http.MethodPost, "/api/repos/alice/repo/ci/runs/1/rerun", "")
+	rr := ciReq(t, s, http.MethodPost, "/api/repos/alice/repo/runs/1/rerun", "")
 	if rr.Code != http.StatusAccepted {
 		t.Fatalf("code = %d, want 202; body=%s", rr.Code, rr.Body.String())
 	}
@@ -188,7 +188,7 @@ func TestRerunEnqueuesNewRun(t *testing.T) {
 func TestRerunDisabledRepo(t *testing.T) {
 	s, repoID := newCIReadServer(t) // CI disabled
 	enqueue(t, s, repoID, "sha", "refs/heads/main")
-	rr := ciReq(t, s, http.MethodPost, "/api/repos/alice/repo/ci/runs/1/rerun", "")
+	rr := ciReq(t, s, http.MethodPost, "/api/repos/alice/repo/runs/1/rerun", "")
 	if rr.Code != http.StatusConflict {
 		t.Fatalf("code = %d, want 409 (CI disabled)", rr.Code)
 	}
@@ -197,7 +197,7 @@ func TestRerunDisabledRepo(t *testing.T) {
 func TestRerunUnknownRun(t *testing.T) {
 	s, repoID := newCIReadServer(t)
 	storage.SetRepoCIEnabled(s.db, repoID, true)
-	rr := ciReq(t, s, http.MethodPost, "/api/repos/alice/repo/ci/runs/42/rerun", "")
+	rr := ciReq(t, s, http.MethodPost, "/api/repos/alice/repo/runs/42/rerun", "")
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("code = %d, want 404", rr.Code)
 	}
@@ -230,7 +230,7 @@ func TestJobEventsReplay(t *testing.T) {
 	run := enqueue(t, s, repoID, "sha", "refs/heads/main")
 	writeJobEvents(t, s, run, "build", ci.EventRunStarted, ci.EventStepStarted, ci.EventRunCompleted)
 
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/build/events", "")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs/1/jobs/build/events", "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("code = %d, want 200; body=%s", rr.Code, rr.Body.String())
 	}
@@ -251,7 +251,7 @@ func TestJobEventsResume(t *testing.T) {
 	writeJobEvents(t, s, run, "build", ci.EventRunStarted, ci.EventStepStarted, ci.EventRunCompleted)
 
 	// Resume after seq 2: only seq 3 should be sent.
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/build/events", "2")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs/1/jobs/build/events", "2")
 	body := rr.Body.String()
 	if strings.Contains(body, "id: 1") || strings.Contains(body, "id: 2") {
 		t.Errorf("resume re-sent already-seen events:\n%s", body)
@@ -283,7 +283,7 @@ func TestJobEventsLiveResumeSentinel(t *testing.T) {
 	}
 	elog.Close()
 
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/build/events", "")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs/1/jobs/build/events", "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("code = %d, want 200; body=%s", rr.Code, rr.Body.String())
 	}
@@ -300,7 +300,7 @@ func TestJobEventsUnknownJob(t *testing.T) {
 	s, repoID := newCIReadServer(t)
 	run := enqueue(t, s, repoID, "sha", "refs/heads/main")
 	storage.FinishRun(s.db, run.ID, storage.RunSuccess)
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/ghost/events", "")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs/1/jobs/ghost/events", "")
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("code = %d, want 404", rr.Code)
 	}
@@ -316,7 +316,7 @@ func TestJobEventsSkippedJobClosesEmpty(t *testing.T) {
 	}
 	storage.FinishRun(s.db, run.ID, storage.RunSuccess)
 
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/skipped/events", "")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs/1/jobs/skipped/events", "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("code = %d, want 200", rr.Code)
 	}
@@ -363,7 +363,7 @@ func TestJobEventsAwaitingInputDrainsAndCloses(t *testing.T) {
 	// recorder would never return; receiving on done proves the stream closed.
 	done := make(chan *httptest.ResponseRecorder, 1)
 	go func() {
-		done <- ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/agent/events", "")
+		done <- ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs/1/jobs/agent/events", "")
 	}()
 	select {
 	case rr := <-done:
@@ -422,7 +422,7 @@ func TestUpdateRepoNoFields(t *testing.T) {
 
 func TestJobEventsRunNotFound(t *testing.T) {
 	s, _ := newCIReadServer(t)
-	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/ci/runs/7/jobs/build/events", "")
+	rr := ciReq(t, s, http.MethodGet, "/api/repos/alice/repo/runs/7/jobs/build/events", "")
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("code = %d, want 404", rr.Code)
 	}
@@ -447,7 +447,7 @@ func TestJobEventsThroughFullHandler(t *testing.T) {
 		t.Fatalf("CreateToken: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/build/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/repos/alice/repo/runs/1/jobs/build/events", nil)
 	req.Header.Set("Authorization", "Bearer "+raw)
 	rr := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rr, req)
@@ -488,7 +488,7 @@ func TestJobEventsPendingJobOnLiveRunStreams(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
-	req := httptest.NewRequest(http.MethodGet, "/api/repos/alice/repo/ci/runs/1/jobs/agent/events", nil).WithContext(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/api/repos/alice/repo/runs/1/jobs/agent/events", nil).WithContext(ctx)
 	req.SetPathValue("owner", "alice")
 	req.SetPathValue("repo", "repo")
 	req.SetPathValue("number", "1")

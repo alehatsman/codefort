@@ -806,7 +806,7 @@ func runCITrigger(args []string) error {
 	if err != nil {
 		return err
 	}
-	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/ci/runs", target.server, target.owner, target.repo)
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/runs", target.server, target.owner, target.repo)
 	resp, raw, err := httpDo(http.MethodPost, endpoint, bytes.NewReader(payload), "application/json")
 	if err != nil {
 		return err
