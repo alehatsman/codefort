@@ -170,7 +170,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		firstTurn: true,
 		mcpPath:   mcpPath,
 	}
-	turnCtx, h := r.registerAgentTurn(run.ID, parent)
+	turnCtx, h := r.registerAgentTurn(parent, run.ID)
 	status, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, 1, in)
 	r.unregisterAgentTurn(run.ID, h)
 	elog.Close()
@@ -277,7 +277,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 		mcpPath:   mcpPath,
 		resume:    true,
 	}
-	turnCtx, h := r.registerAgentTurn(run.ID, parent)
+	turnCtx, h := r.registerAgentTurn(parent, run.ID)
 	status, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, turn.Seq+1, in)
 	r.unregisterAgentTurn(run.ID, h)
 	elog.Close()
@@ -433,7 +433,7 @@ func (r *ciRunner) failAgentTurnRun(run storage.CIRun, jobID int64, workDir, rea
 // registerAgentTurn derives a cancelable context for one turn and records a
 // handle so CancelAgentRun can interrupt it (#146). Returns the context to run
 // the turn under and the handle to check/unregister afterwards.
-func (r *ciRunner) registerAgentTurn(runID int64, parent context.Context) (context.Context, *agentTurnHandle) {
+func (r *ciRunner) registerAgentTurn(parent context.Context, runID int64) (context.Context, *agentTurnHandle) {
 	ctx, cancel := context.WithCancel(parent)
 	h := &agentTurnHandle{cancel: cancel}
 	r.agentTurns.Store(runID, h)
@@ -464,7 +464,7 @@ func (r *ciRunner) CancelAgentRun(runID int64) bool {
 	// Unblock an in-flight turn, if any, and flag it so its goroutine doesn't
 	// re-finalize over the RunCanceled we just wrote.
 	if v, ok := r.agentTurns.Load(runID); ok {
-		h := v.(*agentTurnHandle)
+		h, _ := v.(*agentTurnHandle) // map only ever holds *agentTurnHandle
 		h.canceled.Store(true)
 		h.cancel()
 	}
