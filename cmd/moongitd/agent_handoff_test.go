@@ -176,6 +176,53 @@ func TestFinishAgentRunNoChanges(t *testing.T) {
 	}
 }
 
+// initAgentGitRepo makes /work a real repo with a base commit and, given a
+// non-empty originURL, wires it as the `origin` remote so in-container mgit can
+// resolve owner/repo (#120). An empty URL leaves the repo remote-less.
+func TestInitAgentGitRepoWiresOrigin(t *testing.T) {
+	remoteURL := func(t *testing.T, workDir string) (string, error) {
+		t.Helper()
+		cmd := exec.Command("git", "remote", "get-url", "origin")
+		cmd.Env = append(os.Environ(), "GIT_DIR="+filepath.Join(workDir, ".git"), "GIT_WORK_TREE="+workDir)
+		out, err := cmd.Output()
+		return strings.TrimSpace(string(out)), err
+	}
+
+	t.Run("origin set to the repo URL", func(t *testing.T) {
+		workDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(workDir, "f.txt"), []byte("hi\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		want := "http://host.docker.internal:8080/alice/repo.git"
+		if err := initAgentGitRepo(context.Background(), workDir, want); err != nil {
+			t.Fatalf("initAgentGitRepo: %v", err)
+		}
+		// A base commit exists (the pilot needs git history).
+		head := exec.Command("git", "rev-parse", "HEAD")
+		head.Env = append(os.Environ(), "GIT_DIR="+filepath.Join(workDir, ".git"))
+		if out, err := head.Output(); err != nil || strings.TrimSpace(string(out)) == "" {
+			t.Fatalf("no base commit: %v", err)
+		}
+		got, err := remoteURL(t, workDir)
+		if err != nil || got != want {
+			t.Errorf("origin = %q, %v; want %q", got, err, want)
+		}
+	})
+
+	t.Run("empty URL leaves no remote", func(t *testing.T) {
+		workDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(workDir, "f.txt"), []byte("hi\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := initAgentGitRepo(context.Background(), workDir, ""); err != nil {
+			t.Fatalf("initAgentGitRepo: %v", err)
+		}
+		if got, err := remoteURL(t, workDir); err == nil {
+			t.Errorf("expected no origin remote, got %q", got)
+		}
+	})
+}
+
 // status reads a run's current status.
 func (r *ciRunner) status(t *testing.T, run storage.CIRun) storage.RunStatus {
 	t.Helper()

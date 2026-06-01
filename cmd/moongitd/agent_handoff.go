@@ -220,7 +220,12 @@ func runGit(ctx context.Context, env []string, args ...string) (string, error) {
 // the agent's work lands on is still materialized server-side from the worktree
 // by materializeAgentBranch — this local repo is just the in-container scratch
 // pilot needs.
-func initAgentGitRepo(ctx context.Context, workDir string) error {
+//
+// originURL, when non-empty, is wired as the `origin` remote so in-container
+// `mgit` can resolve owner/repo (it reads the `moongit`/`origin` remote;
+// MOONGIT_SERVER only overrides the host, not the repo). With it the agent can
+// claim/comment/set-state on its issue exactly like a normal checkout (#120).
+func initAgentGitRepo(ctx context.Context, workDir, originURL string) error {
 	env := append(os.Environ(),
 		"GIT_DIR="+filepath.Join(workDir, ".git"),
 		"GIT_WORK_TREE="+workDir,
@@ -235,6 +240,11 @@ func initAgentGitRepo(ctx context.Context, workDir string) error {
 	}
 	if _, err := runGit(ctx, env, "commit", "-q", "--no-gpg-sign", "-m", "agent base"); err != nil {
 		return err
+	}
+	if originURL != "" {
+		if _, err := runGit(ctx, env, "remote", "add", "origin", originURL); err != nil {
+			return err
+		}
 	}
 	return nil
 }

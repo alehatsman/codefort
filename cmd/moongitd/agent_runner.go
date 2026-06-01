@@ -77,9 +77,12 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 
 	// The checkout is a git-archive extract with no .git. The mooncake-pilot
 	// model runs `git` (snapshot/diff) inside /work, so make it a real repo at
-	// the base commit; claude-edit just ignores it. Best-effort — a failure
+	// the base commit; claude-edit just ignores it. The `origin` remote points
+	// at this repo on the server so in-container `mgit` can resolve owner/repo
+	// and claim/comment/set-state on the issue (#120). Best-effort — a failure
 	// here only matters for pilot, which will surface its own error.
-	if err := initAgentGitRepo(parent, workDir); err != nil {
+	originURL := agentServerURL(r.cfg) + "/" + owner + "/" + name + ".git"
+	if err := initAgentGitRepo(parent, workDir, originURL); err != nil {
 		log.Warn("agent git init", "err", err)
 	}
 
