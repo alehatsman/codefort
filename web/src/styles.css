@@ -3151,6 +3151,16 @@ h3 {
   gap: var(--space-2);
   padding: var(--space-1) 0;
 }
+/* A failed step is the one place red belongs — flag the header, not the log. */
+.ci-step__head--failed {
+  padding: var(--space-1) var(--space-2);
+  border-left: 3px solid var(--state-closed);
+  background: var(--state-closed-bg);
+  border-radius: var(--radius-sm);
+}
+.ci-step__head--failed .ci-step__cmd {
+  color: var(--state-closed);
+}
 .ci-step__status {
   width: 8px;
   height: 8px;
@@ -3189,8 +3199,51 @@ h3 {
   overflow-x: auto;
   white-space: pre;
 }
-.ci-log__stderr {
+/* stderr is a stream, not an error — tools write progress/info there (e.g. go's
+   `go: downloading …`). Mark it with a faint gutter tick, never red. Red is
+   reserved for an actually-failed step (.ci-step__head--failed). */
+.ci-log__line {
+  display: block;
+}
+.ci-log__line--stderr {
+  box-shadow: inset 2px 0 0 var(--border);
+  padding-left: var(--space-2);
+}
+
+/* ANSI SGR colors, mapped to theme-aware semantic tokens so log color tracks
+   the active theme and stays legible on every background. */
+.ansi-fg--black {
+  color: var(--fg-muted);
+}
+.ansi-fg--red {
   color: var(--state-closed);
+}
+.ansi-fg--green {
+  color: var(--state-todo);
+}
+.ansi-fg--yellow {
+  color: var(--state-in_progress);
+}
+.ansi-fg--blue {
+  color: var(--accent);
+}
+.ansi-fg--magenta {
+  color: var(--state-done);
+}
+.ansi-fg--cyan {
+  color: var(--accent);
+}
+.ansi-fg--white {
+  color: var(--fg);
+}
+.ansi-bold {
+  font-weight: var(--weight-bold);
+}
+.ansi-dim {
+  opacity: 0.7;
+}
+.ansi-underline {
+  text-decoration: underline;
 }
 
 /* --- Pull requests: list state badge, compare pickers, PR detail --- */

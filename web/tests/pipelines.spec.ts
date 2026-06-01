@@ -79,6 +79,139 @@ function enabledSeed(): Partial<State> {
   }
 }
 
+// A run whose single job mixes a stdout line, an stderr line (progress, not an
+// error), an ANSI-colored line, and a failed step — to pin the log-coloring
+// rules.
+function coloringSeed(): Partial<State> {
+  return {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 0,
+        total_issues: 0,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 1,
+        commit_sha: "deadbeefcafe1234",
+        commit_msg: "ci: exercise log coloring",
+        commit_author: "Alice Example",
+        ref: "refs/heads/main",
+        event: "push",
+        trigger: "alice",
+        status: "failed",
+        created_at: iso,
+        started_at: iso,
+        finished_at: iso,
+        jobs: [
+          { name: "checks", status: "failed", exit_code: 1, started_at: iso, finished_at: iso },
+        ],
+        events: {
+          checks: [
+            { seq: 1, type: "run.started", time: 0, data: { total_steps: 2 } },
+            {
+              seq: 2,
+              type: "step.started",
+              time: 0,
+              data: { step_id: "step-0001", action: "shell", name: "go build ./..." },
+            },
+            {
+              seq: 3,
+              type: "step.stdout",
+              time: 0,
+              data: { step_id: "step-0001", stream: "stdout", line: "compiling main.go" },
+            },
+            {
+              seq: 4,
+              type: "step.stderr",
+              time: 0,
+              data: {
+                step_id: "step-0001",
+                stream: "stderr",
+                line: "go: downloading example.com/foo v1.2.3",
+              },
+            },
+            {
+              seq: 5,
+              type: "step.completed",
+              time: 0,
+              data: { step_id: "step-0001", duration_ms: 5, result: { status: "ok", rc: 0 } },
+            },
+            {
+              seq: 6,
+              type: "step.started",
+              time: 0,
+              data: { step_id: "step-0002", action: "shell", name: "go test ./..." },
+            },
+            {
+              seq: 7,
+              type: "step.stdout",
+              time: 0,
+              data: {
+                step_id: "step-0002",
+                stream: "stdout",
+                // ANSI: green "ok" then reset.
+                line: "\u001b[32mok\u001b[0m  example/pkg  0.10s",
+              },
+            },
+            {
+              seq: 8,
+              type: "step.completed",
+              time: 0,
+              data: { step_id: "step-0002", duration_ms: 9, result: { status: "failed", rc: 1 } },
+            },
+            { seq: 9, type: "run.completed", time: 0, data: { total_steps: 2 } },
+          ],
+        },
+      },
+    ],
+  }
+}
+
+test("stderr log lines are not painted red — stderr is a stream, not an error", async ({
+  page,
+}) => {
+  await mockApi(page, coloringSeed())
+  await page.goto("/alice/demo/pipelines/1")
+
+  const stdout = page.getByText("compiling main.go")
+  const stderr = page.getByText("go: downloading example.com/foo")
+  await expect(stdout).toBeVisible()
+  await expect(stderr).toBeVisible()
+
+  // The stderr line carries the stream marker class…
+  await expect(stderr).toHaveClass(/ci-log__line--stderr/)
+  // …but renders in the same color as stdout — no red error styling.
+  const color = (loc: typeof stdout) => loc.evaluate((el) => getComputedStyle(el).color)
+  expect(await color(stderr)).toBe(await color(stdout))
+})
+
+test("ANSI color escapes render as styled spans, not raw text", async ({ page }) => {
+  await mockApi(page, coloringSeed())
+  await page.goto("/alice/demo/pipelines/1")
+
+  // The green "ok" is a styled span; the raw escape never reaches the DOM text.
+  const green = page.locator(".ansi-fg--green")
+  await expect(green).toHaveText("ok")
+  await expect(page.getByText("example/pkg")).toBeVisible()
+  // The raw SGR escape ("[32m") never lands in the rendered text.
+  await expect(page.locator(".ci-log").last()).not.toContainText("[32m")
+})
+
+test("a failed step flags its header, leaving the log body neutral", async ({ page }) => {
+  await mockApi(page, coloringSeed())
+  await page.goto("/alice/demo/pipelines/1")
+
+  const failedHead = page.locator(".ci-step__head--failed")
+  await expect(failedHead).toHaveCount(1)
+  await expect(failedHead).toContainText("go test ./...")
+})
+
 test("disabled repo shows the enable prompt, and enabling reveals the runs list", async ({
   page,
 }) => {

@@ -9,6 +9,7 @@ import {
   useSetCIEnabled,
   useTriggerCIRun,
 } from "../api/mutations"
+import { parseAnsi } from "../lib/ansi"
 import { useJobEventStream } from "../lib/ciEvents"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import type { CIEvent, CIJob, CIRun, CIRunDetail, CIRunExecutionModel, Repo } from "../api/types"
@@ -464,28 +465,37 @@ function JobLog({
     <div className="ci-job-log">
       {error && <div className="error inline">{error}</div>}
       {steps.length === 0 && !done && <div className="loading">Waiting for output…</div>}
-      {steps.map((step) => (
-        <div className="ci-step" key={step.id}>
-          <div className="ci-step__head">
-            <span className={`ci-step__status ci-step__status--${step.status ?? "running"}`} />
-            <code className="ci-step__cmd">{step.label ?? step.action ?? step.id}</code>
-            {step.durationMs !== undefined && (
-              <span className="muted small ci-step__dur">{formatDuration(step.durationMs)}</span>
+      {steps.map((step) => {
+        const status = step.status ?? "running"
+        const failed = status === "failed" || status === "error"
+        return (
+          <div className="ci-step" key={step.id}>
+            <div className={clsx("ci-step__head", { "ci-step__head--failed": failed })}>
+              <span className={`ci-step__status ci-step__status--${status}`} />
+              <code className="ci-step__cmd">{step.label ?? step.action ?? step.id}</code>
+              {step.durationMs !== undefined && (
+                <span className="muted small ci-step__dur">{formatDuration(step.durationMs)}</span>
+              )}
+            </div>
+            {step.lines.length > 0 && (
+              <pre className="ci-log">
+                {step.lines.map((l, i) => (
+                  <code
+                    // biome-ignore lint/suspicious/noArrayIndexKey: append-only log output, no stable id; line order never changes
+                    key={i}
+                    className={clsx("ci-log__line", {
+                      "ci-log__line--stderr": l.stream === "stderr",
+                    })}
+                  >
+                    <LogLine text={l.text} />
+                    {"\n"}
+                  </code>
+                ))}
+              </pre>
             )}
           </div>
-          {step.lines.length > 0 && (
-            <pre className="ci-log">
-              {step.lines.map((l, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: append-only log output, no stable id; line order never changes
-                <code key={i} className={l.stream === "stderr" ? "ci-log__stderr" : ""}>
-                  {l.text}
-                  {"\n"}
-                </code>
-              ))}
-            </pre>
-          )}
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -705,6 +715,33 @@ function compactJSON(v: unknown): string {
   } catch {
     return String(v)
   }
+}
+
+// LogLine renders one log line, interpreting ANSI SGR color escapes into spans.
+// A line with no escapes is a single plain segment, so the common case stays a
+// bare text node.
+function LogLine({ text }: { text: string }) {
+  const segments = parseAnsi(text)
+  if (segments.length === 1 && !segments[0].fg && !segments[0].bold && !segments[0].underline) {
+    return <>{segments[0].text}</>
+  }
+  return (
+    <>
+      {segments.map((seg, i) => (
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: segments derive from a fixed line; order is stable
+          key={i}
+          className={clsx(seg.fg && `ansi-fg--${seg.fg}`, {
+            "ansi-bold": seg.bold,
+            "ansi-dim": seg.dim,
+            "ansi-underline": seg.underline,
+          })}
+        >
+          {seg.text}
+        </span>
+      ))}
+    </>
+  )
 }
 
 // --- event folding -----------------------------------------------------------
