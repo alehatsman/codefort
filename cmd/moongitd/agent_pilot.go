@@ -10,8 +10,13 @@ import (
 )
 
 // pilotMaxIterationsDefault is the fallback iteration cap when config
-// doesn't set one (or sets a non-positive value).
-const pilotMaxIterationsDefault = 10
+// doesn't set one (or sets a non-positive value). Kept low: on a
+// deterministic step failure the pilot re-runs the whole regenerated plan
+// each iteration rather than adapting, so a high cap just burns minutes
+// re-failing the same step (dex run #21 ground through 10 ≈ 9 min). 3 gives
+// the planner a couple of genuine retries before giving up; raise via
+// MOONGIT_AGENT_PILOT_MAX_ITERATIONS for tasks that legitimately need more.
+const pilotMaxIterationsDefault = 3
 
 // pilotExecutor is the mooncake-pilot model: each turn runs
 // `mooncake pilot run` inside the agent container. Claude is used only as

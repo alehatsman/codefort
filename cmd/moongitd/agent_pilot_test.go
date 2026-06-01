@@ -82,11 +82,11 @@ func TestPilotExecutorAllowShellOverride(t *testing.T) {
 
 func TestPilotExecutorArgvDefaultIterations(t *testing.T) {
 	// nil cfg / non-positive value falls back to the built-in default.
-	if argv := newPilotExecutor(nil, false).Argv(turnSpec{prompt: "g"}); !argvHas(argv, "--max-iterations", "10") {
-		t.Errorf("nil cfg should default to 10 iterations: %v", argv)
+	if argv := newPilotExecutor(nil, false).Argv(turnSpec{prompt: "g"}); !argvHas(argv, "--max-iterations", "3") {
+		t.Errorf("nil cfg should default to 3 iterations: %v", argv)
 	}
-	if argv := newPilotExecutor(&config.Config{AgentPilotMaxIterations: 0}, false).Argv(turnSpec{prompt: "g"}); !argvHas(argv, "--max-iterations", "10") {
-		t.Errorf("zero iterations should default to 10: %v", argv)
+	if argv := newPilotExecutor(&config.Config{AgentPilotMaxIterations: 0}, false).Argv(turnSpec{prompt: "g"}); !argvHas(argv, "--max-iterations", "3") {
+		t.Errorf("zero iterations should default to 3: %v", argv)
 	}
 }
 
