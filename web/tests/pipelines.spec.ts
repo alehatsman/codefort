@@ -485,13 +485,17 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
   await expect(transcript).not.toContainText("0 steps")
   // The pilot loop count (otherwise invisible) is surfaced because it re-planned.
   await expect(page.getByText("3 iterations")).toBeVisible()
-  // The plan header + its steps render as one card: the plan line opens it and
-  // the last step closes it; the recap sits outside the card.
-  await expect(transcript.locator(".agent-grouped--start", { hasText: "plan" })).toBeVisible()
+  // The transcript is a stack of CI-style cards: a "Turn 1" card and a
+  // "plan · 2 steps" card whose body holds the steps + recap.
+  const planCard = transcript.locator(".agent-card", {
+    has: page.locator(".ci-step__head", { hasText: "plan · 2 steps" }),
+  })
+  await expect(planCard).toBeVisible()
+  await expect(planCard.locator(".agent-step", { hasText: "report progress" })).toBeVisible()
+  await expect(planCard.locator(".agent-entry--result", { hasText: "RECAP" })).toBeVisible()
   await expect(
-    transcript.locator(".agent-grouped--end", { hasText: "report progress" })
+    transcript.locator(".agent-card .ci-step__head", { hasText: "Turn 1" })
   ).toBeVisible()
-  await expect(page.locator(".agent-entry--result.agent-grouped")).toHaveCount(0)
 })
 
 test("a failed mooncake step shows a ✗ row with its command + error inline", async ({ page }) => {
@@ -560,29 +564,30 @@ test("a failed mooncake step shows a ✗ row with its command + error inline", a
   await expect(failed).toContainText("--- FAIL: TestThing")
   await expect(failed).toContainText("exit status 1")
   await expect(page.getByText("ok=0  changed=0  failed=1")).toBeVisible()
+  // The card carrying a failed step flags its head red (reusing the CI card).
+  await expect(transcript.locator(".agent-card .ci-step__head--failed")).toBeVisible()
 })
 
-test("a long agent log virtualizes (windowed rows) and auto-follows the bottom", async ({ page }) => {
-  const N = 80
+test("a long agent log virtualizes (windowed cards) and auto-follows the bottom", async ({ page }) => {
+  // Many turns → many cards. Each turn is a "Turn N" card + a "plan · 1 steps"
+  // card, so the transcript is a tall stack that must window + auto-follow.
+  const N = 30
   const mc = (seq: number, type: string, data: Record<string, unknown>) => ({
     seq,
     type: "agent.message",
     time: 0,
     data: { mooncake: { type, data } },
   })
-  // turn.started, then N step.started/step.completed pairs, then run.completed.
-  const evs: Array<{ seq: number; type: string; time: number; data?: Record<string, unknown> }> = [
-    { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #6: do a lot" } },
-  ]
-  let seq = 2
-  for (let i = 1; i <= N; i++) {
-    const id = `s${i}`
-    const name = `step ${String(i).padStart(3, "0")}`
-    evs.push(mc(seq++, "step.started", { step_id: id, action: "file.write", name }))
-    evs.push(mc(seq++, "step.completed", { step_id: id, duration_ms: 1, result: { status: "ok" } }))
+  const evs: Array<{ seq: number; type: string; time: number; data?: Record<string, unknown> }> = []
+  let seq = 1
+  for (let t = 1; t <= N; t++) {
+    evs.push({ seq: seq++, type: "agent.turn.started", time: 0, data: { turn: t, prompt: `turn ${String(t).padStart(2, "0")} prompt` } })
+    evs.push(mc(seq++, "plan.loaded", { total_steps: 1 }))
+    evs.push(mc(seq++, "step.started", { step_id: `s${t}`, action: "file.write", name: `step in turn ${String(t).padStart(2, "0")}` }))
+    evs.push(mc(seq++, "step.completed", { step_id: `s${t}`, duration_ms: 1, result: { status: "ok" } }))
+    evs.push(mc(seq++, "run.completed", { success_steps: 1, changed_steps: 0, failed_steps: 0, duration_ms: 1 }))
+    evs.push({ seq: seq++, type: "agent.turn.completed", time: 0, data: { turn: t, status: "success", num_turns: 0, duration_ms: 0 } })
   }
-  evs.push(mc(seq++, "run.completed", { success_steps: N, changed_steps: 0, failed_steps: 0, duration_ms: 5 }))
-  evs.push({ seq: seq++, type: "agent.turn.completed", time: 0, data: { turn: 1, status: "success", num_turns: 0, duration_ms: 0 } })
 
   await mockApi(page, {
     repos: [
@@ -619,14 +624,13 @@ test("a long agent log virtualizes (windowed rows) and auto-follows the bottom",
 
   const box = page.locator(".agent-transcript")
   await expect(box).toBeVisible()
-  // The list is windowed: it overflows its bounded box, and the early rows are
-  // not even mounted in the DOM (only the on-screen window + overscan).
+  // Windowed: the stack overflows its bounded box, and the early cards are not
+  // even mounted in the DOM (only the on-screen window + overscan).
   const overflows = await box.evaluate((el) => el.scrollHeight > el.clientHeight + 50)
   expect(overflows).toBe(true)
-  await expect(page.getByText("step 001", { exact: true })).toHaveCount(0)
-  // It auto-followed the bottom: the last step + recap are in view, scrolled down.
-  await expect(page.getByText("step 080", { exact: true })).toBeVisible()
-  await expect(page.getByText(/ok=80/)).toBeVisible()
+  await expect(page.getByText("turn 01 prompt", { exact: true })).toHaveCount(0)
+  // It auto-followed the bottom: the last turn's card is in view, scrolled down.
+  await expect(page.getByText("step in turn 30", { exact: true })).toBeVisible()
   const atBottom = await box.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight < 40)
   expect(atBottom).toBe(true)
   // The "jump to latest" control is hidden while pinned to the tail.

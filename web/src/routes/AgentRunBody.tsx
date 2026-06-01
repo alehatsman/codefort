@@ -1,6 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual"
 import clsx from "clsx"
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useCancelAgentRun, useCreateAgentTurn, useFinishAgentRun } from "../api/mutations"
 import type { CIEvent, CIRunDetail } from "../api/types"
 import { useJobEventStream } from "../lib/ciEvents"
@@ -72,31 +72,12 @@ function AgentTranscript({
   )
   const entries = useMemo(() => foldAgentEvents(events), [events])
 
-  // Group the plan header + its steps into one card: a group is a maximal run
-  // of consecutive plan/step entries (prose and the recap fall outside). The
-  // first/last get the card's top/bottom; rows stay individually virtualized,
-  // and their shared side borders stack into one continuous card as you scroll.
-  const groupPos = useMemo(() => {
-    const grouped = (e: AgentEntry) =>
-      e.kind === "step" || (e.kind === "system" && (e.label ?? "").startsWith("plan"))
-    const pos: Array<"start" | "mid" | "end" | "solo" | null> = entries.map(() => null)
-    for (let i = 0; i < entries.length; ) {
-      if (!grouped(entries[i])) {
-        i++
-        continue
-      }
-      let j = i
-      while (j + 1 < entries.length && grouped(entries[j + 1])) j++
-      if (i === j) pos[i] = "solo"
-      else {
-        pos[i] = "start"
-        pos[j] = "end"
-        for (let k = i + 1; k < j; k++) pos[k] = "mid"
-      }
-      i = j + 1
-    }
-    return pos
-  }, [entries])
+  // Group the flat entries into CI-style cards: a "turn" or "plan" entry opens a
+  // card (its label is the card title) and every following non-header entry
+  // (prompt, steps, recap) is its body — so the transcript reads as a stack of
+  // cards ("Turn 1" with the prompt, "plan · N steps" with its steps + recap),
+  // matching the CI pipeline's step cards.
+  const cards = useMemo(() => buildCards(entries), [entries])
 
   // A turn is in flight while its agent.turn.started has no matching
   // turn.completed. During that window the agent is busy but emits nothing
@@ -121,18 +102,17 @@ function AgentTranscript({
   }, [events, entries, terminal, error])
 
   // The transcript is a bounded, windowed scroll region: only the on-screen
-  // rows are mounted (a long run can emit thousands), and it auto-follows the
-  // bottom like a terminal tail so the latest step is always in view without
-  // the page growing unbounded. Rows have variable height (a step is one line;
-  // a failed step's output or assistant prose is taller), so the virtualizer
-  // measures each rendered row rather than assuming a fixed size.
+  // cards are mounted (a long-running session accrues many turns), and it
+  // auto-follows the bottom like a terminal tail so the latest step is always in
+  // view without the page growing unbounded. Cards vary in height, so the
+  // virtualizer measures each rendered card rather than assuming a fixed size.
   const scrollRef = useRef<HTMLDivElement>(null)
   const virtualizer = useVirtualizer({
-    count: entries.length,
+    count: cards.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 26,
-    overscan: 16,
-    getItemKey: (i) => entries[i].id ?? i,
+    estimateSize: () => 96,
+    overscan: 6,
+    getItemKey: (i) => cards[i].id,
   })
 
   // "Stuck" = the viewport is at (or near) the end, so we keep pinning to the
@@ -163,17 +143,17 @@ function AgentTranscript({
   // size, and the phase line so it re-pins as content grows and as rows settle
   // to their real heights (dynamic measurement changes the total post-paint).
   const total = virtualizer.getTotalSize()
-  // biome-ignore lint/correctness/useExhaustiveDependencies: total/phase aren't read in the body — they're the intentional re-pin triggers (content grew or rows re-measured), so the effect must re-run when they change.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: total/phase aren't read in the body — they're the intentional re-pin triggers (content grew or cards re-measured), so the effect must re-run when they change.
   useLayoutEffect(() => {
     const el = scrollRef.current
     if (!el || !stuckRef.current) return
     el.scrollTop = el.scrollHeight
-  }, [entries.length, total, phase])
+  }, [cards.length, total, phase])
 
   return (
     <div className="agent-transcript-wrap">
       {error && <div className="error inline">{error}</div>}
-      {entries.length === 0 && !done && <div className="loading">Waiting for the agent…</div>}
+      {cards.length === 0 && !done && <div className="loading">Waiting for the agent…</div>}
       <div ref={scrollRef} className="agent-transcript" onScroll={onScroll}>
         <div className="agent-transcript__sizer" style={{ height: total }}>
           {virtualizer.getVirtualItems().map((vi) => (
@@ -184,7 +164,7 @@ function AgentTranscript({
               className="agent-transcript__row"
               style={{ transform: `translateY(${vi.start}px)` }}
             >
-              {renderEntry(entries[vi.index], groupPos[vi.index])}
+              {renderCard(cards[vi.index])}
             </div>
           ))}
         </div>
@@ -204,15 +184,84 @@ function AgentTranscript({
   )
 }
 
-// renderEntry draws one folded transcript entry: a terminal-style step line
-// (glyph + name, failure detail below) or a text entry (turn / assistant /
-// thinking / recap). `group` positions the entry within the plan card — the
-// shared `.agent-grouped` border that wraps the plan header + its steps.
-function renderEntry(e: AgentEntry, group: "start" | "mid" | "end" | "solo" | null) {
-  const groupCls = group && ["agent-grouped", `agent-grouped--${group}`]
+// A Card is one section of the transcript — a turn or a plan — rendered with
+// the CI pipeline's step-card chrome: a head (title + status dot) over a body
+// of entries (the prompt, the steps, the recap).
+interface Card {
+  id: string
+  title: string
+  // status drives the head dot / --failed tint, derived from the body's steps;
+  // undefined for a card with no steps (e.g. a bare turn header).
+  status?: "ok" | "failed" | "running"
+  body: AgentEntry[]
+}
+
+// buildCards groups the flat entries into cards. A "turn" or a "plan" system
+// entry opens a card (its label becomes the title); every following non-header
+// entry is appended to that card's body. A turn's prompt rides the turn entry's
+// text, so it's pushed into the body as prose.
+function buildCards(entries: AgentEntry[]): Card[] {
+  const isHeader = (e: AgentEntry) =>
+    e.kind === "turn" || (e.kind === "system" && (e.label ?? "").startsWith("plan"))
+  const cards: Card[] = []
+  let cur: Card | null = null
+  for (const e of entries) {
+    if (isHeader(e)) {
+      cur = { id: e.id ?? `c${cards.length}`, title: e.label ?? "", body: [] }
+      cards.push(cur)
+      if (e.kind === "turn" && e.text) {
+        cur.body.push({ id: `${cur.id}-prompt`, kind: "assistant", text: e.text })
+      }
+      continue
+    }
+    if (!cur) {
+      cur = { id: e.id ?? `c${cards.length}`, title: "", body: [] }
+      cards.push(cur)
+    }
+    cur.body.push(e)
+  }
+  // Derive each card's head status from its steps: failed wins, then running,
+  // else ok if it ran any step at all.
+  for (const c of cards) {
+    for (const b of c.body) {
+      if (b.kind !== "step") continue
+      if (b.status === "failed") {
+        c.status = "failed"
+        break
+      }
+      if (b.status === "running") c.status = "running"
+      else if (c.status !== "running") c.status = "ok"
+    }
+  }
+  return cards
+}
+
+// renderCard draws one section as a CI-style step card: a head (status dot +
+// title) over a body of rendered entries.
+function renderCard(card: Card) {
+  return (
+    <div className="ci-step agent-card">
+      <div className={clsx("ci-step__head", { "ci-step__head--failed": card.status === "failed" })}>
+        {card.status && <span className={`ci-step__status ci-step__status--${card.status}`} />}
+        <code className="ci-step__cmd">{card.title}</code>
+      </div>
+      {card.body.length > 0 && (
+        <div className="ci-log agent-card__body">
+          {card.body.map((e) => (
+            <Fragment key={e.id}>{renderEntry(e)}</Fragment>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// renderEntry draws one body entry: a terminal-style step line (glyph + name,
+// failure detail below) or a text entry (prompt / assistant / thinking / recap).
+function renderEntry(e: AgentEntry) {
   if (e.kind === "step") {
     return (
-      <div className={clsx("agent-step", `agent-step--${e.status}`, groupCls)}>
+      <div className={clsx("agent-step", `agent-step--${e.status}`)}>
         <div className="agent-step__line">
           <span className="agent-step__glyph" aria-hidden="true">
             {STEP_GLYPH[e.status ?? "running"]}
@@ -224,7 +273,7 @@ function renderEntry(e: AgentEntry, group: "start" | "mid" | "end" | "solo" | nu
     )
   }
   return (
-    <div className={clsx("agent-entry", `agent-entry--${e.kind}`, groupCls)}>
+    <div className={clsx("agent-entry", `agent-entry--${e.kind}`)}>
       {e.label && <div className="agent-entry__label">{e.label}</div>}
       {e.text && <pre className="agent-entry__body">{e.text}</pre>}
     </div>
