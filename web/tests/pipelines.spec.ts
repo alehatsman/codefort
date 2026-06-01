@@ -472,17 +472,87 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
 
   const transcript = page.locator(".agent-transcript")
   await expect(transcript).toBeVisible()
-  await expect(page.getByText("🔧 file.write · create CHANGELOG.md")).toBeVisible()
-  await expect(page.getByText("🔧 cmd · report progress")).toBeVisible()
-  // The executed command line (result.target) is surfaced as a `$ …` line.
-  await expect(page.getByText("$ mgit issue comment 6 --body done")).toBeVisible()
-  // The shell step's stdout is surfaced under its step.
-  await expect(page.getByText("commented on #6 by agent-run-9")).toBeVisible()
-  // The real aggregate replaces the bogus "0 steps · 0 ms".
-  await expect(page.getByText("2 ok · 2 changed")).toBeVisible()
+  // Each step is one compact line: just the name (both completed `changed`, so
+  // a ~ glyph), no `🔧 action ·` label, no `$ command`, no success output.
+  await expect(transcript.locator(".agent-step--changed", { hasText: "create CHANGELOG.md" })).toBeVisible()
+  await expect(transcript.locator(".agent-step--changed", { hasText: "report progress" })).toBeVisible()
+  await expect(transcript).not.toContainText("🔧")
+  await expect(transcript).not.toContainText("$ mgit issue comment 6 --body done")
+  await expect(transcript).not.toContainText("commented on #6 by agent-run-9")
+  // run.completed renders mooncake's RECAP line; turn.completed's bogus 0s is gone.
+  await expect(page.getByText(/RECAP/)).toBeVisible()
+  await expect(page.getByText("ok=2  changed=2  failed=0  1s")).toBeVisible()
   await expect(transcript).not.toContainText("0 steps")
   // The pilot loop count (otherwise invisible) is surfaced because it re-planned.
   await expect(page.getByText("3 iterations")).toBeVisible()
+})
+
+test("a failed mooncake step shows a ✗ row with its command + error inline", async ({ page }) => {
+  const mooncake = (seq: number, type: string, data: Record<string, unknown>) => ({
+    seq,
+    type: "agent.message",
+    time: 0,
+    data: { mooncake: { type, data } },
+  })
+  await mockApi(page, {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 1,
+        total_issues: 1,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 1,
+        kind: "agent",
+        issue_number: 6,
+        execution_model: "mooncake-pilot",
+        commit_sha: "deadbeefcafe1234",
+        ref: "HEAD",
+        event: "agent",
+        trigger: "agent#17",
+        status: "failed",
+        created_at: iso,
+        started_at: iso,
+        finished_at: iso,
+        jobs: [{ name: "agent", status: "failed", exit_code: 1, started_at: iso, finished_at: iso }],
+        events: {
+          agent: [
+            { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #6: do it" } },
+            mooncake(2, "step.started", { step_id: "s1", action: "shell", name: "run the tests" }),
+            mooncake(3, "step.stdout", { step_id: "s1", stream: "stdout", line: "--- FAIL: TestThing" }),
+            mooncake(4, "step.completed", {
+              step_id: "s1",
+              duration_ms: 9,
+              result: { status: "failed", failed: true, target: "go test ./...", error: "exit status 1" },
+            }),
+            mooncake(5, "run.completed", { success_steps: 0, changed_steps: 0, failed_steps: 1, duration_ms: 9 }),
+            {
+              seq: 6,
+              type: "agent.turn.completed",
+              time: 0,
+              data: { turn: 1, status: "failed", num_turns: 0, duration_ms: 0 },
+            },
+          ],
+        },
+      },
+    ],
+  })
+  await page.goto("/alice/demo/agents/1")
+
+  const transcript = page.locator(".agent-transcript")
+  const failed = transcript.locator(".agent-step--failed", { hasText: "run the tests" })
+  await expect(failed).toBeVisible()
+  // The failed step surfaces its command, buffered output, and error inline.
+  await expect(failed).toContainText("$ go test ./...")
+  await expect(failed).toContainText("--- FAIL: TestThing")
+  await expect(failed).toContainText("exit status 1")
+  await expect(page.getByText("ok=0  changed=0  failed=1")).toBeVisible()
 })
 
 test("an in-flight agent turn shows a planning/working indicator; a parked run shows none (#133)", async ({

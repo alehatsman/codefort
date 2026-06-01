@@ -3481,46 +3481,91 @@ h3 {
   padding-left: var(--space-5);
 }
 
-/* Agent run transcript — the live claude conversation, folded from the
-   agent.* event stream into typed entries. */
+/* Agent run transcript — folded from the agent.* event stream and rendered
+   like mooncake's terminal output: a tight monospace list, one line per step,
+   the status glyph (▶ → ✓/~/✗/⊘) flipped in place (no duplicated row). */
 .agent-transcript {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-}
-.agent-entry {
-  border-left: 3px solid var(--border);
-  padding: var(--space-1) var(--space-3);
-}
-.agent-entry__label {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-  font-weight: var(--weight-medium);
-  margin-bottom: 2px;
-}
-.agent-entry__body {
-  margin: 0;
+  gap: 1px;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+/* A step / tool action: glyph + name on one line, terminal-style. */
+.agent-step__line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.agent-step__glyph {
+  flex: none;
+  width: 1ch;
+  text-align: center;
+  font-weight: var(--weight-bold);
+}
+.agent-step__name {
+  min-width: 0;
+  word-break: break-word;
+}
+/* Detail (a failed step's command + output) — dim, indented under the glyph.
+   Reset the global <pre> code-box chrome so it reads as flush terminal text. */
+.agent-step__detail {
+  margin: 2px 0 var(--space-1);
+  padding: 0 0 0 calc(1ch + var(--space-2));
+  border: 0;
+  background: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--state-closed);
+}
+/* Glyph colors mirror mooncake (console_logger.go / agentd runs.go). */
+.agent-step--running .agent-step__glyph {
+  color: var(--accent);
+  animation: ci-pulse 1.2s ease-in-out infinite;
+}
+.agent-step--ok .agent-step__glyph {
+  color: var(--state-todo);
+}
+.agent-step--changed .agent-step__glyph {
+  color: var(--state-in_progress);
+}
+.agent-step--skipped .agent-step__glyph,
+.agent-step--skipped .agent-step__name {
+  color: var(--fg-muted);
+}
+.agent-step--failed .agent-step__glyph,
+.agent-step--failed .agent-step__name {
+  color: var(--state-closed);
+}
+
+/* Text entries (turn header, assistant prose, thinking, recap) — no boxes,
+   just a tight list consistent with the step lines. */
+.agent-entry {
+  padding: 0;
+}
+.agent-entry__label {
+  color: var(--fg-muted);
+}
+.agent-entry__body {
+  margin: 2px 0 var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
   white-space: pre-wrap;
   word-break: break-word;
 }
 /* A turn header opens each turn; the issue prompt sits under it. */
 .agent-entry--turn {
-  border-left-color: var(--state-in_progress);
-  margin-top: var(--space-2);
+  margin-top: var(--space-3);
 }
 .agent-entry--turn .agent-entry__label {
   color: var(--fg);
   font-weight: var(--weight-bold);
 }
-.agent-entry--assistant {
-  border-left-color: var(--accent, var(--state-in_progress));
-}
-/* Tool use + results are the agent's actions; thinking is de-emphasized. */
-.agent-entry--tool_use,
-.agent-entry--tool_result {
-  border-left-color: var(--state-todo);
+.agent-entry--assistant .agent-entry__body {
+  color: var(--fg);
 }
 .agent-entry--thinking {
   opacity: 0.7;
@@ -3528,16 +3573,24 @@ h3 {
 .agent-entry--thinking .agent-entry__body {
   font-style: italic;
 }
-.agent-entry--system,
+.agent-entry--tool_use .agent-entry__label,
+.agent-entry--system .agent-entry__label,
 .agent-entry--raw {
   color: var(--fg-muted);
 }
+/* The mooncake-style RECAP / turn-complete summary line. */
 .agent-entry--result {
-  border-left-color: var(--state-todo);
+  margin-top: var(--space-2);
 }
 .agent-entry--result .agent-entry__label {
+  display: inline;
   color: var(--fg);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-bold);
+}
+.agent-entry--result .agent-entry__body {
+  display: inline;
+  margin-left: var(--space-2);
+  color: var(--fg-muted);
 }
 /* Live busy hint after the last entry while a turn is in flight — fills the
    silent gap (esp. mooncake-pilot's planning phase) so it doesn't look hung. */
