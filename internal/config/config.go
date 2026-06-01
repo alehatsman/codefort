@@ -290,7 +290,7 @@ func Load() (*Config, error) {
 	}
 	cfg.AgentTurnTimeout = agentTurnTimeout
 
-	pilotIters, err := strconv.Atoi(envOr("MOONGIT_AGENT_PILOT_MAX_ITERATIONS", "10"))
+	pilotIters, err := strconv.Atoi(envOr("MOONGIT_AGENT_PILOT_MAX_ITERATIONS", "3"))
 	if err != nil {
 		return nil, fmt.Errorf("MOONGIT_AGENT_PILOT_MAX_ITERATIONS: %w", err)
 	}

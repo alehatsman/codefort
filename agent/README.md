@@ -67,7 +67,7 @@ The runner reads these (see `internal/config/config.go`):
 | `MOONGIT_AGENT_ANTHROPIC_API_KEY` | — | alternate API-key auth → `ANTHROPIC_API_KEY`. |
 | `MOONGIT_AGENT_LLM_BASE_URL` | — | optional `ANTHROPIC_BASE_URL` override (a local model later). |
 | `MOONGIT_AGENT_DEX_PROJECT` | — | dex project id the agent's MCP queries (empty omits dex). |
-| `MOONGIT_AGENT_PILOT_MAX_ITERATIONS` | `10` | plan→apply iterations cap per `mooncake-pilot` turn (`mooncake pilot run --max-iterations`). |
+| `MOONGIT_AGENT_PILOT_MAX_ITERATIONS` | `3` | plan→apply iterations cap per `mooncake-pilot` turn (`mooncake pilot run --max-iterations`). Kept low: the pilot re-runs the whole plan on a failure, so a high cap just re-fails a deterministic step. |
 | `MOONGIT_AGENT_PILOT_DENY_ACTIONS` | `shell,cmd` | comma-sep mooncake action types the pilot may **not** use (`--deny-action`); deny wins over allow. Set empty to allow shell. |
 | `MOONGIT_AGENT_PILOT_ALLOW_ACTIONS` | — | comma-sep allowlist (`--allow-action`); empty = any action not denied. |
 | `MOONGIT_AGENT_PILOT_DENY_NETWORK` | `false` | refuse pilot steps that declare network egress (`--deny-network`). |
