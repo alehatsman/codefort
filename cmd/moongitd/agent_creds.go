@@ -20,25 +20,41 @@ func agentTokenName(runID int64) string {
 	return fmt.Sprintf("agent-run-%d", runID)
 }
 
+// agentSettingsOverride carries the operator-set agent config (the Settings
+// store, #106) that overrides the server-env config per run — applied without a
+// moongitd restart. Empty fields fall back to the env config.
+type agentSettingsOverride struct {
+	claudeToken        string // -> CLAUDE_CODE_OAUTH_TOKEN
+	llmBaseURL         string // -> ANTHROPIC_BASE_URL
+	anthropicAuthToken string // -> ANTHROPIC_AUTH_TOKEN (gateway bearer)
+}
+
 // agentContainerEnv builds the KEY=VALUE environment injected into an agent
 // container at creation — everything per-run and scoped, nothing in the image.
-// claude auth prefers the operator-set token (claudeOverride, from Settings),
-// then the OAuth token env, then the API-key env; the ephemeral moongit token +
-// server URL let the in-container git/mgit talk to moongitd; the dex bearer/
-// endpoint/project wire the hot index when configured. Order is stable for
-// testability.
-func agentContainerEnv(cfg *config.Config, claudeOverride, moongitToken, serverURL string) []string {
+// Auth precedence: an operator-set gateway bearer (ANTHROPIC_AUTH_TOKEN) wins
+// and claims the auth slot alone; else the operator-set OAuth token, then the
+// OAuth-token env, then the API-key env. ANTHROPIC_BASE_URL is the operator-set
+// value when present, else the env. The ephemeral moongit token + server URL
+// let the in-container git/mgit talk to moongitd; the dex bearer/endpoint/
+// project wire the hot index when configured. Order is stable for testability.
+func agentContainerEnv(cfg *config.Config, o agentSettingsOverride, moongitToken, serverURL string) []string {
 	var env []string
 	switch {
-	case claudeOverride != "":
-		env = append(env, "CLAUDE_CODE_OAUTH_TOKEN="+claudeOverride)
+	case o.anthropicAuthToken != "":
+		env = append(env, "ANTHROPIC_AUTH_TOKEN="+o.anthropicAuthToken)
+	case o.claudeToken != "":
+		env = append(env, "CLAUDE_CODE_OAUTH_TOKEN="+o.claudeToken)
 	case cfg.AgentClaudeOAuthToken != "":
 		env = append(env, "CLAUDE_CODE_OAUTH_TOKEN="+cfg.AgentClaudeOAuthToken)
 	case cfg.AgentAnthropicAPIKey != "":
 		env = append(env, "ANTHROPIC_API_KEY="+cfg.AgentAnthropicAPIKey)
 	}
-	if cfg.AgentLLMBaseURL != "" {
-		env = append(env, "ANTHROPIC_BASE_URL="+cfg.AgentLLMBaseURL)
+	baseURL := o.llmBaseURL
+	if baseURL == "" {
+		baseURL = cfg.AgentLLMBaseURL
+	}
+	if baseURL != "" {
+		env = append(env, "ANTHROPIC_BASE_URL="+baseURL)
 	}
 	if moongitToken != "" {
 		env = append(env, "MOONGIT_TOKEN="+moongitToken)

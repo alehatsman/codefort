@@ -479,15 +479,20 @@ export interface CIJob {
   finished_at: string | null
 }
 
-// AgentSettings mirrors api.AgentSettings — the token is write-only (only
+// AgentSettings mirrors api.AgentSettings — the Claude token is write-only (only
 // whether one is configured is returned); claude_token_env_fallback reports
 // whether a server-env credential (MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN /
 // _ANTHROPIC_API_KEY) backs runs when no Settings token is set; execution_model
 // is the default model new agent runs use ("" = server's built-in default).
+// llm_base_url is the operator-set ANTHROPIC_BASE_URL (not a secret — returned
+// as-is); anthropic_auth_token_set reports whether the write-only gateway
+// bearer (ANTHROPIC_AUTH_TOKEN) is configured.
 export interface AgentSettings {
   claude_oauth_token_set: boolean
   claude_token_env_fallback: boolean
   execution_model?: CIRunExecutionModel | ""
+  llm_base_url?: string
+  anthropic_auth_token_set: boolean
 }
 
 // UpdateAgentSettingsInput sets global agent config: omit a field to leave it
@@ -495,6 +500,8 @@ export interface AgentSettings {
 export interface UpdateAgentSettingsInput {
   claude_oauth_token?: string
   execution_model?: CIRunExecutionModel | ""
+  llm_base_url?: string
+  anthropic_auth_token?: string
 }
 
 export type AgentTurnStatus = "pending" | "running" | "done" | "error"

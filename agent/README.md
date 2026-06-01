@@ -73,6 +73,14 @@ The runner reads these (see `internal/config/config.go`):
 | `MOONGIT_AGENT_PILOT_DENY_NETWORK` | `false` | refuse pilot steps that declare network egress (`--deny-network`). |
 | `MOONGIT_AGENT_PILOT_MAX_RISK` | `0` | refuse pilot steps over this risk band 1..10 (`--max-risk`); 0 = no cap. |
 
+**Settings → Agent overrides (#106, no restart):** the operator can set these in
+the UI (persisted in `settings`), and they win over the env per run —
+`agent.claude_oauth_token` over `MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN`,
+`agent.llm_base_url` over `MOONGIT_AGENT_LLM_BASE_URL` (→ `ANTHROPIC_BASE_URL`).
+A new `agent.anthropic_auth_token` injects `ANTHROPIC_AUTH_TOKEN` (the bearer for
+a custom-endpoint gateway); when set it claims the container's auth slot alone,
+ahead of the OAuth/API-key paths. Secrets are stored write-only.
+
 ## Execution models (#110)
 
 An agent run executes via one of two **pluggable execution models**, chosen

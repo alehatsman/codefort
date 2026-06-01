@@ -183,3 +183,23 @@ test("agent section sets the default execution model", async ({ page }) => {
   // The GET reflects the new default after the mutation settles.
   await expect(select).toHaveValue("mooncake-pilot")
 })
+
+test("agent section sets a custom endpoint base URL and gateway auth token", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/settings")
+  await page.getByRole("button", { name: "Agent" }).click()
+
+  // Base URL is a shown (non-secret) field: set it and it persists in place.
+  const baseUrl = page.getByLabel("LLM base URL")
+  await expect(baseUrl).toHaveValue("")
+  await baseUrl.fill("https://gateway.example.com")
+  await page.getByRole("button", { name: "Save base URL" }).click()
+  await expect(baseUrl).toHaveValue("https://gateway.example.com")
+
+  // The gateway auth token is write-only, mirroring the Claude token.
+  await expect(page.getByText(/No gateway auth token/)).toBeVisible()
+  await page.getByLabel("Gateway auth token").fill("sk-gw-secret")
+  await page.getByRole("button", { name: "Save auth token" }).click()
+  await expect(page.getByText(/A gateway auth token is configured/)).toBeVisible()
+  await expect(page.getByLabel("Gateway auth token")).toHaveValue("")
+})

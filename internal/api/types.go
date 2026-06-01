@@ -504,18 +504,25 @@ type CreateAgentTurnRequest struct {
 // configured, so the UI can distinguish "no auth at all" from "authenticating
 // via the env fallback" when no Settings token is set. ExecutionModel is the
 // default model new agent runs use when they don't pick one at spawn ("" means
-// the server falls back to its built-in default).
+// the server falls back to its built-in default). LLMBaseURL is the operator-set
+// ANTHROPIC_BASE_URL override (not a secret — returned as-is). AuthTokenSet, like
+// ClaudeTokenSet, is write-only: the API reports only whether an
+// ANTHROPIC_AUTH_TOKEN gateway bearer is configured, never its value.
 type AgentSettings struct {
 	ClaudeTokenSet bool   `json:"claude_oauth_token_set"`
 	EnvFallbackSet bool   `json:"claude_token_env_fallback"`
 	ExecutionModel string `json:"execution_model,omitempty"`
+	LLMBaseURL     string `json:"llm_base_url,omitempty"`
+	AuthTokenSet   bool   `json:"anthropic_auth_token_set"`
 }
 
 // UpdateAgentSettingsRequest sets global agent config. A nil pointer leaves a
 // field unchanged; an empty string clears it; any other value sets it.
 type UpdateAgentSettingsRequest struct {
-	ClaudeToken    *string `json:"claude_oauth_token"`
-	ExecutionModel *string `json:"execution_model"`
+	ClaudeToken        *string `json:"claude_oauth_token"`
+	ExecutionModel     *string `json:"execution_model"`
+	LLMBaseURL         *string `json:"llm_base_url"`
+	AnthropicAuthToken *string `json:"anthropic_auth_token"`
 }
 
 // Event is one entry in the outbound fleet event feed (#73), as streamed by the
