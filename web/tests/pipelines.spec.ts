@@ -485,6 +485,13 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
   await expect(transcript).not.toContainText("0 steps")
   // The pilot loop count (otherwise invisible) is surfaced because it re-planned.
   await expect(page.getByText("3 iterations")).toBeVisible()
+  // The plan header + its steps render as one card: the plan line opens it and
+  // the last step closes it; the recap sits outside the card.
+  await expect(transcript.locator(".agent-grouped--start", { hasText: "plan" })).toBeVisible()
+  await expect(
+    transcript.locator(".agent-grouped--end", { hasText: "report progress" })
+  ).toBeVisible()
+  await expect(page.locator(".agent-entry--result.agent-grouped")).toHaveCount(0)
 })
 
 test("a failed mooncake step shows a ✗ row with its command + error inline", async ({ page }) => {
@@ -553,6 +560,89 @@ test("a failed mooncake step shows a ✗ row with its command + error inline", a
   await expect(failed).toContainText("--- FAIL: TestThing")
   await expect(failed).toContainText("exit status 1")
   await expect(page.getByText("ok=0  changed=0  failed=1")).toBeVisible()
+})
+
+test("a long agent log virtualizes (windowed rows) and auto-follows the bottom", async ({ page }) => {
+  const N = 80
+  const mc = (seq: number, type: string, data: Record<string, unknown>) => ({
+    seq,
+    type: "agent.message",
+    time: 0,
+    data: { mooncake: { type, data } },
+  })
+  // turn.started, then N step.started/step.completed pairs, then run.completed.
+  const evs: Array<{ seq: number; type: string; time: number; data?: Record<string, unknown> }> = [
+    { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #6: do a lot" } },
+  ]
+  let seq = 2
+  for (let i = 1; i <= N; i++) {
+    const id = `s${i}`
+    const name = `step ${String(i).padStart(3, "0")}`
+    evs.push(mc(seq++, "step.started", { step_id: id, action: "file.write", name }))
+    evs.push(mc(seq++, "step.completed", { step_id: id, duration_ms: 1, result: { status: "ok" } }))
+  }
+  evs.push(mc(seq++, "run.completed", { success_steps: N, changed_steps: 0, failed_steps: 0, duration_ms: 5 }))
+  evs.push({ seq: seq++, type: "agent.turn.completed", time: 0, data: { turn: 1, status: "success", num_turns: 0, duration_ms: 0 } })
+
+  await mockApi(page, {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 1,
+        total_issues: 1,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 1,
+        kind: "agent",
+        issue_number: 6,
+        execution_model: "mooncake-pilot",
+        commit_sha: "deadbeefcafe1234",
+        ref: "HEAD",
+        event: "agent",
+        trigger: "agent#17",
+        status: "success",
+        created_at: iso,
+        started_at: iso,
+        finished_at: iso,
+        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        events: { agent: evs },
+      },
+    ],
+  })
+  await page.goto("/alice/demo/agents/1")
+
+  const box = page.locator(".agent-transcript")
+  await expect(box).toBeVisible()
+  // The list is windowed: it overflows its bounded box, and the early rows are
+  // not even mounted in the DOM (only the on-screen window + overscan).
+  const overflows = await box.evaluate((el) => el.scrollHeight > el.clientHeight + 50)
+  expect(overflows).toBe(true)
+  await expect(page.getByText("step 001", { exact: true })).toHaveCount(0)
+  // It auto-followed the bottom: the last step + recap are in view, scrolled down.
+  await expect(page.getByText("step 080", { exact: true })).toBeVisible()
+  await expect(page.getByText(/ok=80/)).toBeVisible()
+  const atBottom = await box.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight < 40)
+  expect(atBottom).toBe(true)
+  // The "jump to latest" control is hidden while pinned to the tail.
+  await expect(page.locator(".agent-follow-btn")).toHaveCount(0)
+
+  // Scrolling up off the tail reveals the control and un-pins following…
+  await box.evaluate((el) => {
+    el.scrollTop = 0
+  })
+  const jump = page.locator(".agent-follow-btn")
+  await expect(jump).toBeVisible()
+  // …and clicking it scrolls back to the bottom and hides the control again.
+  await jump.click()
+  await expect(jump).toHaveCount(0)
+  const backAtBottom = await box.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight < 40)
+  expect(backAtBottom).toBe(true)
 })
 
 test("an in-flight agent turn shows a planning/working indicator; a parked run shows none (#133)", async ({

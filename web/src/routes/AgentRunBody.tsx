@@ -1,5 +1,6 @@
+import { useVirtualizer } from "@tanstack/react-virtual"
 import clsx from "clsx"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useCancelAgentRun, useCreateAgentTurn, useFinishAgentRun } from "../api/mutations"
 import type { CIEvent, CIRunDetail } from "../api/types"
 import { useJobEventStream } from "../lib/ciEvents"
@@ -71,6 +72,32 @@ function AgentTranscript({
   )
   const entries = useMemo(() => foldAgentEvents(events), [events])
 
+  // Group the plan header + its steps into one card: a group is a maximal run
+  // of consecutive plan/step entries (prose and the recap fall outside). The
+  // first/last get the card's top/bottom; rows stay individually virtualized,
+  // and their shared side borders stack into one continuous card as you scroll.
+  const groupPos = useMemo(() => {
+    const grouped = (e: AgentEntry) =>
+      e.kind === "step" || (e.kind === "system" && (e.label ?? "").startsWith("plan"))
+    const pos: Array<"start" | "mid" | "end" | "solo" | null> = entries.map(() => null)
+    for (let i = 0; i < entries.length; ) {
+      if (!grouped(entries[i])) {
+        i++
+        continue
+      }
+      let j = i
+      while (j + 1 < entries.length && grouped(entries[j + 1])) j++
+      if (i === j) pos[i] = "solo"
+      else {
+        pos[i] = "start"
+        pos[j] = "end"
+        for (let k = i + 1; k < j; k++) pos[k] = "mid"
+      }
+      i = j + 1
+    }
+    return pos
+  }, [entries])
+
   // A turn is in flight while its agent.turn.started has no matching
   // turn.completed. During that window the agent is busy but emits nothing
   // while it plans (mooncake-pilot runs Claude as a one-shot planner, then
@@ -93,34 +120,113 @@ function AgentTranscript({
     return lastTurn >= 0 && lastTurn < entries.length - 1 ? "working" : "planning"
   }, [events, entries, terminal, error])
 
+  // The transcript is a bounded, windowed scroll region: only the on-screen
+  // rows are mounted (a long run can emit thousands), and it auto-follows the
+  // bottom like a terminal tail so the latest step is always in view without
+  // the page growing unbounded. Rows have variable height (a step is one line;
+  // a failed step's output or assistant prose is taller), so the virtualizer
+  // measures each rendered row rather than assuming a fixed size.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const virtualizer = useVirtualizer({
+    count: entries.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 26,
+    overscan: 16,
+    getItemKey: (i) => entries[i].id ?? i,
+  })
+
+  // "Stuck" = the viewport is at (or near) the end, so we keep pinning to the
+  // bottom as rows arrive. It starts true (open pinned to the latest line) and
+  // flips off the moment the user scrolls up to read history — then a "jump to
+  // latest" control re-engages it. A ref mirrors it for the layout effect, which
+  // must read the live value without being a dependency.
+  const [stuck, setStuck] = useState(true)
+  const stuckRef = useRef(true)
+
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 32
+    stuckRef.current = atBottom
+    setStuck(atBottom)
+  }, [])
+
+  const jumpToLatest = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    stuckRef.current = true
+    setStuck(true)
+    el.scrollTop = el.scrollHeight
+  }, [])
+
+  // Pin to the bottom while stuck. Keyed on the row count, the measured total
+  // size, and the phase line so it re-pins as content grows and as rows settle
+  // to their real heights (dynamic measurement changes the total post-paint).
+  const total = virtualizer.getTotalSize()
+  // biome-ignore lint/correctness/useExhaustiveDependencies: total/phase aren't read in the body — they're the intentional re-pin triggers (content grew or rows re-measured), so the effect must re-run when they change.
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el || !stuckRef.current) return
+    el.scrollTop = el.scrollHeight
+  }, [entries.length, total, phase])
+
   return (
-    <div className="agent-transcript">
+    <div className="agent-transcript-wrap">
       {error && <div className="error inline">{error}</div>}
       {entries.length === 0 && !done && <div className="loading">Waiting for the agent…</div>}
-      {entries.map((e) =>
-        e.kind === "step" ? (
-          <div key={e.id} className={clsx("agent-step", `agent-step--${e.status}`)}>
-            <div className="agent-step__line">
-              <span className="agent-step__glyph" aria-hidden="true">
-                {STEP_GLYPH[e.status ?? "running"]}
-              </span>
-              <span className="agent-step__name">{e.label}</span>
+      <div ref={scrollRef} className="agent-transcript" onScroll={onScroll}>
+        <div className="agent-transcript__sizer" style={{ height: total }}>
+          {virtualizer.getVirtualItems().map((vi) => (
+            <div
+              key={vi.key}
+              data-index={vi.index}
+              ref={virtualizer.measureElement}
+              className="agent-transcript__row"
+              style={{ transform: `translateY(${vi.start}px)` }}
+            >
+              {renderEntry(entries[vi.index], groupPos[vi.index])}
             </div>
-            {e.text && <pre className="agent-step__detail">{e.text}</pre>}
-          </div>
-        ) : (
-          <div key={e.id} className={clsx("agent-entry", `agent-entry--${e.kind}`)}>
-            {e.label && <div className="agent-entry__label">{e.label}</div>}
-            {e.text && <pre className="agent-entry__body">{e.text}</pre>}
-          </div>
-        )
-      )}
-      {phase && (
-        <div className={clsx("agent-working", `agent-working--${phase}`)} aria-live="polite">
-          <span className="agent-working__dot" aria-hidden="true" />
-          {phase === "planning" ? "Planning…" : "Working…"}
+          ))}
         </div>
+        {phase && (
+          <div className={clsx("agent-working", `agent-working--${phase}`)} aria-live="polite">
+            <span className="agent-working__dot" aria-hidden="true" />
+            {phase === "planning" ? "Planning…" : "Working…"}
+          </div>
+        )}
+      </div>
+      {!stuck && (
+        <button type="button" className="agent-follow-btn" onClick={jumpToLatest}>
+          ↓ Jump to latest
+        </button>
       )}
+    </div>
+  )
+}
+
+// renderEntry draws one folded transcript entry: a terminal-style step line
+// (glyph + name, failure detail below) or a text entry (turn / assistant /
+// thinking / recap). `group` positions the entry within the plan card — the
+// shared `.agent-grouped` border that wraps the plan header + its steps.
+function renderEntry(e: AgentEntry, group: "start" | "mid" | "end" | "solo" | null) {
+  const groupCls = group && ["agent-grouped", `agent-grouped--${group}`]
+  if (e.kind === "step") {
+    return (
+      <div className={clsx("agent-step", `agent-step--${e.status}`, groupCls)}>
+        <div className="agent-step__line">
+          <span className="agent-step__glyph" aria-hidden="true">
+            {STEP_GLYPH[e.status ?? "running"]}
+          </span>
+          <span className="agent-step__name">{e.label}</span>
+        </div>
+        {e.text && <pre className="agent-step__detail">{e.text}</pre>}
+      </div>
+    )
+  }
+  return (
+    <div className={clsx("agent-entry", `agent-entry--${e.kind}`, groupCls)}>
+      {e.label && <div className="agent-entry__label">{e.label}</div>}
+      {e.text && <pre className="agent-entry__body">{e.text}</pre>}
     </div>
   )
 }
