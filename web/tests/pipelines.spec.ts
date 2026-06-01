@@ -424,7 +424,12 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
               data: {
                 mooncake: {
                   type: "step.completed",
-                  data: { step_id: "s2", duration_ms: 18, result: { status: "changed" } },
+                  // result.target carries the rendered argv for cmd/shell steps.
+                  data: {
+                    step_id: "s2",
+                    duration_ms: 18,
+                    result: { status: "changed", target: "mgit issue comment 6 --body done" },
+                  },
                 },
               },
             },
@@ -469,6 +474,8 @@ test("a mooncake-pilot run renders its steps, not a blank transcript", async ({ 
   await expect(transcript).toBeVisible()
   await expect(page.getByText("🔧 file.write · create CHANGELOG.md")).toBeVisible()
   await expect(page.getByText("🔧 cmd · report progress")).toBeVisible()
+  // The executed command line (result.target) is surfaced as a `$ …` line.
+  await expect(page.getByText("$ mgit issue comment 6 --body done")).toBeVisible()
   // The shell step's stdout is surfaced under its step.
   await expect(page.getByText("commented on #6 by agent-run-9")).toBeVisible()
   // The real aggregate replaces the bogus "0 steps · 0 ms".

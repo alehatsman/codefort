@@ -739,7 +739,14 @@ function foldMooncakeEvent(m: Record<string, unknown>, pilot: PilotState): Agent
       const label = action ? `🔧 ${action}${name ? ` · ${name}` : ""}` : name || "step"
       const dur = typeof data.duration_ms === "number" ? data.duration_ms : undefined
       const footer = dur && dur > 0 ? `${status} · ${formatDuration(dur)}` : status
-      const lines = [...(tracked?.lines ?? [])]
+      const lines: string[] = []
+      // For cmd/shell steps the executed command line rides result.target
+      // (mooncake sets it to the rendered argv); lead with it as a `$ …` line
+      // so the transcript records *what ran*, not just the plan's label. Other
+      // actions put a path/package/etc in target — not a command — so skip them.
+      const cmdline = action === "cmd" || action === "shell" ? asString(result.target) : ""
+      if (cmdline) lines.push(`$ ${cmdline}`)
+      lines.push(...(tracked?.lines ?? []))
       const err = asString(result.error)
       if (err) lines.push(err)
       return [
