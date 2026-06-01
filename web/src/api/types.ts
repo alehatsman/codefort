@@ -17,6 +17,10 @@ export interface Repo {
   open_issues: number
   total_issues: number
   ci_enabled: boolean
+  // Status + per-repo number of the repo's most recent CI run, absent when the
+  // repo has no runs. Drives the at-a-glance CI icon on the repos list.
+  ci_status?: CIRunStatus
+  ci_number?: number
 }
 
 export interface UpdateRepoInput {

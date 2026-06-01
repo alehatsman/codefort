@@ -161,6 +161,11 @@ type Repo struct {
 	OpenIssues  int       `json:"open_issues"`
 	TotalIssues int       `json:"total_issues"`
 	CIEnabled   bool      `json:"ci_enabled"`
+	// CIStatus / CINumber describe the repo's most recent CI run (highest run
+	// number), omitted when the repo has no runs. They let the repos list show
+	// a CI status icon linking to that run.
+	CIStatus string `json:"ci_status,omitempty"`
+	CINumber int    `json:"ci_number,omitempty"`
 }
 
 // UpdateRepoRequest is a partial update of a repo's settings. Only non-nil

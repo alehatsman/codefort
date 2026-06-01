@@ -2,6 +2,7 @@ import clsx from "clsx"
 import { useRef } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useRepos } from "../api/queries"
+import CIStatusIcon from "../components/CIStatusIcon"
 import NewRepoForm from "../components/NewRepoForm"
 import StateIcon from "../components/StateIcon"
 import { useListNav } from "../lib/keyboardNav"
@@ -51,6 +52,15 @@ export default function ReposPage() {
                   <span className="muted">{r.owner}/</span>
                   {r.name}
                 </Link>
+                {r.ci_status && (
+                  <Link
+                    to={`/${r.owner}/${r.name}/pipelines/${r.ci_number}`}
+                    className="card__ci"
+                    title={`CI ${r.ci_status}`}
+                  >
+                    <CIStatusIcon status={r.ci_status} />
+                  </Link>
+                )}
               </div>
               <div className="card__meta">
                 <span className="card__meta-item">

@@ -53,6 +53,12 @@ type RepoSummary struct {
 	OpenIssues  int
 	TotalIssues int
 	CIEnabled   bool
+	// CIStatus is the status of the repo's most recent CI run (highest run
+	// number), empty when the repo has no runs. CINumber is that run's
+	// per-repo number, for linking to it. Surfaced so the repos list can show
+	// an at-a-glance CI icon without a per-repo follow-up query.
+	CIStatus string
+	CINumber int
 }
 
 // ListRepos returns every registered repo with issue counts, alphabetically
@@ -66,7 +72,9 @@ func ListRepos(db *sql.DB) ([]RepoSummary, error) {
 		  repos.created_at,
 		  COALESCE(SUM(CASE WHEN issues.state IN ('todo','in_progress') THEN 1 ELSE 0 END), 0) AS open_issues,
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
-		  repos.ci_enabled
+		  repos.ci_enabled,
+		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id ORDER BY cr.number DESC LIMIT 1) AS ci_status,
+		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id ORDER BY cr.number DESC LIMIT 1) AS ci_number
 		FROM repos
 		JOIN users ON users.id = repos.owner_id
 		LEFT JOIN issues ON issues.repo_id = repos.id
@@ -81,7 +89,7 @@ func ListRepos(db *sql.DB) ([]RepoSummary, error) {
 	out := make([]RepoSummary, 0)
 	for rows.Next() {
 		var r RepoSummary
-		if err := rows.Scan(&r.ID, &r.Owner, &r.Name, &r.CreatedAt, &r.OpenIssues, &r.TotalIssues, &r.CIEnabled); err != nil {
+		if err := scanRepoSummary(rows, &r); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -92,7 +100,7 @@ func ListRepos(db *sql.DB) ([]RepoSummary, error) {
 // GetRepoSummary returns a single repo's summary or ErrNotFound.
 func GetRepoSummary(db *sql.DB, owner, name string) (RepoSummary, error) {
 	var r RepoSummary
-	err := db.QueryRow(`
+	row := db.QueryRow(`
 		SELECT
 		  repos.id,
 		  users.name AS owner,
@@ -100,17 +108,39 @@ func GetRepoSummary(db *sql.DB, owner, name string) (RepoSummary, error) {
 		  repos.created_at,
 		  COALESCE(SUM(CASE WHEN issues.state IN ('todo','in_progress') THEN 1 ELSE 0 END), 0) AS open_issues,
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
-		  repos.ci_enabled
+		  repos.ci_enabled,
+		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id ORDER BY cr.number DESC LIMIT 1) AS ci_status,
+		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id ORDER BY cr.number DESC LIMIT 1) AS ci_number
 		FROM repos
 		JOIN users ON users.id = repos.owner_id
 		LEFT JOIN issues ON issues.repo_id = repos.id
 		WHERE users.name = ? AND repos.name = ?
 		GROUP BY repos.id
-	`, owner, name).Scan(&r.ID, &r.Owner, &r.Name, &r.CreatedAt, &r.OpenIssues, &r.TotalIssues, &r.CIEnabled)
-	if errors.Is(err, sql.ErrNoRows) {
-		return r, ErrNotFound
+	`, owner, name)
+	if err := scanRepoSummary(row, &r); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return r, ErrNotFound
+		}
+		return r, err
 	}
-	return r, err
+	return r, nil
+}
+
+// scanRepoSummary scans one repos-list row into r. The CI columns are nullable
+// (a repo with no runs yields NULL), so they're read through Null* and only
+// copied across when present, leaving CIStatus/CINumber zero-valued otherwise.
+func scanRepoSummary(s scanner, r *RepoSummary) error {
+	var ciStatus sql.NullString
+	var ciNumber sql.NullInt64
+	if err := s.Scan(
+		&r.ID, &r.Owner, &r.Name, &r.CreatedAt, &r.OpenIssues, &r.TotalIssues, &r.CIEnabled,
+		&ciStatus, &ciNumber,
+	); err != nil {
+		return err
+	}
+	r.CIStatus = ciStatus.String
+	r.CINumber = int(ciNumber.Int64)
+	return nil
 }
 
 // RepoIdent returns a repo's owner and name by id, or ErrNotFound. The CI

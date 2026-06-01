@@ -145,6 +145,8 @@ func toAPIRepo(r storage.RepoSummary) api.Repo {
 		OpenIssues:  r.OpenIssues,
 		TotalIssues: r.TotalIssues,
 		CIEnabled:   r.CIEnabled,
+		CIStatus:    r.CIStatus,
+		CINumber:    r.CINumber,
 	}
 }
 
