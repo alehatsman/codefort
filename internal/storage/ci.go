@@ -46,6 +46,21 @@ func (s RunStatus) Terminal() bool {
 	}
 }
 
+// CountActiveRuns returns how many of a repo's runs are non-terminal — queued
+// or running, plus the agent-only awaiting_input/finishing — i.e. still owned
+// by the in-process runner. Repo deletion uses it to refuse (409) while work is
+// in flight: the FK cascade would yank the run rows out from under a live
+// goroutine. The non-terminal set is the complement of RunStatus.Terminal();
+// it's spelled out here because the filter runs in SQL.
+func CountActiveRuns(db *sql.DB, repoID int64) (int, error) {
+	var n int
+	err := db.QueryRow(`
+		SELECT COUNT(*) FROM ci_runs
+		 WHERE repo_id = ? AND status IN ('queued','running','awaiting_input','finishing')
+	`, repoID).Scan(&n)
+	return n, err
+}
+
 // RunKind distinguishes a normal pipeline run from an agent run. An agent run
 // reuses the entire CI run spine but, instead of executing a translated
 // mgitci.yml, works an issue via a containerized Claude session (see #74). The

@@ -68,7 +68,14 @@ func EventLogPath(root, owner, repo string, runNumber int, job string) string {
 // every job's EventLogPath. Retention drops a pruned run's logs by removing
 // this directory wholesale.
 func RunLogDir(root, owner, repo string, runNumber int) string {
-	return filepath.Join(root, "ci", owner, repo, strconv.Itoa(runNumber))
+	return filepath.Join(RepoLogDir(root, owner, repo), strconv.Itoa(runNumber))
+}
+
+// RepoLogDir is the directory holding every run's logs for one repo — the
+// parent of all its RunLogDirs. Repo deletion removes it wholesale so a deleted
+// repo doesn't strand its event-log tree under the data dir.
+func RepoLogDir(root, owner, repo string) string {
+	return filepath.Join(root, "ci", owner, repo)
 }
 
 // EventLog is an append-only writer for one job's event stream. It is safe for

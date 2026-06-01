@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/moongit/internal/ci"
 	"github.com/alehatsman/moongit/internal/config"
 	"github.com/alehatsman/moongit/internal/storage"
 )
@@ -38,7 +39,7 @@ func newRepoDeleteServer(t *testing.T) (*Server, string) {
 	}
 
 	s := &Server{
-		cfg:    &config.Config{ReposDir: reposDir},
+		cfg:    &config.Config{ReposDir: reposDir, DataDir: t.TempDir()},
 		db:     db,
 		rdb:    db,
 		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -96,6 +97,65 @@ func TestDeleteRepoHandlerRemovesRowAndGitDir(t *testing.T) {
 	rr = deleteRepo(s, tok, "alice", "repo")
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("second delete status = %d, want 404", rr.Code)
+	}
+}
+
+// A repo with an in-flight (non-terminal) run can't be deleted: the cascade
+// would yank the run row from under a live runner goroutine. The handler 409s
+// and leaves the repo intact until the run reaches a terminal state.
+func TestDeleteRepoRejectsWhileRunActive(t *testing.T) {
+	s, _ := newRepoDeleteServer(t)
+	tok, _ := storage.CreateToken(s.db, "alice", "mgt_alice")
+	repoID, _ := storage.LookupRepo(s.db, "alice", "repo")
+
+	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
+		CommitSHA: "a", Ref: "refs/heads/main", Event: "push",
+	})
+	if err != nil {
+		t.Fatalf("EnqueueRun: %v", err)
+	}
+
+	// Queued run → 409, repo untouched.
+	rr := deleteRepo(s, tok, "alice", "repo")
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("delete with active run = %d, want 409; body %s", rr.Code, rr.Body.String())
+	}
+	if _, err := storage.LookupRepo(s.db, "alice", "repo"); err != nil {
+		t.Errorf("repo gone after a 409 delete: %v", err)
+	}
+
+	// Once the run is terminal, the delete goes through.
+	if err := storage.FinishRun(s.db, run.ID, storage.RunSuccess); err != nil {
+		t.Fatalf("FinishRun: %v", err)
+	}
+	if rr := deleteRepo(s, tok, "alice", "repo"); rr.Code != http.StatusNoContent {
+		t.Fatalf("delete after run finished = %d, want 204; body %s", rr.Code, rr.Body.String())
+	}
+}
+
+// Deleting a repo removes its CI/agent event-log tree under the data dir, which
+// lives outside ReposDir and so isn't covered by the git-dir removal.
+func TestDeleteRepoRemovesLogTree(t *testing.T) {
+	s, _ := newRepoDeleteServer(t)
+	tok, _ := storage.CreateToken(s.db, "alice", "mgt_alice")
+
+	logDir := ci.RepoLogDir(s.cfg.DataDir, "alice", "repo")
+	if err := os.MkdirAll(filepath.Join(logDir, "1"), 0o755); err != nil {
+		t.Fatalf("mkdir log dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(logDir, "1", "build.events.jsonl"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatalf("write log file: %v", err)
+	}
+
+	if rr := deleteRepo(s, tok, "alice", "repo"); rr.Code != http.StatusNoContent {
+		t.Fatalf("delete status = %d, body %s", rr.Code, rr.Body.String())
+	}
+	if _, err := os.Stat(logDir); !os.IsNotExist(err) {
+		t.Errorf("log tree still present: stat err = %v", err)
+	}
+	// The now-empty owner log namespace is pruned too.
+	if _, err := os.Stat(filepath.Join(s.cfg.DataDir, "ci", "alice")); !os.IsNotExist(err) {
+		t.Errorf("empty owner log dir not pruned: stat err = %v", err)
 	}
 }
 
