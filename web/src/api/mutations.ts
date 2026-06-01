@@ -26,6 +26,17 @@ export function useCreateRepo() {
   })
 }
 
+// useDeleteRepo hard-deletes a repo and everything under it. On success the
+// repo is gone, so there's no per-repo cache worth keeping — invalidate the
+// repos list (the only place the now-deleted repo could still show up).
+export function useDeleteRepo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ owner, repo }: { owner: string; repo: string }) => api.deleteRepo(owner, repo),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.repos() }),
+  })
+}
+
 export function useCreateToken() {
   const qc = useQueryClient()
   return useMutation({
