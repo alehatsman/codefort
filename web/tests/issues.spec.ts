@@ -496,6 +496,32 @@ test("allow-shell checkbox is hidden for the claude-edit model", async ({ page }
   await expect(page.getByLabel(/Allow shell commands/)).toHaveCount(0)
 })
 
+test("spawn model selector defaults to the operator's configured default", async ({ page }) => {
+  const now = new Date().toISOString()
+  await mockApi(page, {
+    // Operator's default is mooncake-pilot — the selector must reflect it, not
+    // the hard-coded claude-edit fallback.
+    agentExecutionModel: "mooncake-pilot",
+    issues: [
+      {
+        id: 1,
+        number: 1,
+        title: "Wire the thing",
+        author: "test-user",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+  })
+  await page.goto("/alice/demo/issues/1")
+
+  // Selector follows the configured default, which reveals the shell checkbox.
+  await expect(page.getByLabel("Model")).toHaveValue("mooncake-pilot")
+  await expect(page.getByLabel(/Allow shell commands/)).toBeVisible()
+})
+
 test("a root-absolute link in a comment points at the app route, not a blob path", async ({
   page,
 }) => {

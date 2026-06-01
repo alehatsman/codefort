@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useSpawnAgent } from "../api/mutations"
+import { useAgentSettings } from "../api/queries"
 import type { CIRunExecutionModel } from "../api/types"
 
 interface Props {
@@ -32,7 +33,14 @@ const MODELS: { value: CIRunExecutionModel; label: string; hint: string }[] = [
 export default function SpawnAgentButton({ owner, repo, number }: Props) {
   const navigate = useNavigate()
   const spawn = useSpawnAgent(owner, repo, number)
-  const [model, setModel] = useState<CIRunExecutionModel>("claude-edit")
+  // The selector defaults to the operator's configured default model (Settings
+  // → Agent / `agent.execution_model`); "" means the server's built-in default
+  // (claude-edit). Until the user picks one explicitly, follow that default —
+  // so it tracks the setting even while it loads.
+  const settings = useAgentSettings()
+  const serverDefault: CIRunExecutionModel = settings.data?.execution_model || "claude-edit"
+  const [picked, setPicked] = useState<CIRunExecutionModel | null>(null)
+  const model = picked ?? serverDefault
   const [allowShell, setAllowShell] = useState(false)
   const isPilot = model === "mooncake-pilot"
 
@@ -54,7 +62,7 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
             className="select"
             value={model}
             disabled={spawn.isPending}
-            onChange={(e) => setModel(e.target.value as CIRunExecutionModel)}
+            onChange={(e) => setPicked(e.target.value as CIRunExecutionModel)}
           >
             {MODELS.map((m) => (
               <option key={m.value} value={m.value}>
