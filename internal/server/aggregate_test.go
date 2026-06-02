@@ -95,3 +95,30 @@ func TestHandleListAllRunsKindFilterRoutes(t *testing.T) {
 		t.Fatalf("ci runs => %+v, want alice/demo's single ci run", got)
 	}
 }
+
+// TestHandleListAllRunsStateFilterRoutes proves the ?state query param reaches
+// storage.ListAllRuns. The seed enqueues one CI run, which starts queued, so a
+// matching state returns it and a non-matching state returns none.
+func TestHandleListAllRunsStateFilterRoutes(t *testing.T) {
+	s := newAggregateServer(t)
+	runsFor := func(query string) []api.CIRunWithRepo {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		s.apiHandler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/runs"+query, nil))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status = %d (body=%s)", rr.Code, rr.Body.String())
+		}
+		var got []api.CIRunWithRepo
+		if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return got
+	}
+
+	if got := runsFor("?state=queued,running"); len(got) != 1 || got[0].Status != "queued" {
+		t.Fatalf("?state=queued,running => %+v, want the single queued run", got)
+	}
+	if got := runsFor("?state=success"); len(got) != 0 {
+		t.Fatalf("?state=success => %+v, want none", got)
+	}
+}

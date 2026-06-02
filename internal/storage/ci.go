@@ -262,24 +262,67 @@ func GetRun(db *sql.DB, repoID int64, number int) (CIRun, error) {
 	return run, err
 }
 
-// ListRuns returns a repo's runs newest-first, capped at limit (default 100,
-// max 1000). kind ("" = any) filters to a single run kind in SQL, so the cap
+// RunFilter narrows a runs list query. Kind ("" = any) picks the run kind;
+// Statuses (empty = any) keeps only runs in one of the given lifecycle states;
+// Query is a case-insensitive keyword matched against commit subject/author,
+// ref, and trigger. Limit defaults to 100, capped at 1000. It mirrors the
+// issues ListFilter so the Agents views can filter like the Issues views.
+type RunFilter struct {
+	Kind     RunKind
+	Statuses []RunStatus
+	Query    string
+	Limit    int
+}
+
+func (f RunFilter) clampLimit() int {
+	if f.Limit <= 0 {
+		return 100
+	}
+	if f.Limit > 1000 {
+		return 1000
+	}
+	return f.Limit
+}
+
+// appendRunFilters adds the kind/status/query clauses shared by ListRuns and
+// the cross-repo ListAllRuns. The columns it references are unique to ci_runs,
+// so the clauses stay correct unqualified even under the repos/users join the
+// aggregate query adds (matching appendIssueFilters).
+func appendRunFilters(q *strings.Builder, args *[]any, f RunFilter) {
+	if f.Kind != "" {
+		q.WriteString(" AND kind = ?")
+		*args = append(*args, string(f.Kind))
+	}
+	if len(f.Statuses) > 0 {
+		q.WriteString(" AND status IN (")
+		for i, s := range f.Statuses {
+			if i > 0 {
+				q.WriteString(",")
+			}
+			q.WriteString("?")
+			*args = append(*args, string(s))
+		}
+		q.WriteString(")")
+	}
+	if f.Query != "" {
+		// %term% against the commit subject/author, ref, and trigger; wildcards
+		// in the term are escaped so they're taken literally (as in issues).
+		pat := "%" + likeEscape(f.Query) + "%"
+		q.WriteString(` AND (commit_msg LIKE ? ESCAPE '\' OR commit_author LIKE ? ESCAPE '\' OR ref LIKE ? ESCAPE '\' OR trigger LIKE ? ESCAPE '\')`)
+		*args = append(*args, pat, pat, pat, pat)
+	}
+}
+
+// ListRuns returns a repo's runs newest-first, capped at filter.Limit (default
+// 100, max 1000). The kind/status/query filters are applied in SQL, so the cap
 // applies to the matching set — a ?kind=agent page can't come back short
 // because the newest `limit` rows happened to be CI runs.
-func ListRuns(db *sql.DB, repoID int64, kind RunKind, limit int) ([]CIRun, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-	if limit > 1000 {
-		limit = 1000
-	}
+func ListRuns(db *sql.DB, repoID int64, filter RunFilter) ([]CIRun, error) {
+	limit := filter.clampLimit()
 	q := strings.Builder{}
 	q.WriteString(`SELECT ` + runColumns + ` FROM ci_runs WHERE repo_id = ?`)
 	args := []any{repoID}
-	if kind != "" {
-		q.WriteString(" AND kind = ?")
-		args = append(args, string(kind))
-	}
+	appendRunFilters(&q, &args, filter)
 	q.WriteString(" ORDER BY number DESC LIMIT ?")
 	args = append(args, limit)
 	rows, err := db.Query(q.String(), args...)
@@ -656,30 +699,24 @@ type RunWithRepo struct {
 }
 
 // ListAllRuns returns runs across every repo, newest-created first, each tagged
-// with its owning repo. It backs GET /api/runs. kind ("" = any) filters to a
-// single run kind so the fleet-wide Pipelines (ci) and Agents (agent) tabs each
-// show only their own. limit defaults to 100, capped at 1000. Ordering is by
-// created_at (per-repo run numbers aren't globally orderable), id breaking ties.
-func ListAllRuns(db *sql.DB, kind RunKind, limit int) ([]RunWithRepo, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-	if limit > 1000 {
-		limit = 1000
-	}
+// with its owning repo. It backs GET /api/runs. The kind/status/query filters
+// behave as in ListRuns so the fleet-wide Pipelines (ci) and Agents (agent)
+// tabs each show only their own and can search/filter. limit defaults to 100,
+// capped at 1000. Ordering is by created_at (per-repo run numbers aren't
+// globally orderable), id breaking ties.
+func ListAllRuns(db *sql.DB, filter RunFilter) ([]RunWithRepo, error) {
+	limit := filter.clampLimit()
 	q := strings.Builder{}
 	// Qualify with ci_runs.: id/repo_id/created_at also exist on the joined
-	// repos/users tables, so a bare runColumns would be ambiguous.
+	// repos/users tables, so a bare runColumns would be ambiguous. The filter
+	// clauses reference columns unique to ci_runs, so they stay unqualified.
 	q.WriteString(`SELECT ci_runs.id, ci_runs.repo_id, ci_runs.number, ci_runs.kind, ci_runs.issue_number, ci_runs.execution_model, ci_runs.mooncake_allow_shell, ci_runs.tool_profile, ci_runs.commit_sha, ci_runs.commit_msg, ci_runs.commit_author, ci_runs.ref, ci_runs.event, ci_runs.trigger, ci_runs.status, ci_runs.claimed_at, ci_runs.created_at, ci_runs.started_at, ci_runs.finished_at, users.name, repos.name
 		FROM ci_runs
 		JOIN repos ON repos.id = ci_runs.repo_id
 		JOIN users ON users.id = repos.owner_id
 		WHERE 1=1`)
 	args := []any{}
-	if kind != "" {
-		q.WriteString(" AND ci_runs.kind = ?")
-		args = append(args, string(kind))
-	}
+	appendRunFilters(&q, &args, filter)
 	q.WriteString(" ORDER BY ci_runs.created_at DESC, ci_runs.id DESC LIMIT ?")
 	args = append(args, limit)
 

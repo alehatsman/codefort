@@ -55,7 +55,7 @@ func ciPost(t *testing.T, s *Server, remote, secret string, body ciEventRequest)
 
 func runCount(t *testing.T, s *Server, repoID int64) int {
 	t.Helper()
-	runs, err := storage.ListRuns(s.db, repoID, "", 100)
+	runs, err := storage.ListRuns(s.db, repoID, storage.RunFilter{Limit: 100})
 	if err != nil {
 		t.Fatalf("ListRuns: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestHandleCIEventsEnqueues(t *testing.T) {
 	if rr.Code != http.StatusAccepted {
 		t.Fatalf("code = %d, want 202; body=%s", rr.Code, rr.Body.String())
 	}
-	runs, _ := storage.ListRuns(s.db, repoID, "", 10)
+	runs, _ := storage.ListRuns(s.db, repoID, storage.RunFilter{Limit: 10})
 	if len(runs) != 1 {
 		t.Fatalf("runs = %d, want 1", len(runs))
 	}

@@ -2,6 +2,42 @@
    styles.css. Theme vars, resets, and cross-feature/shared blocks remain in
    src/styles.css. */
 
+/* Agents run grid — the Agents-owned list table (replaces the shared pipelines
+   .ci-runs table for agents): Repo · Run · Status · Hash · Trigger · Duration ·
+   When. Same density/divider styling as the pipelines table for a consistent
+   look, but its own block so the two grids can diverge. */
+.agent-runs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.agent-runs th {
+  text-align: left;
+  font-weight: var(--weight-medium);
+  color: var(--fg-muted);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+.agent-runs td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border-muted);
+  vertical-align: baseline;
+}
+.agent-runs__num {
+  font-weight: var(--weight-medium);
+}
+/* Owning-repo link, shown only in the cross-repo (global) grid. */
+.agent-runs__repo {
+  font-weight: var(--weight-medium);
+}
+.agent-runs__sha {
+  font-family: var(--font-mono);
+}
+/* Execution model under the run number (Claude edit / Mooncake agent). */
+.agent-runs__model {
+  display: block;
+}
+
 /* Spawn-agent: model picker sits inline with the spawn button (#110). */
 .spawn-agent {
   display: flex;

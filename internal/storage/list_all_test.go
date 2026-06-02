@@ -125,7 +125,7 @@ func TestListAllRunsKindFilter(t *testing.T) {
 		t.Fatalf("EnqueueRun agent: %v", err)
 	}
 
-	all, err := ListAllRuns(db, "", 0)
+	all, err := ListAllRuns(db, RunFilter{})
 	if err != nil {
 		t.Fatalf("ListAllRuns: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestListAllRunsKindFilter(t *testing.T) {
 		t.Fatalf("all runs = %d, want 2", len(all))
 	}
 
-	ci, err := ListAllRuns(db, RunKindCI, 0)
+	ci, err := ListAllRuns(db, RunFilter{Kind: RunKindCI})
 	if err != nil {
 		t.Fatalf("ListAllRuns ci: %v", err)
 	}
@@ -141,11 +141,59 @@ func TestListAllRunsKindFilter(t *testing.T) {
 		t.Fatalf("ci runs => %+v, want alice's single ci run", ci)
 	}
 
-	agent, err := ListAllRuns(db, RunKindAgent, 0)
+	agent, err := ListAllRuns(db, RunFilter{Kind: RunKindAgent})
 	if err != nil {
 		t.Fatalf("ListAllRuns agent: %v", err)
 	}
 	if len(agent) != 1 || agent[0].Name != "proj" || agent[0].Run.Kind != RunKindAgent {
 		t.Fatalf("agent runs => %+v, want bob/proj's single agent run", agent)
+	}
+}
+
+// TestListAllRunsStatusAndQueryFilter covers the status (state IN) and keyword
+// (commit subject/author/ref/trigger LIKE) filters added for the Agents views.
+func TestListAllRunsStatusAndQueryFilter(t *testing.T) {
+	db, alice, bob := seedTwoRepos(t)
+	done, err := EnqueueRun(db, alice, NewRun{Kind: RunKindCI, CommitSHA: "a1", CommitMsg: "fix login bug", Ref: "refs/heads/main", Event: "push"})
+	if err != nil {
+		t.Fatalf("EnqueueRun alice: %v", err)
+	}
+	if err := FinishRun(db, done.ID, RunSuccess); err != nil {
+		t.Fatalf("FinishRun: %v", err)
+	}
+	if _, err := EnqueueRun(db, bob, NewRun{Kind: RunKindCI, CommitSHA: "b1", CommitMsg: "add export feature", Ref: "refs/heads/dev", Event: "push"}); err != nil {
+		t.Fatalf("EnqueueRun bob: %v", err)
+	}
+
+	success, err := ListAllRuns(db, RunFilter{Statuses: []RunStatus{RunSuccess}})
+	if err != nil {
+		t.Fatalf("ListAllRuns success: %v", err)
+	}
+	if len(success) != 1 || success[0].Run.Status != RunSuccess {
+		t.Fatalf("success filter => %+v, want the single finished run", success)
+	}
+
+	queued, err := ListAllRuns(db, RunFilter{Statuses: []RunStatus{RunQueued, RunRunning}})
+	if err != nil {
+		t.Fatalf("ListAllRuns queued: %v", err)
+	}
+	if len(queued) != 1 || queued[0].Run.Status != RunQueued {
+		t.Fatalf("queued/running filter => %+v, want the single queued run", queued)
+	}
+
+	login, err := ListAllRuns(db, RunFilter{Query: "login"})
+	if err != nil {
+		t.Fatalf("ListAllRuns query: %v", err)
+	}
+	if len(login) != 1 || login[0].Run.CommitMsg != "fix login bug" {
+		t.Fatalf("query 'login' => %+v, want the matching commit subject", login)
+	}
+
+	none, err := ListAllRuns(db, RunFilter{Query: "nonexistent"})
+	if err != nil {
+		t.Fatalf("ListAllRuns no-match: %v", err)
+	}
+	if len(none) != 0 {
+		t.Fatalf("query 'nonexistent' => %d rows, want 0", len(none))
 	}
 }

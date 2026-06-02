@@ -480,6 +480,22 @@ export type CIRunStatus =
   | "interrupted" // runner went away mid-flight (shutdown/restart) — neutral, not a gate failure
   | "stalled" // agent-only: ran to completion but never converged (max_iterations/no_progress) — neutral, not a failure
 
+// Iteration order for the run status filter chips (Agents views): live states
+// first, then terminal — mirrors the lifecycle and keeps the common filters
+// (running / awaiting_input) at the front.
+export const RUN_STATUSES: readonly CIRunStatus[] = [
+  "queued",
+  "running",
+  "awaiting_input",
+  "finishing",
+  "success",
+  "failed",
+  "canceled",
+  "error",
+  "interrupted",
+  "stalled",
+]
+
 // Mirrors storage.JobStatus.
 export type CIJobStatus =
   | "queued"

@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/alehatsman/moongit/internal/api"
@@ -51,22 +50,16 @@ func (s *Server) handleListAllPulls(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleListAllRuns returns CI/agent runs across every repo, newest-created
-// first. ?kind=ci|agent filters to one run kind so the fleet-wide Pipelines and
-// Agents tabs each show only their own; ?limit caps the page (default 100, max
-// 1000 — enforced by storage.ListAllRuns).
+// first. Filtered by the shared ?kind/?state/?q/?limit params (see
+// parseRunFilter) so the fleet-wide Pipelines and Agents tabs each show only
+// their own and can search/filter; the cap is enforced by storage.ListAllRuns.
 func (s *Server) handleListAllRuns(w http.ResponseWriter, r *http.Request) {
-	limit := 0
-	if v := r.URL.Query().Get("limit"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 0 {
-			writeError(w, http.StatusBadRequest, "invalid limit")
-			return
-		}
-		limit = n
+	filter, ok := parseRunFilter(w, r)
+	if !ok {
+		return
 	}
-	kind := storage.RunKind(r.URL.Query().Get("kind"))
 
-	runs, err := storage.ListAllRuns(s.rdb, kind, limit)
+	runs, err := storage.ListAllRuns(s.rdb, filter)
 	if err != nil {
 		s.logger.Error("list all runs", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")

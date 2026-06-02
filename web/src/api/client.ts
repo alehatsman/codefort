@@ -162,11 +162,13 @@ export const api = {
     const qs = q.toString()
     return request<PullRequestWithRepo[]>(`/api/pulls${qs ? `?${qs}` : ""}`)
   },
-  listAllRuns: (kind = "", limit = 0) => {
-    const q = new URLSearchParams()
-    if (kind) q.set("kind", kind)
-    if (limit) q.set("limit", String(limit))
-    const qs = q.toString()
+  // query is an extra param string (state, q, limit) the caller pre-builds,
+  // mirroring listAllIssues; kind is merged in so the Pipelines/Agents tabs stay
+  // scoped. Filtering is applied server-side so the row cap covers the match set.
+  listAllRuns: (kind = "", query = "") => {
+    const p = new URLSearchParams(query)
+    if (kind) p.set("kind", kind)
+    const qs = p.toString()
     return request<CIRunWithRepo[]>(`/api/runs${qs ? `?${qs}` : ""}`)
   },
 
@@ -318,11 +320,17 @@ export const api = {
   mergePull: (owner: string, repo: string, n: number, body: MergeRequestInput) =>
     request<MergeResult>(`/api/repos/${owner}/${repo}/pulls/${n}/merge`, { method: "POST", body }),
 
-  listCIRuns: (owner: string, repo: string, limit = 0, kind = "") => {
-    const q = new URLSearchParams()
-    if (limit) q.set("limit", String(limit))
-    if (kind) q.set("kind", kind)
-    const qs = q.toString()
+  listCIRuns: (
+    owner: string,
+    repo: string,
+    opts: { limit?: number; kind?: string; state?: string; q?: string } = {}
+  ) => {
+    const p = new URLSearchParams()
+    if (opts.limit) p.set("limit", String(opts.limit))
+    if (opts.kind) p.set("kind", opts.kind)
+    if (opts.state) p.set("state", opts.state)
+    if (opts.q) p.set("q", opts.q)
+    const qs = p.toString()
     return request<CIRun[]>(`/api/repos/${owner}/${repo}/runs${qs ? `?${qs}` : ""}`)
   },
   triggerCIRun: (owner: string, repo: string, ref: string) =>

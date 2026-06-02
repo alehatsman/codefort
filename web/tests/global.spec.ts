@@ -133,12 +133,18 @@ test("global nav links the cross-repo aggregate views", async ({ page }) => {
   )
 
   // Agents tab: agent runs across repos, into the owning repo's agents route.
+  // The Agents-owned grid is .agent-runs (its own block, not the .ci-runs table).
   await page.locator("nav.tabs").getByRole("link", { name: "Agents" }).click()
   await expect(page).toHaveURL(/\/agents$/)
-  const agentRow = page.locator(".ci-runs tbody tr")
+  const agentRow = page.locator(".agent-runs tbody tr")
   await expect(agentRow.getByRole("link", { name: "bob/api" })).toBeVisible()
   await expect(agentRow.getByRole("link", { name: "#2" })).toHaveAttribute(
     "href",
     "/bob/api/agents/2"
+  )
+  // The Trigger column surfaces the spawning issue, linked to it.
+  await expect(agentRow.getByRole("link", { name: "issue #7" })).toHaveAttribute(
+    "href",
+    "/bob/api/issues/7"
   )
 })

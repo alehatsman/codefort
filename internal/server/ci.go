@@ -15,30 +15,50 @@ import (
 	"github.com/alehatsman/moongit/internal/storage"
 )
 
-// handleListCIRuns returns a repo's CI runs, newest-first. ?limit caps the page
-// (default 100, max 1000 — enforced by storage.ListRuns).
+// parseRunFilter reads the shared ?kind/?state/?q/?limit query params for the
+// run-list endpoints into a storage.RunFilter, writing a 400 and returning
+// ok=false on a bad ?limit. ?kind=ci|agent scopes the run kind; ?state is a
+// comma-separated status list (running,queued,…); ?q is a keyword search over
+// the commit subject/author, ref, and trigger — mirroring the issues filters.
+func parseRunFilter(w http.ResponseWriter, r *http.Request) (storage.RunFilter, bool) {
+	q := r.URL.Query()
+	f := storage.RunFilter{
+		Kind:  storage.RunKind(q.Get("kind")),
+		Query: q.Get("q"),
+	}
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			writeError(w, http.StatusBadRequest, "invalid limit")
+			return storage.RunFilter{}, false
+		}
+		f.Limit = n
+	}
+	if v := q.Get("state"); v != "" {
+		for _, s := range strings.Split(v, ",") {
+			if s = strings.TrimSpace(s); s != "" {
+				f.Statuses = append(f.Statuses, storage.RunStatus(s))
+			}
+		}
+	}
+	return f, true
+}
+
+// handleListCIRuns returns a repo's CI/agent runs, newest-first. Filtered by
+// the shared ?kind/?state/?q/?limit params (see parseRunFilter), applied in SQL
+// (storage.ListRuns) so the limit caps the matching set, not a pre-filter window.
 func (s *Server) handleListCIRuns(w http.ResponseWriter, r *http.Request) {
 	repoID, ok := s.lookupRepoOrFail(w, r)
 	if !ok {
 		return
 	}
 
-	limit := 0
-	if v := r.URL.Query().Get("limit"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 0 {
-			writeError(w, http.StatusBadRequest, "invalid limit")
-			return
-		}
-		limit = n
+	filter, ok := parseRunFilter(w, r)
+	if !ok {
+		return
 	}
 
-	// Optional ?kind=ci|agent filter so the Pipelines and Agents tabs each show
-	// only their own runs. Applied in SQL (storage.ListRuns) so the limit caps
-	// the matching set, not a pre-filter window.
-	kind := storage.RunKind(r.URL.Query().Get("kind"))
-
-	runs, err := storage.ListRuns(s.rdb, repoID, kind, limit)
+	runs, err := storage.ListRuns(s.rdb, repoID, filter)
 	if err != nil {
 		s.logger.Error("ci list runs", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")

@@ -13,7 +13,7 @@ export const keys = {
   repos: () => ["repos"] as const,
   allIssues: (query = "") => (query ? (["allIssues", query] as const) : (["allIssues"] as const)),
   allPulls: (state = "", query = "") => ["allPulls", state, query] as const,
-  allRuns: (kind = "") => ["allRuns", kind] as const,
+  allRuns: (kind = "", query = "") => ["allRuns", kind, query] as const,
   repo: (owner: string, repo: string) => ["repo", owner, repo] as const,
   refs: (owner: string, repo: string) => ["refs", owner, repo] as const,
   tree: (owner: string, repo: string, path: string, ref = "") =>
@@ -116,10 +116,10 @@ export function useAllPulls(state = "", query = "") {
   })
 }
 
-export function useAllRuns(kind: "" | "ci" | "agent" = "") {
+export function useAllRuns(kind: "" | "ci" | "agent" = "", query = "") {
   return useQuery({
-    queryKey: keys.allRuns(kind),
-    queryFn: () => api.listAllRuns(kind),
+    queryKey: keys.allRuns(kind, query),
+    queryFn: () => api.listAllRuns(kind, query),
     // Poll the fleet-wide feed while any run is still live, mirroring useCIRuns,
     // so freshly triggered runs tick toward terminal without a manual refresh.
     refetchInterval: (q) => (q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false),
@@ -352,12 +352,19 @@ export function useIntelSummaries(owner: string, repo: string, enabled: boolean)
 const ciRunsRefetchInterval = (q: { state: { data?: CIRun[] } }) =>
   q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false
 
-export function useCIRuns(owner: string, repo: string, kind: "" | "ci" | "agent" = "") {
+export function useCIRuns(owner: string, repo: string, kind: "" | "ci" | "agent" = "", query = "") {
+  const params = new URLSearchParams(query)
   return useQuery({
-    // kind is appended so a mutation invalidating the keys.ciRuns prefix still
-    // refreshes every kind variant (react-query matches by prefix).
-    queryKey: [...keys.ciRuns(owner, repo), kind],
-    queryFn: () => api.listCIRuns(owner, repo, 0, kind),
+    // kind/query are appended so a mutation invalidating the keys.ciRuns prefix
+    // still refreshes every variant (react-query matches by prefix), and each
+    // filter combination caches independently.
+    queryKey: [...keys.ciRuns(owner, repo), kind, query],
+    queryFn: () =>
+      api.listCIRuns(owner, repo, {
+        kind,
+        state: params.get("state") ?? undefined,
+        q: params.get("q") ?? undefined,
+      }),
     enabled: !!owner && !!repo,
     refetchInterval: ciRunsRefetchInterval,
   })

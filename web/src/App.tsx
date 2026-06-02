@@ -8,6 +8,8 @@ import ReposPage from "@/features/repo/ReposPage"
 import GlobalIssuesPage from "@/features/issues/GlobalIssuesPage"
 import GlobalPullsPage from "@/features/pulls/GlobalPullsPage"
 import GlobalRunsPage from "@/features/pipelines/GlobalRunsPage"
+import GlobalAgentsPage from "@/features/agents/GlobalAgentsPage"
+import AgentsPage from "@/features/agents/AgentsPage"
 import RepoPage from "@/features/repo/RepoPage"
 import CommitsPage from "@/features/commits/CommitsPage"
 import CommitPage from "@/features/commits/CommitPage"
@@ -47,7 +49,7 @@ export default function App() {
         <Route path="/issues" element={<GlobalIssuesPage />} />
         <Route path="/pulls" element={<GlobalPullsPage />} />
         <Route path="/pipelines" element={<GlobalRunsPage kind="ci" />} />
-        <Route path="/agents" element={<GlobalRunsPage kind="agent" />} />
+        <Route path="/agents" element={<GlobalAgentsPage />} />
         <Route path="/:owner/:repo" element={<RepoPage />} />
         <Route path="/:owner/:repo/tree/*" element={<RepoPage />} />
         <Route path="/:owner/:repo/blob/*" element={<RepoPage />} />
@@ -65,7 +67,7 @@ export default function App() {
         <Route path="/:owner/:repo/review" element={<ReviewPage />} />
         <Route path="/:owner/:repo/pipelines" element={<PipelinesPage />} />
         <Route path="/:owner/:repo/pipelines/:number" element={<PipelinesPage />} />
-        <Route path="/:owner/:repo/agents" element={<PipelinesPage kind="agent" />} />
+        <Route path="/:owner/:repo/agents" element={<AgentsPage />} />
         <Route path="/:owner/:repo/agents/:number" element={<PipelinesPage kind="agent" />} />
         <Route path="/:owner/:repo/settings" element={<RepoSettingsPage />} />
         <Route path="/settings" element={<SettingsPage />} />

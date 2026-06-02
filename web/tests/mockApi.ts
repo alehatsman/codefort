@@ -419,14 +419,25 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       const { jobs: _j, events: _e, ...run } = next
       return json(route, 202, run)
     }
-    // GET: strip jobs from the list view, matching the server's list shape;
-    // honor the optional ?kind=ci|agent filter (kind defaults to "ci").
-    const kind = new URL(route.request().url()).searchParams.get("kind")
+    // GET: strip jobs from the list view, matching the server's list shape.
+    // Honor the optional ?kind (defaults to "ci"), ?state (comma list), and ?q
+    // (keyword over commit subject/author + ref + trigger) filters server-side.
+    const params = new URL(route.request().url()).searchParams
+    const kind = params.get("kind")
+    const states = (params.get("state") ?? "").split(",").filter(Boolean)
+    const q = (params.get("q") ?? "").toLowerCase()
+    const matchesQ = (r: CIRun) =>
+      !q ||
+      [r.commit_msg, r.commit_author, r.ref, r.trigger].some((f) =>
+        (f ?? "").toLowerCase().includes(q)
+      )
     return json(
       route,
       200,
       state.ciRuns
         .filter((r) => !kind || (r.kind ?? "ci") === kind)
+        .filter((r) => states.length === 0 || states.includes(r.status))
+        .filter(matchesQ)
         .map(({ jobs: _jobs, events: _events, ...run }) => run)
     )
   })
