@@ -57,7 +57,7 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 
 	// The MCP config we wrote into the workspace isn't the agent's work — drop
 	// it so it doesn't land in the branch.
-	_ = os.Remove(filepath.Join(workDir, dexMCPConfigName))
+	_ = os.Remove(filepath.Join(workDir, agentMCPConfigName))
 
 	msg := fmt.Sprintf("agent: %s\n\nWorked issue #%d via moongit agent run #%d.\n",
 		issue.Title, issue.Number, run.Number)

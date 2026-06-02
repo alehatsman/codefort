@@ -26,8 +26,8 @@ func agentSessionID(runID int64) string {
 // prompt is the turn's user message (the issue body on turn 1, a follow-up
 // message thereafter). resume picks `--resume` over `--session-id` for
 // follow-up turns on the same session. mcpConfigPath, when set, attaches the
-// dex MCP server, restricting claude to only the servers in that file
-// (--strict-mcp-config).
+// agent MCP servers (mgit, plus dex when configured), restricting claude to
+// only the servers in that file (--strict-mcp-config).
 //
 // Permissions: --permission-mode bypassPermissions reliably auto-approves the
 // file/search tools (Edit/Write/Read/Glob/Grep) — which is what lets the agent

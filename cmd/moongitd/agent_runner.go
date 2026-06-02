@@ -134,11 +134,12 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 	env := agentContainerEnv(r.cfg, override, moongitToken, agentServerURL(r.cfg))
 
-	// Generate the dex MCP config (if dex is configured) into the workspace.
-	mcpPath, _, err := writeDexMCPConfig(workDir, r.cfg)
+	// Generate the agent MCP config (mgit always, dex when configured) into the
+	// workspace.
+	mcpPath, err := writeAgentMCPConfig(workDir, r.cfg)
 	if err != nil {
 		log.Error("agent write mcp config", "err", err)
-		mcpPath = "" // non-fatal: run without dex MCP
+		mcpPath = "" // non-fatal: run without MCP servers
 	}
 
 	// Open the container (the same isolation seam CI jobs use) with the env
@@ -263,11 +264,8 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 	// turn 1 being the issue body. A follow-up resumes the session (claude),
 	// so firstTurn is false: the executor omits the system prompt (already in
 	// the session) and uses the message as the goal. The MCP config file
-	// persists in the workspace from turn 1.
-	mcpPath := ""
-	if r.cfg.DexURL != "" {
-		mcpPath = "/work/" + dexMCPConfigName
-	}
+	// (written on turn 1) persists in the workspace, so resume sees the same servers.
+	mcpPath := "/work/" + agentMCPConfigName
 	in := turnInput{
 		sessionID: agentSessionID(run.ID),
 		message:   turn.Body,

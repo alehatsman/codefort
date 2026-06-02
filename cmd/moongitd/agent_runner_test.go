@@ -252,9 +252,9 @@ func TestAgentRunInjectsCredentials(t *testing.T) {
 		t.Errorf("token name = %q, want %q", tok.Name, agentTokenName(h.run.ID))
 	}
 
-	// dex MCP is wired into the launch.
-	if !argvHas(*h.gotArgv, "--mcp-config", "/work/"+dexMCPConfigName) || !argvContains(*h.gotArgv, "--strict-mcp-config") {
-		t.Errorf("argv missing dex MCP config: %v", *h.gotArgv)
+	// The agent MCP config (mgit + dex) is wired into the launch.
+	if !argvHas(*h.gotArgv, "--mcp-config", "/work/"+agentMCPConfigName) || !argvContains(*h.gotArgv, "--strict-mcp-config") {
+		t.Errorf("argv missing agent MCP config: %v", *h.gotArgv)
 	}
 
 	// On teardown the ephemeral token is revoked.

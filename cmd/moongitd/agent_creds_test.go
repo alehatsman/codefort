@@ -113,42 +113,60 @@ func TestAgentServerURL(t *testing.T) {
 	}
 }
 
-func TestWriteDexMCPConfig(t *testing.T) {
+func TestWriteAgentMCPConfig(t *testing.T) {
+	type serverConf struct {
+		Command string   `json:"command"`
+		Args    []string `json:"args"`
+	}
+	readConf := func(t *testing.T, dir string) map[string]serverConf {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(dir, agentMCPConfigName))
+		if err != nil {
+			t.Fatalf("read config: %v", err)
+		}
+		var conf struct {
+			MCPServers map[string]serverConf `json:"mcpServers"`
+		}
+		if err := json.Unmarshal(raw, &conf); err != nil {
+			t.Fatalf("config not valid JSON: %v", err)
+		}
+		// No secret rides in the file — bearer/token are env-only.
+		if strings.Contains(string(raw), "DEX_SERVE_TOKEN") || strings.Contains(string(raw), "MOONGIT_TOKEN") {
+			t.Errorf("MCP config file should carry no secret:\n%s", raw)
+		}
+		return conf.MCPServers
+	}
+
+	// No dex configured -> file still written, mgit registered, no dex server.
 	dir := t.TempDir()
-
-	// No dex configured -> no file, ok=false.
-	if p, ok, err := writeDexMCPConfig(dir, &config.Config{}); err != nil || ok || p != "" {
-		t.Fatalf("no-dex = (%q,%v,%v), want (\"\",false,nil)", p, ok, err)
-	}
-
-	// Dex configured -> writes a valid MCP config naming the dex shim.
-	p, ok, err := writeDexMCPConfig(dir, &config.Config{DexURL: "http://dex.local"})
-	if err != nil || !ok {
-		t.Fatalf("writeDexMCPConfig: ok=%v err=%v", ok, err)
-	}
-	if p != "/work/"+dexMCPConfigName {
-		t.Errorf("container path = %q, want /work/%s", p, dexMCPConfigName)
-	}
-	raw, err := os.ReadFile(filepath.Join(dir, dexMCPConfigName))
+	p, err := writeAgentMCPConfig(dir, &config.Config{})
 	if err != nil {
-		t.Fatalf("read config: %v", err)
+		t.Fatalf("writeAgentMCPConfig (no dex): %v", err)
 	}
-	var conf struct {
-		MCPServers map[string]struct {
-			Command string   `json:"command"`
-			Args    []string `json:"args"`
-		} `json:"mcpServers"`
+	if p != "/work/"+agentMCPConfigName {
+		t.Errorf("container path = %q, want /work/%s", p, agentMCPConfigName)
 	}
-	if err := json.Unmarshal(raw, &conf); err != nil {
-		t.Fatalf("config not valid JSON: %v", err)
+	servers := readConf(t, dir)
+	mgit, ok := servers["mgit"]
+	if !ok || mgit.Command != "mgit" || !sliceContains(mgit.Args, "mcp") {
+		t.Errorf("mgit server config wrong: %+v", servers)
 	}
-	dex, present := conf.MCPServers["dex"]
+	if _, ok := servers["dex"]; ok {
+		t.Errorf("dex should be absent when unconfigured: %+v", servers)
+	}
+
+	// Dex configured -> both mgit and the dex shim are registered.
+	dir = t.TempDir()
+	if _, err := writeAgentMCPConfig(dir, &config.Config{DexURL: "http://dex.local"}); err != nil {
+		t.Fatalf("writeAgentMCPConfig (dex): %v", err)
+	}
+	servers = readConf(t, dir)
+	if _, ok := servers["mgit"]; !ok {
+		t.Errorf("mgit server missing when dex configured: %+v", servers)
+	}
+	dex, present := servers["dex"]
 	if !present || dex.Command != "dex" || !sliceContains(dex.Args, "http://dex.local") {
-		t.Errorf("dex server config wrong: %+v", conf.MCPServers)
-	}
-	// The bearer is NOT in the file — it rides in the container env.
-	if strings.Contains(string(raw), "DEX_SERVE_TOKEN") {
-		t.Errorf("MCP config file should carry no secret:\n%s", raw)
+		t.Errorf("dex server config wrong: %+v", servers)
 	}
 }
 

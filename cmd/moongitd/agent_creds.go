@@ -10,9 +10,9 @@ import (
 	"github.com/alehatsman/moongit/internal/config"
 )
 
-// dexMCPConfigName is the MCP config file written into the workspace (so it's
+// agentMCPConfigName is the MCP config file written into the workspace (so it's
 // reachable at /work/<name> inside the container).
-const dexMCPConfigName = ".moongit-agent-mcp.json"
+const agentMCPConfigName = ".moongit-agent-mcp.json"
 
 // agentTokenName is the deterministic name of a run's ephemeral moongit token,
 // so it can be revoked on finalize without persisting anything extra.
@@ -90,29 +90,38 @@ func agentServerURL(cfg *config.Config) string {
 	return "http://host.docker.internal:" + port
 }
 
-// writeDexMCPConfig writes a claude --mcp-config file into the workspace,
-// pointing at the dex shim (option A: a stdio `dex mcp --remote` on PATH in the
-// agent image, per dex#6). It returns the in-container path, or ok=false when
-// dex isn't configured. The bearer/project ride in the container env, so the
-// file carries no secret.
-func writeDexMCPConfig(hostWorkDir string, cfg *config.Config) (containerPath string, ok bool, err error) {
-	if cfg.DexURL == "" {
-		return "", false, nil
-	}
-	conf := map[string]any{
-		"mcpServers": map[string]any{
-			"dex": map[string]any{
-				"command": "dex",
-				"args":    []string{"mcp", "--remote", cfg.DexURL},
-			},
+// writeAgentMCPConfig writes the claude --mcp-config file into the workspace,
+// registering the stdio MCP servers the agent gets (both reachable at /work and
+// run under --strict-mcp-config, so this file is the agent's whole MCP surface):
+//
+//   - mgit: the moongit issue/review/pipeline/agent toolset (`mgit mcp`, #158).
+//     Always registered — the per-run MOONGIT_TOKEN + MOONGIT_SERVER ride in the
+//     container env (agentContainerEnv), so the shim resolves its target and
+//     identity without anything in this file.
+//   - dex: the stdio->REST shim (`dex mcp --remote`, dex#6), registered only when
+//     dex is configured. Its bearer/project also ride the env.
+//
+// The file therefore always exists for an agent run and carries no secret. It
+// returns the in-container path.
+func writeAgentMCPConfig(hostWorkDir string, cfg *config.Config) (containerPath string, err error) {
+	servers := map[string]any{
+		"mgit": map[string]any{
+			"command": "mgit",
+			"args":    []string{"mcp"},
 		},
 	}
-	b, err := json.MarshalIndent(conf, "", "  ")
+	if cfg.DexURL != "" {
+		servers["dex"] = map[string]any{
+			"command": "dex",
+			"args":    []string{"mcp", "--remote", cfg.DexURL},
+		}
+	}
+	b, err := json.MarshalIndent(map[string]any{"mcpServers": servers}, "", "  ")
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
-	if err := os.WriteFile(filepath.Join(hostWorkDir, dexMCPConfigName), b, 0o644); err != nil {
-		return "", false, err
+	if err := os.WriteFile(filepath.Join(hostWorkDir, agentMCPConfigName), b, 0o644); err != nil {
+		return "", err
 	}
-	return "/work/" + dexMCPConfigName, true, nil
+	return "/work/" + agentMCPConfigName, nil
 }
