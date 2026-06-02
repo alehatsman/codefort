@@ -60,7 +60,7 @@ func newTestRunner(t *testing.T, pipeline string, enabled bool, exec stepExecuto
 			return &hostSession{workDir: workDir, exec: exec}, nil
 		},
 		checkout: func(context.Context, string, string, string) error { return nil },
-		readPipeline: func(string, string) ([]byte, bool, error) {
+		readPipeline: func(context.Context, string, string) ([]byte, bool, error) {
 			if pipeline == "" {
 				return nil, false, nil
 			}

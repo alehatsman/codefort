@@ -336,12 +336,31 @@ func Migrate(db *sql.DB) error {
 
 	for i := current; i < len(migrations); i++ {
 		ver := i + 1
-		if _, err := db.Exec(migrations[i]); err != nil {
-			return fmt.Errorf("migration %d: %w", ver, err)
-		}
-		if _, err := db.Exec(`INSERT INTO schema_version(version) VALUES (?)`, ver); err != nil {
-			return fmt.Errorf("record migration %d: %w", ver, err)
+		// Run each migration and its version bump in one transaction. SQLite
+		// supports transactional DDL, so a multi-statement migration that fails
+		// partway rolls back wholesale rather than leaving a half-applied schema
+		// that can't be cleanly re-run (a non-idempotent ALTER would then collide
+		// on the next startup).
+		if err := applyMigration(db, ver, migrations[i]); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// applyMigration runs one migration's SQL and records its version atomically.
+func applyMigration(db *sql.DB, ver int, sqlText string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("migration %d: begin: %w", ver, err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(sqlText); err != nil {
+		return fmt.Errorf("migration %d: %w", ver, err)
+	}
+	if _, err := tx.Exec(`INSERT INTO schema_version(version) VALUES (?)`, ver); err != nil {
+		return fmt.Errorf("record migration %d: %w", ver, err)
+	}
+	return tx.Commit()
 }

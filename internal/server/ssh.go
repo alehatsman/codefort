@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -91,8 +92,19 @@ func (s *Server) acceptSSH(ctx context.Context, ln net.Listener, cfg *ssh.Server
 			if ctx.Err() != nil {
 				return nil // shutdown
 			}
-			s.logger.Error("ssh: accept", "err", err)
-			return err
+			// A transient Accept error (fd exhaustion under load, ECONNABORTED)
+			// is recoverable — log and retry after a short backoff rather than
+			// tearing down the whole SSH transport (and, via listenErr, the
+			// daemon) for the rest of the process lifetime. The listener only
+			// dies for good on shutdown, handled by the ctx.Err() check above.
+			// Mirrors net/http.Server.Serve's temporary-error backoff.
+			s.logger.Error("ssh: accept (retrying)", "err", err)
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(50 * time.Millisecond):
+			}
+			continue
 		}
 		go s.handleSSHConn(ctx, conn, cfg)
 	}

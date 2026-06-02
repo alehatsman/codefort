@@ -6,10 +6,18 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/alehatsman/moongit/internal/api"
 	"github.com/alehatsman/moongit/internal/storage"
 )
+
+// tokenTouchInterval debounces last_used_at writes: a token used again within
+// this window doesn't trigger another writer UPDATE. A read-heavy polling fleet
+// would otherwise turn every authed request into a serialized write contending
+// with real mutations on the single writer pool, while last_used_at only needs
+// coarse "recently used" granularity.
+const tokenTouchInterval = 5 * time.Minute
 
 // tokenCtxKey is the context key under which the authenticated token's
 // metadata is stored. Use TokenFromContext to read it back from a handler.
@@ -44,7 +52,11 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 			return
 		}
 		// Record usage on the writer; best-effort, off the auth critical path.
-		storage.TouchToken(s.db, tok.ID)
+		// Debounced (see tokenTouchInterval) so a polling fleet doesn't amplify
+		// reads into a per-request writer UPDATE.
+		if tok.LastUsedAt == nil || time.Since(*tok.LastUsedAt) >= tokenTouchInterval {
+			storage.TouchToken(s.db, tok.ID)
+		}
 
 		ctx := context.WithValue(r.Context(), tokenCtxKey{}, tok)
 		next.ServeHTTP(w, r.WithContext(ctx))

@@ -152,6 +152,11 @@ func (s *Server) doMerge(ctx context.Context, repoDir string, pr api.PullRequest
 			return "", false, nil, errNotFastForward
 		}
 		if err := updateRef(ctx, repoDir, "refs/heads/"+pr.BaseRef, headTip, baseTip); err != nil {
+			// Almost always the CAS guard failing (a concurrent push moved base),
+			// which we surface as a retryable 409. Log the real git error too, so
+			// a persistent non-CAS failure (git missing, corrupt refs, perms)
+			// doesn't masquerade as a transient conflict with no diagnostic.
+			s.logger.Warn("merge update-ref (ff)", "repo", repoDir, "ref", pr.BaseRef, "err", err)
 			return "", false, nil, errBaseMoved
 		}
 		return headTip, true, nil, nil
@@ -172,6 +177,9 @@ func (s *Server) doMerge(ctx context.Context, repoDir string, pr api.PullRequest
 		return "", false, nil, err
 	}
 	if err := updateRef(ctx, repoDir, "refs/heads/"+pr.BaseRef, commit, baseTip); err != nil {
+		// See the ff path: usually a concurrent push moved base (retryable 409),
+		// but log the underlying git error so a real failure stays diagnosable.
+		s.logger.Warn("merge update-ref", "repo", repoDir, "ref", pr.BaseRef, "err", err)
 		return "", false, nil, errBaseMoved
 	}
 	return commit, false, nil, nil

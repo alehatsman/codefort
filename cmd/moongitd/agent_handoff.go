@@ -61,7 +61,7 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 
 	msg := fmt.Sprintf("agent: %s\n\nWorked issue #%d via moongit agent run #%d.\n",
 		issue.Title, issue.Number, run.Number)
-	commit, changed, err := materializeAgentBranch(parent, bareRepo, run.CommitSHA, workDir, "refs/heads/"+branch, agentCommentAuthor, msg)
+	commit, changed, err := materializeAgentBranch(parent, run.ID, bareRepo, run.CommitSHA, workDir, "refs/heads/"+branch, agentCommentAuthor, msg)
 	if err != nil {
 		log.Error("handoff materialize branch", "err", err)
 		r.postAgentComment(issue.ID, fmt.Sprintf(
@@ -102,8 +102,12 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 // seeding the index from base so deletions are captured. The ref is updated
 // only after a successful commit, so a mid-way failure leaves no branch. When
 // the tree is identical to base, no commit/ref is made (changed=false).
-func materializeAgentBranch(ctx context.Context, bareRepo, base, workDir, ref, author, msg string) (commit string, changed bool, err error) {
-	idx := filepath.Join(os.TempDir(), fmt.Sprintf("moongit-agent-index-%d-%d", os.Getpid(), hashRef(ref)))
+func materializeAgentBranch(ctx context.Context, runID int64, bareRepo, base, workDir, ref, author, msg string) (commit string, changed bool, err error) {
+	// Key the throwaway index on the (globally unique) run id, not the ref:
+	// the ref is a pure function of the issue number, so two concurrent
+	// handoffs for the same issue would otherwise share one GIT_INDEX_FILE and
+	// corrupt each other.
+	idx := filepath.Join(os.TempDir(), fmt.Sprintf("moongit-agent-index-%d-%d", os.Getpid(), runID))
 	defer func() { _ = os.Remove(idx) }()
 
 	base = strings.TrimSpace(base)
@@ -244,15 +248,4 @@ func wireAgentMoongitRemote(ctx context.Context, workDir, remoteURL string) erro
 		}
 	}
 	return nil
-}
-
-// hashRef is a tiny stable hash of a ref, to keep concurrent index files
-// distinct.
-func hashRef(s string) uint32 {
-	var h uint32 = 2166136261
-	for i := 0; i < len(s); i++ {
-		h ^= uint32(s[i])
-		h *= 16777619
-	}
-	return h
 }

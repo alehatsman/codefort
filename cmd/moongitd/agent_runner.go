@@ -199,7 +199,12 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	// verdict rides the turn.completed event + stderr replay (#117), so the
 	// transcript still shows what happened.
 	if err := storage.MarkRunAwaitingInput(r.db, run.ID); err != nil {
+		// The park write failed, so the run stays 'running' with a live container
+		// the idle reaper (awaiting_input only) will never touch. Tear it down
+		// rather than strand the container until the next restart sweep.
 		log.Error("agent park awaiting_input", "err", err)
+		r.failAgentRun(run.ID, job.ID, workDir)
+		return
 	}
 	log.Info("agent run awaiting input", "turn1_status", status)
 }
@@ -301,7 +306,11 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 		log.Error("agent finish turn", "err", err)
 	}
 	if err := storage.MarkRunAwaitingInput(r.db, run.ID); err != nil {
+		// Failed re-park leaves the run 'running' with a live container the idle
+		// reaper won't reclaim — tear it down instead of stranding it.
 		log.Error("agent re-park awaiting_input", "err", err)
+		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
+		return
 	}
 	log.Info("agent turn done; awaiting input", "status", status)
 }

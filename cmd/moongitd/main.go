@@ -164,7 +164,9 @@ func runServe(logger *slog.Logger) error {
 		runCIRunner(ciCtx, runner)
 	}()
 
-	listenErr := make(chan error, 1)
+	// Buffered for both listeners so neither blocks sending on shutdown (which
+	// would otherwise wedge the SSH drain below).
+	listenErr := make(chan error, 2)
 	go func() {
 		logger.Info("listening", "addr", cfg.Addr, "repos_dir", cfg.ReposDir)
 		err := httpSrv.ListenAndServe()
@@ -178,9 +180,14 @@ func runServe(logger *slog.Logger) error {
 	// Opt-in git SSH transport: a second listener on the same process, started
 	// only when MOONGIT_SSH_ADDR is set so the default deployment stays one
 	// port. It shuts down with ctx; a listen failure here surfaces on listenErr
-	// to bring the whole process down rather than silently losing SSH.
+	// to bring the whole process down rather than silently losing SSH. sshDone
+	// closes when the listener has drained, so shutdown can wait for it before
+	// the DB closes.
+	var sshDone chan struct{}
 	if cfg.SSHAddr != "" {
+		sshDone = make(chan struct{})
 		go func() {
+			defer close(sshDone)
 			if err := srv.ServeSSH(ctx, cfg.SSHAddr); err != nil {
 				listenErr <- err
 			}
@@ -198,6 +205,15 @@ func runServe(logger *slog.Logger) error {
 	defer cancel()
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil && serveErr == nil {
 		serveErr = err
+	}
+	// Stop the SSH listener and wait for it to drain before the deferred
+	// db.Close(), so an in-flight git-over-SSH op can't touch a closed DB. The
+	// SSH goroutine is bound to ctx (the signal context), which the signal path
+	// already cancelled but the serve-error path has not — cancel it explicitly
+	// via stop() so this holds on both paths.
+	if sshDone != nil {
+		stop()
+		<-sshDone
 	}
 	// Cancel + drain the CI runner before the deferred db.Close() so an in-flight
 	// run finalizes its status against an open DB. This runs on both exit paths,

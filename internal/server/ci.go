@@ -33,22 +33,20 @@ func (s *Server) handleListCIRuns(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 
-	runs, err := storage.ListRuns(s.rdb, repoID, limit)
+	// Optional ?kind=ci|agent filter so the Pipelines and Agents tabs each show
+	// only their own runs. Applied in SQL (storage.ListRuns) so the limit caps
+	// the matching set, not a pre-filter window.
+	kind := storage.RunKind(r.URL.Query().Get("kind"))
+
+	runs, err := storage.ListRuns(s.rdb, repoID, kind, limit)
 	if err != nil {
 		s.logger.Error("ci list runs", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
-	// Optional ?kind=ci|agent filter so the Pipelines and Agents tabs each show
-	// only their own runs.
-	kind := storage.RunKind(r.URL.Query().Get("kind"))
-
 	out := make([]api.CIRun, 0, len(runs))
 	for _, run := range runs {
-		if kind != "" && run.Kind != kind {
-			continue
-		}
 		out = append(out, toAPIRun(run))
 	}
 	writeJSON(w, http.StatusOK, out)

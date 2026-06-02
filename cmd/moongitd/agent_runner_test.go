@@ -157,7 +157,7 @@ func newAgentHarness(t *testing.T, opts agentTestOpts) agentHarness {
 		},
 		teardownContainer: func(string) { teardowns.Add(1) },
 		checkout:          func(context.Context, string, string, string) error { return nil },
-		readPipeline: func(string, string) ([]byte, bool, error) {
+		readPipeline: func(context.Context, string, string) ([]byte, bool, error) {
 			t.Error("agent run must not read a pipeline")
 			return nil, false, nil
 		},

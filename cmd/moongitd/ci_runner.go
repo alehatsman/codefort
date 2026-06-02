@@ -48,7 +48,7 @@ type (
 	// checkoutFunc materializes the repo tree at commitSHA into workDir.
 	checkoutFunc func(ctx context.Context, bareRepo, commitSHA, workDir string) error
 	// pipelineReader reads mgitci.yml at commitSHA; ok=false means absent.
-	pipelineReader func(bareRepo, commitSHA string) (raw []byte, ok bool, err error)
+	pipelineReader func(ctx context.Context, bareRepo, commitSHA string) (raw []byte, ok bool, err error)
 )
 
 // jobSession executes one job's steps in some environment and is closed when
@@ -392,7 +392,7 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 		return
 	}
 	bareRepo := filepath.Join(r.cfg.ReposDir, owner, name+".git")
-	raw, ok, err := r.readPipeline(bareRepo, run.CommitSHA)
+	raw, ok, err := r.readPipeline(parent, bareRepo, run.CommitSHA)
 	if err != nil {
 		log.Error("ci read mgitci.yml", "err", err)
 		r.finish(run, storage.RunError)
@@ -485,12 +485,17 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 			}
 		}
 		if len(ready) == 0 {
-			// Nothing ready this pass. Either we just skipped a cascade (loop
-			// again to propagate) or all remaining jobs await an in-flight wave;
-			// since a wave is fully awaited below, "no ready, no skip" can only
-			// mean a malformed DAG — break rather than spin.
-			if len(pending) == 0 {
-				break
+			// No job is ready and none was skippable this pass. A wave is fully
+			// awaited below, so "no ready, no skip" can only be a malformed DAG
+			// that slipped past TopoOrder's validation. Finalize the stuck jobs
+			// as errored rather than leaving them queued forever (the post-loop
+			// finalizer only covers the ctx-cancelled case), then stop.
+			log.Error("ci scheduling stuck: no runnable job", "pending", len(pending))
+			for jn := range pending {
+				r.finishJob(jobIDs[jn], storage.JobError, nil)
+				status[jn] = storage.JobError
+				delete(pending, jn)
+				anyNotSuccess = true
 			}
 			break
 		}
@@ -837,8 +842,18 @@ func openAgentDockerSession(ctx context.Context, logger *slog.Logger, name, work
 		// host-gateway to the host, same as Docker Desktop.
 		"--add-host", "host.docker.internal:host-gateway",
 	}
-	for _, e := range env {
-		args = append(args, "-e", e)
+	// Pass the per-run secrets (Claude/LLM tokens, the ephemeral moongit token,
+	// dex bearer) via --env-file rather than `-e KEY=VALUE`: the latter puts every
+	// value on the docker-run argv (visible in `ps`/proc) and bakes it into
+	// `docker inspect`.Config.Env for the container's whole lifetime. The 0600
+	// file is read by docker only during run and removed right after.
+	if len(env) > 0 {
+		envFile, err := writeAgentEnvFile(env)
+		if err != nil {
+			return nil, fmt.Errorf("agent env file: %w", err)
+		}
+		defer func() { _ = os.Remove(envFile) }()
+		args = append(args, "--env-file", envFile)
 	}
 	args = append(args, "--entrypoint", "sleep", image, "infinity")
 	out, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
@@ -846,6 +861,28 @@ func openAgentDockerSession(ctx context.Context, logger *slog.Logger, name, work
 		return nil, fmt.Errorf("docker run %s: %v (%s)", image, err, strings.TrimSpace(string(out)))
 	}
 	return &dockerSession{name: name, logger: logger}, nil
+}
+
+// writeAgentEnvFile writes the agent container's env to a private (0600) temp
+// file in docker --env-file format (one KEY=VALUE per line), so the per-run
+// secrets never appear on the docker-run argv or in `docker inspect`. The
+// caller removes it once `docker run` has consumed it. Values are single-line
+// (tokens, URLs), which the KEY=VALUE-per-line format requires.
+func writeAgentEnvFile(env []string) (string, error) {
+	f, err := os.CreateTemp("", "moongit-agent-env-*")
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	if err := f.Chmod(0o600); err != nil {
+		_ = os.Remove(f.Name())
+		return "", err
+	}
+	if _, err := f.WriteString(strings.Join(env, "\n") + "\n"); err != nil {
+		_ = os.Remove(f.Name())
+		return "", err
+	}
+	return f.Name(), nil
 }
 
 func (d *dockerSession) Exec(ctx context.Context, stepYAML string) (stepResult, error) {
@@ -1060,8 +1097,8 @@ func gitCheckout(ctx context.Context, bareRepo, commitSHA, workDir string) error
 // gitReadPipeline reads mgitci.yml at commitSHA from the bare repo. A missing
 // file (git reports the path doesn't exist at that rev) yields ok=false rather
 // than an error — that's the gate for "this commit has no pipeline".
-func gitReadPipeline(bareRepo, commitSHA string) ([]byte, bool, error) {
-	cmd := exec.Command("git", "--git-dir", bareRepo, "show", commitSHA+":mgitci.yml")
+func gitReadPipeline(ctx context.Context, bareRepo, commitSHA string) ([]byte, bool, error) {
+	cmd := exec.CommandContext(ctx, "git", "--git-dir", bareRepo, "show", commitSHA+":mgitci.yml")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

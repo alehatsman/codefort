@@ -117,14 +117,30 @@ func ClaimNextTurn(db *sql.DB, lease time.Duration) (AgentTurn, CIRun, error) {
 		return AgentTurn{}, CIRun{}, err
 	}
 
+	// Re-apply the claimable predicate in the UPDATE as a compare-and-set, so a
+	// concurrent claimer can't double-take this turn between the SELECT and the
+	// UPDATE — mirroring ClaimNextRunOfKind, and correct even if the single-writer
+	// guarantee is ever relaxed. The run-status check rides a correlated subquery
+	// since this UPDATE has no join.
+	updCond := "status = 'pending' AND (SELECT status FROM ci_runs WHERE id = run_id) = 'awaiting_input'"
+	updArgs := []any{turnID}
+	if lease > 0 {
+		updCond = "(status = 'pending' AND (SELECT status FROM ci_runs WHERE id = run_id) = 'awaiting_input') OR " +
+			"(status = 'running' AND claimed_at <= strftime('%s','now') - ?)"
+		updArgs = append(updArgs, int64(lease.Seconds()))
+	}
 	turn, err := scanTurn(tx.QueryRow(`
 		UPDATE agent_turns
 		   SET status = 'running',
 		       claimed_at = strftime('%s','now'),
 		       started_at = COALESCE(started_at, strftime('%s','now'))
-		 WHERE id = ?
+		 WHERE id = ? AND (`+updCond+`)
 		 RETURNING `+turnColumns+`
-	`, turnID))
+	`, updArgs...))
+	if errors.Is(err, sql.ErrNoRows) {
+		// Lost the race between SELECT and UPDATE — report idle, not an error.
+		return AgentTurn{}, CIRun{}, ErrNoTurnPending
+	}
 	if err != nil {
 		return AgentTurn{}, CIRun{}, err
 	}

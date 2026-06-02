@@ -72,7 +72,7 @@ func (s *Server) handleCreateCodeComment(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req api.CreateCodeCommentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
@@ -137,7 +137,7 @@ func (s *Server) handlePatchCodeComment(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var req api.UpdateCodeCommentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}

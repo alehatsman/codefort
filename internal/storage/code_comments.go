@@ -58,22 +58,18 @@ func ListCodeComments(db *sql.DB, repoID int64, ref, path string, includeResolve
 // matches the author. Returns ErrNotFound or ErrForbidden so the handler can
 // pick the right HTTP status.
 func SetCodeCommentResolved(db *sql.DB, id int64, resolved bool, requester string) (api.CodeComment, error) {
-	var author string
-	err := db.QueryRow(`SELECT author FROM code_comments WHERE id = ?`, id).Scan(&author)
-	if errors.Is(err, sql.ErrNoRows) {
-		return api.CodeComment{}, ErrNotFound
-	}
-	if err != nil {
-		return api.CodeComment{}, err
-	}
-	if author != requester {
-		return api.CodeComment{}, ErrForbidden
-	}
-	row := db.QueryRow(`
-		UPDATE code_comments SET resolved = ? WHERE id = ?
+	// Fold the author check into the write (one authorized UPDATE) so it shares
+	// the hardened, race-free pattern DeleteCodeComment uses (#189). On no row,
+	// deleteMiss distinguishes a missing comment (ErrNotFound) from one owned by
+	// someone else (ErrForbidden).
+	c, err := scanCodeComment(db.QueryRow(`
+		UPDATE code_comments SET resolved = ? WHERE id = ? AND author = ?
 		RETURNING id, repo_id, ref, path, start_line, end_line, commit_sha, author, body, resolved, created_at
-	`, resolved, id)
-	return scanCodeComment(row)
+	`, resolved, id, requester))
+	if errors.Is(err, ErrNotFound) {
+		return api.CodeComment{}, deleteMiss(db, `SELECT 1 FROM code_comments WHERE id = ?`, id)
+	}
+	return c, err
 }
 
 // DeleteCodeComment removes a comment by id, but only if requester matches the

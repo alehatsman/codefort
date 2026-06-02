@@ -263,16 +263,26 @@ func GetRun(db *sql.DB, repoID int64, number int) (CIRun, error) {
 }
 
 // ListRuns returns a repo's runs newest-first, capped at limit (default 100,
-// max 1000).
-func ListRuns(db *sql.DB, repoID int64, limit int) ([]CIRun, error) {
+// max 1000). kind ("" = any) filters to a single run kind in SQL, so the cap
+// applies to the matching set — a ?kind=agent page can't come back short
+// because the newest `limit` rows happened to be CI runs.
+func ListRuns(db *sql.DB, repoID int64, kind RunKind, limit int) ([]CIRun, error) {
 	if limit <= 0 {
 		limit = 100
 	}
 	if limit > 1000 {
 		limit = 1000
 	}
-	rows, err := db.Query(
-		`SELECT `+runColumns+` FROM ci_runs WHERE repo_id = ? ORDER BY number DESC LIMIT ?`, repoID, limit)
+	q := strings.Builder{}
+	q.WriteString(`SELECT ` + runColumns + ` FROM ci_runs WHERE repo_id = ?`)
+	args := []any{repoID}
+	if kind != "" {
+		q.WriteString(" AND kind = ?")
+		args = append(args, string(kind))
+	}
+	q.WriteString(" ORDER BY number DESC LIMIT ?")
+	args = append(args, limit)
+	rows, err := db.Query(q.String(), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +332,7 @@ func ClaimNextRunOfKind(db *sql.DB, kind RunKind, lease time.Duration) (CIRun, e
 
 	var id int64
 	err = tx.QueryRow(
-		`SELECT id FROM ci_runs WHERE `+claimable+` ORDER BY number ASC LIMIT 1`, selArgs...,
+		`SELECT id FROM ci_runs WHERE `+claimable+` ORDER BY id ASC LIMIT 1`, selArgs...,
 	).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return CIRun{}, ErrNoRunQueued
@@ -660,7 +670,7 @@ func ListAllRuns(db *sql.DB, kind RunKind, limit int) ([]RunWithRepo, error) {
 	q := strings.Builder{}
 	// Qualify with ci_runs.: id/repo_id/created_at also exist on the joined
 	// repos/users tables, so a bare runColumns would be ambiguous.
-	q.WriteString(`SELECT ci_runs.id, ci_runs.repo_id, ci_runs.number, ci_runs.kind, ci_runs.issue_number, ci_runs.execution_model, ci_runs.mooncake_allow_shell, ci_runs.commit_sha, ci_runs.commit_msg, ci_runs.commit_author, ci_runs.ref, ci_runs.event, ci_runs.trigger, ci_runs.status, ci_runs.claimed_at, ci_runs.created_at, ci_runs.started_at, ci_runs.finished_at, users.name, repos.name
+	q.WriteString(`SELECT ci_runs.id, ci_runs.repo_id, ci_runs.number, ci_runs.kind, ci_runs.issue_number, ci_runs.execution_model, ci_runs.mooncake_allow_shell, ci_runs.tool_profile, ci_runs.commit_sha, ci_runs.commit_msg, ci_runs.commit_author, ci_runs.ref, ci_runs.event, ci_runs.trigger, ci_runs.status, ci_runs.claimed_at, ci_runs.created_at, ci_runs.started_at, ci_runs.finished_at, users.name, repos.name
 		FROM ci_runs
 		JOIN repos ON repos.id = ci_runs.repo_id
 		JOIN users ON users.id = repos.owner_id
@@ -688,7 +698,7 @@ func ListAllRuns(db *sql.DB, kind RunKind, limit int) ([]RunWithRepo, error) {
 		var allowShell int
 		var owner, name string
 		if err := rows.Scan(
-			&r.ID, &r.RepoID, &r.Number, &kindCol, &issueNum, &r.ExecutionModel, &allowShell, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
+			&r.ID, &r.RepoID, &r.Number, &kindCol, &issueNum, &r.ExecutionModel, &allowShell, &r.ToolProfile, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
 			&r.Ref, &r.Event, &r.Trigger,
 			&status, &claimed, &created, &started, &finished, &owner, &name,
 		); err != nil {

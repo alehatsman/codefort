@@ -42,9 +42,13 @@ const postReceiveHook = `#!/bin/sh
 [ -n "$MOONGIT_CI_URL" ] || exit 0
 [ -n "$MOONGIT_CI_SECRET" ] || exit 0
 [ -n "$MOONGIT_CI_REPO" ] || exit 0
+# Escape a value for embedding in a JSON string: backslash first, then quote.
+# Git ref names may contain " (and a token name is arbitrary), so interpolating
+# raw would break the JSON or let a crafted ref inject fields.
+je() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 while read -r old new ref; do
 	body=$(printf '{"repo":"%s","old":"%s","new":"%s","ref":"%s","pusher":"%s"}' \
-		"$MOONGIT_CI_REPO" "$old" "$new" "$ref" "${MOONGIT_CI_PUSHER:-}")
+		"$(je "$MOONGIT_CI_REPO")" "$(je "$old")" "$(je "$new")" "$(je "$ref")" "$(je "${MOONGIT_CI_PUSHER:-}")")
 	curl -fsS -m 5 -X POST "$MOONGIT_CI_URL/internal/ci/events" \
 		-H "X-Moongit-CI-Secret: $MOONGIT_CI_SECRET" \
 		-H "Content-Type: application/json" \
