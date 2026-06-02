@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { useSpawnAgent } from "../api/mutations"
 import { useAgentSettings } from "../api/queries"
 import type { CIRunExecutionModel, CIRunToolProfile } from "../api/types"
-import { Button, Select } from "./ui"
+import { Button, ErrorMessage, Select } from "./ui"
 
 interface Props {
   owner: string
@@ -124,7 +124,7 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
       <p className="muted small">
         {hint} {profileHint} Runs in an isolated container; progress streams under Pipelines.
       </p>
-      {spawn.error && <div className="error inline">{(spawn.error as Error).message}</div>}
+      <ErrorMessage error={spawn.error} inline />
     </>
   )
 }

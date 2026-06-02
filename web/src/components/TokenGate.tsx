@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { setToken, verifyToken } from "../api/client"
+import { ErrorMessage } from "./ui"
 
 interface Props {
   onSet: () => void
@@ -49,7 +50,7 @@ export default function TokenGate({ onSet }: Props) {
             // biome-ignore lint/a11y/noAutofocus: full-screen pre-auth gate with one field — focusing it on load is the expected flow, nothing to skip past.
             autoFocus
           />
-          {error && <div className="error">{error}</div>}
+          <ErrorMessage error={error} />
           <button type="submit" disabled={checking}>
             {checking ? "Checking…" : "Continue"}
           </button>

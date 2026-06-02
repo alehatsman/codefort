@@ -3,7 +3,7 @@ import { usePulls } from "../api/queries"
 import { PR_STATES, type PRState } from "../api/types"
 import OverviewCard from "../components/OverviewCard"
 import PRStateIcon from "../components/PRStateIcon"
-import { Button, EmptyState, FilterChip, Spinner } from "../components/ui"
+import { Button, EmptyState, ErrorMessage, FilterChip, Spinner } from "../components/ui"
 
 const STATE_LABEL: Record<PRState, string> = {
   open: "open",
@@ -79,7 +79,7 @@ export default function PullsPage() {
       </div>
 
       {isLoading && <Spinner />}
-      {error && <div className="error">{(error as Error).message}</div>}
+      {error && <ErrorMessage error={error} />}
 
       {data && data.length === 0 && <EmptyState>No pull requests match this filter.</EmptyState>}
 

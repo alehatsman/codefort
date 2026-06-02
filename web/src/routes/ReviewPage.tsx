@@ -6,7 +6,7 @@ import { useDeleteCodeComment, useSetCodeCommentResolved } from "../api/mutation
 import BranchSelector from "../components/BranchSelector"
 import DraftReviewButton from "../components/DraftReviewButton"
 import Avatar from "../components/Avatar"
-import { Badge, Button, EmptyState, Spinner } from "../components/ui"
+import { Badge, Button, EmptyState, ErrorMessage, Spinner } from "../components/ui"
 import type { CodeComment, CodeCommentState } from "../api/types"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it lazily
@@ -83,7 +83,7 @@ export default function ReviewPage() {
       </div>
 
       {commentsQ.isLoading && <Spinner />}
-      {commentsQ.error && <div className="error">{(commentsQ.error as Error).message}</div>}
+      <ErrorMessage error={commentsQ.error} />
       {commentsQ.data && comments.length === 0 && (
         <EmptyState>No {state === "all" ? "" : `${state} `}comments on this branch.</EmptyState>
       )}

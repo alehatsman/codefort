@@ -3,7 +3,7 @@ import { Link } from "react-router-dom"
 import type { CIRun, Commit } from "../api/types"
 import Avatar from "./Avatar"
 import CommitCIStatus from "./CommitCIStatus"
-import { absoluteTime, timeAgo } from "../lib/timeAgo"
+import { RelativeTime } from "./ui"
 
 interface Props {
   owner: string
@@ -33,9 +33,7 @@ export default function CommitMeta({ owner, repo, commit, ciRun, className }: Pr
       <code className="commit-meta__sha" title={commit.sha}>
         {commit.short_sha}
       </code>
-      <span className="muted small" title={absoluteTime(commit.date)}>
-        {timeAgo(commit.date)}
-      </span>
+      <RelativeTime className="muted small" iso={commit.date} />
       <CommitCIStatus owner={owner} repo={repo} run={ciRun} />
     </div>
   )

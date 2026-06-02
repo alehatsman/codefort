@@ -6,7 +6,7 @@ import { usePull } from "../api/queries"
 import type { MergeConflictResponse } from "../api/types"
 import CompareView from "../components/CompareView"
 import OverviewCard from "../components/OverviewCard"
-import { Button, EmptyState, Spinner } from "../components/ui"
+import { Button, EmptyState, ErrorMessage, Spinner } from "../components/ui"
 
 const Markdown = lazy(() => import("../components/Markdown"))
 
@@ -43,7 +43,7 @@ export default function PullPage() {
       {pullQ.isLoading ? (
         <Spinner />
       ) : pullQ.error ? (
-        <div className="error">{(pullQ.error as Error).message}</div>
+        <ErrorMessage error={pullQ.error} />
       ) : !pr ? (
         <EmptyState>Pull request not found.</EmptyState>
       ) : (
@@ -113,9 +113,7 @@ export default function PullPage() {
                   </ul>
                 </div>
               ) : (
-                mergePull.error && (
-                  <div className="error inline">{(mergePull.error as Error).message}</div>
-                )
+                mergePull.error && <ErrorMessage error={mergePull.error} inline />
               )}
             </div>
           )}

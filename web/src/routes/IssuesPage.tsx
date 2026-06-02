@@ -8,7 +8,7 @@ import OverviewCard from "../components/OverviewCard"
 import StateIcon from "../components/StateIcon"
 import IssuesViewSwitch from "../components/IssuesViewSwitch"
 import { useListNav } from "../lib/keyboardNav"
-import { EmptyState, FilterChip, Spinner } from "../components/ui"
+import { EmptyState, ErrorMessage, FilterChip, Spinner } from "../components/ui"
 
 export default function IssuesPage() {
   const { owner = "", repo = "" } = useParams()
@@ -188,7 +188,7 @@ export default function IssuesPage() {
       </div>
 
       {isLoading && <Spinner />}
-      {error && <div className="error">{(error as Error).message}</div>}
+      {error && <ErrorMessage error={error} />}
 
       {data && data.length === 0 && <EmptyState>No issues match these filters.</EmptyState>}
 

@@ -4,7 +4,7 @@ import { ApiError } from "../api/client"
 import { useRepo } from "../api/queries"
 import { useDeleteRepo } from "../api/mutations"
 import NotFound from "../components/NotFound"
-import { Button, Input, Spinner } from "../components/ui"
+import { Button, ErrorMessage, Input, Spinner } from "../components/ui"
 
 // Per-repo settings. Today it hosts a single Danger Zone — deleting the repo —
 // but it's the natural home for future per-repo settings (the CI opt-in could
@@ -21,7 +21,7 @@ export default function RepoSettingsPage() {
         <NotFound title="Repository not found" detail={`${owner}/${repo} isn’t registered here.`} />
       )
     }
-    return <div className="error">{(err as Error).message}</div>
+    return <ErrorMessage error={err} />
   }
   if (!repoQ.data) return null
 
@@ -81,7 +81,7 @@ function DangerZone({ owner, repo }: { owner: string; repo: string }) {
           </Button>
         </div>
       </div>
-      {del.error && <div className="error inline">{(del.error as Error).message}</div>}
+      {del.error && <ErrorMessage error={del.error} inline />}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react"
 import { useDeleteComment } from "../api/mutations"
 import type { Comment } from "../api/types"
 import Avatar from "./Avatar"
+import { ErrorMessage } from "./ui"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it lazily
 // so the comment list doesn't drag it into the main bundle.
@@ -59,7 +60,7 @@ export default function CommentItem({ owner, repo, issueNumber, comment, canDele
             <Markdown content={comment.body} owner={owner} repo={repo} basePath="" />
           </Suspense>
         </div>
-        {del.error && <div className="error inline">{(del.error as Error).message}</div>}
+        {del.error && <ErrorMessage error={del.error} inline />}
       </div>
     </li>
   )

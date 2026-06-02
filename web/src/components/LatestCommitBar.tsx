@@ -3,7 +3,7 @@ import { Link } from "react-router-dom"
 import type { CIRun, Commit } from "../api/types"
 import Avatar from "./Avatar"
 import CommitCIStatus from "./CommitCIStatus"
-import { absoluteTime, timeAgo } from "../lib/timeAgo"
+import { RelativeTime } from "./ui"
 
 interface Props {
   owner: string
@@ -44,9 +44,7 @@ export default function LatestCommitBar({
           <code className="latest-commit-bar__sha" title={latest.sha}>
             {latest.short_sha}
           </code>
-          <span className="muted small" title={absoluteTime(latest.date)}>
-            {timeAgo(latest.date)}
-          </span>
+          <RelativeTime className="muted small" iso={latest.date} />
           <CommitCIStatus owner={owner} repo={repo} run={ciRun} />
         </div>
       ) : (

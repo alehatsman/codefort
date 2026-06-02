@@ -1,11 +1,15 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import {
   Badge,
   Button,
   Card,
+  Dialog,
   EmptyState,
+  ErrorMessage,
+  Field,
   FilterChip,
   Input,
+  RelativeTime,
   Select,
   Spinner,
   Textarea,
@@ -35,6 +39,8 @@ export default function DevGalleryPage() {
       <CardsSection />
       <FeedbackSection />
       <FormSection />
+      <RelativeTimeSection />
+      <DialogSection />
     </div>
   )
 }
@@ -124,6 +130,10 @@ function FeedbackSection() {
         <EmptyState>No issues match these filters.</EmptyState>
         <EmptyState bordered>Bordered: nothing to show yet.</EmptyState>
       </Section>
+      <Section title="ErrorMessage">
+        <ErrorMessage error={new Error("Something went wrong.")} />
+        <ErrorMessage error={new Error("Inline variant — sits within a form body.")} inline />
+      </Section>
     </>
   )
 }
@@ -134,23 +144,60 @@ function FormSection() {
   const [choice, setChoice] = useState("one")
   return (
     <Section title="Form inputs">
-      <Input
-        placeholder="Input…"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        aria-label="Demo input"
-      />
-      <Select value={choice} onChange={(e) => setChoice(e.target.value)} aria-label="Demo select">
-        <option value="one">Option one</option>
-        <option value="two">Option two</option>
-      </Select>
-      <Textarea
-        placeholder="Textarea…"
-        rows={3}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        aria-label="Demo textarea"
-      />
+      <Field label="Text input">
+        <Input placeholder="Input…" value={text} onChange={(e) => setText(e.target.value)} />
+      </Field>
+      <Field label="Select">
+        <Select value={choice} onChange={(e) => setChoice(e.target.value)}>
+          <option value="one">Option one</option>
+          <option value="two">Option two</option>
+        </Select>
+      </Field>
+      <Field label="Textarea">
+        <Textarea
+          placeholder="Textarea…"
+          rows={3}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+        />
+      </Field>
+    </Section>
+  )
+}
+
+function RelativeTimeSection() {
+  return (
+    <Section title="RelativeTime">
+      <RelativeTime iso="2020-01-01T00:00:00Z" />
+      <RelativeTime className="muted small" iso="2026-05-30T12:00:00Z" />
+    </Section>
+  )
+}
+
+function DialogSection() {
+  const ref = useRef<HTMLDialogElement>(null)
+  const close = () => ref.current?.close()
+  return (
+    <Section title="Dialog">
+      <Button onClick={() => ref.current?.showModal()}>Open dialog</Button>
+      <Dialog
+        ref={ref}
+        title="Example dialog"
+        onClose={close}
+        footer={
+          <>
+            <Button onClick={close}>Cancel</Button>
+            <Button variant="primary" onClick={close}>
+              Done
+            </Button>
+          </>
+        }
+      >
+        <Field label="A field">
+          <Input placeholder="Inside the dialog…" />
+        </Field>
+        <ErrorMessage error={new Error("Errors render inline in the body.")} inline />
+      </Dialog>
     </Section>
   )
 }

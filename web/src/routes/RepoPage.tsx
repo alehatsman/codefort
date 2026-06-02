@@ -19,7 +19,7 @@ import CommitMeta from "../components/CommitMeta"
 import ReadmeCard from "../components/ReadmeCard"
 import OverviewCard from "../components/OverviewCard"
 import NotFound from "../components/NotFound"
-import { EmptyState, Spinner } from "../components/ui"
+import { EmptyState, ErrorMessage, Spinner } from "../components/ui"
 import { findReadme } from "../lib/readme"
 import { useListNav } from "../lib/keyboardNav"
 import BranchSelector from "../components/BranchSelector"
@@ -50,7 +50,7 @@ export default function RepoPage() {
         <NotFound title="Repository not found" detail={`${owner}/${repo} isn’t registered here.`} />
       )
     }
-    return <div className="error">{(err as Error).message}</div>
+    return <ErrorMessage error={err} />
   }
   if (!repoQ.data) return null
 
@@ -112,7 +112,7 @@ function TreeView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   })
 
   if (treeQ.isLoading) return <Spinner />
-  if (treeQ.error) return <div className="error">{(treeQ.error as Error).message}</div>
+  if (treeQ.error) return <ErrorMessage error={treeQ.error} />
   if (!treeQ.data) return null
 
   // Empty root listing == unborn repo (no commits pushed yet).
@@ -192,7 +192,7 @@ function BlobView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
       const suffix = gitRef ? `?ref=${encodeURIComponent(gitRef)}` : ""
       return <Navigate to={`/${owner}/${repo}/tree/${path}${suffix}`} replace />
     }
-    return <div className="error">{(err as Error).message}</div>
+    return <ErrorMessage error={err} />
   }
   if (!blobQ.data) return null
 

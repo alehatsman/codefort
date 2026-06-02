@@ -11,7 +11,7 @@ import {
   useRepo,
 } from "../api/queries"
 import OverviewCard from "../components/OverviewCard"
-import { Button, Spinner, EmptyState, Input } from "../components/ui"
+import { Button, EmptyState, ErrorMessage, Input, RelativeTime, Spinner } from "../components/ui"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import type {
   Commit,
@@ -45,7 +45,7 @@ export default function ExplorePage() {
   const lastCommitByPath = usePackageRecency(owner, repo, packages, isIndexed)
 
   if (repoQ.isLoading) return <Spinner />
-  if (repoQ.error) return <div className="error">{(repoQ.error as Error).message}</div>
+  if (repoQ.error) return <ErrorMessage error={repoQ.error} />
   if (!repoQ.data) return null
 
   const r = repoQ.data
@@ -56,7 +56,7 @@ export default function ExplorePage() {
       <OverviewCard owner={r.owner} repo={r.name} path="" summaries={{}} />
 
       {intelQ.isLoading && <Spinner label="Loading index status…" />}
-      {intelQ.error && <div className="error">{(intelQ.error as Error).message}</div>}
+      <ErrorMessage error={intelQ.error} />
 
       {intel && !intel.enabled && (
         <EmptyState bordered>
@@ -121,9 +121,7 @@ export default function ExplorePage() {
 
       {/* summariesQ is fetched so the breadcrumb / future panels share its
           cache; surface its error rather than failing silently. */}
-      {isIndexed && summariesQ.error && (
-        <div className="error">{(summariesQ.error as Error).message}</div>
-      )}
+      {isIndexed && <ErrorMessage error={summariesQ.error} />}
     </div>
   )
 }
@@ -254,9 +252,7 @@ function Hotspots({
               <Link className="hotspot__path" to={`/${owner}/${repo}/tree/${pkg.path}`}>
                 {pkg.path}
               </Link>
-              <span className="hotspot__when" title={absoluteTime(commit.date)}>
-                {timeAgo(commit.date)}
-              </span>
+              <RelativeTime className="hotspot__when" iso={commit.date} />
             </div>
             <div className="hotspot__subject">{commit.subject}</div>
             <div className="hotspot__summary muted small">{firstLine(pkg.summary)}</div>
@@ -348,7 +344,7 @@ function FallbackPackageMap({ owner, repo, packages, lastCommitByPath, loading, 
   }, [packages])
 
   if (loading) return <Spinner label="Loading map…" />
-  if (error) return <div className="error">{error.message}</div>
+  if (error) return <ErrorMessage error={error} />
   if (groups.length === 0) return null
 
   return (
@@ -428,7 +424,7 @@ function GraphPackageMap({
   )
 
   if (loading) return <Spinner label="Loading map…" />
-  if (error) return <div className="error">{error.message}</div>
+  if (error) return <ErrorMessage error={error} />
   if (tiers.length === 0) return null
 
   return (
@@ -474,9 +470,7 @@ function GraphPackageCard({ owner, repo, card }: { owner: string; repo: string; 
           ←{card.inDegree} →{card.outDegree}
         </span>
         {card.commit && (
-          <span className="pkg-card__when muted small" title={absoluteTime(card.commit.date)}>
-            {timeAgo(card.commit.date)}
-          </span>
+          <RelativeTime className="pkg-card__when muted small" iso={card.commit.date} />
         )}
         {card.summary && (
           <span className="pkg-card__preview muted small">{firstLine(card.summary)}</span>
@@ -681,11 +675,7 @@ function PackageCard({
     <details className="pkg-card">
       <summary className="pkg-card__summary">
         <span className="pkg-card__path">{pkg.path}</span>
-        {commit && (
-          <span className="pkg-card__when muted small" title={absoluteTime(commit.date)}>
-            {timeAgo(commit.date)}
-          </span>
-        )}
+        {commit && <RelativeTime className="pkg-card__when muted small" iso={commit.date} />}
         <span className="pkg-card__preview muted small">{firstLine(pkg.summary)}</span>
       </summary>
       <div className="pkg-card__body">{pkg.summary}</div>
@@ -761,7 +751,7 @@ function AskBox({ owner, repo }: { owner: string; repo: string }) {
         </button>
       </form>
 
-      {search.error && <div className="error">{(search.error as Error).message}</div>}
+      <ErrorMessage error={search.error} />
       {search.data && <IntelResult owner={owner} repo={repo} result={search.data} />}
     </section>
   )

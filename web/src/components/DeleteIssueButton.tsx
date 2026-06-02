@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom"
 import { useDeleteIssue } from "../api/mutations"
-import { Button } from "./ui"
+import { Button, ErrorMessage } from "./ui"
 
 interface Props {
   owner: string
@@ -30,7 +30,7 @@ export default function DeleteIssueButton({ owner, repo, number }: Props) {
       <Button variant="danger" disabled={del.isPending} onClick={onDelete}>
         {del.isPending ? "Deleting…" : "Delete issue"}
       </Button>
-      {del.error && <div className="error inline">{(del.error as Error).message}</div>}
+      {del.error && <ErrorMessage error={del.error} inline />}
     </>
   )
 }

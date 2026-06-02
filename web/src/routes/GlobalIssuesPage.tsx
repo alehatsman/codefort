@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useAllIssues } from "../api/queries"
 import { ISSUE_STATES, type IssueState } from "../api/types"
 import StateIcon from "../components/StateIcon"
-import { EmptyState, Spinner } from "../components/ui"
+import { EmptyState, ErrorMessage, Spinner } from "../components/ui"
 import { useListNav } from "../lib/keyboardNav"
 
 // Fleet-wide Issues view: every repo's issues in one list, newest-updated
@@ -88,7 +88,7 @@ export default function GlobalIssuesPage() {
       </div>
 
       {isLoading && <Spinner />}
-      {error && <div className="error">{(error as Error).message}</div>}
+      {error && <ErrorMessage error={error} />}
 
       {data && data.length === 0 && <EmptyState>No issues match these filters.</EmptyState>}
 

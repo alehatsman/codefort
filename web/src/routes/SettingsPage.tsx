@@ -10,7 +10,7 @@ import {
 } from "../api/mutations"
 import type { CIRunExecutionModel, CreatedToken, SSHKey, Token } from "../api/types"
 import ThemeSelect from "../components/ThemeSelect"
-import { Badge, Button, EmptyState, Input, Select, Spinner } from "../components/ui"
+import { Badge, Button, EmptyState, ErrorMessage, Input, Select, Spinner } from "../components/ui"
 
 // Sections of the settings surface. "tokens", "agent", "ssh", and "appearance"
 // are backed. "users" and "branches" are planned features whose server backends
@@ -288,7 +288,7 @@ function AgentSection() {
         </form>
       </div>
 
-      {update.error && <div className="error inline">{(update.error as Error).message}</div>}
+      <ErrorMessage error={update.error} inline />
     </section>
   )
 }
@@ -361,7 +361,7 @@ function TokensSection() {
           {create.isPending ? "Creating…" : "Create token"}
         </Button>
       </form>
-      {create.error && <div className="error inline">{(create.error as Error).message}</div>}
+      <ErrorMessage error={create.error} inline />
 
       {revealed && (
         <div className="token-reveal">
@@ -390,8 +390,8 @@ function TokensSection() {
       )}
 
       {tokensQ.isLoading && <Spinner />}
-      {tokensQ.error && <div className="error">{(tokensQ.error as Error).message}</div>}
-      {revoke.error && <div className="error inline">{(revoke.error as Error).message}</div>}
+      <ErrorMessage error={tokensQ.error} />
+      <ErrorMessage error={revoke.error} inline />
 
       {tokensQ.data && tokensQ.data.length === 0 && (
         <EmptyState>No tokens yet. Create one above.</EmptyState>
@@ -506,11 +506,11 @@ function SSHKeysSection() {
           {add.isPending ? "Adding…" : "Add SSH key"}
         </Button>
       </form>
-      {add.error && <div className="error inline">{(add.error as Error).message}</div>}
+      <ErrorMessage error={add.error} inline />
 
       {keysQ.isLoading && <Spinner />}
-      {keysQ.error && <div className="error">{(keysQ.error as Error).message}</div>}
-      {del.error && <div className="error inline">{(del.error as Error).message}</div>}
+      <ErrorMessage error={keysQ.error} />
+      <ErrorMessage error={del.error} inline />
 
       {keysQ.data && keysQ.data.length === 0 && (
         <EmptyState>No SSH keys yet. Add one above.</EmptyState>

@@ -4,7 +4,7 @@ import { useRepos } from "../api/queries"
 import CIStatusIcon from "../components/CIStatusIcon"
 import NewRepoForm from "../components/NewRepoForm"
 import StateIcon from "../components/StateIcon"
-import { Card, EmptyState, Spinner } from "../components/ui"
+import { Card, EmptyState, ErrorMessage, Spinner } from "../components/ui"
 import { useListNav } from "../lib/keyboardNav"
 
 export default function ReposPage() {
@@ -33,7 +33,7 @@ export default function ReposPage() {
       </div>
 
       {isLoading && <Spinner />}
-      {error && <div className="error">{(error as Error).message}</div>}
+      {error && <ErrorMessage error={error} />}
 
       {!isLoading && !error && (!data || data.length === 0) && (
         <EmptyState>No repos registered yet. Create one with the button above.</EmptyState>

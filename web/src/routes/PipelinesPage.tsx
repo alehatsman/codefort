@@ -5,7 +5,7 @@ import { useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from "../api/mutation
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import type { Repo } from "../api/types"
 import CIStatusBadge from "../components/CIStatusBadge"
-import { Button, EmptyState, Input, Spinner } from "../components/ui"
+import { Button, EmptyState, ErrorMessage, Input, Spinner } from "../components/ui"
 import AgentRunBody from "./AgentRunBody"
 import CIRunBody from "./CIRunBody"
 import {
@@ -29,7 +29,7 @@ export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
   const repoQ = useRepo(owner, repo)
 
   if (repoQ.isLoading) return <Spinner />
-  if (repoQ.error) return <div className="error">{(repoQ.error as Error).message}</div>
+  if (repoQ.error) return <ErrorMessage error={repoQ.error} />
   if (!repoQ.data) return null
 
   const r = repoQ.data
@@ -122,10 +122,10 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
           </>
         )}
       </p>
-      {trigger.error && <div className="error inline">{(trigger.error as Error).message}</div>}
+      <ErrorMessage error={trigger.error} inline />
 
       {runsQ.isLoading && <Spinner />}
-      {runsQ.error && <div className="error">{(runsQ.error as Error).message}</div>}
+      <ErrorMessage error={runsQ.error} />
       {runsQ.data && runsQ.data.length === 0 && (
         <EmptyState>
           {isAgent ? (
@@ -212,9 +212,7 @@ function CIDisabledCard({ owner, repo }: { owner: string; repo: string }) {
         >
           {setEnabled.isPending ? "Enabling…" : "Enable CI"}
         </Button>
-        {setEnabled.error && (
-          <div className="error inline">{(setEnabled.error as Error).message}</div>
-        )}
+        <ErrorMessage error={setEnabled.error} inline />
       </EmptyState>
     </section>
   )
@@ -236,7 +234,7 @@ function RunDetail({
   const rerun = useRerunCIRun(owner, repo)
 
   if (runQ.isLoading) return <Spinner />
-  if (runQ.error) return <div className="error">{(runQ.error as Error).message}</div>
+  if (runQ.error) return <ErrorMessage error={runQ.error} />
   if (!runQ.data) return null
 
   const run = runQ.data
@@ -265,7 +263,7 @@ function RunDetail({
           </Button>
         )}
       </div>
-      {rerun.error && <div className="error inline">{(rerun.error as Error).message}</div>}
+      <ErrorMessage error={rerun.error} inline />
 
       {run.commit_msg && <p className="ci-run-subject">{run.commit_msg}</p>}
 

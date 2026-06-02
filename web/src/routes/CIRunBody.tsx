@@ -3,7 +3,7 @@ import { Fragment, useMemo, useState } from "react"
 import CIStatusBadge from "../components/CIStatusBadge"
 import type { CIEvent, CIJob } from "../api/types"
 import { parseAnsi } from "../lib/ansi"
-import { EmptyState, Spinner } from "../components/ui"
+import { EmptyState, ErrorMessage, Spinner } from "../components/ui"
 import { useJobEventStream } from "../lib/ciEvents"
 import { formatDuration } from "./runHelpers"
 
@@ -142,7 +142,7 @@ function JobLog({
 
   return (
     <div className="ci-job-log">
-      {error && <div className="error inline">{error}</div>}
+      <ErrorMessage error={error} inline />
       {steps.length === 0 && !done && <Spinner label="Waiting for output…" />}
       {steps.map((step) => {
         const status = step.status ?? "running"

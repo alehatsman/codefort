@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useCreateComment } from "../api/mutations"
-import { Button, Textarea } from "./ui"
+import { Button, ErrorMessage, Textarea } from "./ui"
 
 interface Props {
   owner: string
@@ -42,7 +42,7 @@ export default function CommentForm({ owner, repo, number }: Props) {
         onKeyDown={onKeyDown}
         rows={3}
       />
-      {mutation.error && <div className="error">{(mutation.error as Error).message}</div>}
+      {mutation.error && <ErrorMessage error={mutation.error} />}
       <div className="row">
         <Button type="submit" variant="primary" disabled={!body.trim() || mutation.isPending}>
           {mutation.isPending ? "Posting…" : "Comment"}

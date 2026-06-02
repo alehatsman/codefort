@@ -5,8 +5,7 @@ import OverviewCard from "../components/OverviewCard"
 import Avatar from "../components/Avatar"
 import BranchTag from "../components/BranchTag"
 import DiffView from "../components/DiffView"
-import { EmptyState, Spinner } from "../components/ui"
-import { absoluteTime, timeAgo } from "../lib/timeAgo"
+import { EmptyState, ErrorMessage, RelativeTime, Spinner } from "../components/ui"
 
 type Mode = "split" | "unified"
 
@@ -41,7 +40,7 @@ export default function CommitPage() {
       {commitQ.isLoading ? (
         <Spinner />
       ) : commitQ.error ? (
-        <div className="error">{(commitQ.error as Error).message}</div>
+        <ErrorMessage error={commitQ.error} />
       ) : !detail ? (
         <EmptyState>Commit not found.</EmptyState>
       ) : (
@@ -53,7 +52,7 @@ export default function CommitPage() {
               <Avatar name={detail.commit.author} />
               <span className="commit-detail__author">{detail.commit.author}</span>
               {" committed "}
-              <span title={absoluteTime(detail.commit.date)}>{timeAgo(detail.commit.date)}</span>
+              <RelativeTime iso={detail.commit.date} />
               <span className="commit-detail__sha-group">
                 <button
                   type="button"

@@ -1,7 +1,6 @@
 import { lazy, Suspense, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { useComments, useIssue, useIssueCommits, useWhoami } from "../api/queries"
-import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import OverviewCard from "../components/OverviewCard"
 import StateButtons from "../components/StateButtons"
 import AssigneeControl from "../components/AssigneeControl"
@@ -14,7 +13,7 @@ import DeleteIssueButton from "../components/DeleteIssueButton"
 import BranchTag from "../components/BranchTag"
 import SpawnAgentButton from "../components/SpawnAgentButton"
 import NotFound from "../components/NotFound"
-import { Button, Spinner } from "../components/ui"
+import { Button, ErrorMessage, RelativeTime, Spinner } from "../components/ui"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it only
 // when an issue with a body is actually shown.
@@ -43,7 +42,7 @@ export default function IssuePage() {
   }
 
   if (issueQ.isLoading) return <Spinner />
-  if (issueQ.error) return <div className="error">{(issueQ.error as Error).message}</div>
+  if (issueQ.error) return <ErrorMessage error={issueQ.error} />
   if (!issueQ.data) return null
 
   const iss = issueQ.data
@@ -136,7 +135,7 @@ export default function IssuePage() {
                         <div className="commit-row__meta muted small">
                           <span className="commit-row__author">{c.author}</span>
                           {" committed "}
-                          <span title={absoluteTime(c.date)}>{timeAgo(c.date)}</span>
+                          <RelativeTime iso={c.date} />
                         </div>
                       </div>
                       {c.branch && <BranchTag branch={c.branch} />}

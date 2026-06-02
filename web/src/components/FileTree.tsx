@@ -2,8 +2,7 @@ import clsx from "clsx"
 import { Link } from "react-router-dom"
 import type { Commit, TreeEntry } from "../api/types"
 import FileIcon from "./FileIcon"
-import { absoluteTime, timeAgo } from "../lib/timeAgo"
-import { EmptyState } from "./ui"
+import { EmptyState, RelativeTime } from "./ui"
 
 interface Props {
   owner: string
@@ -85,9 +84,7 @@ export default function FileTree({
             )}
 
             {c ? (
-              <span className="file-tree__age muted small" title={absoluteTime(c.date)}>
-                {timeAgo(c.date)}
-              </span>
+              <RelativeTime className="file-tree__age muted small" iso={c.date} />
             ) : (
               <span
                 className={clsx("file-tree__age file-tree__ph", { "is-loading": commitsLoading })}

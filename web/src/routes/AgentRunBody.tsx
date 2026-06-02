@@ -3,7 +3,7 @@ import clsx from "clsx"
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useCancelAgentRun, useCreateAgentTurn, useFinishAgentRun } from "../api/mutations"
 import type { CIEvent, CIRunDetail } from "../api/types"
-import { Button, Spinner } from "../components/ui"
+import { Button, ErrorMessage, Spinner } from "../components/ui"
 import { useJobEventStream } from "../lib/ciEvents"
 import { formatDuration } from "./runHelpers"
 
@@ -169,7 +169,7 @@ function AgentTranscript({
 
   return (
     <div className="agent-transcript-wrap">
-      {error && <div className="error inline">{error}</div>}
+      <ErrorMessage error={error} inline />
       {cards.length === 0 && !done && <Spinner label="Waiting for the agent…" />}
       <div ref={scrollRef} className="agent-transcript" onScroll={onScroll}>
         <div className="agent-transcript__sizer" style={{ height: total }}>
@@ -397,9 +397,9 @@ function AgentMessageBox({
           {send.isPending ? "Sending…" : "Send"}
         </Button>
       </div>
-      {send.error && <div className="error inline">{(send.error as Error).message}</div>}
-      {finish.error && <div className="error inline">{(finish.error as Error).message}</div>}
-      {cancel.error && <div className="error inline">{(cancel.error as Error).message}</div>}
+      <ErrorMessage error={send.error} inline />
+      <ErrorMessage error={finish.error} inline />
+      <ErrorMessage error={cancel.error} inline />
     </form>
   )
 }

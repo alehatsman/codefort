@@ -5,7 +5,7 @@ import { useCompare, useRefs } from "../api/queries"
 import { useCreatePull } from "../api/mutations"
 import CompareView from "../components/CompareView"
 import OverviewCard from "../components/OverviewCard"
-import { Button, EmptyState, Spinner } from "../components/ui"
+import { Button, EmptyState, ErrorMessage, Spinner } from "../components/ui"
 
 /**
  * Compare two branches: pick base + head, see the ahead/behind + three-dot diff,
@@ -104,7 +104,7 @@ export default function ComparePage() {
       {!head && !sameBranch && <EmptyState>Choose a head branch to compare.</EmptyState>}
 
       {compareQ.isLoading && <Spinner />}
-      {compareQ.error && <div className="error">{(compareQ.error as Error).message}</div>}
+      {compareQ.error && <ErrorMessage error={compareQ.error} />}
 
       {compareQ.data && (
         <>

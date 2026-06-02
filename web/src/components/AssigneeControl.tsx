@@ -1,7 +1,7 @@
 import { useClaimIssue, useUnclaimIssue } from "../api/mutations"
 import type { IssueState } from "../api/types"
 import Avatar from "./Avatar"
-import { Button } from "./ui"
+import { Button, ErrorMessage } from "./ui"
 
 interface Props {
   owner: string
@@ -56,7 +56,7 @@ export default function AssigneeControl({ owner, repo, number, assignee, state, 
           )}
         </div>
       )}
-      {error && <div className="error inline">{(error as Error).message}</div>}
+      {error && <ErrorMessage error={error} inline />}
     </div>
   )
 }

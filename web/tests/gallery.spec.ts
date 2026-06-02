@@ -13,12 +13,34 @@ test("dev gallery renders every primitive section", async ({ page }) => {
   await page.goto("/dev/ui")
 
   await expect(page.getByRole("heading", { name: "UI primitives" })).toBeVisible()
-  for (const section of ["Button", "Badge", "FilterChip", "Card", "Spinner", "EmptyState"]) {
+  for (const section of [
+    "Button",
+    "Badge",
+    "FilterChip",
+    "Card",
+    "Spinner",
+    "EmptyState",
+    "ErrorMessage",
+    "RelativeTime",
+    "Dialog",
+  ]) {
     await expect(page.getByRole("heading", { name: section, exact: true })).toBeVisible()
   }
 
   // The primary button variant is present.
   await expect(page.getByRole("button", { name: "primary", exact: true })).toBeVisible()
+})
+
+test("dev gallery Dialog opens and closes", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/dev/ui")
+
+  await expect(page.getByRole("dialog")).not.toBeVisible()
+  await page.getByRole("button", { name: "Open dialog" }).click()
+  await expect(page.getByRole("dialog")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Example dialog" })).toBeVisible()
+  await page.getByRole("button", { name: "Cancel" }).click()
+  await expect(page.getByRole("dialog")).not.toBeVisible()
 })
 
 test("dev gallery FilterChip toggles its checkbox", async ({ page }) => {

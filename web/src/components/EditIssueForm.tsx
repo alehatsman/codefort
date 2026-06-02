@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useUpdateIssue } from "../api/mutations"
-import { Button, Input, Textarea } from "./ui"
+import { Button, ErrorMessage, Field, Input, Textarea } from "./ui"
 
 interface Props {
   owner: string
@@ -38,20 +38,18 @@ export default function EditIssueForm({
 
   return (
     <form className="issue-edit" onSubmit={submit}>
-      <label className="field">
-        <span className="field__label">Title</span>
+      <Field label="Title">
         <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
-      </label>
-      <label className="field">
-        <span className="field__label">Description</span>
+      </Field>
+      <Field label="Description">
         <Textarea
           placeholder="Leave a description"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={8}
         />
-      </label>
-      {mutation.error && <div className="error">{(mutation.error as Error).message}</div>}
+      </Field>
+      <ErrorMessage error={mutation.error} />
       <div className="row">
         <Button type="submit" variant="primary" disabled={!title.trim() || mutation.isPending}>
           {mutation.isPending ? "Saving…" : "Save"}

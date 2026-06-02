@@ -1,7 +1,7 @@
 import { useRef, useState } from "react"
 import { useCreateRepo } from "../api/mutations"
 import { useWhoami } from "../api/queries"
-import { Button, Input } from "./ui"
+import { Button, Dialog, ErrorMessage, Field, Input } from "./ui"
 
 interface Props {
   onCreated?: (owner: string, name: string) => void
@@ -41,10 +41,6 @@ export default function NewRepoForm({ onCreated }: Props) {
     reset()
   }
 
-  function onBackdropClick(e: React.MouseEvent<HTMLDialogElement>) {
-    if (e.target === dialogRef.current) close()
-  }
-
   const trimmedOwner = owner.trim()
   const trimmedName = name.trim().replace(/\.git$/, "")
   const valid = VALID.test(trimmedOwner) && VALID.test(trimmedName)
@@ -69,62 +65,48 @@ export default function NewRepoForm({ onCreated }: Props) {
         + New repo
       </Button>
 
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click-to-dismiss only; <dialog> handles Esc/keyboard natively */}
-      <dialog ref={dialogRef} className="modal" onClick={onBackdropClick}>
-        <form className="modal__form" onSubmit={submit}>
-          <header className="modal__head">
-            <h3 className="modal__title">New repository</h3>
-            <button
-              type="button"
-              className="modal__close"
-              onClick={close}
-              aria-label="Close"
-              title="Close"
-            >
-              ×
-            </button>
-          </header>
-
-          <div className="modal__body">
-            <label className="field">
-              <span className="field__label">Owner</span>
-              <Input
-                ref={ownerRef}
-                placeholder="owner"
-                value={owner}
-                onChange={(e) => setOwner(e.target.value)}
-                required
-              />
-            </label>
-            <label className="field">
-              <span className="field__label">Name</span>
-              <Input
-                placeholder="repo-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </label>
-            <div className="field__label muted">
-              Creates a bare git repo at{" "}
-              <code>
-                {trimmedOwner || "owner"}/{trimmedName || "name"}
-              </code>
-              . Allowed characters: letters, digits, <code>. _ -</code>
-            </div>
-            {mutation.error && <div className="error">{(mutation.error as Error).message}</div>}
-          </div>
-
-          <footer className="modal__foot">
+      <Dialog
+        ref={dialogRef}
+        title="New repository"
+        onClose={close}
+        onSubmit={submit}
+        footer={
+          <>
             <Button onClick={close} disabled={mutation.isPending}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={!valid || mutation.isPending}>
               {mutation.isPending ? "Creating…" : "Create repository"}
             </Button>
-          </footer>
-        </form>
-      </dialog>
+          </>
+        }
+      >
+        <Field label="Owner">
+          <Input
+            ref={ownerRef}
+            placeholder="owner"
+            value={owner}
+            onChange={(e) => setOwner(e.target.value)}
+            required
+          />
+        </Field>
+        <Field label="Name">
+          <Input
+            placeholder="repo-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </Field>
+        <div className="field__label muted">
+          Creates a bare git repo at{" "}
+          <code>
+            {trimmedOwner || "owner"}/{trimmedName || "name"}
+          </code>
+          . Allowed characters: letters, digits, <code>. _ -</code>
+        </div>
+        <ErrorMessage error={mutation.error} />
+      </Dialog>
     </>
   )
 }

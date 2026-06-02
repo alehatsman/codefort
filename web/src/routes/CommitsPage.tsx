@@ -4,8 +4,7 @@ import type { CIRun, Commit } from "../api/types"
 import OverviewCard from "../components/OverviewCard"
 import Avatar from "../components/Avatar"
 import CommitCIStatus from "../components/CommitCIStatus"
-import { EmptyState, Spinner } from "../components/ui"
-import { absoluteTime, timeAgo } from "../lib/timeAgo"
+import { EmptyState, ErrorMessage, RelativeTime, Spinner } from "../components/ui"
 
 const PER_PAGE = 30
 
@@ -38,7 +37,7 @@ export default function CommitsPage() {
       {commitsQ.isLoading && commits.length === 0 ? (
         <Spinner />
       ) : commitsQ.error ? (
-        <div className="error">{(commitsQ.error as Error).message}</div>
+        <ErrorMessage error={commitsQ.error} />
       ) : commits.length === 0 ? (
         <EmptyState>No commit history.</EmptyState>
       ) : (
@@ -98,7 +97,7 @@ function CommitRow({
         <div className="commit-row__meta muted small">
           <span className="commit-row__author">{commit.author}</span>
           {" committed "}
-          <span title={absoluteTime(commit.date)}>{timeAgo(commit.date)}</span>
+          <RelativeTime iso={commit.date} />
         </div>
       </div>
       <CommitCIStatus owner={owner} repo={repo} run={ciRun} />

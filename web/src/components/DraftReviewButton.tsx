@@ -7,7 +7,7 @@ import {
   reviewTargetNeedsBase,
   reviewTargetNeedsPath,
 } from "../lib/reviewTemplates"
-import { Button, Input, Select } from "./ui"
+import { Button, Dialog, ErrorMessage, Field, Input, Select } from "./ui"
 
 interface Props {
   owner: string
@@ -64,9 +64,6 @@ export default function DraftReviewButton({ owner, repo, defaultRef }: Props) {
   function close() {
     dialogRef.current?.close()
   }
-  function onBackdropClick(e: React.MouseEvent<HTMLDialogElement>) {
-    if (e.target === dialogRef.current) close()
-  }
 
   const needsPath = reviewTargetNeedsPath(target)
   const needsBase = reviewTargetNeedsBase(target)
@@ -87,87 +84,69 @@ export default function DraftReviewButton({ owner, repo, defaultRef }: Props) {
     <>
       <Button onClick={open}>Draft review issue</Button>
 
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click-to-dismiss only; <dialog> handles Esc/keyboard natively */}
-      <dialog ref={dialogRef} className="modal" onClick={onBackdropClick}>
-        <form className="modal__form" onSubmit={submit}>
-          <header className="modal__head">
-            <h3 className="modal__title">Draft review issue</h3>
-            <button
-              type="button"
-              className="modal__close"
-              onClick={close}
-              aria-label="Close"
-              title="Close"
-            >
-              ×
-            </button>
-          </header>
-
-          <div className="modal__body">
-            <label className="field">
-              <span className="field__label">Target</span>
-              <Select value={target} onChange={(e) => setTarget(e.target.value as ReviewTarget)}>
-                {TARGETS.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </Select>
-            </label>
-
-            <label className="field">
-              <span className="field__label">{target === "commit" ? "Commit" : "Ref"}</span>
-              <Input
-                placeholder={target === "commit" ? "commit SHA" : "branch / tag / SHA"}
-                value={ref}
-                onChange={(e) => setRef(e.target.value)}
-                required
-              />
-            </label>
-
-            {needsBase && (
-              <label className="field">
-                <span className="field__label">Base ref</span>
-                <Input
-                  placeholder="base branch (diff is base..ref)"
-                  value={base}
-                  onChange={(e) => setBase(e.target.value)}
-                  required
-                />
-              </label>
-            )}
-
-            {needsPath && (
-              <label className="field">
-                <span className="field__label">
-                  {target === "file" ? "File path" : "Directory"}
-                </span>
-                <Input
-                  placeholder={target === "file" ? "path/to/file.go" : "path/to/dir"}
-                  value={path}
-                  onChange={(e) => setPath(e.target.value)}
-                  required
-                />
-              </label>
-            )}
-
-            <p className="muted small">
-              Creates an issue and spawns a read-only review agent (read + review tools only). Its
-              findings appear here as you watch the transcript under Pipelines.
-            </p>
-            {draft.error && <div className="error">{(draft.error as Error).message}</div>}
-          </div>
-
-          <footer className="modal__foot">
+      <Dialog
+        ref={dialogRef}
+        title="Draft review issue"
+        onClose={close}
+        onSubmit={submit}
+        footer={
+          <>
             <Button onClick={close} disabled={draft.isPending}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={!ready || draft.isPending}>
               {draft.isPending ? "Spawning…" : "Create + spawn review agent"}
             </Button>
-          </footer>
-        </form>
-      </dialog>
+          </>
+        }
+      >
+        <Field label="Target">
+          <Select value={target} onChange={(e) => setTarget(e.target.value as ReviewTarget)}>
+            {TARGETS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field label={target === "commit" ? "Commit" : "Ref"}>
+          <Input
+            placeholder={target === "commit" ? "commit SHA" : "branch / tag / SHA"}
+            value={ref}
+            onChange={(e) => setRef(e.target.value)}
+            required
+          />
+        </Field>
+
+        {needsBase && (
+          <Field label="Base ref">
+            <Input
+              placeholder="base branch (diff is base..ref)"
+              value={base}
+              onChange={(e) => setBase(e.target.value)}
+              required
+            />
+          </Field>
+        )}
+
+        {needsPath && (
+          <Field label={target === "file" ? "File path" : "Directory"}>
+            <Input
+              placeholder={target === "file" ? "path/to/file.go" : "path/to/dir"}
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              required
+            />
+          </Field>
+        )}
+
+        <p className="muted small">
+          Creates an issue and spawns a read-only review agent (read + review tools only). Its
+          findings appear here as you watch the transcript under Pipelines.
+        </p>
+        <ErrorMessage error={draft.error} />
+      </Dialog>
     </>
   )
 }

@@ -10,7 +10,7 @@ import {
 } from "../api/mutations"
 import type { CodeComment } from "../api/types"
 import Avatar from "./Avatar"
-import { Badge, Button, Textarea } from "./ui"
+import { Badge, Button, ErrorMessage, Textarea } from "./ui"
 
 // The markdown renderer pulls in remark/rehype; load it lazily.
 const Markdown = lazy(() => import("./Markdown"))
@@ -270,9 +270,7 @@ function CodeCommentCard({
             <Markdown content={comment.body} owner={owner} repo={repo} basePath="" />
           </Suspense>
         </div>
-        {(resolve.error || del.error) && (
-          <div className="error inline">{((resolve.error || del.error) as Error).message}</div>
-        )}
+        <ErrorMessage error={resolve.error || del.error} inline />
       </div>
     </li>
   )
@@ -329,7 +327,7 @@ function ComposeForm({
         onKeyDown={onKeyDown}
         rows={3}
       />
-      {create.error && <div className="error">{(create.error as Error).message}</div>}
+      <ErrorMessage error={create.error} />
       <div className="row">
         <Button type="submit" variant="primary" disabled={!body.trim() || create.isPending}>
           {create.isPending ? "Adding…" : "Add comment"}

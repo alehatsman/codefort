@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useCreateIssue } from "../api/mutations"
-import { Button, Input, Textarea } from "./ui"
+import { Button, Dialog, ErrorMessage, Field, Input, Textarea } from "./ui"
 
 interface Props {
   owner: string
@@ -49,14 +49,6 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
     dialogRef.current?.close()
   }
 
-  function onBackdropClick(e: React.MouseEvent<HTMLDialogElement>) {
-    // Native <dialog> backdrop is the element itself when the click
-    // target is dialog (the form below has stopPropagation via being
-    // a child node). Closing on backdrop click matches platform
-    // convention.
-    if (e.target === dialogRef.current) close()
-  }
-
   function submit(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = title.trim()
@@ -78,55 +70,41 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
         + New issue
       </Button>
 
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click-to-dismiss only; <dialog> handles Esc/keyboard natively */}
-      <dialog ref={dialogRef} className="modal" onClick={onBackdropClick}>
-        <form className="modal__form" onSubmit={submit}>
-          <header className="modal__head">
-            <h3 className="modal__title">New issue</h3>
-            <button
-              type="button"
-              className="modal__close"
-              onClick={close}
-              aria-label="Close"
-              title="Close"
-            >
-              ×
-            </button>
-          </header>
-
-          <div className="modal__body">
-            <label className="field">
-              <span className="field__label">Title</span>
-              <Input
-                ref={titleRef}
-                placeholder="Short summary"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-              />
-            </label>
-            <label className="field">
-              <span className="field__label">Description</span>
-              <Textarea
-                placeholder="Optional — what's the problem or task?"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={8}
-              />
-            </label>
-            {mutation.error && <div className="error">{(mutation.error as Error).message}</div>}
-          </div>
-
-          <footer className="modal__foot">
+      <Dialog
+        ref={dialogRef}
+        title="New issue"
+        onClose={close}
+        onSubmit={submit}
+        footer={
+          <>
             <Button onClick={close} disabled={mutation.isPending}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={!title.trim() || mutation.isPending}>
               {mutation.isPending ? "Creating…" : "Submit new issue"}
             </Button>
-          </footer>
-        </form>
-      </dialog>
+          </>
+        }
+      >
+        <Field label="Title">
+          <Input
+            ref={titleRef}
+            placeholder="Short summary"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+        </Field>
+        <Field label="Description">
+          <Textarea
+            placeholder="Optional — what's the problem or task?"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={8}
+          />
+        </Field>
+        <ErrorMessage error={mutation.error} />
+      </Dialog>
     </>
   )
 }
