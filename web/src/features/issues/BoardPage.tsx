@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react"
+import "./issues.css"
 import { useParams } from "react-router-dom"
 import {
   DndContext,

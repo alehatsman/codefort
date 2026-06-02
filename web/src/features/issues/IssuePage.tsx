@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState } from "react"
+import "./issues.css"
 import { Link, useParams } from "react-router-dom"
 import { useComments, useIssue, useIssueCommits, useWhoami } from "@/api/queries"
 import OverviewCard from "@/shell/OverviewCard"

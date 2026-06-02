@@ -1,5 +1,6 @@
 import clsx from "clsx"
 import { useEffect, useMemo, useState } from "react"
+import "./issues.css"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useIssues } from "@/api/queries"
 import { ISSUE_STATES, type IssueState } from "@/api/types"
