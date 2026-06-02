@@ -862,7 +862,7 @@ a.file-tree__commit:hover {
   gap: var(--space-3);
   align-items: center;
 }
-.issues__search {
+.list-search {
   flex-basis: 100%;
   padding: 5px var(--space-3);
   background: var(--bg);
@@ -872,7 +872,7 @@ a.file-tree__commit:hover {
   font: inherit;
   box-shadow: inset 0 1px 0 rgba(208, 215, 222, 0.2);
 }
-.issues__search:focus {
+.list-search:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-muted);

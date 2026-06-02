@@ -76,8 +76,9 @@ func (s *Server) handleListPulls(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
-	pulls, err := storage.ListPulls(s.rdb, repoID, states)
+	pulls, err := storage.ListPulls(s.rdb, repoID, states, query)
 	if err != nil {
 		s.logger.Error("list pulls", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")

@@ -12,7 +12,7 @@ export const keys = {
   agentSettings: () => ["agentSettings"] as const,
   repos: () => ["repos"] as const,
   allIssues: (query = "") => (query ? (["allIssues", query] as const) : (["allIssues"] as const)),
-  allPulls: (state = "") => ["allPulls", state] as const,
+  allPulls: (state = "", query = "") => ["allPulls", state, query] as const,
   allRuns: (kind = "") => ["allRuns", kind] as const,
   repo: (owner: string, repo: string) => ["repo", owner, repo] as const,
   refs: (owner: string, repo: string) => ["refs", owner, repo] as const,
@@ -48,7 +48,8 @@ export const keys = {
   ciRun: (owner: string, repo: string, n: number) => ["ciRun", owner, repo, n] as const,
   compare: (owner: string, repo: string, base: string, head: string) =>
     ["compare", owner, repo, base, head] as const,
-  pulls: (owner: string, repo: string, state = "") => ["pulls", owner, repo, state] as const,
+  pulls: (owner: string, repo: string, state = "", query = "") =>
+    ["pulls", owner, repo, state, query] as const,
   pull: (owner: string, repo: string, n: number) => ["pull", owner, repo, n] as const,
 }
 
@@ -108,10 +109,10 @@ export function useAllIssues(query: string) {
   })
 }
 
-export function useAllPulls(state = "") {
+export function useAllPulls(state = "", query = "") {
   return useQuery({
-    queryKey: keys.allPulls(state),
-    queryFn: () => api.listAllPulls(state),
+    queryKey: keys.allPulls(state, query),
+    queryFn: () => api.listAllPulls(state, query),
   })
 }
 
@@ -392,10 +393,10 @@ export function useCompare(owner: string, repo: string, base: string, head: stri
   })
 }
 
-export function usePulls(owner: string, repo: string, state = "") {
+export function usePulls(owner: string, repo: string, state = "", query = "") {
   return useQuery({
-    queryKey: keys.pulls(owner, repo, state),
-    queryFn: () => api.listPulls(owner, repo, state),
+    queryKey: keys.pulls(owner, repo, state, query),
+    queryFn: () => api.listPulls(owner, repo, state, query),
     enabled: !!owner && !!repo,
   })
 }

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import "./pulls.css"
 import { useAllPulls } from "@/api/queries"
@@ -28,7 +29,28 @@ export default function GlobalPullsPage() {
           .map((s) => s.trim())
           .filter((s): s is PRState => PR_STATES.includes(s as PRState))
 
-  const { data, isLoading, error } = useAllPulls(activeStates.join(","))
+  // Keyword search lives in the URL as ?q=, debounced into the param so typing
+  // doesn't refetch on every keystroke; mirrors GlobalIssuesPage.
+  const committedQuery = params.get("q") ?? ""
+  const [search, setSearch] = useState(committedQuery)
+  useEffect(() => {
+    const trimmed = search.trim()
+    if (trimmed === committedQuery) return
+    const t = setTimeout(() => {
+      setParams(
+        (prev) => {
+          const p = new URLSearchParams(prev)
+          if (trimmed) p.set("q", trimmed)
+          else p.delete("q")
+          return p
+        },
+        { replace: true }
+      )
+    }, 250)
+    return () => clearTimeout(t)
+  }, [search, committedQuery, setParams])
+
+  const { data, isLoading, error } = useAllPulls(activeStates.join(","), committedQuery)
 
   function toggleState(s: PRState) {
     const next = activeStates.includes(s)
@@ -53,6 +75,14 @@ export default function GlobalPullsPage() {
       </div>
 
       <div className="filters">
+        <input
+          type="search"
+          className="list-search"
+          placeholder="Search title or body across all repos…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search pull requests"
+        />
         <div className="filter-row">
           <span className="filter-label">state:</span>
           {PR_STATES.map((s) => (

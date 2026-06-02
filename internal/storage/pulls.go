@@ -58,22 +58,13 @@ func GetPull(db *sql.DB, repoID int64, number int) (api.PullRequest, error) {
 }
 
 // ListPulls returns a repo's PRs, newest number first, optionally filtered to
-// the given states (OR-match; nil/empty means any).
-func ListPulls(db *sql.DB, repoID int64, states []api.PRState) ([]api.PullRequest, error) {
+// the given states (OR-match; nil/empty means any) and to a case-insensitive
+// keyword matched against title or body (query == "" means any).
+func ListPulls(db *sql.DB, repoID int64, states []api.PRState, query string) ([]api.PullRequest, error) {
 	q := strings.Builder{}
 	q.WriteString(`SELECT ` + pullColumns + ` FROM pull_requests WHERE repo_id = ?`)
 	args := []any{repoID}
-	if len(states) > 0 {
-		q.WriteString(" AND state IN (")
-		for i, s := range states {
-			if i > 0 {
-				q.WriteString(",")
-			}
-			q.WriteString("?")
-			args = append(args, string(s))
-		}
-		q.WriteString(")")
-	}
+	appendPullFilters(&q, &args, "", states, query)
 	q.WriteString(" ORDER BY number DESC")
 
 	rows, err := db.Query(q.String(), args...)
@@ -91,6 +82,32 @@ func ListPulls(db *sql.DB, repoID int64, states []api.PRState) ([]api.PullReques
 		pulls = append(pulls, pr)
 	}
 	return pulls, rows.Err()
+}
+
+// appendPullFilters writes the shared state/query predicates onto an in-progress
+// pull-request query, used by both ListPulls and ListAllPulls. prefix qualifies
+// the columns ("" for the single-repo query, "pull_requests." under the
+// aggregate query's join where bare names would be ambiguous).
+func appendPullFilters(q *strings.Builder, args *[]any, prefix string, states []api.PRState, query string) {
+	if len(states) > 0 {
+		q.WriteString(" AND " + prefix + "state IN (")
+		for i, s := range states {
+			if i > 0 {
+				q.WriteString(",")
+			}
+			q.WriteString("?")
+			*args = append(*args, string(s))
+		}
+		q.WriteString(")")
+	}
+	if query != "" {
+		// LIKE is case-insensitive for ASCII in SQLite by default. Match the same
+		// %term% against title and body; wildcards in the term are escaped so
+		// they're taken literally. Mirrors appendIssueFilters' query clause.
+		pat := "%" + likeEscape(query) + "%"
+		q.WriteString(` AND (` + prefix + `title LIKE ? ESCAPE '\' OR ` + prefix + `body LIKE ? ESCAPE '\')`)
+		*args = append(*args, pat, pat)
+	}
 }
 
 // UpdatePull applies a partial update: only the non-nil fields are written and
@@ -194,9 +211,10 @@ func decodePull(pr *api.PullRequest, body sql.NullString, merged sql.NullInt64, 
 
 // ListAllPulls returns pull requests across every repo, newest-updated first,
 // each tagged with its owning repo. It backs GET /api/pulls. states filters by
-// OR-match (nil/empty = any), as in ListPulls; ordering is by recency
-// (updated_at) since per-repo PR numbers aren't globally orderable.
-func ListAllPulls(db *sql.DB, states []api.PRState) ([]api.PullRequestWithRepo, error) {
+// OR-match (nil/empty = any) and query is a case-insensitive title/body keyword
+// (== "" means any), both as in ListPulls; ordering is by recency (updated_at)
+// since per-repo PR numbers aren't globally orderable.
+func ListAllPulls(db *sql.DB, states []api.PRState, query string) ([]api.PullRequestWithRepo, error) {
 	q := strings.Builder{}
 	// Qualify with pull_requests.: id/created_at/updated_at also exist on the
 	// joined repos/users tables, so a bare pullColumns would be ambiguous.
@@ -206,17 +224,7 @@ func ListAllPulls(db *sql.DB, states []api.PRState) ([]api.PullRequestWithRepo, 
 		JOIN users ON users.id = repos.owner_id
 		WHERE 1=1`)
 	args := []any{}
-	if len(states) > 0 {
-		q.WriteString(" AND pull_requests.state IN (")
-		for i, s := range states {
-			if i > 0 {
-				q.WriteString(",")
-			}
-			q.WriteString("?")
-			args = append(args, string(s))
-		}
-		q.WriteString(")")
-	}
+	appendPullFilters(&q, &args, "pull_requests.", states, query)
 	q.WriteString(" ORDER BY pull_requests.updated_at DESC, pull_requests.id DESC")
 
 	rows, err := db.Query(q.String(), args...)

@@ -948,13 +948,19 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       return json(route, 201, pr)
     }
     // GET: filter by comma-joined / repeated ?state= (absent or empty = any),
-    // matching the server's parsePRStates.
+    // matching the server's parsePRStates, then by ?q= keyword over title/body.
     const wants = url.searchParams
       .getAll("state")
       .flatMap((s) => s.split(","))
       .map((s) => s.trim())
       .filter(Boolean)
-    const out = wants.length ? state.pulls.filter((p) => wants.includes(p.state)) : state.pulls
+    const q = url.searchParams.get("q")?.trim().toLowerCase() || undefined
+    let out = wants.length ? state.pulls.filter((p) => wants.includes(p.state)) : state.pulls
+    if (q) {
+      out = out.filter(
+        (p) => p.title.toLowerCase().includes(q) || (p.body ?? "").toLowerCase().includes(q)
+      )
+    }
     return json(route, 200, [...out].sort((a, b) => b.number - a.number))
   })
 

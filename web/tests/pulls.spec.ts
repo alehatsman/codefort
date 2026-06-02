@@ -87,6 +87,36 @@ test("pull request list filters by state", async ({ page }) => {
   await expect(page.getByText("Open one")).toBeHidden()
 })
 
+test("pull request list searches title and body", async ({ page }) => {
+  await mockApi(page, {
+    branches: ["main", "feature"],
+    pulls: [
+      openPR({ id: 1, number: 1, title: "Add auth middleware" }),
+      openPR({ id: 2, number: 2, title: "Refactor parser" }),
+      // Keyword lives only in the body, not the title.
+      openPR({ id: 3, number: 3, title: "Tweak config", body: "wires up the auth token" }),
+    ],
+  })
+  await routeIntelOff(page)
+
+  await page.goto("/alice/demo/pulls")
+  await expect(page.getByText("Add auth middleware")).toBeVisible()
+  await expect(page.getByText("Refactor parser")).toBeVisible()
+
+  // Typing a keyword narrows to the title hit and the body-only hit; the
+  // parser PR drops out. Debounced into ?q=, so the URL reflects the query.
+  const search = page.getByRole("searchbox", { name: "Search pull requests" })
+  await search.fill("auth")
+  await expect(page.getByText("Add auth middleware")).toBeVisible()
+  await expect(page.getByText("Tweak config")).toBeVisible()
+  await expect(page.getByText("Refactor parser")).toBeHidden()
+  await expect(page).toHaveURL(/[?&]q=auth/)
+
+  // Clearing the box restores the full list and drops the param.
+  await search.fill("")
+  await expect(page.getByText("Refactor parser")).toBeVisible()
+})
+
 test("merge a pull request from its detail page", async ({ page }) => {
   const state = await mockApi(page, {
     branches: ["main", "feature"],

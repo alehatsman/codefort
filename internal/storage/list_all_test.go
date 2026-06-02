@@ -74,7 +74,7 @@ func TestListAllPullsAcrossRepos(t *testing.T) {
 		t.Fatalf("CreatePull bob: %v", err)
 	}
 
-	got, err := ListAllPulls(db, nil)
+	got, err := ListAllPulls(db, nil, "")
 	if err != nil {
 		t.Fatalf("ListAllPulls: %v", err)
 	}
@@ -90,19 +90,28 @@ func TestListAllPullsAcrossRepos(t *testing.T) {
 	}
 
 	// State filter narrows to one.
-	open, err := ListAllPulls(db, []api.PRState{api.PROpen})
+	open, err := ListAllPulls(db, []api.PRState{api.PROpen}, "")
 	if err != nil {
 		t.Fatalf("ListAllPulls open: %v", err)
 	}
 	if len(open) != 2 {
 		t.Errorf("open PRs = %d, want 2 (both born open)", len(open))
 	}
-	merged, err := ListAllPulls(db, []api.PRState{api.PRMerged})
+	merged, err := ListAllPulls(db, []api.PRState{api.PRMerged}, "")
 	if err != nil {
 		t.Fatalf("ListAllPulls merged: %v", err)
 	}
 	if len(merged) != 0 {
 		t.Errorf("merged PRs = %d, want 0", len(merged))
+	}
+
+	// Query filter spans repos and matches title case-insensitively.
+	q, err := ListAllPulls(db, nil, "ALICE")
+	if err != nil {
+		t.Fatalf("ListAllPulls query: %v", err)
+	}
+	if len(q) != 1 || q[0].Repo.Owner != "alice" {
+		t.Errorf("query 'ALICE' = %+v, want only alice's PR", q)
 	}
 }
 

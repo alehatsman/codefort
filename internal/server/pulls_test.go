@@ -118,6 +118,22 @@ func TestHandleListPulls(t *testing.T) {
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("bad state status = %d, want 400", rr.Code)
 	}
+
+	// ?q= keyword-matches the title (case-insensitive).
+	rr = drivePull(t, s, s.handleListPulls, http.MethodGet, "/api/repos/alice/proj/pulls?q=FEATURE", "agent#7", "", nil)
+	var matched []api.PullRequest
+	json.Unmarshal(rr.Body.Bytes(), &matched)
+	if len(matched) != 1 {
+		t.Errorf("q=FEATURE returned %d, want 1", len(matched))
+	}
+
+	// A non-matching ?q= returns nothing.
+	rr = drivePull(t, s, s.handleListPulls, http.MethodGet, "/api/repos/alice/proj/pulls?q=nomatch", "agent#7", "", nil)
+	var none []api.PullRequest
+	json.Unmarshal(rr.Body.Bytes(), &none)
+	if len(none) != 0 {
+		t.Errorf("q=nomatch returned %d, want 0", len(none))
+	}
 }
 
 func TestHandleGetPullDetailEmbedsCompareAndComments(t *testing.T) {

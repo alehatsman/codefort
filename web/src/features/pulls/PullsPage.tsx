@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import "./pulls.css"
 import { usePulls } from "@/api/queries"
@@ -34,9 +35,31 @@ export default function PullsPage() {
           .map((s) => s.trim())
           .filter((s): s is PRState => PR_STATES.includes(s as PRState))
 
+  // Keyword search lives in the URL as ?q=, matched against title/body by the
+  // server. Debounced into the param (like the issue list) so typing doesn't
+  // refetch on every keystroke; the committed value drives the query.
+  const committedQuery = params.get("q") ?? ""
+  const [search, setSearch] = useState(committedQuery)
+  useEffect(() => {
+    const trimmed = search.trim()
+    if (trimmed === committedQuery) return
+    const t = setTimeout(() => {
+      setParams(
+        (prev) => {
+          const p = new URLSearchParams(prev)
+          if (trimmed) p.set("q", trimmed)
+          else p.delete("q")
+          return p
+        },
+        { replace: true }
+      )
+    }, 250)
+    return () => clearTimeout(t)
+  }, [search, committedQuery, setParams])
+
   // Empty selection => no state param => the server returns every state, the
   // same "no filter = all" behavior the issue list has.
-  const { data, isLoading, error } = usePulls(owner, repo, activeStates.join(","))
+  const { data, isLoading, error } = usePulls(owner, repo, activeStates.join(","), committedQuery)
 
   function toggleState(s: PRState) {
     const next = activeStates.includes(s)
@@ -68,6 +91,14 @@ export default function PullsPage() {
       </div>
 
       <div className="filters">
+        <input
+          type="search"
+          className="list-search"
+          placeholder="Search title or body…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search pull requests"
+        />
         <div className="filter-row">
           <span className="filter-label">state:</span>
           {PR_STATES.map((s) => (

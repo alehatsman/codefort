@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/alehatsman/moongit/internal/api"
 	"github.com/alehatsman/moongit/internal/storage"
@@ -32,14 +33,15 @@ func (s *Server) handleListAllIssues(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleListAllPulls returns pull requests across every repo, newest-updated
-// first. Same ?state= filter as the per-repo list.
+// first. Same ?state= and ?q= (title/body keyword) filters as the per-repo list.
 func (s *Server) handleListAllPulls(w http.ResponseWriter, r *http.Request) {
 	states, err := parsePRStates(r.URL.Query()["state"])
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	pulls, err := storage.ListAllPulls(s.rdb, states)
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	pulls, err := storage.ListAllPulls(s.rdb, states, query)
 	if err != nil {
 		s.logger.Error("list all pulls", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")

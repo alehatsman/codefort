@@ -125,7 +125,7 @@ export default function IssuesPage() {
       <div className="filters">
         <input
           type="search"
-          className="issues__search"
+          className="list-search"
           placeholder="Search title or body, or #number…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}

@@ -59,7 +59,7 @@ func TestListPullsFilterByState(t *testing.T) {
 		t.Fatalf("merge: %v", err)
 	}
 
-	all, err := ListPulls(db, repoID, nil)
+	all, err := ListPulls(db, repoID, nil, "")
 	if err != nil {
 		t.Fatalf("ListPulls all: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestListPullsFilterByState(t *testing.T) {
 		t.Fatalf("all = %d rows, first #%d, want 3 newest-first", len(all), all[0].Number)
 	}
 
-	onlyOpen, err := ListPulls(db, repoID, []api.PRState{api.PROpen})
+	onlyOpen, err := ListPulls(db, repoID, []api.PRState{api.PROpen}, "")
 	if err != nil {
 		t.Fatalf("ListPulls open: %v", err)
 	}
@@ -76,12 +76,65 @@ func TestListPullsFilterByState(t *testing.T) {
 		t.Fatalf("open filter = %+v, want [#%d]", onlyOpen, open.Number)
 	}
 
-	openOrMerged, err := ListPulls(db, repoID, []api.PRState{api.PROpen, api.PRMerged})
+	openOrMerged, err := ListPulls(db, repoID, []api.PRState{api.PROpen, api.PRMerged}, "")
 	if err != nil {
 		t.Fatalf("ListPulls open|merged: %v", err)
 	}
 	if len(openOrMerged) != 2 {
 		t.Fatalf("open|merged filter = %d rows, want 2", len(openOrMerged))
+	}
+}
+
+// TestListPullsFilterByQuery covers the case-insensitive title/body keyword
+// filter, including that it composes with the state filter and that LIKE
+// wildcards in the term are matched literally.
+func TestListPullsFilterByQuery(t *testing.T) {
+	db, repoID := seedRepo(t)
+
+	auth := mustCreatePull(t, db, repoID, "main", "f1", "Add auth middleware")
+	mustCreatePull(t, db, repoID, "main", "f2", "Refactor parser")
+	// Keyword lives only in the body, not the title.
+	body, err := CreatePull(db, repoID, api.CreatePullRequest{
+		Base: "main", Head: "f3", Title: "Tweak config", Body: "wires up the auth token", Author: "alice",
+	})
+	if err != nil {
+		t.Fatalf("CreatePull with body: %v", err)
+	}
+	// Title containing a literal % — must not be treated as a wildcard.
+	pct := mustCreatePull(t, db, repoID, "main", "f4", "Bump coverage to 80%")
+
+	// Matches the title hit and the body-only hit, case-insensitively; excludes
+	// the parser PR. Newest number first.
+	got, err := ListPulls(db, repoID, nil, "AUTH")
+	if err != nil {
+		t.Fatalf("ListPulls query: %v", err)
+	}
+	if len(got) != 2 || got[0].Number != body.Number || got[1].Number != auth.Number {
+		t.Fatalf("query 'AUTH' = %+v, want [#%d, #%d]", got, body.Number, auth.Number)
+	}
+
+	// Composes with the state filter: closing the body PR drops it from an
+	// open-only query.
+	closed := api.PRClosed
+	if _, err := UpdatePull(db, repoID, body.Number, nil, nil, &closed); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	openAuth, err := ListPulls(db, repoID, []api.PRState{api.PROpen}, "auth")
+	if err != nil {
+		t.Fatalf("ListPulls open+query: %v", err)
+	}
+	if len(openAuth) != 1 || openAuth[0].Number != auth.Number {
+		t.Fatalf("open+query = %+v, want [#%d]", openAuth, auth.Number)
+	}
+
+	// A % in the query is a literal, not a wildcard: "80%" matches only the
+	// coverage PR, not every title.
+	pctHit, err := ListPulls(db, repoID, nil, "80%")
+	if err != nil {
+		t.Fatalf("ListPulls literal-pct: %v", err)
+	}
+	if len(pctHit) != 1 || pctHit[0].Number != pct.Number {
+		t.Fatalf("query '80%%' = %+v, want [#%d]", pctHit, pct.Number)
 	}
 }
 

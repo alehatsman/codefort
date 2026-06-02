@@ -155,9 +155,10 @@ export const api = {
   // Each row carries its owning repo (`repo`) so it can link to the per-repo
   // detail route. Query params mirror the per-repo list endpoints.
   listAllIssues: (query = "") => request<IssueWithRepo[]>(`/api/issues${query ? `?${query}` : ""}`),
-  listAllPulls: (state = "") => {
+  listAllPulls: (state = "", query = "") => {
     const q = new URLSearchParams()
     if (state) q.set("state", state)
+    if (query) q.set("q", query)
     const qs = q.toString()
     return request<PullRequestWithRepo[]>(`/api/pulls${qs ? `?${qs}` : ""}`)
   },
@@ -301,9 +302,10 @@ export const api = {
     return request<Compare>(`/api/repos/${owner}/${repo}/compare?${q.toString()}`)
   },
 
-  listPulls: (owner: string, repo: string, state = "") => {
+  listPulls: (owner: string, repo: string, state = "", query = "") => {
     const q = new URLSearchParams()
     if (state) q.set("state", state)
+    if (query) q.set("q", query)
     const qs = q.toString()
     return request<PullRequest[]>(`/api/repos/${owner}/${repo}/pulls${qs ? `?${qs}` : ""}`)
   },

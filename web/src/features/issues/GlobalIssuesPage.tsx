@@ -65,7 +65,7 @@ export default function GlobalIssuesPage() {
       <div className="filters">
         <input
           type="search"
-          className="issues__search"
+          className="list-search"
           placeholder="Search title or body across all repos…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
