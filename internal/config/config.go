@@ -114,10 +114,13 @@ type Config struct {
 	// http://host.docker.internal:<port-of-Addr>. Set via MOONGIT_AGENT_SERVER_URL.
 	AgentServerURL string
 
-	// AgentMooncakeMaxIterations caps the plan→apply iterations a single
-	// mooncake-agent turn runs (`mooncake agent run --max-iterations`).
-	// Only used by the mooncake-agent execution model (#110). Set via
-	// MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS.
+	// AgentMooncakeMaxIterations is the step-loop backstop for a mooncake-agent
+	// turn (`mooncake agent run --max-iterations`). Under --style step the loop
+	// is meant to end on its own terminal signal (goal reached / stall); this is
+	// just the ceiling for a planner that never converges, with the per-turn
+	// wall-clock (AgentTurnTimeout) as the real governor. Defaults high (run
+	// until done); set a lower value via MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS to
+	// pin a tighter cap. Only used by the mooncake-agent execution model (#110).
 	AgentMooncakeMaxIterations int
 
 	// mooncake-agent policy (#110/#11): mooncake enforces these per run at

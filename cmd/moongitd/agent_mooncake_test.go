@@ -24,11 +24,14 @@ func TestMooncakeExecutorArgv(t *testing.T) {
 	if argv[0] != "mooncake" || argv[1] != "agent" || argv[2] != "run" {
 		t.Errorf("argv prefix = %v, want mooncake agent run", argv[:3])
 	}
-	if !argvHas(argv, "--goal", "fix the bug") {
-		t.Errorf("missing --goal: %v", argv)
+	if !argvHas(argv, "--goal", composeMooncakeGoal("fix the bug")) {
+		t.Errorf("--goal should be the message wrapped in the working-style preamble: %v", argv)
 	}
 	if !argvHas(argv, "--provider", "anthropic-cli") {
 		t.Errorf("missing --provider anthropic-cli: %v", argv)
+	}
+	if !argvHas(argv, "--style", "step") {
+		t.Errorf("missing --style step: %v", argv)
 	}
 	if !argvHas(argv, "--output-format", "json") {
 		t.Errorf("missing --output-format json: %v", argv)
@@ -96,12 +99,12 @@ func TestMooncakeExecutorAllowShellOverride(t *testing.T) {
 }
 
 func TestMooncakeExecutorArgvDefaultIterations(t *testing.T) {
-	// nil cfg / non-positive value falls back to the built-in default.
-	if argv := newMooncakeExecutor(nil, false).Argv(turnInput{message: "g"}); !argvHas(argv, "--max-iterations", "3") {
-		t.Errorf("nil cfg should default to 3 iterations: %v", argv)
+	// nil cfg / non-positive value falls back to the run-until-done backstop.
+	if argv := newMooncakeExecutor(nil, false).Argv(turnInput{message: "g"}); !argvHas(argv, "--max-iterations", "100") {
+		t.Errorf("nil cfg should default to the backstop (100): %v", argv)
 	}
-	if argv := newMooncakeExecutor(&config.Config{AgentMooncakeMaxIterations: 0}, false).Argv(turnInput{message: "g"}); !argvHas(argv, "--max-iterations", "3") {
-		t.Errorf("zero iterations should default to 3: %v", argv)
+	if argv := newMooncakeExecutor(&config.Config{AgentMooncakeMaxIterations: 0}, false).Argv(turnInput{message: "g"}); !argvHas(argv, "--max-iterations", "100") {
+		t.Errorf("zero iterations should default to the backstop (100): %v", argv)
 	}
 }
 

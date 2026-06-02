@@ -10,14 +10,17 @@ import (
 	"github.com/alehatsman/moongit/internal/config"
 )
 
-// mooncakeMaxIterationsDefault is the fallback iteration cap when config
-// doesn't set one (or sets a non-positive value). Kept low: on a
-// deterministic step failure the agent re-runs the whole regenerated plan
-// each iteration rather than adapting, so a high cap just burns minutes
-// re-failing the same step (dex run #21 ground through 10 ≈ 9 min). 3 gives
-// the planner a couple of genuine retries before giving up; raise via
-// MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS for tasks that legitimately need more.
-const mooncakeMaxIterationsDefault = 3
+// mooncakeMaxIterationsDefault is the run-until-done backstop, not a working
+// budget. Under --style step (one action per iteration) a real fix needs many
+// iterations — read, edit, verify, react — so the loop is meant to end on its
+// OWN terminal signal: step_done (the planner emits an empty plan = "goal
+// reached") or no_progress (a stall). mooncake has no unbounded mode — 0 or a
+// negative value resets to its built-in 5 — so we pass a high explicit cap and
+// let the per-turn wall-clock (AgentTurnTimeout, enforced as a process kill in
+// runAgentTurn) be the real ceiling. The cap only catches a planner that never
+// converges yet never stalls. Operators can still pin a lower limit via
+// MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS.
+const mooncakeMaxIterationsDefault = 100
 
 // mooncakeExecutor is the mooncake-agent model: each turn runs
 // `mooncake agent run` inside the agent container. Claude is used only as
@@ -81,18 +84,40 @@ func withoutShellCmd(deny []string) []string {
 
 func (*mooncakeExecutor) Model() string { return agentModelMooncakeAgent }
 
-// Argv builds the mooncake invocation for a turn. in.goal() (the issue body on
-// turn 1, a follow-up message thereafter) is the goal; mooncake has no resumable
-// session, so the persisted /work checkout is the carried state and
-// sessionID/resume are unused (and no system prompt is composed for it).
-// --output-format json gives the NDJSON event stream Translate parses;
-// --auto-apply runs unattended.
+// mooncakeGoalPreamble orients the mooncake planner toward acting instead of
+// deliberating. The claude-edit system prompt can't be reused here — it tells
+// the agent shell is unavailable, which is false under mooncake (and doubly so
+// with allow_shell). Paired with --style step, it nudges the planner to commit
+// to one concrete next action rather than authoring (and re-authoring) a long
+// plan up front, which is the behavior that had runs burn a whole turn thinking.
+const mooncakeGoalPreamble = "You are an autonomous coding agent resolving a task in the /work checkout. " +
+	"Work in small concrete steps: take the single next action that makes real progress " +
+	"— read a file, make an edit, run a check — then react to its result and continue. " +
+	"Don't draft a long plan or deliberate at length up front; act, observe, and keep going " +
+	"until the task is genuinely done, then stop. Stay within the task's scope.\n\n"
+
+// composeMooncakeGoal wraps a turn's work text in the working-style preamble.
+// It rides every turn (turn 1's issue and later follow-ups alike) because
+// mooncake has no session to carry orientation across turns.
+func composeMooncakeGoal(goal string) string {
+	return mooncakeGoalPreamble + goal
+}
+
+// Argv builds the mooncake invocation for a turn. The goal is the turn's work
+// (issue body on turn 1, follow-up message after) wrapped in a working-style
+// preamble (composeMooncakeGoal); mooncake has no resumable session, so the
+// persisted /work checkout is the carried state and sessionID/resume are unused.
+// --style step makes the planner emit ONE action per iteration and re-plan with
+// its result, so it works incrementally toward done instead of authoring a whole
+// plan up front (which had it deliberating for minutes without acting). It rides
+// every turn since there's no session to carry it. --output-format json gives the
+// NDJSON event stream Translate parses; --auto-apply runs unattended.
 func (p *mooncakeExecutor) Argv(in turnInput) []string {
 	argv := []string{
 		"mooncake", "agent", "run",
-		"--goal", in.goal(),
+		"--goal", composeMooncakeGoal(in.goal()),
 		"--provider", "anthropic-cli",
-		"--style", "plan",
+		"--style", "step",
 		"--auto-apply",
 		"--max-iterations", strconv.Itoa(p.maxIterations),
 		"--output-format", "json",
