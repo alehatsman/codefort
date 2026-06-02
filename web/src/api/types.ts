@@ -47,6 +47,28 @@ export interface Comment {
   created_at: string
 }
 
+// RepoRef tags a globally-listed row (issue / PR / run) with its owning repo so
+// the cross-repo views can link each entry back to the per-repo detail route.
+// Mirrors api.RepoRef.
+export interface RepoRef {
+  owner: string
+  name: string
+}
+
+// The cross-repo aggregate shapes returned by GET /api/issues, /api/pulls,
+// /api/runs — the per-repo row plus its owning repo. Mirror api.*WithRepo.
+export interface IssueWithRepo extends Issue {
+  repo: RepoRef
+}
+
+export interface PullRequestWithRepo extends PullRequest {
+  repo: RepoRef
+}
+
+export interface CIRunWithRepo extends CIRun {
+  repo: RepoRef
+}
+
 export interface CreateRepoInput {
   owner: string
   name: string

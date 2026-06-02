@@ -11,6 +11,9 @@ export const keys = {
   sshKeys: () => ["sshKeys"] as const,
   agentSettings: () => ["agentSettings"] as const,
   repos: () => ["repos"] as const,
+  allIssues: (query = "") => (query ? (["allIssues", query] as const) : (["allIssues"] as const)),
+  allPulls: (state = "") => ["allPulls", state] as const,
+  allRuns: (kind = "") => ["allRuns", kind] as const,
   repo: (owner: string, repo: string) => ["repo", owner, repo] as const,
   refs: (owner: string, repo: string) => ["refs", owner, repo] as const,
   tree: (owner: string, repo: string, path: string, ref = "") =>
@@ -91,6 +94,33 @@ export function useRepos() {
   return useQuery({
     queryKey: keys.repos(),
     queryFn: () => api.listRepos(),
+  })
+}
+
+// Cross-repo aggregate feeds for the top-level (non-repo) list views. Each row
+// carries its owning repo, so the list pages can link into the per-repo detail
+// routes without a separate lookup.
+export function useAllIssues(query: string) {
+  return useQuery({
+    queryKey: keys.allIssues(query),
+    queryFn: () => api.listAllIssues(query),
+  })
+}
+
+export function useAllPulls(state = "") {
+  return useQuery({
+    queryKey: keys.allPulls(state),
+    queryFn: () => api.listAllPulls(state),
+  })
+}
+
+export function useAllRuns(kind: "" | "ci" | "agent" = "") {
+  return useQuery({
+    queryKey: keys.allRuns(kind),
+    queryFn: () => api.listAllRuns(kind),
+    // Poll the fleet-wide feed while any run is still live, mirroring useCIRuns,
+    // so freshly triggered runs tick toward terminal without a manual refresh.
+    refetchInterval: (q) => (q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false),
   })
 }
 

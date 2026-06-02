@@ -488,6 +488,34 @@ type CIRunDetail struct {
 	Turns []AgentTurn `json:"turns,omitempty"`
 }
 
+// RepoRef identifies the repo a globally-listed item belongs to. The
+// cross-repo aggregate endpoints (/api/issues, /api/pulls, /api/runs) attach it
+// to every row so a fleet-wide list view can link each entry back to its repo's
+// detail route. Number stays per-repo, so a row is addressed by Repo + Number.
+type RepoRef struct {
+	Owner string `json:"owner"`
+	Name  string `json:"name"`
+}
+
+// IssueWithRepo is an Issue plus its owning repo, returned by GET /api/issues.
+type IssueWithRepo struct {
+	Issue
+	Repo RepoRef `json:"repo"`
+}
+
+// PullRequestWithRepo is a PullRequest plus its owning repo, returned by
+// GET /api/pulls.
+type PullRequestWithRepo struct {
+	PullRequest
+	Repo RepoRef `json:"repo"`
+}
+
+// CIRunWithRepo is a CIRun plus its owning repo, returned by GET /api/runs.
+type CIRunWithRepo struct {
+	CIRun
+	Repo RepoRef `json:"repo"`
+}
+
 // AgentTurn is one human follow-up message in an agent run's conversation.
 type AgentTurn struct {
 	Seq        int        `json:"seq"`

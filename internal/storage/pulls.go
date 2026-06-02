@@ -174,6 +174,13 @@ func scanPull(s scanner) (api.PullRequest, error) {
 	); err != nil {
 		return pr, err
 	}
+	decodePull(&pr, body, merged, mergeBase, mergeHead, created, updated)
+	return pr, nil
+}
+
+// decodePull fills a PullRequest's nullable/time fields from the raw column
+// values, shared by scanPull and the cross-repo aggregate scan.
+func decodePull(pr *api.PullRequest, body sql.NullString, merged sql.NullInt64, mergeBase, mergeHead sql.NullString, created, updated int64) {
 	pr.Body = body.String
 	pr.CreatedAt = time.Unix(created, 0).UTC()
 	pr.UpdatedAt = time.Unix(updated, 0).UTC()
@@ -183,5 +190,57 @@ func scanPull(s scanner) (api.PullRequest, error) {
 	}
 	pr.MergeBaseSHA = mergeBase.String
 	pr.MergeHeadSHA = mergeHead.String
-	return pr, nil
+}
+
+// ListAllPulls returns pull requests across every repo, newest-updated first,
+// each tagged with its owning repo. It backs GET /api/pulls. states filters by
+// OR-match (nil/empty = any), as in ListPulls; ordering is by recency
+// (updated_at) since per-repo PR numbers aren't globally orderable.
+func ListAllPulls(db *sql.DB, states []api.PRState) ([]api.PullRequestWithRepo, error) {
+	q := strings.Builder{}
+	// Qualify with pull_requests.: id/created_at/updated_at also exist on the
+	// joined repos/users tables, so a bare pullColumns would be ambiguous.
+	q.WriteString(`SELECT pull_requests.id, pull_requests.number, pull_requests.base_ref, pull_requests.head_ref, pull_requests.title, pull_requests.body, pull_requests.author, pull_requests.state, pull_requests.created_at, pull_requests.updated_at, pull_requests.merged_at, pull_requests.merge_base_sha, pull_requests.merge_head_sha, users.name, repos.name
+		FROM pull_requests
+		JOIN repos ON repos.id = pull_requests.repo_id
+		JOIN users ON users.id = repos.owner_id
+		WHERE 1=1`)
+	args := []any{}
+	if len(states) > 0 {
+		q.WriteString(" AND pull_requests.state IN (")
+		for i, s := range states {
+			if i > 0 {
+				q.WriteString(",")
+			}
+			q.WriteString("?")
+			args = append(args, string(s))
+		}
+		q.WriteString(")")
+	}
+	q.WriteString(" ORDER BY pull_requests.updated_at DESC, pull_requests.id DESC")
+
+	rows, err := db.Query(q.String(), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]api.PullRequestWithRepo, 0)
+	for rows.Next() {
+		var pr api.PullRequest
+		var body sql.NullString
+		var merged sql.NullInt64
+		var mergeBase, mergeHead sql.NullString
+		var created, updated int64
+		var owner, name string
+		if err := rows.Scan(
+			&pr.ID, &pr.Number, &pr.BaseRef, &pr.HeadRef, &pr.Title, &body, &pr.Author, &pr.State,
+			&created, &updated, &merged, &mergeBase, &mergeHead, &owner, &name,
+		); err != nil {
+			return nil, err
+		}
+		decodePull(&pr, body, merged, mergeBase, mergeHead, created, updated)
+		out = append(out, api.PullRequestWithRepo{PullRequest: pr, Repo: api.RepoRef{Owner: owner, Name: name}})
+	}
+	return out, rows.Err()
 }

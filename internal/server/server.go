@@ -114,6 +114,11 @@ func (s *Server) apiHandler() http.Handler {
 
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 
+	// Cross-repo aggregate feeds backing the top-level (non-repo) list views.
+	mux.HandleFunc("GET /api/issues", s.handleListAllIssues)
+	mux.HandleFunc("GET /api/pulls", s.handleListAllPulls)
+	mux.HandleFunc("GET /api/runs", s.handleListAllRuns)
+
 	mux.HandleFunc("GET /api/tokens", s.handleListTokens)
 	mux.HandleFunc("POST /api/tokens", s.handleCreateToken)
 	mux.HandleFunc("DELETE /api/tokens/{id}", s.handleRevokeToken)

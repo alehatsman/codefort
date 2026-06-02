@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom"
 import { clearToken } from "../api/client"
 import { useRepo } from "../api/queries"
+import GlobalTabs from "./GlobalTabs"
 import RepoTabs from "./RepoTabs"
 
 interface Props {
@@ -35,8 +36,10 @@ export default function Layout({ children, onSignOut }: Props) {
           <Link to="/" className="brand">
             moongit
           </Link>
-          {ctx && (
+          {ctx ? (
             <RepoTabs owner={ctx.owner} repo={ctx.repo} openIssues={repoQ.data?.open_issues} />
+          ) : (
+            <GlobalTabs />
           )}
         </div>
         <div className="topbar__actions">

@@ -1706,6 +1706,11 @@ a.file-tree__commit:hover {
   white-space: nowrap;
   padding-top: var(--space-1);
 }
+/* Owning-repo slug shown in the cross-repo (global) issue/PR lists. */
+.issue-row__repo {
+  font-weight: var(--weight-medium);
+  color: var(--fg);
+}
 
 /* State icons ---------------------------------------------------------- */
 .state-icon {
@@ -3155,6 +3160,10 @@ h3 {
   border-bottom: 1px solid var(--border-muted);
 }
 .ci-runs__num {
+  font-weight: var(--weight-medium);
+}
+/* Owning-repo link shown in the cross-repo (global) Pipelines/Agents tables. */
+.ci-runs__repo {
   font-weight: var(--weight-medium);
 }
 .ci-runs__sha {

@@ -5,6 +5,9 @@ import TokenGate from "./components/TokenGate"
 import NotFound from "./components/NotFound"
 import { getToken } from "./api/client"
 import ReposPage from "./routes/ReposPage"
+import GlobalIssuesPage from "./routes/GlobalIssuesPage"
+import GlobalPullsPage from "./routes/GlobalPullsPage"
+import GlobalRunsPage from "./routes/GlobalRunsPage"
 import RepoPage from "./routes/RepoPage"
 import CommitsPage from "./routes/CommitsPage"
 import CommitPage from "./routes/CommitPage"
@@ -38,6 +41,12 @@ export default function App() {
     <Layout onSignOut={() => setHasToken(false)}>
       <Routes>
         <Route path="/" element={<ReposPage />} />
+        {/* Top-level cross-repo aggregate views (the global nav tabs). Static
+            paths, so they rank above the /:owner/:repo dynamic route. */}
+        <Route path="/issues" element={<GlobalIssuesPage />} />
+        <Route path="/pulls" element={<GlobalPullsPage />} />
+        <Route path="/pipelines" element={<GlobalRunsPage kind="ci" />} />
+        <Route path="/agents" element={<GlobalRunsPage kind="agent" />} />
         <Route path="/:owner/:repo" element={<RepoPage />} />
         <Route path="/:owner/:repo/tree/*" element={<RepoPage />} />
         <Route path="/:owner/:repo/blob/*" element={<RepoPage />} />

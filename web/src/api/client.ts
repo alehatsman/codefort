@@ -37,6 +37,9 @@ import type {
   IntelSearchInput,
   IntelSearchResult,
   Issue,
+  IssueWithRepo,
+  PullRequestWithRepo,
+  CIRunWithRepo,
   Repo,
   SSHKey,
   Token,
@@ -145,6 +148,24 @@ export const api = {
   createSSHKey: (body: CreateSSHKeyInput) =>
     request<SSHKey>("/api/ssh-keys", { method: "POST", body }),
   deleteSSHKey: (id: number) => request<void>(`/api/ssh-keys/${id}`, { method: "DELETE" }),
+
+  // Cross-repo aggregate feeds backing the top-level (non-repo) list views.
+  // Each row carries its owning repo (`repo`) so it can link to the per-repo
+  // detail route. Query params mirror the per-repo list endpoints.
+  listAllIssues: (query = "") => request<IssueWithRepo[]>(`/api/issues${query ? `?${query}` : ""}`),
+  listAllPulls: (state = "") => {
+    const q = new URLSearchParams()
+    if (state) q.set("state", state)
+    const qs = q.toString()
+    return request<PullRequestWithRepo[]>(`/api/pulls${qs ? `?${qs}` : ""}`)
+  },
+  listAllRuns: (kind = "", limit = 0) => {
+    const q = new URLSearchParams()
+    if (kind) q.set("kind", kind)
+    if (limit) q.set("limit", String(limit))
+    const qs = q.toString()
+    return request<CIRunWithRepo[]>(`/api/runs${qs ? `?${qs}` : ""}`)
+  },
 
   listRepos: () => request<Repo[]>("/api/repos"),
   createRepo: (body: CreateRepoInput) => request<Repo>("/api/repos", { method: "POST", body }),

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -582,6 +583,13 @@ func scanRun(s scanner) (CIRun, error) {
 	); err != nil {
 		return r, err
 	}
+	decodeRun(&r, kind, status, issueNum, claimed, started, finished, created, allowShell)
+	return r, nil
+}
+
+// decodeRun fills a CIRun's typed/nullable fields from the raw column values,
+// shared by scanRun and the cross-repo aggregate scan so they never drift.
+func decodeRun(r *CIRun, kind, status string, issueNum, claimed, started, finished sql.NullInt64, created int64, allowShell int) {
 	r.Kind = RunKind(kind)
 	r.MooncakeAllowShell = allowShell != 0
 	if issueNum.Valid {
@@ -593,7 +601,69 @@ func scanRun(s scanner) (CIRun, error) {
 	r.ClaimedAt = nullTime(claimed)
 	r.StartedAt = nullTime(started)
 	r.FinishedAt = nullTime(finished)
-	return r, nil
+}
+
+// RunWithRepo pairs a CIRun with its owning repo's owner/name, the shape
+// ListAllRuns returns so the server can attach a RepoRef when serializing.
+type RunWithRepo struct {
+	Run   CIRun
+	Owner string
+	Name  string
+}
+
+// ListAllRuns returns runs across every repo, newest-created first, each tagged
+// with its owning repo. It backs GET /api/runs. kind ("" = any) filters to a
+// single run kind so the fleet-wide Pipelines (ci) and Agents (agent) tabs each
+// show only their own. limit defaults to 100, capped at 1000. Ordering is by
+// created_at (per-repo run numbers aren't globally orderable), id breaking ties.
+func ListAllRuns(db *sql.DB, kind RunKind, limit int) ([]RunWithRepo, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	q := strings.Builder{}
+	// Qualify with ci_runs.: id/repo_id/created_at also exist on the joined
+	// repos/users tables, so a bare runColumns would be ambiguous.
+	q.WriteString(`SELECT ci_runs.id, ci_runs.repo_id, ci_runs.number, ci_runs.kind, ci_runs.issue_number, ci_runs.execution_model, ci_runs.mooncake_allow_shell, ci_runs.commit_sha, ci_runs.commit_msg, ci_runs.commit_author, ci_runs.ref, ci_runs.event, ci_runs.trigger, ci_runs.status, ci_runs.claimed_at, ci_runs.created_at, ci_runs.started_at, ci_runs.finished_at, users.name, repos.name
+		FROM ci_runs
+		JOIN repos ON repos.id = ci_runs.repo_id
+		JOIN users ON users.id = repos.owner_id
+		WHERE 1=1`)
+	args := []any{}
+	if kind != "" {
+		q.WriteString(" AND ci_runs.kind = ?")
+		args = append(args, string(kind))
+	}
+	q.WriteString(" ORDER BY ci_runs.created_at DESC, ci_runs.id DESC LIMIT ?")
+	args = append(args, limit)
+
+	rows, err := db.Query(q.String(), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]RunWithRepo, 0)
+	for rows.Next() {
+		var r CIRun
+		var kindCol, status string
+		var issueNum, claimed, started, finished sql.NullInt64
+		var created int64
+		var allowShell int
+		var owner, name string
+		if err := rows.Scan(
+			&r.ID, &r.RepoID, &r.Number, &kindCol, &issueNum, &r.ExecutionModel, &allowShell, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
+			&r.Ref, &r.Event, &r.Trigger,
+			&status, &claimed, &created, &started, &finished, &owner, &name,
+		); err != nil {
+			return nil, err
+		}
+		decodeRun(&r, kindCol, status, issueNum, claimed, started, finished, created, allowShell)
+		out = append(out, RunWithRepo{Run: r, Owner: owner, Name: name})
+	}
+	return out, rows.Err()
 }
 
 const jobColumns = "id, run_id, name, needs, status, exit_code, created_at, started_at, finished_at"

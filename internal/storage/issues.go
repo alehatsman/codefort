@@ -278,36 +278,7 @@ func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error
 	q := strings.Builder{}
 	q.WriteString(`SELECT ` + issueColumns + ` FROM issues WHERE repo_id = ?`)
 	args := []any{repoID}
-
-	if len(filter.States) > 0 {
-		q.WriteString(" AND state IN (")
-		for i, s := range filter.States {
-			if i > 0 {
-				q.WriteString(",")
-			}
-			q.WriteString("?")
-			args = append(args, string(s))
-		}
-		q.WriteString(")")
-	}
-	if filter.Assignee == "null" {
-		q.WriteString(" AND assignee IS NULL")
-	} else if filter.Assignee != "" {
-		q.WriteString(" AND assignee = ?")
-		args = append(args, filter.Assignee)
-	}
-	if filter.Author != "" {
-		q.WriteString(" AND author = ?")
-		args = append(args, filter.Author)
-	}
-	if filter.Query != "" {
-		// LIKE is case-insensitive for ASCII in SQLite by default, which is
-		// fine for a keyword search. Match the same %term% against title and
-		// body; wildcards in the term are escaped so they're taken literally.
-		pat := "%" + likeEscape(filter.Query) + "%"
-		q.WriteString(` AND (title LIKE ? ESCAPE '\' OR body LIKE ? ESCAPE '\')`)
-		args = append(args, pat, pat)
-	}
+	appendIssueFilters(&q, &args, filter)
 
 	limit := filter.Limit
 	if limit <= 0 {
@@ -366,6 +337,13 @@ func scanIssue(s scanner) (api.Issue, error) {
 	); err != nil {
 		return iss, err
 	}
+	decodeIssue(&iss, assignee, claimed, created, updated)
+	return iss, nil
+}
+
+// decodeIssue fills an Issue's nullable/time fields from the raw column values,
+// shared by scanIssue and the cross-repo aggregate scan so the two never drift.
+func decodeIssue(iss *api.Issue, assignee sql.NullString, claimed sql.NullInt64, created, updated int64) {
 	if assignee.Valid {
 		iss.Assignee = &assignee.String
 	}
@@ -375,5 +353,93 @@ func scanIssue(s scanner) (api.Issue, error) {
 	}
 	iss.CreatedAt = time.Unix(created, 0).UTC()
 	iss.UpdatedAt = time.Unix(updated, 0).UTC()
-	return iss, nil
+}
+
+// appendIssueFilters writes the shared state/assignee/author/query predicates
+// onto an in-progress issue query, used by both ListIssues and ListAllIssues.
+// Every referenced column is unique to the issues table, so the clauses stay
+// correct unqualified even under the repos/users join the aggregate query adds.
+func appendIssueFilters(q *strings.Builder, args *[]any, filter ListFilter) {
+	if len(filter.States) > 0 {
+		q.WriteString(" AND state IN (")
+		for i, s := range filter.States {
+			if i > 0 {
+				q.WriteString(",")
+			}
+			q.WriteString("?")
+			*args = append(*args, string(s))
+		}
+		q.WriteString(")")
+	}
+	if filter.Assignee == "null" {
+		q.WriteString(" AND assignee IS NULL")
+	} else if filter.Assignee != "" {
+		q.WriteString(" AND assignee = ?")
+		*args = append(*args, filter.Assignee)
+	}
+	if filter.Author != "" {
+		q.WriteString(" AND author = ?")
+		*args = append(*args, filter.Author)
+	}
+	if filter.Query != "" {
+		// LIKE is case-insensitive for ASCII in SQLite by default, which is
+		// fine for a keyword search. Match the same %term% against title and
+		// body; wildcards in the term are escaped so they're taken literally.
+		pat := "%" + likeEscape(filter.Query) + "%"
+		q.WriteString(` AND (title LIKE ? ESCAPE '\' OR body LIKE ? ESCAPE '\')`)
+		*args = append(*args, pat, pat)
+	}
+}
+
+// ListAllIssues returns issues across every repo, newest-updated first, each
+// tagged with its owning repo. It backs GET /api/issues (the fleet-wide Issues
+// view). The state/assignee/author/query filters and limit cap behave as in
+// ListIssues; Sort is ignored — per-repo issue numbers aren't globally
+// orderable, so the cross-repo feed is always by recency (updated_at), with
+// issues.id breaking ties for a stable order.
+func ListAllIssues(db *sql.DB, filter ListFilter) ([]api.IssueWithRepo, error) {
+	q := strings.Builder{}
+	// Qualify with the issues. prefix: id/created_at also exist on repos/users
+	// under the join, so a bare issueColumns would be ambiguous.
+	q.WriteString(`SELECT issues.id, issues.number, issues.title, issues.body, issues.author, issues.state, issues.assignee, issues.claimed_at, issues.created_at, issues.updated_at, users.name, repos.name
+		FROM issues
+		JOIN repos ON repos.id = issues.repo_id
+		JOIN users ON users.id = repos.owner_id
+		WHERE 1=1`)
+	args := []any{}
+	appendIssueFilters(&q, &args, filter)
+
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	q.WriteString(" ORDER BY issues.updated_at DESC, issues.id DESC LIMIT ?")
+	args = append(args, limit)
+
+	rows, err := db.Query(q.String(), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]api.IssueWithRepo, 0)
+	for rows.Next() {
+		var iss api.Issue
+		var assignee sql.NullString
+		var claimed sql.NullInt64
+		var created, updated int64
+		var owner, name string
+		if err := rows.Scan(
+			&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State,
+			&assignee, &claimed, &created, &updated, &owner, &name,
+		); err != nil {
+			return nil, err
+		}
+		decodeIssue(&iss, assignee, claimed, created, updated)
+		out = append(out, api.IssueWithRepo{Issue: iss, Repo: api.RepoRef{Owner: owner, Name: name}})
+	}
+	return out, rows.Err()
 }
