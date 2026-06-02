@@ -1,0 +1,223 @@
+/* pulls styles — co-located BEM blocks moved out of the global
+   styles.css. Theme vars, resets, and cross-feature/shared blocks remain in
+   src/styles.css. */
+
+.diff-split,
+.diff-unified {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-sm) / 20px var(--font-mono);
+  table-layout: fixed;
+}
+/* Fixed table-layout takes column widths from <col>, not from cells in later
+   rows (the first row is a colspan hunk header). Size columns here so the
+   number gutters stay narrow and the code columns absorb the rest. */
+.diff-col-num {
+  width: 44px;
+}
+.diff-col-code {
+  width: auto;
+}
+.diff-num {
+  padding: 0 var(--space-2);
+  text-align: right;
+  color: var(--fg-muted);
+  vertical-align: top;
+  user-select: none;
+  white-space: nowrap;
+  background: var(--bg-canvas);
+}
+.diff-num::before {
+  content: attr(data-line);
+}
+.diff-code {
+  padding: 0 var(--space-3);
+  white-space: pre-wrap;
+  word-break: break-word;
+  vertical-align: top;
+  /* Split: two code columns share the row; cap each so long lines wrap. */
+  max-width: 0;
+}
+.diff-code--add {
+  background: var(--state-todo-bg);
+}
+.diff-code--del {
+  background: var(--state-closed-bg);
+}
+.diff-code--empty {
+  background: var(--bg-canvas);
+}
+.diff-marker {
+  display: inline-block;
+  width: 1ch;
+  color: var(--fg-muted);
+  user-select: none;
+}
+.diff-hunk__header {
+  padding: 2px var(--space-3);
+  background: var(--accent-muted);
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+}
+/* Branch selector + state segmented control on the repo toolbar. */
+.repo-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-2) 0;
+}
+/* Review tab: comments grouped by file. */
+.review-file {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+}
+.review-file__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-muted);
+}
+.review-file__path {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.review-row {
+  padding: var(--space-2) var(--space-4);
+}
+.review-row + .review-row {
+  border-top: 1px solid var(--border-muted);
+}
+.review-row.is-resolved {
+  opacity: 0.6;
+}
+.review-row__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.review-row__lines {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.review-row__actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.review-row__body {
+  margin: 4px 0 0;
+}
+.review-row__snippet {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--code-bg);
+  color: var(--code-fg);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+/* PR state badge — open=green, merged=purple, closed=red, matching issues. */
+.pr-state {
+  flex: none;
+  align-self: center;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: lowercase;
+}
+.pr-state--open {
+  color: var(--state-todo);
+  background: var(--state-todo-bg);
+}
+.pr-state--merged {
+  color: var(--state-done);
+  background: var(--state-done-bg);
+}
+.pr-state--closed {
+  color: var(--state-closed);
+  background: var(--state-closed-bg);
+}
+/* Shared compare body: ahead/behind line + commit list before the diff. */
+.compare-view__range {
+  margin: var(--space-3) 0;
+}
+.compare-view__commits {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.compare-view__commit {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+}
+.compare-view__commit + .compare-view__commit {
+  border-top: 1px solid var(--border-muted);
+}
+.compare-view__sha {
+  flex: none;
+  color: var(--fg-muted);
+}
+.compare-view__subject {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* PR detail header + merge controls. */
+.pull-head {
+  margin: var(--space-4) 0;
+}
+.pull-head__number {
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+.pull-head__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.pull-head__body {
+  margin-top: var(--space-3);
+}
+.pull-merge {
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.pull-merge__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.pull-merge__opt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+.pull-merge__conflicts {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-5);
+}

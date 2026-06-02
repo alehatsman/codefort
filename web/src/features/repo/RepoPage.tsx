@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react"
+import "./repo.css"
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
 import {

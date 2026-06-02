@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
+import "./pulls.css"
 import { usePulls } from "@/api/queries"
 import { PR_STATES, type PRState } from "@/api/types"
 import OverviewCard from "@/shell/OverviewCard"

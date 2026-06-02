@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router-dom"
+import "./commits.css"
 import { useCommitCIStatus, useInfiniteCommits, useRepo } from "@/api/queries"
 import type { CIRun, Commit } from "@/api/types"
 import OverviewCard from "@/shell/OverviewCard"

@@ -1,4 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom"
+import "./pulls.css"
 import { useAllPulls } from "@/api/queries"
 import { PR_STATES, type PRState } from "@/api/types"
 import { EmptyState, ErrorMessage, Spinner } from "@/ui"

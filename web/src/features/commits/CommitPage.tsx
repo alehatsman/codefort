@@ -1,4 +1,5 @@
 import { useState } from "react"
+import "./commits.css"
 import { Link, useParams } from "react-router-dom"
 import { useCommit } from "@/api/queries"
 import OverviewCard from "@/shell/OverviewCard"

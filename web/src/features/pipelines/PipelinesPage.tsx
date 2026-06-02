@@ -1,4 +1,5 @@
 import { useState } from "react"
+import "./pipelines.css"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useCIRun, useCIRuns, useRefs, useRepo } from "@/api/queries"
 import { useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from "@/api/mutations"

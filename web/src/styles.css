@@ -282,93 +282,12 @@ pre {
   display: flex;
   flex-direction: column;
 }
-.topbar {
-  display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  /* No vertical padding: the repo tabs stretch the full bar height so the
-     active tab's underline lands on the bar's bottom border (see .tab). The
-     brand and actions self-center via align-self. */
-  padding: 0 var(--space-5);
-  min-height: 52px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
-}
-/* Brand + repo tabs, left-aligned; actions sit at the far right. */
-.topbar__lead {
-  display: flex;
-  align-items: stretch;
-  gap: var(--space-5);
-}
-.brand {
-  align-self: center;
-  font-weight: var(--weight-bold);
-  font-size: var(--text-lg);
-  color: var(--fg);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.brand:hover {
-  text-decoration: none;
-  opacity: 0.85;
-}
-.topbar__signout {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--fg);
-  padding: 5px var(--space-3);
-  border-radius: var(--radius);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--text-base);
-}
-.topbar__signout:hover {
-  background: var(--bg-canvas);
-  border-color: var(--fg-muted);
-}
-.topbar__actions {
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-.theme-select {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.theme-select__label {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-}
-.theme-select__input {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--fg);
-  padding: 5px var(--space-2);
-  border-radius: var(--radius);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--text-base);
-}
-.theme-select__input:hover {
-  border-color: var(--fg-muted);
-}
 .main {
   padding: var(--space-5);
   max-width: 1280px;
   width: 100%;
   margin: 0 auto;
   flex: 1;
-}
-
-/* Breadcrumbs ---------------------------------------------------------- */
-.crumbs {
-  font-size: var(--text-md);
-  margin-bottom: var(--space-3);
-  color: var(--fg-muted);
 }
 
 /* Repo identity (owner/repo) is no longer a standalone page heading; it leads
@@ -415,13 +334,6 @@ pre {
   font-weight: var(--weight-medium);
   color: var(--fg);
 }
-
-/* Repos list ----------------------------------------------------------- */
-.card-grid {
-  display: grid;
-  gap: var(--space-4);
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-}
 .card {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -454,31 +366,6 @@ pre {
   align-items: center;
   flex-shrink: 0;
 }
-
-/* CI status icon — compact counterpart to .ci-badge; colors track the same
-   issue-state vars by meaning so both stay in sync across themes. */
-.ci-icon {
-  display: inline-block;
-  vertical-align: text-bottom;
-}
-.ci-icon--success {
-  color: var(--state-todo);
-}
-.ci-icon--running {
-  color: var(--state-in_progress);
-}
-.ci-icon--failed,
-.ci-icon--error {
-  color: var(--state-closed);
-}
-.ci-icon--queued,
-.ci-icon--canceled,
-.ci-icon--interrupted {
-  color: var(--fg-muted);
-}
-.ci-icon--stalled {
-  color: var(--state-in_progress);
-}
 .card__meta {
   display: flex;
   gap: var(--space-4);
@@ -491,138 +378,9 @@ pre {
   align-items: center;
   gap: var(--space-1);
 }
-
-/* Code browser --------------------------------------------------------- */
-.path-breadcrumb {
-  font-size: var(--text-lg);
-  margin-bottom: var(--space-3);
-}
-.path-breadcrumb__seg {
-  color: var(--accent);
-}
-.path-breadcrumb__current {
-  font-weight: var(--weight-semibold);
-  color: var(--fg);
-}
-.path-breadcrumb__sep {
-  color: var(--fg-muted);
-  margin: 0 6px;
-}
-/* Affordance: a crumb dex has prose for carries it as a hover tooltip. The
-   dotted underline signals "hover me", the help cursor confirms it on the
-   current (non-link) segment; links keep their pointer. */
-.path-breadcrumb__seg--info {
-  text-decoration: underline dotted;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-  text-decoration-color: var(--fg-muted);
-}
-.path-breadcrumb__current.path-breadcrumb__seg--info {
-  cursor: help;
-}
-
-.file-icon {
-  vertical-align: text-bottom;
-  color: var(--fg-muted);
-}
-.file-icon--tree {
-  color: var(--color-folder);
-}
-
-.file-tree {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  overflow: hidden;
-}
-.file-tree__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) max-content;
-  align-items: center;
-  border-top: 1px solid var(--border-muted);
-}
-.file-tree__row:first-child {
-  border-top: none;
-}
-.file-tree__row:hover {
-  background: var(--bg-canvas);
-}
-.file-tree__link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 7px var(--space-4);
-  color: var(--fg);
-  min-width: 0;
-}
-.file-tree__link:hover {
-  text-decoration: none;
-}
-.file-tree__link:hover .file-tree__name {
-  color: var(--accent);
-  text-decoration: underline;
-}
-.file-tree__icon {
-  display: inline-flex;
-  flex-shrink: 0;
-}
-.file-tree__name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* Affordance: this entry has a dex summary, shown on hover (native title).
-   The dotted underline signals it; the row's hover rule above promotes it to
-   a solid underline like any other entry. */
-.file-tree__name--info {
-  text-decoration: underline dotted;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-  text-decoration-color: var(--fg-muted);
-}
-/* Per-file last-commit columns. */
-.file-tree__commit {
-  min-width: 0;
-  padding: 7px var(--space-2);
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 a.file-tree__commit:hover {
   color: var(--accent);
   text-decoration: underline;
-}
-.file-tree__age {
-  padding: 7px var(--space-4);
-  text-align: right;
-  white-space: nowrap;
-  color: var(--fg-muted);
-}
-/* Dim bar shown in the commit/age cells while tree-commits is loading. */
-.file-tree__ph {
-  display: inline-block;
-  height: 12px;
-  border-radius: var(--radius-sm);
-  background: var(--border-muted);
-  opacity: 0.5;
-}
-.file-tree__commit.file-tree__ph {
-  width: 45%;
-  margin: 7px var(--space-2);
-}
-.file-tree__age.file-tree__ph {
-  width: 48px;
-  justify-self: end;
-  margin: 7px var(--space-4);
-}
-.file-tree__ph.is-loading {
-  animation: commit-ph-pulse 1.2s ease-in-out infinite;
 }
 @keyframes commit-ph-pulse {
   0%,
@@ -633,143 +391,11 @@ a.file-tree__commit:hover {
     opacity: 0.6;
   }
 }
-
-/* Branch picker + latest-commit bar share one row above the file tree. */
-.branch-commit-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-}
-.branch-commit-row .branch-select {
-  max-width: 100px;
-}
-.branch-commit-row .latest-commit-bar {
-  flex: 1;
-  min-width: 0;
-  margin-bottom: 0;
-}
-
-/* Latest-commit bar above the file tree. */
-.latest-commit-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-canvas);
-  margin-bottom: var(--space-3);
-}
-.latest-commit-bar__commit {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-.latest-commit-bar__author {
-  font-weight: 600;
-  white-space: nowrap;
-}
-.latest-commit-bar__subject {
-  color: var(--fg);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.latest-commit-bar__subject:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-.latest-commit-bar__sha {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-}
-.latest-commit-bar__count {
-  white-space: nowrap;
-  color: var(--fg-muted);
-}
-.latest-commit-bar__count:hover {
-  color: var(--accent);
-}
-.latest-commit-bar__ph {
-  display: inline-block;
-  width: 280px;
-  max-width: 60vw;
-  height: 14px;
-  border-radius: var(--radius-sm);
-  background: var(--border-muted);
-  opacity: 0.5;
-}
-.latest-commit-bar__ph.is-loading {
-  animation: commit-ph-pulse 1.2s ease-in-out infinite;
-}
-
-/* Compact commit line in the blob header. */
-.commit-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
 .blob__commit {
   padding: var(--space-2) var(--space-4);
   background: var(--bg-canvas);
   border-bottom: 1px solid var(--border-muted);
   font-size: var(--text-sm);
-}
-.commit-meta__author {
-  font-weight: 600;
-  white-space: nowrap;
-}
-.commit-meta__subject {
-  color: var(--fg);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.commit-meta__subject:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-.commit-meta__sha {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-}
-
-/* CI status badge linking to its run — sits beside commits in the history
-   list and the last-commit bars. */
-.commit-ci {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  text-decoration: none;
-}
-
-/* Commits list page. */
-.commits-page__head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin: var(--space-4) 0;
-}
-.commits-page__head h2 {
-  margin: 0;
-}
-.commit-group {
-  margin-bottom: var(--space-4);
-}
-.commit-group__day {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-  font-weight: 600;
-  margin: 0 0 var(--space-2);
-  padding-left: var(--space-2);
 }
 .commit-list {
   list-style: none;
@@ -830,41 +456,6 @@ a.file-tree__commit:hover {
 .commit-row__sha:hover {
   color: var(--accent);
   border-color: var(--accent);
-}
-.branch-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  max-width: 16ch;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-  background: var(--bg-canvas);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1px var(--space-2);
-  white-space: nowrap;
-}
-.branch-tag svg {
-  flex-shrink: 0;
-  opacity: 0.7;
-}
-.commits-page__more {
-  margin-top: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--accent);
-  cursor: pointer;
-}
-.commits-page__more:hover {
-  background: var(--bg-canvas);
-}
-.commits-page__more:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 /* Commit detail + diff view -------------------------------------------- */
@@ -1038,65 +629,6 @@ a.file-tree__commit:hover {
   font-size: var(--text-sm);
 }
 
-.diff-split,
-.diff-unified {
-  width: 100%;
-  border-collapse: collapse;
-  font: var(--text-sm) / 20px var(--font-mono);
-  table-layout: fixed;
-}
-/* Fixed table-layout takes column widths from <col>, not from cells in later
-   rows (the first row is a colspan hunk header). Size columns here so the
-   number gutters stay narrow and the code columns absorb the rest. */
-.diff-col-num {
-  width: 44px;
-}
-.diff-col-code {
-  width: auto;
-}
-.diff-num {
-  padding: 0 var(--space-2);
-  text-align: right;
-  color: var(--fg-muted);
-  vertical-align: top;
-  user-select: none;
-  white-space: nowrap;
-  background: var(--bg-canvas);
-}
-.diff-num::before {
-  content: attr(data-line);
-}
-.diff-code {
-  padding: 0 var(--space-3);
-  white-space: pre-wrap;
-  word-break: break-word;
-  vertical-align: top;
-  /* Split: two code columns share the row; cap each so long lines wrap. */
-  max-width: 0;
-}
-.diff-code--add {
-  background: var(--state-todo-bg);
-}
-.diff-code--del {
-  background: var(--state-closed-bg);
-}
-.diff-code--empty {
-  background: var(--bg-canvas);
-}
-.diff-marker {
-  display: inline-block;
-  width: 1ch;
-  color: var(--fg-muted);
-  user-select: none;
-}
-.diff-hunk__header {
-  padding: 2px var(--space-3);
-  background: var(--accent-muted);
-  color: var(--fg-muted);
-  font-size: var(--text-xs);
-  white-space: pre-wrap;
-}
-
 .blob {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1109,96 +641,6 @@ a.file-tree__commit:hover {
   padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border-muted);
 }
-
-.code-view {
-  overflow-x: auto;
-}
-.code-view__table {
-  border-collapse: collapse;
-  width: 100%;
-  font: var(--text-sm) / 20px var(--font-mono);
-}
-.code-line__num {
-  width: 1%;
-  min-width: 50px;
-  padding: 0 var(--space-4) 0 10px;
-  text-align: right;
-  color: var(--fg-muted);
-  vertical-align: top;
-  user-select: none;
-  white-space: nowrap;
-}
-.code-line__num::before {
-  content: attr(data-line);
-}
-.code-line__text {
-  padding: 0 var(--space-4);
-  white-space: pre;
-  vertical-align: top;
-  width: 100%;
-}
-.code-line:hover .code-line__num,
-.code-line:hover .code-line__text {
-  background: var(--code-line-hl);
-}
-/* Lines covered by a saved review comment: a muted persistent tint + gutter bar
-   so the range a thread annotates stays visible. Declared before the deep-link
-   and active-selection rules so those (equal specificity, later) win when a
-   commented line is also linked or being selected. */
-.code-line.is-commented .code-line__num,
-.code-line.is-commented .code-line__text {
-  background: color-mix(in srgb, var(--state-done) 12%, transparent);
-}
-.code-line.is-commented .code-line__num {
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--state-done) 70%, transparent);
-}
-/* Deep-link target: a Research suggested-read opened the file at this block,
-   so the #L<n> / #L<start>-L<end> range is tinted and barred down the gutter. */
-.code-line.is-highlighted .code-line__num,
-.code-line.is-highlighted .code-line__text {
-  background: color-mix(in srgb, var(--state-in_progress) 16%, transparent);
-}
-.code-line.is-highlighted .code-line__num {
-  box-shadow: inset 2px 0 0 var(--state-in_progress);
-}
-
-/* Review comments: a clickable gutter selects lines to comment on. The active
-   selection reuses the deep-link tint with an accent gutter bar. */
-.code-line__num.is-clickable {
-  cursor: pointer;
-}
-.code-line__num.is-clickable:hover {
-  color: var(--fg-default);
-}
-/* While dragging a gutter selection, suppress native text selection so the
-   drag highlights line ranges instead of selecting the code text. */
-.code-view.is-selecting {
-  user-select: none;
-}
-.code-line.is-selected .code-line__num,
-.code-line.is-selected .code-line__text {
-  background: color-mix(in srgb, var(--accent-fg, var(--state-in_progress)) 20%, transparent);
-}
-.code-line.is-selected .code-line__num {
-  box-shadow: inset 2px 0 0 var(--accent-fg, var(--state-in_progress));
-}
-
-/* Inline comment threads + compose form, rendered as full-width rows beneath
-   the code line they annotate. */
-.code-comments-row .code-comments-cell {
-  padding: var(--space-2) var(--space-4);
-  background: var(--bg-canvas);
-  border-top: 1px solid var(--border-muted);
-  border-bottom: 1px solid var(--border-muted);
-}
-.code-comments {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
 .comment.is-resolved {
   opacity: 0.6;
 }
@@ -1207,103 +649,6 @@ a.file-tree__commit:hover {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-}
-.code-compose {
-  max-width: 720px;
-}
-.code-compose__head {
-  margin-bottom: var(--space-2);
-}
-
-/* Branch selector + state segmented control on the repo toolbar. */
-.repo-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin: var(--space-2) 0;
-}
-.branch-select {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-canvas);
-  color: var(--fg-muted);
-}
-.branch-select select {
-  border: none;
-  background: transparent;
-  color: var(--fg-default);
-  font: inherit;
-  cursor: pointer;
-  outline: none;
-  min-width: 0;
-  flex: 1;
-  text-overflow: ellipsis;
-}
-/* Review tab: comments grouped by file. */
-.review-file {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  margin-bottom: var(--space-3);
-  overflow: hidden;
-}
-.review-file__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  background: var(--bg-canvas);
-  border-bottom: 1px solid var(--border-muted);
-}
-.review-file__path {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-}
-.review-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.review-row {
-  padding: var(--space-2) var(--space-4);
-}
-.review-row + .review-row {
-  border-top: 1px solid var(--border-muted);
-}
-.review-row.is-resolved {
-  opacity: 0.6;
-}
-.review-row__head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.review-row__lines {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-}
-.review-row__actions {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.review-row__body {
-  margin: 4px 0 0;
-}
-.review-row__snippet {
-  margin: var(--space-2) 0 0;
-  padding: var(--space-2) var(--space-3);
-  background: var(--code-bg);
-  color: var(--code-fg);
-  border-radius: var(--radius);
-  overflow-x: auto;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
 }
 
 /* Syntax highlighting — highlight.js scopes mapped to the Primer palette.
@@ -1371,28 +716,6 @@ a.file-tree__commit:hover {
 }
 .hljs-emphasis {
   font-style: italic;
-}
-
-/* README card + rendered markdown -------------------------------------- */
-.readme-card {
-  margin-top: var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.readme-card__head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  background: var(--bg-canvas);
-  border-bottom: 1px solid var(--border-muted);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--fg-muted);
-}
-.readme-card .markdown-body {
-  padding: var(--space-5) var(--space-6);
 }
 
 .markdown-body {
@@ -1507,19 +830,6 @@ a.file-tree__commit:hover {
 }
 .markdown-body input[type="checkbox"] {
   margin: 0 var(--space-1) 0 0;
-}
-/* Authenticated images: a placeholder while the blob loads, alt on failure. */
-.md-img-loading {
-  display: inline-block;
-  width: 1.2em;
-  height: 1.2em;
-  vertical-align: text-bottom;
-  background: var(--neutral-muted);
-  border-radius: var(--radius-sm);
-}
-.md-img-missing {
-  color: var(--fg-muted);
-  font-style: italic;
 }
 
 /* Issues list ---------------------------------------------------------- */
@@ -1836,63 +1146,6 @@ a.file-tree__commit:hover {
   color: var(--state-closed);
   background: var(--state-closed-bg);
 }
-
-/* Avatar (initial circle) --------------------------------------------- */
-.avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-circle);
-  background: var(--accent);
-  color: white;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-  text-transform: uppercase;
-  flex-shrink: 0;
-}
-.avatar--lg {
-  width: 28px;
-  height: 28px;
-  font-size: var(--text-base);
-}
-
-/* Buttons + inputs ---------------------------------------------------- */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px var(--space-4);
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font: inherit;
-  font-size: var(--text-md);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast);
-}
-.btn:hover:not(:disabled) {
-  background: var(--bg-canvas);
-  border-color: var(--fg-muted);
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.btn--primary {
-  background: var(--state-todo);
-  color: white;
-  border-color: rgba(31, 35, 40, 0.15);
-}
-.btn--primary:hover:not(:disabled) {
-  background: var(--state-todo-hover);
-  border-color: rgba(31, 35, 40, 0.15);
-}
 /* Monokai's --state-todo lime (#a6e22e) is too bright for white text;
    use a deeper green that keeps white legible (~4.6:1). */
 [data-theme="monokai"] .btn--primary {
@@ -1902,31 +1155,6 @@ a.file-tree__commit:hover {
 [data-theme="monokai"] .btn--primary:hover:not(:disabled) {
   background: #5aa000;
   border-color: rgba(0, 0, 0, 0.3);
-}
-.btn--small {
-  padding: 3px 10px;
-  font-size: var(--text-sm);
-}
-.btn--danger {
-  color: var(--state-closed);
-  border-color: var(--border);
-}
-.btn--danger:hover:not(:disabled) {
-  color: white;
-  background: var(--state-closed);
-  border-color: var(--state-closed);
-}
-/* Ghost: a borderless secondary action (Cancel / inline Edit). Previously a
-   dead modifier with no rule — these rendered as plain .btn buttons. */
-.btn--ghost {
-  background: transparent;
-  border-color: transparent;
-  color: var(--fg-muted);
-}
-.btn--ghost:hover:not(:disabled) {
-  background: var(--bg-canvas);
-  border-color: transparent;
-  color: var(--fg);
 }
 
 .input,
@@ -1963,43 +1191,6 @@ a.file-tree__commit:hover {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-muted);
-}
-
-/* Spawn-agent: model picker sits inline with the spawn button (#110). */
-.spawn-agent {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.spawn-agent__model {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.spawn-agent__shell {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-  cursor: pointer;
-}
-.spawn-agent__shell input {
-  margin-top: 3px;
-}
-/* Default-model picker in Settings → Agent. */
-.agent-default-model {
-  margin-top: var(--space-4);
-}
-.agent-default-model__label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  max-width: 48ch;
-}
-/* Per-run model tag in the Agents run list. */
-.ci-runs__model {
-  display: block;
 }
 .row {
   display: flex;
@@ -2198,246 +1389,6 @@ h3 {
 }
 
 /* --- Explore tab (dex code intelligence: hero + ask + map + hotspots) --- */
-/* Keep the column focused, not stretched edge-to-edge. */
-.explore {
-  max-width: 920px;
-}
-.explore-section {
-  margin-top: var(--space-6);
-}
-.explore-section__heading {
-  font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
-  margin: 0 0 var(--space-3);
-}
-
-/* Hero: a collapsible card — the repo name is the toggle, the summary prose +
-   index stats the body. Default open; click the name to close once read. */
-.explore-hero {
-  margin: var(--space-4) 0 var(--space-5);
-}
-.explore-hero__head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  cursor: pointer;
-  list-style: none;
-}
-.explore-hero__head::-webkit-details-marker {
-  display: none;
-}
-.explore-hero__head::before {
-  content: "▾";
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
-}
-.explore-hero:not([open]) .explore-hero__head::before {
-  content: "▸";
-}
-.explore-hero__name {
-  margin: 0;
-  font-size: var(--text-2xl);
-  font-weight: var(--weight-semibold);
-}
-.explore-hero__body {
-  margin-top: var(--space-3);
-}
-.explore-hero__summary {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-lg);
-  line-height: var(--leading-relaxed);
-  white-space: pre-wrap;
-}
-.explore-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-.explore-stat {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-  background: var(--bg-canvas);
-  border: 1px solid var(--border-muted);
-  border-radius: 10px;
-  padding: 1px var(--space-2);
-}
-.explore-stat--pending {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-/* Ask box: one natural-language field; the power modes hide behind Advanced. */
-.explore-ask {
-  margin: var(--space-4) 0;
-}
-.explore-ask__bar {
-  display: flex;
-  gap: var(--space-2);
-}
-.explore-ask__kind {
-  flex: 0 0 auto;
-  width: auto;
-}
-.explore-ask__input {
-  flex: 1;
-}
-.explore-ask__go {
-  flex: 0 0 auto;
-}
-.explore-ask__advanced {
-  margin-top: var(--space-2);
-  padding: 0;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-}
-.explore-ask__advanced:hover {
-  color: var(--accent);
-}
-
-/* Package map: layered groups of cards, each card a collapsible summary. */
-.pkg-map {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.pkg-layer__name {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
-  margin: 0 0 var(--space-2);
-}
-.pkg-layer__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--space-2);
-}
-.pkg-card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  overflow: hidden;
-}
-.pkg-card__summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-  list-style: none;
-}
-.pkg-card__summary::-webkit-details-marker {
-  display: none;
-}
-.pkg-card__summary:hover {
-  background: var(--bg-canvas);
-}
-.pkg-card__path {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--accent);
-}
-.pkg-card__when {
-  margin-left: auto;
-  white-space: nowrap;
-}
-.pkg-card__preview {
-  flex: 1 1 100%;
-  min-width: 0;
-}
-.pkg-card__body {
-  padding: 0 var(--space-3) var(--space-2);
-  white-space: pre-wrap;
-  line-height: var(--leading-relaxed);
-}
-.pkg-card__browse {
-  display: inline-block;
-  margin: 0 var(--space-3) var(--space-3);
-  font-size: var(--text-sm);
-  color: var(--accent);
-  text-decoration: none;
-}
-
-/* Graph-driven map extras: in/out-degree badge + internal dependency links. */
-.pkg-map__legend {
-  margin: 0 0 var(--space-3);
-}
-.pkg-card__degree {
-  font-family: var(--font-mono);
-  white-space: nowrap;
-}
-.pkg-card__deps {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: 0 var(--space-3) var(--space-2);
-}
-.pkg-card__deprow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-2);
-}
-.pkg-card__deplabel {
-  flex: 0 0 auto;
-  font-family: var(--font-mono);
-}
-.pkg-dep {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--accent);
-  text-decoration: none;
-}
-.pkg-dep:hover {
-  text-decoration: underline;
-}
-.pkg-dep--plain {
-  color: var(--fg-muted);
-}
-
-/* Hotspots: the most-recently-touched packages, newest first. */
-.hotspots {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  overflow: hidden;
-}
-.hotspot {
-  padding: var(--space-3);
-  border-top: 1px solid var(--border-muted);
-}
-.hotspot:first-child {
-  border-top: none;
-}
-.hotspot__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-.hotspot__path {
-  font-family: var(--font-mono);
-  font-size: var(--text-base);
-  color: var(--accent);
-  text-decoration: none;
-}
-.hotspot__when {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-  white-space: nowrap;
-}
-.hotspot__subject {
-  margin-top: 2px;
-  font-size: var(--text-sm);
-}
 
 .intel__hits {
   list-style: none;
@@ -2446,43 +1397,6 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-}
-.hit {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.hit__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background: var(--bg-canvas);
-  border-bottom: 1px solid var(--border-muted);
-}
-.hit__path {
-  font-family: var(--font-mono);
-  font-size: var(--text-base);
-  color: var(--accent);
-  text-decoration: none;
-}
-.hit__lines {
-  color: var(--fg-muted);
-}
-.hit__meta {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-  white-space: nowrap;
-}
-.hit__code {
-  margin: 0;
-  padding: var(--space-3);
-  overflow-x: auto;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  line-height: var(--leading-normal);
-  background: var(--bg-card);
 }
 
 /* Ask view (dex /ask response) ---------------------------------------- */
@@ -2551,58 +1465,6 @@ h3 {
   border-radius: var(--radius);
   background: var(--bg);
 }
-.ask-read {
-  counter-increment: read;
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--border-muted);
-  position: relative;
-  padding-left: 40px;
-}
-.ask-read:first-child {
-  border-top: none;
-}
-.ask-read::before {
-  content: counter(read) ".";
-  position: absolute;
-  left: var(--space-4);
-  top: var(--space-3);
-  color: var(--fg-muted);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-base);
-  font-weight: var(--weight-medium);
-}
-.ask-read__head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.ask-read__reason {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-  font-style: italic;
-}
-.ask-read__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 6px 0 0;
-}
-.ask-chip {
-  display: inline-block;
-  padding: 1px var(--space-2);
-  border-radius: 10px;
-  font-size: var(--text-xs);
-  background: var(--bg-canvas);
-  border: 1px solid var(--border-muted);
-  color: var(--fg-muted);
-  font-family: var(--font-mono);
-}
-.ask-read .hit__code {
-  margin-top: var(--space-2);
-  border: 1px solid var(--border-muted);
-  border-radius: var(--radius);
-}
 
 /* Ask — graph + raw matches sections ---------------------------------- */
 .ask__graph {
@@ -2611,29 +1473,6 @@ h3 {
   background: var(--bg);
   padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-4);
-}
-.ask-graph-row {
-  display: grid;
-  grid-template-columns: 90px 1fr;
-  gap: var(--space-3);
-  align-items: baseline;
-  padding: 6px 0;
-  border-top: 1px solid var(--border-muted);
-}
-.ask-graph-row:first-child {
-  border-top: none;
-}
-.ask-graph-kind {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
-}
-.ask-graph-nodes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 
 .ask__raw {
@@ -2724,76 +1563,6 @@ h3 {
   margin: 0 0 var(--space-2);
   font-size: var(--text-md);
 }
-
-/* Danger Zone: irreversible repo-level actions, fenced off in a red-bordered
-   card so they read as deliberately set apart from ordinary settings. */
-.danger-zone {
-  border: 1px solid var(--state-closed);
-  border-radius: 6px;
-  margin-top: var(--space-4);
-  max-width: 60ch;
-}
-.danger-zone__title {
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-md);
-  color: var(--state-closed);
-  border-bottom: 1px solid var(--border);
-}
-.danger-zone__item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3);
-}
-.danger-zone__copy p {
-  margin: var(--space-1) 0 0;
-}
-.danger-zone__action {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: flex-start;
-}
-.danger-zone__confirm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  width: 100%;
-}
-
-/* Agent settings: global Claude token (write-only). */
-.agent-token-status {
-  margin: var(--space-3) 0;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  background: var(--neutral-muted);
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
-}
-.agent-token-status.is-set {
-  background: var(--state-todo-bg);
-  color: var(--state-todo);
-}
-.agent-token-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  max-width: 48ch;
-}
-.agent-token-form__actions {
-  display: flex;
-  gap: var(--space-2);
-}
-/* Custom-endpoint (gateway) block in Settings → Agent. */
-.agent-endpoint {
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border);
-}
-.agent-endpoint .agent-token-form {
-  margin-top: var(--space-2);
-}
 .settings__create {
   display: flex;
   gap: var(--space-2);
@@ -2817,64 +1586,6 @@ h3 {
 .settings__create--stacked textarea.input {
   font-family: var(--font-mono);
   resize: vertical;
-}
-
-.token-reveal {
-  border: 1px solid var(--accent);
-  background: var(--accent-muted);
-  border-radius: var(--radius);
-  padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-4);
-}
-.token-reveal__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.token-reveal__head p,
-.token-reveal p {
-  margin: var(--space-1) 0 var(--space-2);
-}
-.token-reveal__secret {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.token-reveal__secret code {
-  flex: 1;
-  overflow-x: auto;
-  white-space: nowrap;
-  background: var(--code-bg);
-  color: var(--code-fg);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
-  font-family: var(--font-mono);
-}
-
-.token-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-base);
-}
-.token-table th {
-  text-align: left;
-  color: var(--fg-muted);
-  font-weight: var(--weight-bold);
-  border-bottom: 1px solid var(--border);
-  padding: var(--space-2) var(--space-3);
-}
-.token-table td {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border-muted);
-}
-.token-table tr.is-revoked td {
-  opacity: 0.55;
-}
-.token-table td .badge {
-  margin-left: var(--space-2);
-}
-.token-table__actions {
-  text-align: right;
 }
 
 @media (max-width: 640px) {
@@ -2918,187 +1629,6 @@ h3 {
 .pipelines__run-ref {
   width: auto;
   font-size: var(--text-sm);
-}
-
-/* Status pill — colors track issue-state vars by meaning. */
-.ci-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  line-height: var(--leading-none);
-  text-transform: capitalize;
-}
-.ci-badge--success {
-  background: var(--state-todo-bg);
-  color: var(--state-todo);
-}
-.ci-badge--running,
-.ci-badge--awaiting_input,
-.ci-badge--finishing {
-  background: var(--state-in_progress-bg);
-  color: var(--state-in_progress);
-}
-.ci-badge--failed,
-.ci-badge--error {
-  background: var(--state-closed-bg);
-  color: var(--state-closed);
-}
-.ci-badge--queued,
-.ci-badge--canceled,
-.ci-badge--skipped,
-.ci-badge--interrupted {
-  background: var(--neutral-muted);
-  color: var(--fg-muted);
-}
-/* stalled: the agent gave up without converging — amber (attention), not red
-   (a failure) and not grey (a no-op like canceled/interrupted). */
-.ci-badge--stalled {
-  background: var(--state-in_progress-bg);
-  color: var(--state-in_progress);
-}
-
-/* Runs table */
-.ci-runs {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-sm);
-}
-.ci-runs th {
-  text-align: left;
-  font-weight: var(--weight-medium);
-  color: var(--fg-muted);
-  padding: var(--space-2);
-  border-bottom: 1px solid var(--border);
-}
-.ci-runs td {
-  padding: var(--space-2);
-  border-bottom: 1px solid var(--border-muted);
-}
-.ci-runs__num {
-  font-weight: var(--weight-medium);
-}
-/* Owning-repo link shown in the cross-repo (global) Pipelines/Agents tables. */
-.ci-runs__repo {
-  font-weight: var(--weight-medium);
-}
-.ci-runs__sha {
-  font-family: var(--font-mono);
-}
-.ci-runs__commit {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  max-width: 26rem;
-}
-.ci-runs__msg {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Run detail */
-.ci-run-subject {
-  margin: var(--space-3) 0 0;
-  font-size: var(--text-lg);
-  font-weight: var(--weight-medium);
-}
-.ci-run-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-.ci-run-head__back {
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
-}
-.ci-run-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  margin: var(--space-3) 0;
-  padding: var(--space-3);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.ci-run-meta dt {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-}
-.ci-run-meta dd {
-  margin: 2px 0 0;
-}
-
-/* Jobs — the `needs` DAG as depth-ordered columns with arrows between stages */
-.ci-dag {
-  display: flex;
-  align-items: stretch;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-  overflow-x: auto;
-}
-.ci-dag__stage {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  justify-content: flex-start;
-}
-.ci-dag__arrow {
-  display: flex;
-  align-items: center;
-  color: var(--fg-muted);
-  font-size: var(--text-lg);
-  padding: 0 var(--space-1);
-}
-.ci-dag__job {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  min-width: 140px;
-  padding: var(--space-2) var(--space-3);
-  /* A status-colored left accent (set per --<status> below) makes pass/fail
-     scannable without reading each pill. */
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--fg-muted);
-  border-radius: var(--radius);
-  background: var(--bg-card);
-  cursor: pointer;
-  color: var(--fg);
-  text-align: left;
-}
-.ci-dag__job--success {
-  border-left-color: var(--state-todo);
-}
-.ci-dag__job--running {
-  border-left-color: var(--state-in_progress);
-}
-.ci-dag__job--failed,
-.ci-dag__job--error {
-  border-left-color: var(--state-closed);
-}
-.ci-dag__job--skipped,
-.ci-dag__job--queued,
-.ci-dag__job--canceled,
-.ci-dag__job--interrupted {
-  border-left-color: var(--border);
-}
-/* Selection is a ring, kept distinct from the status accent (the colored left
-   border) so the two signals don't collide. */
-.ci-dag__job.is-active {
-  box-shadow: 0 0 0 2px var(--accent);
-}
-.ci-dag__name {
-  font-weight: var(--weight-medium);
-}
-.ci-dag__needs {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-  font-family: var(--font-mono);
 }
 
 /* Step timeline + log viewer — header and its log body are one bound card so
@@ -3187,66 +1717,7 @@ h3 {
   padding-left: var(--space-2);
 }
 
-/* ANSI SGR colors, mapped to theme-aware semantic tokens so log color tracks
-   the active theme and stays legible on every background. */
-.ansi-fg--black {
-  color: var(--fg-muted);
-}
-.ansi-fg--red {
-  color: var(--state-closed);
-}
-.ansi-fg--green {
-  color: var(--state-todo);
-}
-.ansi-fg--yellow {
-  color: var(--state-in_progress);
-}
-.ansi-fg--blue {
-  color: var(--accent);
-}
-.ansi-fg--magenta {
-  color: var(--state-done);
-}
-.ansi-fg--cyan {
-  color: var(--accent);
-}
-.ansi-fg--white {
-  color: var(--fg);
-}
-.ansi-bold {
-  font-weight: var(--weight-bold);
-}
-.ansi-dim {
-  opacity: 0.7;
-}
-.ansi-underline {
-  text-decoration: underline;
-}
-
 /* --- Pull requests: list state badge, compare pickers, PR detail --- */
-
-/* PR state badge — open=green, merged=purple, closed=red, matching issues. */
-.pr-state {
-  flex: none;
-  align-self: center;
-  padding: 1px var(--space-2);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  text-transform: lowercase;
-}
-.pr-state--open {
-  color: var(--state-todo);
-  background: var(--state-todo-bg);
-}
-.pr-state--merged {
-  color: var(--state-done);
-  background: var(--state-done-bg);
-}
-.pr-state--closed {
-  color: var(--state-closed);
-  background: var(--state-closed-bg);
-}
 
 /* Compare screen: base/head pickers + the inline create-PR form. */
 .compare__pickers {
@@ -3283,300 +1754,6 @@ h3 {
   align-self: flex-start;
 }
 
-/* Shared compare body: ahead/behind line + commit list before the diff. */
-.compare-view__range {
-  margin: var(--space-3) 0;
-}
-.compare-view__commits {
-  list-style: none;
-  margin: 0 0 var(--space-4);
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.compare-view__commit {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-}
-.compare-view__commit + .compare-view__commit {
-  border-top: 1px solid var(--border-muted);
-}
-.compare-view__sha {
-  flex: none;
-  color: var(--fg-muted);
-}
-.compare-view__subject {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* PR detail header + merge controls. */
-.pull-head {
-  margin: var(--space-4) 0;
-}
-.pull-head__number {
-  color: var(--fg-muted);
-  font-weight: 400;
-}
-.pull-head__meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-}
-.pull-head__body {
-  margin-top: var(--space-3);
-}
-.pull-merge {
-  margin: var(--space-4) 0;
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.pull-merge__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-.pull-merge__opt {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
-}
-.pull-merge__conflicts {
-  margin: var(--space-1) 0 0;
-  padding-left: var(--space-5);
-}
-
-/* Agent run transcript — folded from the agent.* event stream and rendered
-   like mooncake's terminal output: a tight monospace list, one line per step,
-   the status glyph (▶ → ✓/~/✗/⊘) flipped in place (no duplicated row). */
-.agent-transcript-wrap {
-  position: relative;
-}
-/* The transcript is a bounded, windowed scroll region (react-virtual) that
-   auto-follows the bottom; only on-screen rows are mounted, so the page never
-   grows unbounded as a long run streams. */
-.agent-transcript {
-  max-height: min(60vh, 42rem);
-  overflow-y: auto;
-  overflow-anchor: none;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  line-height: 1.35;
-}
-/* Virtualizer inner: explicit total height, absolutely-positioned rows. */
-.agent-transcript__sizer {
-  position: relative;
-  width: 100%;
-}
-/* Each virtualized row is one CI-style card. The card spacing is padding on the
-   row (the virtualizer measures border-box, so margins would be ignored and the
-   cards would overlap). */
-.agent-transcript__row {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  padding-bottom: var(--space-2);
-}
-/* A transcript section reuses the CI step-card chrome (.ci-step / __head /
-   .ci-log); drop the CI margin since the row owns the gap. */
-.agent-card.ci-step {
-  margin-bottom: 0;
-}
-.agent-card__body {
-  /* tight terminal list inside the card body */
-  white-space: normal;
-  line-height: 1.35;
-}
-/* A queued follow-up message: sent by the human, not yet picked up by the
-   agent. Dashed/muted so it reads as pending rather than part of the agent's
-   own transcript; it's replaced by the real "Turn N" card once the agent runs
-   it. */
-.agent-card--queued.ci-step {
-  border-style: dashed;
-  border-color: var(--border-muted);
-  background: var(--neutral-muted);
-}
-.agent-card--queued .ci-step__cmd {
-  color: var(--fg-muted);
-}
-.agent-card__queued-glyph {
-  color: var(--fg-muted);
-}
-/* "Jump to latest" — appears only when the user has scrolled up off the tail. */
-.agent-follow-btn {
-  position: absolute;
-  right: var(--space-3);
-  bottom: var(--space-3);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-canvas);
-  color: var(--fg);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
-}
-.agent-follow-btn:hover {
-  background: var(--neutral-muted);
-}
-
-/* A step / tool action: glyph + name on one line, terminal-style. */
-.agent-step__line {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-.agent-step__glyph {
-  flex: none;
-  width: 1ch;
-  text-align: center;
-  font-weight: var(--weight-bold);
-}
-.agent-step__name {
-  min-width: 0;
-  word-break: break-word;
-}
-/* Detail (a failed step's command + output) — dim, indented under the glyph.
-   Reset the global <pre> code-box chrome so it reads as flush terminal text. */
-.agent-step__detail {
-  margin: 1px 0 2px;
-  padding: 0 0 0 calc(1ch + var(--space-2));
-  border: 0;
-  background: none;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: var(--state-closed);
-}
-/* Glyph colors mirror mooncake (console_logger.go / agentd runs.go). */
-.agent-step--running .agent-step__glyph {
-  color: var(--accent);
-  animation: ci-pulse 1.2s ease-in-out infinite;
-}
-.agent-step--ok .agent-step__glyph {
-  color: var(--state-todo);
-}
-.agent-step--changed .agent-step__glyph {
-  color: var(--state-in_progress);
-}
-.agent-step--skipped .agent-step__glyph,
-.agent-step--skipped .agent-step__name {
-  color: var(--fg-muted);
-}
-.agent-step--failed .agent-step__glyph,
-.agent-step--failed .agent-step__name {
-  color: var(--state-closed);
-}
-
-/* Text entries (turn header, assistant prose, thinking, recap) — no boxes,
-   just a tight list consistent with the step lines. */
-.agent-entry {
-  padding: 0;
-}
-.agent-entry__label {
-  color: var(--fg-muted);
-}
-.agent-entry__body {
-  margin: 1px 0 2px;
-  padding: 0;
-  border: 0;
-  background: none;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-/* A turn header opens each turn; the issue prompt sits under it. Spacing is
-   padding (not margin) so the virtualizer measures it into the row height. */
-.agent-entry--turn {
-  padding-top: var(--space-2);
-}
-.agent-entry--turn .agent-entry__label {
-  color: var(--fg);
-  font-weight: var(--weight-bold);
-}
-.agent-entry--assistant .agent-entry__body {
-  color: var(--fg);
-}
-.agent-entry--thinking {
-  opacity: 0.7;
-}
-.agent-entry--thinking .agent-entry__body {
-  font-style: italic;
-}
-/* Live planner output streamed during the plan phase (#171 / mooncake #76):
-   the plan text the agent is writing, full-strength like an assistant turn. */
-.agent-entry--planning .agent-entry__body {
-  color: var(--fg);
-}
-.agent-entry--tool_use .agent-entry__label,
-.agent-entry--system .agent-entry__label,
-.agent-entry--raw {
-  color: var(--fg-muted);
-}
-/* The mooncake-style RECAP / turn-complete summary line. */
-.agent-entry--result {
-  padding-top: var(--space-1);
-}
-.agent-entry--result .agent-entry__label {
-  display: inline;
-  color: var(--fg);
-  font-weight: var(--weight-bold);
-}
-.agent-entry--result .agent-entry__body {
-  display: inline;
-  margin-left: var(--space-2);
-  color: var(--fg-muted);
-}
-/* Live busy hint after the last entry while a turn is in flight — fills the
-   silent gap (esp. mooncake-pilot's planning phase) so it doesn't look hung. */
-.agent-working {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-  border-left: 3px solid var(--state-in_progress);
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
-}
-.agent-working__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-circle);
-  background: var(--state-in_progress);
-  animation: ci-pulse 1.2s ease-in-out infinite;
-}
-
-/* Message box for sending the agent follow-up turns. */
-.agent-msgbox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-}
-.agent-msgbox--done {
-  border-top: 1px solid var(--border);
-}
-.agent-msgbox__input {
-  width: 100%;
-  font-family: inherit;
-  resize: vertical;
-}
-.agent-msgbox__actions {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
 /* /dev/ui primitives gallery ------------------------------------------- */
 .gallery {
   max-width: 920px;
@@ -3611,4 +1788,66 @@ h3 {
 .gallery__muted {
   color: var(--fg-muted);
   margin: var(--space-1) 0 0;
+}
+
+/* Buttons (shared design-system primitive — used directly across features) */
+/* Buttons + inputs ---------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px var(--space-4);
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.btn:hover:not(:disabled) {
+  background: var(--bg-canvas);
+  border-color: var(--fg-muted);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn--primary {
+  background: var(--state-todo);
+  color: white;
+  border-color: rgba(31, 35, 40, 0.15);
+}
+.btn--primary:hover:not(:disabled) {
+  background: var(--state-todo-hover);
+  border-color: rgba(31, 35, 40, 0.15);
+}
+.btn--small {
+  padding: 3px 10px;
+  font-size: var(--text-sm);
+}
+.btn--danger {
+  color: var(--state-closed);
+  border-color: var(--border);
+}
+.btn--danger:hover:not(:disabled) {
+  color: white;
+  background: var(--state-closed);
+  border-color: var(--state-closed);
+}
+/* Ghost: a borderless secondary action (Cancel / inline Edit). Previously a
+   dead modifier with no rule — these rendered as plain .btn buttons. */
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-muted);
+}
+.btn--ghost:hover:not(:disabled) {
+  background: var(--bg-canvas);
+  border-color: transparent;
+  color: var(--fg);
 }

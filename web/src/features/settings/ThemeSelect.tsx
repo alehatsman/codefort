@@ -1,4 +1,5 @@
 import { useState } from "react"
+import "./settings.css"
 import { THEMES, getTheme, setTheme, type ThemeId } from "@/theme"
 
 export default function ThemeSelect() {

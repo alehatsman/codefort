@@ -1,0 +1,160 @@
+/* settings styles — co-located BEM blocks moved out of the global
+   styles.css. Theme vars, resets, and cross-feature/shared blocks remain in
+   src/styles.css. */
+
+.theme-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.theme-select__label {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+.theme-select__input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 5px var(--space-2);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-base);
+}
+.theme-select__input:hover {
+  border-color: var(--fg-muted);
+}
+/* Default-model picker in Settings → Agent. */
+.agent-default-model {
+  margin-top: var(--space-4);
+}
+.agent-default-model__label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 48ch;
+}
+/* Danger Zone: irreversible repo-level actions, fenced off in a red-bordered
+   card so they read as deliberately set apart from ordinary settings. */
+.danger-zone {
+  border: 1px solid var(--state-closed);
+  border-radius: 6px;
+  margin-top: var(--space-4);
+  max-width: 60ch;
+}
+.danger-zone__title {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-md);
+  color: var(--state-closed);
+  border-bottom: 1px solid var(--border);
+}
+.danger-zone__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+.danger-zone__copy p {
+  margin: var(--space-1) 0 0;
+}
+.danger-zone__action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.danger-zone__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+}
+/* Agent settings: global Claude token (write-only). */
+.agent-token-status {
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--neutral-muted);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+.agent-token-status.is-set {
+  background: var(--state-todo-bg);
+  color: var(--state-todo);
+}
+.agent-token-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 48ch;
+}
+.agent-token-form__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+/* Custom-endpoint (gateway) block in Settings → Agent. */
+.agent-endpoint {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+.agent-endpoint .agent-token-form {
+  margin-top: var(--space-2);
+}
+.token-reveal {
+  border: 1px solid var(--accent);
+  background: var(--accent-muted);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.token-reveal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.token-reveal__head p,
+.token-reveal p {
+  margin: var(--space-1) 0 var(--space-2);
+}
+.token-reveal__secret {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.token-reveal__secret code {
+  flex: 1;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+}
+.token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-base);
+}
+.token-table th {
+  text-align: left;
+  color: var(--fg-muted);
+  font-weight: var(--weight-bold);
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+}
+.token-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-muted);
+}
+.token-table tr.is-revoked td {
+  opacity: 0.55;
+}
+.token-table td .badge {
+  margin-left: var(--space-2);
+}
+.token-table__actions {
+  text-align: right;
+}

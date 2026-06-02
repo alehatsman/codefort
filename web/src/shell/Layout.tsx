@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
+import "./shell.css"
 import { clearToken } from "@/api/client"
 import { useRepo } from "@/api/queries"
 import GlobalTabs from "@/shell/GlobalTabs"

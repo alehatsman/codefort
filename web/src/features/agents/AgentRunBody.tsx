@@ -1,4 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual"
+import "./agents.css"
 import clsx from "clsx"
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useCancelAgentRun, useCreateAgentTurn, useFinishAgentRun } from "@/api/mutations"

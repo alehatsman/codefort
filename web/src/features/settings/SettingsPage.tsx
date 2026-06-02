@@ -1,4 +1,5 @@
 import clsx from "clsx"
+import "./settings.css"
 import { useEffect, useState } from "react"
 import { useAgentSettings, useSSHKeys, useTokens, useWhoami } from "@/api/queries"
 import {

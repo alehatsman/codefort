@@ -1,4 +1,5 @@
 import { useState } from "react"
+import "./pulls.css"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
 import { useCompare, useRefs } from "@/api/queries"

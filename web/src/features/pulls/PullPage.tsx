@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState } from "react"
+import "./pulls.css"
 import { useParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
 import { useMergePull, useUpdatePull } from "@/api/mutations"

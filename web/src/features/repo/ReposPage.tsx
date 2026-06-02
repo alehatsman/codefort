@@ -1,4 +1,5 @@
 import { useRef } from "react"
+import "./repo.css"
 import { Link, useNavigate } from "react-router-dom"
 import { useRepos } from "@/api/queries"
 import CIStatusIcon from "@/features/pipelines/CIStatusIcon"

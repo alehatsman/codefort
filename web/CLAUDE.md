@@ -27,12 +27,32 @@ helpers from it for now (a marked temporary seam — agents will grow its own).
 
 ## Styling: hand-written semantic BEM, no utility framework
 
-- CSS lives in `src/styles.css` as semantic **BEM** — `block__element--modifier`
-  (`board-col`, `board-col__head`, `board-col__head--done`). Theme values are
-  CSS custom properties (`var(--border)`, `var(--fg-muted)`) defined alongside
-  `src/theme.ts`. No Tailwind, no CSS-in-JS, no CSS modules.
+- Semantic **BEM** — `block__element--modifier` (`board-col`,
+  `board-col__head`, `board-col__head--done`). Theme values are CSS custom
+  properties (`var(--border)`, `var(--fg-muted)`) defined alongside
+  `src/theme.ts`. No Tailwind, no CSS-in-JS, no CSS **modules** (the class
+  names are part of the contract — Playwright specs and the `is-*` / vim-nav
+  selectors target them; hashed names would break that).
 - One class names the thing; modifiers (`--state`, `is-active`, `is-loading`,
   `is-vim-selected`) toggle variants. State flags use the `is-*` prefix.
+
+### Where a block lives: co-located per feature
+
+- **Feature-specific blocks** live in a co-located stylesheet next to the
+  feature, imported by that feature's pages: `features/<x>/<x>.css` (e.g.
+  `features/issues/issues.css`, `features/pulls/pulls.css`) and
+  `shell/shell.css`. Add a feature's new block to its stylesheet — `import
+  "./<x>.css"` from the feature's page component(s).
+- **The shared base stays in `src/styles.css`**: theme vars + dark-mode
+  `@media`, global resets, utilities (`.muted`, `.small`), the syntax-highlight
+  (`hljs-*`) tokens, and the **design-system primitives** — `.btn`, `.card`,
+  `.input`/`.select`/`.textarea`/`.field`, `.badge`, `.chip`, the app shell
+  (`.app`/`.topbar`/`.main`/`.tabs`), and any block used directly across more
+  than one feature (e.g. `comment`, `issue-row`, `markdown-body`, `diff-file`).
+- Rule of thumb: used by one feature → that feature's stylesheet; used by the
+  `ui/` primitives or across features → base `styles.css`. Vite bundles all of
+  it into one CSS file in prod; the split is for source locality, not runtime
+  scoping.
 
 ## Composing className: use `clsx`, not template-literal ternaries
 

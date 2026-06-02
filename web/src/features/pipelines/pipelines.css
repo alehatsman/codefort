@@ -1,0 +1,244 @@
+/* pipelines styles — co-located BEM blocks moved out of the global
+   styles.css. Theme vars, resets, and cross-feature/shared blocks remain in
+   src/styles.css. */
+
+/* CI status icon — compact counterpart to .ci-badge; colors track the same
+   issue-state vars by meaning so both stay in sync across themes. */
+.ci-icon {
+  display: inline-block;
+  vertical-align: text-bottom;
+}
+.ci-icon--success {
+  color: var(--state-todo);
+}
+.ci-icon--running {
+  color: var(--state-in_progress);
+}
+.ci-icon--failed,
+.ci-icon--error {
+  color: var(--state-closed);
+}
+.ci-icon--queued,
+.ci-icon--canceled,
+.ci-icon--interrupted {
+  color: var(--fg-muted);
+}
+.ci-icon--stalled {
+  color: var(--state-in_progress);
+}
+/* Per-run model tag in the Agents run list. */
+.ci-runs__model {
+  display: block;
+}
+/* Status pill — colors track issue-state vars by meaning. */
+.ci-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-none);
+  text-transform: capitalize;
+}
+.ci-badge--success {
+  background: var(--state-todo-bg);
+  color: var(--state-todo);
+}
+.ci-badge--running,
+.ci-badge--awaiting_input,
+.ci-badge--finishing {
+  background: var(--state-in_progress-bg);
+  color: var(--state-in_progress);
+}
+.ci-badge--failed,
+.ci-badge--error {
+  background: var(--state-closed-bg);
+  color: var(--state-closed);
+}
+.ci-badge--queued,
+.ci-badge--canceled,
+.ci-badge--skipped,
+.ci-badge--interrupted {
+  background: var(--neutral-muted);
+  color: var(--fg-muted);
+}
+/* stalled: the agent gave up without converging — amber (attention), not red
+   (a failure) and not grey (a no-op like canceled/interrupted). */
+.ci-badge--stalled {
+  background: var(--state-in_progress-bg);
+  color: var(--state-in_progress);
+}
+/* Runs table */
+.ci-runs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.ci-runs th {
+  text-align: left;
+  font-weight: var(--weight-medium);
+  color: var(--fg-muted);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+.ci-runs td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border-muted);
+}
+.ci-runs__num {
+  font-weight: var(--weight-medium);
+}
+/* Owning-repo link shown in the cross-repo (global) Pipelines/Agents tables. */
+.ci-runs__repo {
+  font-weight: var(--weight-medium);
+}
+.ci-runs__sha {
+  font-family: var(--font-mono);
+}
+.ci-runs__commit {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 26rem;
+}
+.ci-runs__msg {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Run detail */
+.ci-run-subject {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
+.ci-run-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.ci-run-head__back {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+.ci-run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.ci-run-meta dt {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+.ci-run-meta dd {
+  margin: 2px 0 0;
+}
+/* Jobs — the `needs` DAG as depth-ordered columns with arrows between stages */
+.ci-dag {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  overflow-x: auto;
+}
+.ci-dag__stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  justify-content: flex-start;
+}
+.ci-dag__arrow {
+  display: flex;
+  align-items: center;
+  color: var(--fg-muted);
+  font-size: var(--text-lg);
+  padding: 0 var(--space-1);
+}
+.ci-dag__job {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 140px;
+  padding: var(--space-2) var(--space-3);
+  /* A status-colored left accent (set per --<status> below) makes pass/fail
+     scannable without reading each pill. */
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--fg-muted);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  cursor: pointer;
+  color: var(--fg);
+  text-align: left;
+}
+.ci-dag__job--success {
+  border-left-color: var(--state-todo);
+}
+.ci-dag__job--running {
+  border-left-color: var(--state-in_progress);
+}
+.ci-dag__job--failed,
+.ci-dag__job--error {
+  border-left-color: var(--state-closed);
+}
+.ci-dag__job--skipped,
+.ci-dag__job--queued,
+.ci-dag__job--canceled,
+.ci-dag__job--interrupted {
+  border-left-color: var(--border);
+}
+/* Selection is a ring, kept distinct from the status accent (the colored left
+   border) so the two signals don't collide. */
+.ci-dag__job.is-active {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.ci-dag__name {
+  font-weight: var(--weight-medium);
+}
+.ci-dag__needs {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+}
+/* ANSI SGR colors, mapped to theme-aware semantic tokens so log color tracks
+   the active theme and stays legible on every background. */
+.ansi-fg--black {
+  color: var(--fg-muted);
+}
+.ansi-fg--red {
+  color: var(--state-closed);
+}
+.ansi-fg--green {
+  color: var(--state-todo);
+}
+.ansi-fg--yellow {
+  color: var(--state-in_progress);
+}
+.ansi-fg--blue {
+  color: var(--accent);
+}
+.ansi-fg--magenta {
+  color: var(--state-done);
+}
+.ansi-fg--cyan {
+  color: var(--accent);
+}
+.ansi-fg--white {
+  color: var(--fg);
+}
+.ansi-bold {
+  font-weight: var(--weight-bold);
+}
+.ansi-dim {
+  opacity: 0.7;
+}
+.ansi-underline {
+  text-decoration: underline;
+}

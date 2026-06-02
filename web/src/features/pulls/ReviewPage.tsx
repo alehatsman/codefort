@@ -1,4 +1,5 @@
 import clsx from "clsx"
+import "./pulls.css"
 import { lazy, Suspense } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
 import { useCodeComments, useWhoami } from "@/api/queries"

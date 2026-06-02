@@ -1,4 +1,5 @@
 import { useState } from "react"
+import "./settings.css"
 import { useNavigate, useParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
 import { useRepo } from "@/api/queries"

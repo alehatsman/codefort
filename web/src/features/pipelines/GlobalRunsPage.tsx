@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom"
+import "./pipelines.css"
 import { useAllRuns } from "@/api/queries"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
 import { EmptyState, ErrorMessage, Spinner } from "@/ui"

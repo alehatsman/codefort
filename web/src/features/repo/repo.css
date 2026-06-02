@@ -1,0 +1,362 @@
+/* repo styles — co-located BEM blocks moved out of the global
+   styles.css. Theme vars, resets, and cross-feature/shared blocks remain in
+   src/styles.css. */
+
+/* Repos list ----------------------------------------------------------- */
+.card-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+/* Code browser --------------------------------------------------------- */
+.path-breadcrumb {
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-3);
+}
+.path-breadcrumb__seg {
+  color: var(--accent);
+}
+.path-breadcrumb__current {
+  font-weight: var(--weight-semibold);
+  color: var(--fg);
+}
+.path-breadcrumb__sep {
+  color: var(--fg-muted);
+  margin: 0 6px;
+}
+/* Affordance: a crumb dex has prose for carries it as a hover tooltip. The
+   dotted underline signals "hover me", the help cursor confirms it on the
+   current (non-link) segment; links keep their pointer. */
+.path-breadcrumb__seg--info {
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--fg-muted);
+}
+.path-breadcrumb__current.path-breadcrumb__seg--info {
+  cursor: help;
+}
+.file-icon {
+  vertical-align: text-bottom;
+  color: var(--fg-muted);
+}
+.file-icon--tree {
+  color: var(--color-folder);
+}
+.file-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+}
+.file-tree__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) max-content;
+  align-items: center;
+  border-top: 1px solid var(--border-muted);
+}
+.file-tree__row:first-child {
+  border-top: none;
+}
+.file-tree__row:hover {
+  background: var(--bg-canvas);
+}
+.file-tree__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px var(--space-4);
+  color: var(--fg);
+  min-width: 0;
+}
+.file-tree__link:hover {
+  text-decoration: none;
+}
+.file-tree__link:hover .file-tree__name {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.file-tree__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.file-tree__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Affordance: this entry has a dex summary, shown on hover (native title).
+   The dotted underline signals it; the row's hover rule above promotes it to
+   a solid underline like any other entry. */
+.file-tree__name--info {
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--fg-muted);
+}
+/* Per-file last-commit columns. */
+.file-tree__commit {
+  min-width: 0;
+  padding: 7px var(--space-2);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-tree__age {
+  padding: 7px var(--space-4);
+  text-align: right;
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
+/* Dim bar shown in the commit/age cells while tree-commits is loading. */
+.file-tree__ph {
+  display: inline-block;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--border-muted);
+  opacity: 0.5;
+}
+.file-tree__commit.file-tree__ph {
+  width: 45%;
+  margin: 7px var(--space-2);
+}
+.file-tree__age.file-tree__ph {
+  width: 48px;
+  justify-self: end;
+  margin: 7px var(--space-4);
+}
+.file-tree__ph.is-loading {
+  animation: commit-ph-pulse 1.2s ease-in-out infinite;
+}
+/* Branch picker + latest-commit bar share one row above the file tree. */
+.branch-commit-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.branch-commit-row .branch-select {
+  max-width: 100px;
+}
+.branch-commit-row .latest-commit-bar {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+/* Latest-commit bar above the file tree. */
+.latest-commit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-canvas);
+  margin-bottom: var(--space-3);
+}
+.latest-commit-bar__commit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.latest-commit-bar__author {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.latest-commit-bar__subject {
+  color: var(--fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.latest-commit-bar__subject:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.latest-commit-bar__sha {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+.latest-commit-bar__count {
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
+.latest-commit-bar__count:hover {
+  color: var(--accent);
+}
+.latest-commit-bar__ph {
+  display: inline-block;
+  width: 280px;
+  max-width: 60vw;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--border-muted);
+  opacity: 0.5;
+}
+.latest-commit-bar__ph.is-loading {
+  animation: commit-ph-pulse 1.2s ease-in-out infinite;
+}
+.branch-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  max-width: 16ch;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1px var(--space-2);
+  white-space: nowrap;
+}
+.branch-tag svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.code-view {
+  overflow-x: auto;
+}
+.code-view__table {
+  border-collapse: collapse;
+  width: 100%;
+  font: var(--text-sm) / 20px var(--font-mono);
+}
+.code-line__num {
+  width: 1%;
+  min-width: 50px;
+  padding: 0 var(--space-4) 0 10px;
+  text-align: right;
+  color: var(--fg-muted);
+  vertical-align: top;
+  user-select: none;
+  white-space: nowrap;
+}
+.code-line__num::before {
+  content: attr(data-line);
+}
+.code-line__text {
+  padding: 0 var(--space-4);
+  white-space: pre;
+  vertical-align: top;
+  width: 100%;
+}
+.code-line:hover .code-line__num,
+.code-line:hover .code-line__text {
+  background: var(--code-line-hl);
+}
+/* Lines covered by a saved review comment: a muted persistent tint + gutter bar
+   so the range a thread annotates stays visible. Declared before the deep-link
+   and active-selection rules so those (equal specificity, later) win when a
+   commented line is also linked or being selected. */
+.code-line.is-commented .code-line__num,
+.code-line.is-commented .code-line__text {
+  background: color-mix(in srgb, var(--state-done) 12%, transparent);
+}
+.code-line.is-commented .code-line__num {
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--state-done) 70%, transparent);
+}
+/* Deep-link target: a Research suggested-read opened the file at this block,
+   so the #L<n> / #L<start>-L<end> range is tinted and barred down the gutter. */
+.code-line.is-highlighted .code-line__num,
+.code-line.is-highlighted .code-line__text {
+  background: color-mix(in srgb, var(--state-in_progress) 16%, transparent);
+}
+.code-line.is-highlighted .code-line__num {
+  box-shadow: inset 2px 0 0 var(--state-in_progress);
+}
+/* Review comments: a clickable gutter selects lines to comment on. The active
+   selection reuses the deep-link tint with an accent gutter bar. */
+.code-line__num.is-clickable {
+  cursor: pointer;
+}
+.code-line__num.is-clickable:hover {
+  color: var(--fg-default);
+}
+/* While dragging a gutter selection, suppress native text selection so the
+   drag highlights line ranges instead of selecting the code text. */
+.code-view.is-selecting {
+  user-select: none;
+}
+.code-line.is-selected .code-line__num,
+.code-line.is-selected .code-line__text {
+  background: color-mix(in srgb, var(--accent-fg, var(--state-in_progress)) 20%, transparent);
+}
+.code-line.is-selected .code-line__num {
+  box-shadow: inset 2px 0 0 var(--accent-fg, var(--state-in_progress));
+}
+/* Inline comment threads + compose form, rendered as full-width rows beneath
+   the code line they annotate. */
+.code-comments-row .code-comments-cell {
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-canvas);
+  border-top: 1px solid var(--border-muted);
+  border-bottom: 1px solid var(--border-muted);
+}
+.code-comments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.code-compose {
+  max-width: 720px;
+}
+.code-compose__head {
+  margin-bottom: var(--space-2);
+}
+.branch-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-canvas);
+  color: var(--fg-muted);
+}
+.branch-select select {
+  border: none;
+  background: transparent;
+  color: var(--fg-default);
+  font: inherit;
+  cursor: pointer;
+  outline: none;
+  min-width: 0;
+  flex: 1;
+  text-overflow: ellipsis;
+}
+/* README card + rendered markdown -------------------------------------- */
+.readme-card {
+  margin-top: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.readme-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-muted);
+}
+.readme-card .markdown-body {
+  padding: var(--space-5) var(--space-6);
+}

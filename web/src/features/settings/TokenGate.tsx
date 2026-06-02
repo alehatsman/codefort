@@ -1,4 +1,5 @@
 import { useState } from "react"
+import "./settings.css"
 import { setToken, verifyToken } from "@/api/client"
 import { ErrorMessage } from "@/ui"
 

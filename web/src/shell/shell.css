@@ -1,0 +1,95 @@
+/* shell styles — co-located BEM blocks moved out of the global
+   styles.css. Theme vars, resets, and cross-feature/shared blocks remain in
+   src/styles.css. */
+
+.topbar {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  /* No vertical padding: the repo tabs stretch the full bar height so the
+     active tab's underline lands on the bar's bottom border (see .tab). The
+     brand and actions self-center via align-self. */
+  padding: 0 var(--space-5);
+  min-height: 52px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+/* Brand + repo tabs, left-aligned; actions sit at the far right. */
+.topbar__lead {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-5);
+}
+.brand {
+  align-self: center;
+  font-weight: var(--weight-bold);
+  font-size: var(--text-lg);
+  color: var(--fg);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.brand:hover {
+  text-decoration: none;
+  opacity: 0.85;
+}
+.topbar__signout {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 5px var(--space-3);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-base);
+}
+.topbar__signout:hover {
+  background: var(--bg-canvas);
+  border-color: var(--fg-muted);
+}
+.topbar__actions {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+/* Breadcrumbs ---------------------------------------------------------- */
+.crumbs {
+  font-size: var(--text-md);
+  margin-bottom: var(--space-3);
+  color: var(--fg-muted);
+}
+/* Authenticated images: a placeholder while the blob loads, alt on failure. */
+.md-img-loading {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: text-bottom;
+  background: var(--neutral-muted);
+  border-radius: var(--radius-sm);
+}
+.md-img-missing {
+  color: var(--fg-muted);
+  font-style: italic;
+}
+/* Avatar (initial circle) --------------------------------------------- */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-circle);
+  background: var(--accent);
+  color: white;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.avatar--lg {
+  width: 28px;
+  height: 28px;
+  font-size: var(--text-base);
+}

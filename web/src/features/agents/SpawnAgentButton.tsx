@@ -1,4 +1,5 @@
 import { useState } from "react"
+import "./agents.css"
 import { useNavigate } from "react-router-dom"
 import { useSpawnAgent } from "@/api/mutations"
 import { useAgentSettings } from "@/api/queries"
