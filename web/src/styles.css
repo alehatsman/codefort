@@ -1298,7 +1298,6 @@ a.file-tree__commit:hover {
 }
 .review-row__body {
   margin: 4px 0 0;
-  white-space: pre-wrap;
 }
 .review-row__snippet {
   margin: var(--space-2) 0 0;

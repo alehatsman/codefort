@@ -1,4 +1,5 @@
 import clsx from "clsx"
+import { lazy, Suspense } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
 import { useCodeComments, useWhoami } from "../api/queries"
 import { useDeleteCodeComment, useSetCodeCommentResolved } from "../api/mutations"
@@ -6,6 +7,10 @@ import BranchSelector from "../components/BranchSelector"
 import DraftReviewButton from "../components/DraftReviewButton"
 import Avatar from "../components/Avatar"
 import type { CodeComment, CodeCommentState } from "../api/types"
+
+// The markdown renderer pulls in remark/rehype + the highlighter; load it lazily
+// so the review list doesn't drag it into the main bundle.
+const Markdown = lazy(() => import("../components/Markdown"))
 
 // The two real comment states. Both checked (or neither) => "all"; the
 // checkbox set maps onto the server's single ?state= (open|resolved|all),
@@ -164,7 +169,11 @@ function ReviewRow({
           </span>
         )}
       </div>
-      <div className="review-row__body">{comment.body}</div>
+      <div className="review-row__body">
+        <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
+          <Markdown content={comment.body} owner={owner} repo={repo} basePath="" />
+        </Suspense>
+      </div>
       {comment.snippet && <pre className="review-row__snippet">{comment.snippet}</pre>}
     </li>
   )

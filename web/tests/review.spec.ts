@@ -172,6 +172,38 @@ test("review tab groups comments by file, deep-links, and filters by state", asy
   await expect(page.getByText("open comment here")).toHaveCount(0)
 })
 
+test("review comment bodies render as markdown", async ({ page }) => {
+  const seeded: CodeComment[] = [
+    {
+      id: 1,
+      repo_id: 1,
+      ref: "main",
+      path: "src/app.ts",
+      start_line: 1,
+      end_line: 1,
+      author: "test-user",
+      body: "**guard** needed:\n\n- check `nil`\n- return early",
+      resolved: false,
+      snippet: "la1",
+      created_at: new Date().toISOString(),
+    },
+  ]
+  await mockApi(page, { codeComments: seeded })
+  await routeBlob(page)
+  await routeIntelOff(page)
+
+  await page.goto("/alice/demo/review")
+
+  // The body renders through the shared Markdown component: bold, inline code,
+  // and a bullet list — not the raw `**…**`/`-` source text.
+  const body = page.locator(".review-row__body .markdown-body")
+  await expect(body).toBeVisible()
+  await expect(body.locator("strong")).toHaveText("guard")
+  await expect(body.locator("code")).toHaveText("nil")
+  await expect(body.locator("li")).toHaveCount(2)
+  await expect(page.getByText("**guard**")).toHaveCount(0)
+})
+
 test("draft review issue spawns a read-only review agent from the Review tab", async ({
   page,
 }) => {
