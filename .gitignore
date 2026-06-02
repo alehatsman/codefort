@@ -23,3 +23,5 @@
 agent/dex
 agent/mgit
 agent/mooncake
+
+.playwright-mcp
