@@ -110,6 +110,7 @@ export default function ExplorePage() {
             repo={r.name}
             packages={packages}
             graph={packageGraphQ.data}
+            graphLoading={packageGraphQ.isLoading}
             lastCommitByPath={lastCommitByPath}
             loading={overviewQ.isLoading}
             error={overviewQ.error as Error | null}
@@ -295,6 +296,7 @@ interface MapProps {
   repo: string
   packages: IntelPackageSummary[]
   graph?: IntelPackageGraph
+  graphLoading: boolean
   lastCommitByPath: Record<string, Commit>
   loading: boolean
   error: Error | null
@@ -313,6 +315,16 @@ function PackageMap(props: MapProps) {
   const hasLinked = !!graph?.nodes.some((n) => n.in_degree > 0 || n.out_degree > 0)
   if (graph && graph.status === "ok" && hasLinked) {
     return <GraphPackageMap {...props} graph={graph} />
+  }
+  // The graph query hasn't resolved yet (it's slower than the overview on big
+  // repos): show the loading state rather than flashing the path-name fallback
+  // and then swapping it for the graph map.
+  if (!graph && props.graphLoading) {
+    return (
+      <section className="explore-section">
+        <div className="loading">Loading map…</div>
+      </section>
+    )
   }
   return <FallbackPackageMap {...props} />
 }
@@ -527,7 +539,7 @@ function buildTiers(
 ): MapModel {
   const linked = graph.nodes.filter((n) => n.in_degree > 0 || n.out_degree > 0)
   const hiddenCount = graph.nodes.length - linked.length
-  const prefix = commonPathPrefix(linked.map((n) => n.package))
+  const prefix = deriveModulePrefix(linked.map((n) => n.package))
   const refOf = (pkg: string): PkgRef => {
     if (prefix && pkg === prefix) return { label: ".", repoRel: ".", local: true }
     if (prefix && pkg.startsWith(`${prefix}/`)) {
@@ -614,6 +626,21 @@ function tierLabel(depth: number, maxDepth: number): string {
   if (depth === maxDepth) return "Entry points"
   if (depth === 0) return "Foundation"
   return `Layer ${depth}`
+}
+
+// deriveModulePrefix finds the repo's Go module path among the import paths.
+// Grouping by first path segment and taking the common prefix of the LARGEST
+// group keeps a stray off-module node (e.g. a python/js testdata fixture whose
+// dotted path shares no prefix with the Go packages) from collapsing the
+// prefix to "" — which would full-path every label and break navigation.
+// Off-module nodes simply don't match the prefix and stay non-navigable.
+function deriveModulePrefix(paths: string[]): string {
+  if (paths.length === 0) return ""
+  const byHead = new Map<string, string[]>()
+  for (const p of paths) pushTo(byHead, p.split("/")[0], p)
+  let largest: string[] = []
+  for (const group of byHead.values()) if (group.length > largest.length) largest = group
+  return commonPathPrefix(largest)
 }
 
 // commonPathPrefix returns the longest segment-aligned shared prefix of the

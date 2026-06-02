@@ -134,6 +134,12 @@ const PACKAGE_GRAPH = {
     // must be hidden from the map (no structural signal) and must not drag the
     // module-prefix derivation off the Go packages onto "".
     { package: "web/src/App", in_degree: 0, out_degree: 0, page_rank: 0 },
+    // A *linked* off-module fixture pair (dex's python testdata case): they
+    // import each other so they aren't isolated, and their dotted paths share
+    // no prefix with the Go module. The module prefix must still be derived
+    // from the dominant (Go) group, so the Go labels stay repo-relative.
+    { package: "fixtures.testdata.alpha", in_degree: 0, out_degree: 1, page_rank: 0 },
+    { package: "fixtures.testdata.beta", in_degree: 1, out_degree: 0, page_rank: 0 },
   ],
   edges: [
     { from_package: "github.com/acme/demo/cmd/demo", to_package: "github.com/acme/demo/internal/server" },
@@ -141,6 +147,7 @@ const PACKAGE_GRAPH = {
       from_package: "github.com/acme/demo/internal/server",
       to_package: "github.com/acme/demo/internal/storage",
     },
+    { from_package: "fixtures.testdata.alpha", to_package: "fixtures.testdata.beta" },
   ],
 }
 
@@ -195,9 +202,15 @@ test("Explore: package map layers by dex import graph with degree + cross-links"
   // from the linked Go packages — is stripped to clean repo-relative labels.
   await expect(page.locator(".pkg-card__path", { hasText: "web/src/App" })).toHaveCount(0)
   const mapHeading = page.locator(".explore-section__heading", { hasText: "Map of the codebase" })
-  await expect(mapHeading).toContainText("3 packages")
+  // 3 Go + 2 linked fixture packages drawn; the 1 isolated node hidden.
+  await expect(mapHeading).toContainText("5 packages")
   await expect(mapHeading).toContainText("1 unlinked hidden")
+  // The Go label stays repo-relative even though linked off-module fixtures are
+  // present — the prefix is derived from the dominant (Go) group, not a global
+  // common prefix (which the dotted fixtures would collapse to "").
   await expect(server.locator(".pkg-card__path")).toHaveText("internal/server")
+  // The off-module fixture is shown with its full path (non-navigable).
+  await expect(page.locator(".pkg-card__path", { hasText: "fixtures.testdata.alpha" })).toBeVisible()
 })
 
 test("Explore: ask box defaults to Ask; Advanced reveals the mode picker", async ({ page }) => {
