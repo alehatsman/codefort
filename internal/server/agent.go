@@ -78,6 +78,18 @@ func (s *Server) handleSpawnAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resolve the tool profile: an explicit request value wins (must be known),
+	// else the default "full". "review" scopes the run to read + review_* tools
+	// (the read-only review agent); enforcement is shim-side (#184).
+	profile := strings.TrimSpace(req.ToolProfile)
+	if profile == "" {
+		profile = storage.DefaultToolProfile
+	}
+	if !storage.ValidToolProfile(profile) {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid tool profile %q", profile))
+		return
+	}
+
 	owner := r.PathValue("owner")
 	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
 	bareRepo := filepath.Join(s.cfg.ReposDir, owner, repo+".git")
@@ -98,6 +110,7 @@ func (s *Server) handleSpawnAgent(w http.ResponseWriter, r *http.Request) {
 		IssueNumber:        &n,
 		ExecutionModel:     model,
 		MooncakeAllowShell: req.AllowShell,
+		ToolProfile:        profile,
 		CommitSHA:          sha,
 		CommitMsg:          msg,
 		CommitAuthor:       author,

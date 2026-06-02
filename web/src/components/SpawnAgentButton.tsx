@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useSpawnAgent } from "../api/mutations"
 import { useAgentSettings } from "../api/queries"
-import type { CIRunExecutionModel } from "../api/types"
+import type { CIRunExecutionModel, CIRunToolProfile } from "../api/types"
 
 interface Props {
   owner: string
@@ -20,6 +20,19 @@ const MODELS: { value: CIRunExecutionModel; label: string; hint: string }[] = [
     value: "mooncake-agent",
     label: "Mooncake agent (run actions)",
     hint: "Claude plans; mooncake applies the actions, so commands run.",
+  },
+]
+
+const PROFILES: { value: CIRunToolProfile; label: string; hint: string }[] = [
+  {
+    value: "full",
+    label: "Full toolset",
+    hint: "All mgit tools: claim issues, post comments, spawn agents, trigger pipelines.",
+  },
+  {
+    value: "review",
+    label: "Review (read-only)",
+    hint: "Read + review comments only — can't claim issues, spawn agents, or trigger pipelines.",
   },
 ]
 
@@ -43,15 +56,17 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
   const model = picked ?? serverDefault
   const [allowShell, setAllowShell] = useState(false)
   const isMooncake = model === "mooncake-agent"
+  const [profile, setProfile] = useState<CIRunToolProfile>("full")
 
   function onSpawn() {
     spawn.mutate(
-      { model, allowShell: isMooncake && allowShell },
+      { model, allowShell: isMooncake && allowShell, toolProfile: profile },
       { onSuccess: (run) => navigate(`/${owner}/${repo}/agents/${run.number}`) }
     )
   }
 
   const hint = MODELS.find((m) => m.value === model)?.hint
+  const profileHint = PROFILES.find((p) => p.value === profile)?.hint
 
   return (
     <>
@@ -67,6 +82,21 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
             {MODELS.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="spawn-agent__model">
+          <span className="muted small">Tools</span>
+          <select
+            className="select"
+            value={profile}
+            disabled={spawn.isPending}
+            onChange={(e) => setProfile(e.target.value as CIRunToolProfile)}
+          >
+            {PROFILES.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
               </option>
             ))}
           </select>
@@ -98,7 +128,7 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
         </label>
       )}
       <p className="muted small">
-        {hint} Runs in an isolated container; progress streams under Pipelines.
+        {hint} {profileHint} Runs in an isolated container; progress streams under Pipelines.
       </p>
       {spawn.error && <div className="error inline">{(spawn.error as Error).message}</div>}
     </>

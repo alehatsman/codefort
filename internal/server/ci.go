@@ -445,6 +445,7 @@ func toAPIRun(run storage.CIRun) api.CIRun {
 		IssueNumber:        run.IssueNumber,
 		ExecutionModel:     run.ExecutionModel,
 		MooncakeAllowShell: run.MooncakeAllowShell,
+		ToolProfile:        run.ToolProfile,
 		CommitSHA:          run.CommitSHA,
 		CommitMsg:          run.CommitMsg,
 		CommitAuthor:       run.CommitAuthor,

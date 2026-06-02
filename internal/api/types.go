@@ -436,6 +436,7 @@ type CIRun struct {
 	IssueNumber        *int       `json:"issue_number,omitempty"`         // the issue an agent run serves
 	ExecutionModel     string     `json:"execution_model,omitempty"`      // agent model: "claude-edit" | "mooncake-agent"
 	MooncakeAllowShell bool       `json:"mooncake_allow_shell,omitempty"` // mooncake-agent run allowed to use shell/cmd (#110)
+	ToolProfile        string     `json:"tool_profile,omitempty"`         // mgit MCP toolset slice: "full" | "review" (#184)
 	CommitSHA          string     `json:"commit_sha"`
 	CommitMsg          string     `json:"commit_msg,omitempty"`
 	CommitAuthor       string     `json:"commit_author,omitempty"`
@@ -458,6 +459,9 @@ type SpawnAgentRequest struct {
 	// AllowShell, for the mooncake-agent model, drops the default shell/cmd
 	// denial for this run so the agent's plan may run shell commands (#110).
 	AllowShell bool `json:"allow_shell,omitempty"`
+	// ToolProfile scopes which mgit MCP tools the run sees ("full" | "review");
+	// empty defaults to "full". "review" yields a read-only review agent (#184).
+	ToolProfile string `json:"tool_profile,omitempty"`
 }
 
 // TriggerCIRunRequest starts a CI run for an arbitrary ref (branch, tag, or

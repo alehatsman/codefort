@@ -171,3 +171,43 @@ test("review tab groups comments by file, deep-links, and filters by state", asy
   await page.getByRole("checkbox", { name: "resolved" }).click()
   await expect(page.getByText("open comment here")).toHaveCount(0)
 })
+
+test("draft review issue spawns a read-only review agent from the Review tab", async ({
+  page,
+}) => {
+  const state = await mockApi(page)
+  await routeIntelOff(page)
+
+  await page.goto("/alice/demo/review?ref=main")
+
+  // Open the draft modal.
+  await page.getByRole("button", { name: "Draft review issue" }).click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog).toBeVisible()
+
+  // Default target is the branch/PR diff → the base ref field is shown, no path.
+  await expect(dialog.getByText("Base ref")).toBeVisible()
+  await expect(dialog.getByText("File path")).toHaveCount(0)
+
+  // Switch to "A file" → the path field appears and the base field hides.
+  await dialog.getByRole("combobox").selectOption("file")
+  await expect(dialog.getByText("File path")).toBeVisible()
+  await expect(dialog.getByText("Base ref")).toHaveCount(0)
+
+  // The ref seeded from ?ref=main; fill the file path and spawn.
+  await dialog.getByPlaceholder("path/to/file.go").fill("src/app.ts")
+  await dialog.getByRole("button", { name: "Create + spawn review agent" }).click()
+
+  // It created an issue from the file template and spawned a review-profile agent,
+  // then navigated to the agent run's transcript.
+  await expect(page).toHaveURL(/\/alice\/demo\/agents\/\d+$/)
+  expect(state.issues).toHaveLength(1)
+  expect(state.issues[0].title).toBe("Review: src/app.ts")
+  expect(state.issues[0].body).toContain("review_create")
+  expect(state.ciRuns).toHaveLength(1)
+  expect(state.ciRuns[0]).toMatchObject({
+    kind: "agent",
+    execution_model: "claude-edit",
+    tool_profile: "review",
+  })
+})

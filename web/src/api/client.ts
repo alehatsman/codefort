@@ -6,6 +6,7 @@ import type {
   CIRun,
   CIRunDetail,
   CIRunExecutionModel,
+  CIRunToolProfile,
   ClaimIssueInput,
   CodeComment,
   CodeCommentState,
@@ -335,7 +336,12 @@ export const api = {
     owner: string,
     repo: string,
     n: number,
-    opts?: { ref?: string; model?: CIRunExecutionModel; allowShell?: boolean }
+    opts?: {
+      ref?: string
+      model?: CIRunExecutionModel
+      allowShell?: boolean
+      toolProfile?: CIRunToolProfile
+    }
   ) =>
     request<CIRun>(`/api/repos/${owner}/${repo}/issues/${n}/agent`, {
       method: "POST",
@@ -343,6 +349,7 @@ export const api = {
         ...(opts?.ref ? { ref: opts.ref } : {}),
         ...(opts?.model ? { model: opts.model } : {}),
         ...(opts?.allowShell ? { allow_shell: true } : {}),
+        ...(opts?.toolProfile ? { tool_profile: opts.toolProfile } : {}),
       },
     }),
   // createAgentTurn queues a follow-up message on an agent run; the dispatch

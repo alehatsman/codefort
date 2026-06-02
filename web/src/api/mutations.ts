@@ -3,6 +3,7 @@ import { api } from "./client"
 import { keys } from "./queries"
 import type {
   CIRunExecutionModel,
+  CIRunToolProfile,
   ClaimIssueInput,
   UpdateAgentSettingsInput,
   CreateCodeCommentInput,
@@ -247,9 +248,37 @@ export function useRerunCIRun(owner: string, repo: string) {
 export function useSpawnAgent(owner: string, repo: string, n: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (vars?: { ref?: string; model?: CIRunExecutionModel; allowShell?: boolean }) =>
-      api.spawnAgent(owner, repo, n, vars),
+    mutationFn: (vars?: {
+      ref?: string
+      model?: CIRunExecutionModel
+      allowShell?: boolean
+      toolProfile?: CIRunToolProfile
+    }) => api.spawnAgent(owner, repo, n, vars),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) }),
+  })
+}
+
+// useDraftReviewAgent creates a review issue from a draft and immediately spawns
+// a read-only review agent against it (#159): one click on the Review tab turns
+// "review this target" into an issue + a running agent scoped to the "review"
+// tool profile (read + review_* only). Returns the spawned run so the caller can
+// navigate to its live transcript. claude-edit is pinned because it reliably
+// unlocks read tools + MCP under headless bypassPermissions (#110).
+export function useDraftReviewAgent(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: CreateIssueInput) => {
+      const issue = await api.createIssue(owner, repo, input)
+      const run = await api.spawnAgent(owner, repo, issue.number, {
+        model: "claude-edit",
+        toolProfile: "review",
+      })
+      return { issue, run }
+    },
+    onSuccess: () => {
+      invalidateIssueWrites(qc, owner, repo)
+      qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) })
+    },
   })
 }
 

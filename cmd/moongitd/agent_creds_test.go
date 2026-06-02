@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/alehatsman/moongit/internal/config"
+	"github.com/alehatsman/moongit/internal/storage"
 )
 
 func TestAgentContainerEnvOAuthAndDex(t *testing.T) {
@@ -138,8 +139,9 @@ func TestWriteAgentMCPConfig(t *testing.T) {
 	}
 
 	// No dex configured -> file still written, mgit registered, no dex server.
+	// An empty profile defaults to "full" in the shim argv.
 	dir := t.TempDir()
-	p, err := writeAgentMCPConfig(dir, &config.Config{})
+	p, err := writeAgentMCPConfig(dir, &config.Config{}, "")
 	if err != nil {
 		t.Fatalf("writeAgentMCPConfig (no dex): %v", err)
 	}
@@ -151,18 +153,25 @@ func TestWriteAgentMCPConfig(t *testing.T) {
 	if !ok || mgit.Command != "mgit" || !sliceContains(mgit.Args, "mcp") {
 		t.Errorf("mgit server config wrong: %+v", servers)
 	}
+	if !sliceContains(mgit.Args, "--profile") || !sliceContains(mgit.Args, storage.ToolProfileFull) {
+		t.Errorf("mgit args should carry the default profile: %+v", mgit.Args)
+	}
 	if _, ok := servers["dex"]; ok {
 		t.Errorf("dex should be absent when unconfigured: %+v", servers)
 	}
 
-	// Dex configured -> both mgit and the dex shim are registered.
+	// Dex configured + review profile -> both servers; mgit carries --profile review.
 	dir = t.TempDir()
-	if _, err := writeAgentMCPConfig(dir, &config.Config{DexURL: "http://dex.local"}); err != nil {
+	if _, err := writeAgentMCPConfig(dir, &config.Config{DexURL: "http://dex.local"}, storage.ToolProfileReview); err != nil {
 		t.Fatalf("writeAgentMCPConfig (dex): %v", err)
 	}
 	servers = readConf(t, dir)
-	if _, ok := servers["mgit"]; !ok {
+	mgit, ok = servers["mgit"]
+	if !ok {
 		t.Errorf("mgit server missing when dex configured: %+v", servers)
+	}
+	if !sliceContains(mgit.Args, "--profile") || !sliceContains(mgit.Args, storage.ToolProfileReview) {
+		t.Errorf("mgit args should carry the review profile: %+v", mgit.Args)
 	}
 	dex, present := servers["dex"]
 	if !present || dex.Command != "dex" || !sliceContains(dex.Args, "http://dex.local") {

@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom"
 import { useCodeComments, useWhoami } from "../api/queries"
 import { useDeleteCodeComment, useSetCodeCommentResolved } from "../api/mutations"
 import BranchSelector from "../components/BranchSelector"
+import DraftReviewButton from "../components/DraftReviewButton"
 import Avatar from "../components/Avatar"
 import type { CodeComment, CodeCommentState } from "../api/types"
 
@@ -72,8 +73,8 @@ export default function ReviewPage() {
             </label>
           ))}
         </div>
+        <DraftReviewButton owner={owner} repo={repo} defaultRef={gitRef} />
       </div>
-
 
       {commentsQ.isLoading && <div className="loading">Loading…</div>}
       {commentsQ.error && <div className="error">{(commentsQ.error as Error).message}</div>}

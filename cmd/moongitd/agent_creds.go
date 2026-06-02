@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/alehatsman/moongit/internal/config"
+	"github.com/alehatsman/moongit/internal/storage"
 )
 
 // agentMCPConfigName is the MCP config file written into the workspace (so it's
@@ -97,17 +98,22 @@ func agentServerURL(cfg *config.Config) string {
 //   - mgit: the moongit issue/review/pipeline/agent toolset (`mgit mcp`, #158).
 //     Always registered — the per-run MOONGIT_TOKEN + MOONGIT_SERVER ride in the
 //     container env (agentContainerEnv), so the shim resolves its target and
-//     identity without anything in this file.
+//     identity without anything in this file. The run's tool profile (#184) is
+//     passed as `--profile <p>`, so the shim only registers the tools that
+//     profile permits (shim-side enforcement, robust headless — #110).
 //   - dex: the stdio->REST shim (`dex mcp --remote`, dex#6), registered only when
 //     dex is configured. Its bearer/project also ride the env.
 //
 // The file therefore always exists for an agent run and carries no secret. It
 // returns the in-container path.
-func writeAgentMCPConfig(hostWorkDir string, cfg *config.Config) (containerPath string, err error) {
+func writeAgentMCPConfig(hostWorkDir string, cfg *config.Config, toolProfile string) (containerPath string, err error) {
+	if toolProfile == "" {
+		toolProfile = storage.DefaultToolProfile
+	}
 	servers := map[string]any{
 		"mgit": map[string]any{
 			"command": "mgit",
-			"args":    []string{"mcp"},
+			"args":    []string{"mcp", "--profile", toolProfile},
 		},
 	}
 	if cfg.DexURL != "" {

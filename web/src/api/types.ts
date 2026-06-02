@@ -475,12 +475,17 @@ export type CIRunKind = "ci" | "agent"
 // mooncake plans+applies actions (so commands run).
 export type CIRunExecutionModel = "claude-edit" | "mooncake-agent"
 
+// CIRunToolProfile scopes which mgit MCP tools an agent run sees (#184): full =
+// the whole toolset; review = read tools + review_* (the read-only review agent).
+export type CIRunToolProfile = "full" | "review"
+
 export interface CIRun {
   number: number
   kind: CIRunKind
   issue_number?: number
   execution_model?: CIRunExecutionModel
   mooncake_allow_shell?: boolean
+  tool_profile?: CIRunToolProfile
   commit_sha: string
   commit_msg?: string
   commit_author?: string

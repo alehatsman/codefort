@@ -31,6 +31,66 @@ func spawnAgent(t *testing.T, s *Server, num int, ref string) *httptest.Response
 	return rr
 }
 
+// spawnAgentReq drives handleSpawnAgent with an explicit request body, so tests
+// can exercise fields beyond ref (model, tool profile).
+func spawnAgentReq(t *testing.T, s *Server, num int, body api.SpawnAgentRequest) *httptest.ResponseRecorder {
+	t.Helper()
+	raw, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/repos/alice/repo/issues/"+strconv.Itoa(num)+"/agent", bytes.NewReader(raw))
+	req.SetPathValue("owner", "alice")
+	req.SetPathValue("repo", "repo")
+	req.SetPathValue("number", strconv.Itoa(num))
+	req = req.WithContext(context.WithValue(req.Context(), tokenCtxKey{}, api.Token{Name: "agent#17"}))
+	rr := httptest.NewRecorder()
+	s.handleSpawnAgent(rr, req)
+	return rr
+}
+
+// The tool profile is validated, defaulted to "full", and persisted onto the run.
+func TestSpawnAgentToolProfile(t *testing.T) {
+	s, repoID := newCITriggerServer(t)
+	issue, err := storage.CreateIssue(s.db, repoID, api.CreateIssueRequest{Title: "review me", Author: "alice"})
+	if err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+
+	// An explicit "review" profile round-trips onto the run.
+	rr := spawnAgentReq(t, s, issue.Number, api.SpawnAgentRequest{ToolProfile: storage.ToolProfileReview})
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("code = %d, want 202; body=%s", rr.Code, rr.Body.String())
+	}
+	var run api.CIRun
+	if err := json.Unmarshal(rr.Body.Bytes(), &run); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if run.ToolProfile != storage.ToolProfileReview {
+		t.Errorf("tool_profile = %q, want review", run.ToolProfile)
+	}
+	stored, err := storage.GetRun(s.db, repoID, run.Number)
+	if err != nil {
+		t.Fatalf("GetRun: %v", err)
+	}
+	if stored.ToolProfile != storage.ToolProfileReview {
+		t.Errorf("stored profile = %q, want review", stored.ToolProfile)
+	}
+
+	// Omitting it defaults to "full".
+	rr = spawnAgentReq(t, s, issue.Number, api.SpawnAgentRequest{})
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("default profile code = %d, want 202; body=%s", rr.Code, rr.Body.String())
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &run)
+	if run.ToolProfile != storage.ToolProfileFull {
+		t.Errorf("default tool_profile = %q, want full", run.ToolProfile)
+	}
+
+	// An unknown profile is a 400, before anything is queued.
+	rr = spawnAgentReq(t, s, issue.Number, api.SpawnAgentRequest{ToolProfile: "root"})
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("bad profile code = %d, want 400; body=%s", rr.Code, rr.Body.String())
+	}
+}
+
 // Spawning an agent for an existing issue enqueues a kind=agent run linked to
 // the issue, resolved against the repo's HEAD, triggered by the caller.
 func TestSpawnAgentEnqueuesAgentRun(t *testing.T) {

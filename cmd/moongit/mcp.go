@@ -30,11 +30,15 @@ import (
 // repo for its lifetime — owner/repo overrides are a later addition.
 func runMCP(args []string) error {
 	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
+	profile := fs.String("profile", profileFull, "tool profile scoping which tools are registered: full | review")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
 		return fmt.Errorf("mcp takes no arguments (got %v)", fs.Args())
+	}
+	if !validProfile(*profile) {
+		return fmt.Errorf("mcp: invalid profile %q (want full or review)", *profile)
 	}
 
 	tgt, err := discoverTarget()
@@ -45,13 +49,60 @@ func runMCP(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	return (&mcpServer{target: tgt}).run(ctx)
+	return (&mcpServer{target: tgt, profile: *profile}).run(ctx)
 }
 
-// mcpServer holds the resolved target for the session. Handlers are methods so
-// they can reach it (and the package-level httpDo/decodeError helpers).
+// Tool profiles (#184) scope which tools the shim registers. The mapping is
+// owned here — mgit owns its own toolset — and the server only names the
+// profile over the wire; these strings are that contract (mirror of
+// storage.ToolProfile{Full,Review}).
+const (
+	profileFull   = "full"
+	profileReview = "review"
+)
+
+// reviewProfileTools is the slice of tools the "review" profile exposes: read
+// tools + review_* + issue_comment (so a review agent can survey, anchor
+// findings, and report on its driving issue), but nothing that mutates issue
+// state, spawns agents, or triggers pipelines.
+var reviewProfileTools = map[string]bool{
+	"issue_list":     true,
+	"issue_show":     true,
+	"issue_comment":  true,
+	"review_list":    true,
+	"review_create":  true,
+	"review_resolve": true,
+	"review_reopen":  true,
+	"pipeline_list":  true,
+	"pipeline_get":   true,
+}
+
+func validProfile(p string) bool { return p == profileFull || p == profileReview }
+
+// mcpServer holds the resolved target and tool profile for the session.
+// Handlers are methods so they can reach it (and the package-level
+// httpDo/decodeError helpers).
 type mcpServer struct {
-	target target
+	target  target
+	profile string
+}
+
+// allows reports whether the session's profile exposes the named tool. "full"
+// (the default) exposes everything; "review" is restricted to its slice.
+func (m *mcpServer) allows(name string) bool {
+	if m.profile == "" || m.profile == profileFull {
+		return true
+	}
+	return reviewProfileTools[name]
+}
+
+// addTool registers a tool only when the session's profile permits it — the
+// shim-side enforcement seam (#184). It mirrors sdk.AddTool's signature so the
+// registration sites read unchanged apart from the receiver.
+func addTool[In, Out any](m *mcpServer, srv *sdk.Server, t *sdk.Tool, h sdk.ToolHandlerFor[In, Out]) {
+	if m.allows(t.Name) {
+		sdk.AddTool(srv, t, h)
+	}
 }
 
 // call issues an authenticated request against the session's target repo and,
@@ -92,8 +143,9 @@ func (m *mcpServer) run(ctx context.Context) error {
 	return m.newServer().Run(ctx, &sdk.StdioTransport{})
 }
 
-// newServer builds the MCP server and registers the full toolset. Split out
-// from run so tests can drive it over an in-memory transport.
+// newServer builds the MCP server and registers the toolset the session's
+// profile permits (addTool gates each registration, #184; "full" exposes all).
+// Split out from run so tests can drive it over an in-memory transport.
 func (m *mcpServer) newServer() *sdk.Server {
 	srv := sdk.NewServer(&sdk.Implementation{
 		Name:    "moongit",
@@ -101,84 +153,85 @@ func (m *mcpServer) newServer() *sdk.Server {
 	}, nil)
 
 	// ── issues ──────────────────────────────────────────────────────────────
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name: "issue_list",
 		Description: "List issues in the repo. Filter by state(s) (comma-separated: " +
 			"todo,in_progress,done,closed), by assignee ('null' for unassigned), or by a " +
 			"keyword in title/body. Survey this before claiming work.",
 	}, m.issueList)
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name:        "issue_show",
 		Description: "Show one issue (title, state, author, assignee, body) plus its comment timeline.",
 	}, m.issueShow)
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name:        "issue_create",
 		Description: "Create a new issue. The author is stamped from the token identity. Returns the new issue.",
 	}, m.issueCreate)
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name:        "issue_comment",
 		Description: "Post a comment on an issue — use this to report progress at real checkpoints.",
 	}, m.issueComment)
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name: "issue_claim",
 		Description: "Atomically claim (assign yourself) an issue, optionally transitioning its state " +
 			"(e.g. in_progress). Fails if the issue is already claimed by someone else. Claim before coding.",
 	}, m.issueClaim)
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name:        "issue_unclaim",
 		Description: "Release your claim on an issue so someone else can pick it up.",
 	}, m.issueUnclaim)
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name:        "issue_set_state",
 		Description: "Set an issue's state to one of: todo, in_progress, done, closed.",
 	}, m.issueSetState)
 
 	// ── reviews (code comments anchored to a file's line range on a branch) ──
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name: "review_list",
 		Description: "List code-review comments anchored to file line-ranges on a branch. Scope by " +
 			"ref (branch; defaults to the repo default), by path, and by state (open|resolved|all). " +
 			"Each comment carries its file, line range, author, body, and the source snippet.",
 	}, m.reviewList)
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name: "review_create",
 		Description: "Post a code-review comment anchored to PATH's line range (1-based, inclusive) on a " +
 			"branch REF. This is how a review agent records findings — no shell needed. The author and " +
 			"the ref's commit SHA are stamped server-side.",
 	}, m.reviewCreate)
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name:        "review_resolve",
 		Description: "Mark a code-review comment resolved, by its id.",
 	}, m.reviewSetResolved(true))
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name:        "review_reopen",
 		Description: "Reopen a previously-resolved code-review comment, by its id.",
 	}, m.reviewSetResolved(false))
 
 	// ── pipelines (CI runs) ──────────────────────────────────────────────────
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name: "pipeline_trigger",
 		Description: "Trigger a CI run for a ref (branch, tag, or commit SHA) without a push. Returns the " +
 			"queued run.",
 	}, m.pipelineTrigger)
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name: "pipeline_list",
 		Description: "List recent runs. Optionally cap with limit and filter by kind ('ci' or 'agent'). " +
 			"Returns each run's number, kind, ref, status, and timestamps.",
 	}, m.pipelineList)
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name:        "pipeline_get",
 		Description: "Get one run by number, including its jobs (and, for an agent run, its follow-up turns).",
 	}, m.pipelineGet)
 
 	// ── agents ───────────────────────────────────────────────────────────────
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name: "agent_spawn",
 		Description: "Spawn an agent run to work an issue in a container. Optionally pin the base ref " +
 			"(defaults to repo HEAD), pick the execution model (claude-edit|mooncake-agent; empty uses the " +
-			"server default), and allow shell for the mooncake-agent model. Returns the queued run.",
+			"server default), allow shell for the mooncake-agent model, and set the tool profile " +
+			"(full|review; review spawns a read-only review agent). Returns the queued run.",
 	}, m.agentSpawn)
-	sdk.AddTool(srv, &sdk.Tool{
+	addTool(m, srv, &sdk.Tool{
 		Name: "agent_turn",
 		Description: "Queue a follow-up message on an agent run that's awaiting input (or running — it " +
 			"queues behind the current turn). Addressed by run number.",
@@ -560,6 +613,7 @@ type agentSpawnInput struct {
 	Ref         string `json:"ref,omitempty" jsonschema:"base ref to check out (defaults to repo HEAD)"`
 	Model       string `json:"model,omitempty" jsonschema:"execution model: claude-edit | mooncake-agent (empty uses the server default)"`
 	AllowShell  bool   `json:"allow_shell,omitempty" jsonschema:"for mooncake-agent, allow the plan to run shell/cmd actions"`
+	ToolProfile string `json:"tool_profile,omitempty" jsonschema:"mgit MCP toolset scope: full | review (empty defaults to full); review spawns a read-only review agent"`
 }
 
 func (m *mcpServer) agentSpawn(_ context.Context, _ *sdk.CallToolRequest, in agentSpawnInput) (*sdk.CallToolResult, runOutput, error) {
@@ -567,7 +621,7 @@ func (m *mcpServer) agentSpawn(_ context.Context, _ *sdk.CallToolRequest, in age
 		return nil, runOutput{Status: statusError, Error: "issue_number must be a positive issue number"}, nil
 	}
 	var run api.CIRun
-	req := api.SpawnAgentRequest{Ref: in.Ref, Model: in.Model, AllowShell: in.AllowShell}
+	req := api.SpawnAgentRequest{Ref: in.Ref, Model: in.Model, AllowShell: in.AllowShell, ToolProfile: in.ToolProfile}
 	if err := m.call(http.MethodPost, fmt.Sprintf("/issues/%d/agent", in.IssueNumber), req, http.StatusAccepted, &run); err != nil {
 		return nil, runOutput{Status: statusError, Error: err.Error()}, nil
 	}

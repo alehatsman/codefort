@@ -308,6 +308,14 @@ var migrations = []string{
 	UPDATE ci_runs SET execution_model = 'mooncake-agent' WHERE execution_model = 'mooncake-pilot';
 	ALTER TABLE ci_runs RENAME COLUMN pilot_allow_shell TO mooncake_allow_shell;
 	`,
+
+	// 18: per-run agent tool profile (#184). Names the slice of the mgit MCP
+	// toolset a run may see ('full' | 'review'); the shim enforces it. 'full'
+	// is the column default so existing agent runs and CI rows keep the
+	// current full surface.
+	`
+	ALTER TABLE ci_runs ADD COLUMN tool_profile TEXT NOT NULL DEFAULT 'full';
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

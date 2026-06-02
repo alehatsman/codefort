@@ -136,7 +136,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 
 	// Generate the agent MCP config (mgit always, dex when configured) into the
 	// workspace.
-	mcpPath, err := writeAgentMCPConfig(workDir, r.cfg)
+	mcpPath, err := writeAgentMCPConfig(workDir, r.cfg, run.ToolProfile)
 	if err != nil {
 		log.Error("agent write mcp config", "err", err)
 		mcpPath = "" // non-fatal: run without MCP servers

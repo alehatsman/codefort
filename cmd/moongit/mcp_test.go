@@ -185,6 +185,70 @@ func TestMCPServerError(t *testing.T) {
 	}
 }
 
+// TestMCPProfileFilter confirms the "review" profile (#184) only registers
+// read tools + review_* + issue_comment — the shim-side enforcement seam — and
+// drops everything that mutates issue state, spawns agents, or triggers
+// pipelines. "full" (and the empty default) advertise the whole toolset.
+func TestMCPProfileFilter(t *testing.T) {
+	listTools := func(t *testing.T, profile string) map[string]bool {
+		t.Helper()
+		m := &mcpServer{target: target{server: "http://x", owner: "a", repo: "b"}, profile: profile}
+		ctx := context.Background()
+		serverT, clientT := sdk.NewInMemoryTransports()
+		ss, err := m.newServer().Connect(ctx, serverT, nil)
+		if err != nil {
+			t.Fatalf("server connect: %v", err)
+		}
+		defer ss.Close()
+		client := sdk.NewClient(&sdk.Implementation{Name: "test", Version: "0"}, nil)
+		cs, err := client.Connect(ctx, clientT, nil)
+		if err != nil {
+			t.Fatalf("client connect: %v", err)
+		}
+		defer cs.Close()
+		lt, err := cs.ListTools(ctx, nil)
+		if err != nil {
+			t.Fatalf("list tools: %v", err)
+		}
+		have := map[string]bool{}
+		for _, tool := range lt.Tools {
+			have[tool.Name] = true
+		}
+		return have
+	}
+
+	review := listTools(t, profileReview)
+	wantReview := []string{
+		"issue_list", "issue_show", "issue_comment",
+		"review_list", "review_create", "review_resolve", "review_reopen",
+		"pipeline_list", "pipeline_get",
+	}
+	for _, w := range wantReview {
+		if !review[w] {
+			t.Errorf("review profile should expose %q", w)
+		}
+	}
+	if len(review) != len(wantReview) {
+		t.Errorf("review profile advertised %d tools, want %d: %v", len(review), len(wantReview), review)
+	}
+	for _, denied := range []string{
+		"issue_create", "issue_claim", "issue_unclaim", "issue_set_state",
+		"pipeline_trigger", "agent_spawn", "agent_turn",
+	} {
+		if review[denied] {
+			t.Errorf("review profile must NOT expose %q", denied)
+		}
+	}
+
+	// "full" and the empty default expose everything (16 tools).
+	if got := len(listTools(t, profileFull)); got != 16 {
+		t.Errorf("full profile advertised %d tools, want 16", got)
+	}
+	if got := len(listTools(t, "")); got != 16 {
+		t.Errorf("empty (default) profile advertised %d tools, want 16", got)
+	}
+}
+
 // TestMCPRoundTrip exercises the whole server over the SDK's in-memory
 // transport: it confirms tool-schema inference doesn't panic at registration,
 // every expected tool is advertised, and a tool call round-trips its structured

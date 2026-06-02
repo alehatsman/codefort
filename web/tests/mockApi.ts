@@ -73,6 +73,7 @@ export interface CIRun {
   issue_number?: number
   execution_model?: "claude-edit" | "mooncake-agent"
   mooncake_allow_shell?: boolean
+  tool_profile?: "full" | "review"
   turns?: AgentTurn[]
   commit_sha: string
   commit_msg?: string
@@ -726,6 +727,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const body = (route.request().postDataJSON() ?? {}) as {
       model?: "claude-edit" | "mooncake-agent"
       allow_shell?: boolean
+      tool_profile?: "full" | "review"
     }
     const model = body.model || state.agentExecutionModel || "claude-edit"
     const next: CIRun = {
@@ -734,6 +736,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       issue_number: n,
       execution_model: model,
       mooncake_allow_shell: model === "mooncake-agent" && body.allow_shell === true,
+      tool_profile: body.tool_profile || "full",
       commit_sha: "feedface0000abcd",
       ref: "HEAD",
       event: "agent",

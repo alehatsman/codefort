@@ -94,6 +94,29 @@ const (
 	DefaultExecutionModel = ExecModelClaudeEdit
 )
 
+// Agent tool profiles (#184): which slice of the mgit MCP toolset an agent run
+// is allowed to see. Enforcement is shim-side — `mgit mcp --profile <p>` only
+// registers the tools the profile permits — so the restriction holds even
+// though claude's --allowedTools is unreliable headlessly (#110). The canonical
+// tool→profile mapping lives in the shim (mgit owns its own toolset); storage
+// only carries the profile name, defaults it, and validates it.
+const (
+	// ToolProfileFull exposes the entire mgit + dex surface (current behavior).
+	ToolProfileFull = "full"
+	// ToolProfileReview restricts a run to read tools + review_* (+ issue_comment):
+	// the read-only review agent. No issue_claim/set_state/create, no
+	// agent_spawn/turn, no pipeline_trigger.
+	ToolProfileReview = "review"
+	// DefaultToolProfile seeds runs that don't specify one (and the column
+	// default for pre-#184 / CI rows).
+	DefaultToolProfile = ToolProfileFull
+)
+
+// ValidToolProfile reports whether p names a known agent tool profile.
+func ValidToolProfile(p string) bool {
+	return p == ToolProfileFull || p == ToolProfileReview
+}
+
 // JobStatus is the lifecycle state of a single job within a run.
 type JobStatus string
 
@@ -129,17 +152,20 @@ type CIRun struct {
 	// from the mooncake-agent policy for this run only (#110). Ignored by
 	// claude-edit / CI.
 	MooncakeAllowShell bool
-	CommitSHA          string
-	CommitMsg          string // commit subject, frozen at enqueue (may be empty)
-	CommitAuthor       string // commit author name, frozen at enqueue (may be empty)
-	Ref                string
-	Event              string
-	Trigger            string
-	Status             RunStatus
-	ClaimedAt          *time.Time
-	CreatedAt          time.Time
-	StartedAt          *time.Time
-	FinishedAt         *time.Time
+	// ToolProfile names the mgit MCP toolset slice this agent run sees
+	// ('full' | 'review'); 'full' for CI rows by the column default (#184).
+	ToolProfile  string
+	CommitSHA    string
+	CommitMsg    string // commit subject, frozen at enqueue (may be empty)
+	CommitAuthor string // commit author name, frozen at enqueue (may be empty)
+	Ref          string
+	Event        string
+	Trigger      string
+	Status       RunStatus
+	ClaimedAt    *time.Time
+	CreatedAt    time.Time
+	StartedAt    *time.Time
+	FinishedAt   *time.Time
 }
 
 // CIJob is one job within a run, identified within the run by Name.
@@ -167,12 +193,16 @@ type NewRun struct {
 	// MooncakeAllowShell overrides the default shell/cmd denial for this
 	// mooncake-agent run (#110). Set only for agent runs.
 	MooncakeAllowShell bool
-	CommitSHA          string
-	CommitMsg          string
-	CommitAuthor       string
-	Ref                string
-	Event              string
-	Trigger            string
+	// ToolProfile names the mgit MCP toolset slice for this agent run
+	// ('full' | 'review'); empty falls back to the column default ('full').
+	// Set only for agent runs (#184).
+	ToolProfile  string
+	CommitSHA    string
+	CommitMsg    string
+	CommitAuthor string
+	Ref          string
+	Event        string
+	Trigger      string
 }
 
 // EnqueueRun allocates the next per-repo run number and inserts a queued run.
@@ -204,11 +234,15 @@ func EnqueueRun(db *sql.DB, repoID int64, r NewRun) (CIRun, error) {
 	if r.MooncakeAllowShell {
 		allowShell = 1
 	}
+	profile := r.ToolProfile
+	if profile == "" {
+		profile = DefaultToolProfile
+	}
 	run, err := scanRun(tx.QueryRow(`
-		INSERT INTO ci_runs(repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, commit_sha, commit_msg, commit_author, ref, event, trigger, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO ci_runs(repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, tool_profile, commit_sha, commit_msg, commit_author, ref, event, trigger, status)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING `+runColumns+`
-	`, repoID, next, string(kind), r.IssueNumber, execModel, allowShell, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued)))
+	`, repoID, next, string(kind), r.IssueNumber, execModel, allowShell, profile, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued)))
 	if err != nil {
 		return CIRun{}, err
 	}
@@ -568,7 +602,7 @@ func affected(res sql.Result, err error) error {
 	return nil
 }
 
-const runColumns = "id, repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at"
+const runColumns = "id, repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, tool_profile, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at"
 
 func scanRun(s scanner) (CIRun, error) {
 	var r CIRun
@@ -577,7 +611,7 @@ func scanRun(s scanner) (CIRun, error) {
 	var created int64
 	var allowShell int
 	if err := s.Scan(
-		&r.ID, &r.RepoID, &r.Number, &kind, &issueNum, &r.ExecutionModel, &allowShell, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
+		&r.ID, &r.RepoID, &r.Number, &kind, &issueNum, &r.ExecutionModel, &allowShell, &r.ToolProfile, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
 		&r.Ref, &r.Event, &r.Trigger,
 		&status, &claimed, &created, &started, &finished,
 	); err != nil {
