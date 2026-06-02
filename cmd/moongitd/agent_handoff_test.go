@@ -176,6 +176,48 @@ func TestFinishAgentRunNoChanges(t *testing.T) {
 	}
 }
 
+// A workspace that gitignores .mooncake/ and carries a .mooncake scratch dir
+// must still hand off cleanly: the scratch dir is dropped, the branch is
+// created, and .mooncake never lands in the tree. Regression for #201, where a
+// `:(exclude).mooncake` pathspec tripped git's ignored-path guard ("use -f")
+// and failed the whole handoff.
+func TestFinishAgentRunDropsGitignoredMooncakeScratch(t *testing.T) {
+	r, run, _, _ := handoffHarness(t, true)
+	bare := filepath.Join(r.cfg.ReposDir, "alice", "repo.git")
+	workDir := agentWorkDir(r.cfg.DataDir, run.ID)
+
+	// The repo gitignores .mooncake/, and the executor left a scratch dir.
+	if err := os.WriteFile(filepath.Join(workDir, ".gitignore"), []byte(".mooncake/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(workDir, ".mooncake", "agent"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workDir, ".mooncake", "agent", "x"), []byte("scratch\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	r.finishAgentRun(context.Background(), run)
+
+	commit, err := gitIn(t, bare, "rev-parse", "refs/heads/agent/issue-1")
+	if err != nil {
+		t.Fatalf("branch agent/issue-1 not created (handoff failed): %v", err)
+	}
+	tree, err := gitIn(t, bare, "ls-tree", "-r", "--name-only", commit)
+	if err != nil {
+		t.Fatalf("ls-tree: %v", err)
+	}
+	if !strings.Contains(tree, "new.txt") {
+		t.Errorf("branch tree = %q, want it to include new.txt", tree)
+	}
+	if strings.Contains(tree, ".mooncake") {
+		t.Errorf("branch tree = %q, want it to exclude the .mooncake scratch dir", tree)
+	}
+	if got := r.status(t, run); got != storage.RunSuccess {
+		t.Errorf("run status = %q, want success", got)
+	}
+}
+
 // wireAgentMoongitRemote adds a `moongit` remote (the server URL) to the
 // already-cloned agent workspace so in-container mgit can resolve owner/repo,
 // without disturbing the clone's local-path `origin` (#144). An empty URL is a

@@ -119,11 +119,17 @@ func materializeAgentBranch(ctx context.Context, runID int64, bareRepo, base, wo
 	if _, err := runGit(ctx, env, "read-tree", base); err != nil {
 		return "", false, fmt.Errorf("read-tree: %w", err)
 	}
-	// Snapshot the worktree, but exclude the mooncake-agent scratch dir
-	// (.mooncake/agent/iterations etc.) — it's per-run executor bookkeeping,
-	// not part of the agent's change to the repo. (.git is skipped by git
-	// natively.)
-	if _, err := runGit(ctx, env, "add", "-A", "--", ".", ":(exclude).mooncake"); err != nil {
+	// Drop the mooncake-agent scratch dir (.mooncake/agent/iterations etc.)
+	// before snapshotting — it's per-run executor bookkeeping, not part of the
+	// agent's change to the repo. Remove it from disk rather than excluding it
+	// via a `:(exclude).mooncake` pathspec: git treats the literal path in that
+	// pathspec as explicitly named, so when the repo's .gitignore lists
+	// .mooncake/ (moongit's own does), `git add` fails the ignored-path guard
+	// ("use -f") instead of skipping it (#201). The workspace is torn down right
+	// after handoff, so removing the scratch dir here is safe. (.git is skipped
+	// by git natively.)
+	_ = os.RemoveAll(filepath.Join(workDir, ".mooncake"))
+	if _, err := runGit(ctx, env, "add", "-A", "--", "."); err != nil {
 		return "", false, fmt.Errorf("add: %w", err)
 	}
 	tree, err := runGit(ctx, env, "write-tree")
