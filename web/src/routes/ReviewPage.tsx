@@ -59,6 +59,8 @@ export default function ReviewPage() {
 
   return (
     <div className="repo">
+      <h2 className="issue-title">Review comments</h2>
+
       <div className="repo-toolbar">
         <BranchSelector owner={owner} repo={repo} />
         <div className="filter-row">
@@ -72,7 +74,6 @@ export default function ReviewPage() {
         </div>
       </div>
 
-      <h2 className="issue-title">Review comments</h2>
 
       {commentsQ.isLoading && <div className="loading">Loading…</div>}
       {commentsQ.error && <div className="error">{(commentsQ.error as Error).message}</div>}
