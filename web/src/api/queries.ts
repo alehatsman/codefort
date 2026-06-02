@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
-import { api } from "./client"
-import type { CIRun, CodeCommentState, Issue, Repo } from "./types"
+import { api } from "@/api/client"
+import type { CIRun, CodeCommentState, Issue, Repo } from "@/api/types"
 
 // Query keys live in one place so mutations can invalidate consistently.
 // Pattern: hierarchical arrays so `["issues", owner, repo]` invalidation

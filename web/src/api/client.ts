@@ -49,7 +49,7 @@ import type {
   UpdateIssueInput,
   UpdateRepoInput,
   Whoami,
-} from "./types"
+} from "@/api/types"
 
 const TOKEN_KEY = "moongit_token"
 

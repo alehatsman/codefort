@@ -2,6 +2,29 @@
 
 Vite + React 19 SPA. Read this before adding or editing components.
 
+## Structure: organize by feature, import via `@/`
+
+`src/` is grouped by **feature**, not by technical type:
+
+- `src/features/<feature>/` — pages + components + helpers for one feature
+  (`issues`, `pulls`, `repo`, `commits`, `pipelines`, `agents`, `explore`,
+  `settings`). A feature owns everything specific to it; put new files for a
+  feature here, not in a global drawer.
+- `src/shell/` — cross-cutting app chrome (`Layout`, nav tabs, `Avatar`,
+  `Markdown`, `NotFound`, `keyboardNav`, `timeAgo`).
+- `src/ui/` — base UI primitives (Button/Card/Dialog/…) + the `/dev/ui` gallery.
+- `src/api/` — the shared TanStack-Query surface (`client`, `queries`,
+  `mutations`, `types`); one cross-feature layer, not split per feature.
+- Root: `App.tsx`, `main.tsx`, `theme.ts`, `styles.css`.
+
+Imports use the `@/` alias = `src/` (configured in `tsconfig.json` paths +
+`vite.config.ts` resolve.alias) — e.g. `@/api/queries`, `@/shell/Layout`,
+`@/ui`, `@/features/issues/CommentForm`. **No relative `../` imports** across
+folders; keep them `@/`-absolute so files stay move-proof.
+
+`pipelines/` owns the shared CI+agent run shell; `agents/` imports a couple of
+helpers from it for now (a marked temporary seam — agents will grow its own).
+
 ## Styling: hand-written semantic BEM, no utility framework
 
 - CSS lives in `src/styles.css` as semantic **BEM** — `block__element--modifier`

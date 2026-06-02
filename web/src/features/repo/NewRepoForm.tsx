@@ -1,0 +1,112 @@
+import { useRef, useState } from "react"
+import { useCreateRepo } from "@/api/mutations"
+import { useWhoami } from "@/api/queries"
+import { Button, Dialog, ErrorMessage, Field, Input } from "@/ui"
+
+interface Props {
+  onCreated?: (owner: string, name: string) => void
+}
+
+const VALID = /^[A-Za-z0-9._-]+$/
+
+/**
+ * Modal dialog for provisioning a new repository. Mirrors NewIssueForm:
+ * native <dialog> via showModal() for a real backdrop, Escape-to-close,
+ * and focus trapping with no extra deps. State is local; the mutation
+ * owns server state. Resets on close.
+ */
+export default function NewRepoForm({ onCreated }: Props) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const ownerRef = useRef<HTMLInputElement>(null)
+  const whoami = useWhoami()
+  const [owner, setOwner] = useState("")
+  const [name, setName] = useState("")
+  const mutation = useCreateRepo()
+
+  function reset() {
+    setOwner("")
+    setName("")
+    mutation.reset()
+  }
+
+  function open() {
+    // Seed owner from the authenticated identity as a sensible default.
+    setOwner((prev) => prev || whoami.data?.name || "")
+    dialogRef.current?.showModal()
+    queueMicrotask(() => ownerRef.current?.focus())
+  }
+
+  function close() {
+    dialogRef.current?.close()
+    reset()
+  }
+
+  const trimmedOwner = owner.trim()
+  const trimmedName = name.trim().replace(/\.git$/, "")
+  const valid = VALID.test(trimmedOwner) && VALID.test(trimmedName)
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!valid || mutation.isPending) return
+    mutation.mutate(
+      { owner: trimmedOwner, name: trimmedName },
+      {
+        onSuccess: (repo) => {
+          close()
+          onCreated?.(repo.owner, repo.name)
+        },
+      }
+    )
+  }
+
+  return (
+    <>
+      <Button variant="primary" onClick={open}>
+        + New repo
+      </Button>
+
+      <Dialog
+        ref={dialogRef}
+        title="New repository"
+        onClose={close}
+        onSubmit={submit}
+        footer={
+          <>
+            <Button onClick={close} disabled={mutation.isPending}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" disabled={!valid || mutation.isPending}>
+              {mutation.isPending ? "Creating…" : "Create repository"}
+            </Button>
+          </>
+        }
+      >
+        <Field label="Owner">
+          <Input
+            ref={ownerRef}
+            placeholder="owner"
+            value={owner}
+            onChange={(e) => setOwner(e.target.value)}
+            required
+          />
+        </Field>
+        <Field label="Name">
+          <Input
+            placeholder="repo-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </Field>
+        <div className="field__label muted">
+          Creates a bare git repo at{" "}
+          <code>
+            {trimmedOwner || "owner"}/{trimmedName || "name"}
+          </code>
+          . Allowed characters: letters, digits, <code>. _ -</code>
+        </div>
+        <ErrorMessage error={mutation.error} />
+      </Dialog>
+    </>
+  )
+}

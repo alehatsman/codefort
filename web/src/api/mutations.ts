@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "./client"
-import { keys } from "./queries"
+import { api } from "@/api/client"
+import { keys } from "@/api/queries"
 import type {
   CIRunExecutionModel,
   CIRunToolProfile,
@@ -17,7 +17,7 @@ import type {
   UpdateIssueInput,
   UpdatePullRequestInput,
   UpdateRepoInput,
-} from "./types"
+} from "@/api/types"
 
 export function useCreateRepo() {
   const qc = useQueryClient()
