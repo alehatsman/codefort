@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useCreateComment } from "../api/mutations"
-import { Button } from "./ui"
+import { Button, Textarea } from "./ui"
 
 interface Props {
   owner: string
@@ -35,8 +35,7 @@ export default function CommentForm({ owner, repo, number }: Props) {
 
   return (
     <form className="comment-form" onSubmit={submit}>
-      <textarea
-        className="textarea"
+      <Textarea
         placeholder="Leave a comment"
         value={body}
         onChange={(e) => setBody(e.target.value)}

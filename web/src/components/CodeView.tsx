@@ -10,7 +10,7 @@ import {
 } from "../api/mutations"
 import type { CodeComment } from "../api/types"
 import Avatar from "./Avatar"
-import { Badge, Button } from "./ui"
+import { Badge, Button, Textarea } from "./ui"
 
 // The markdown renderer pulls in remark/rehype; load it lazily.
 const Markdown = lazy(() => import("./Markdown"))
@@ -322,8 +322,7 @@ function ComposeForm({
   return (
     <form className="comment-form code-compose" onSubmit={submit}>
       <div className="code-compose__head muted small">Commenting on {range}</div>
-      <textarea
-        className="textarea"
+      <Textarea
         placeholder="Leave a comment on this code"
         value={body}
         onChange={(e) => setBody(e.target.value)}

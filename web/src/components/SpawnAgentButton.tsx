@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { useSpawnAgent } from "../api/mutations"
 import { useAgentSettings } from "../api/queries"
 import type { CIRunExecutionModel, CIRunToolProfile } from "../api/types"
-import { Button } from "./ui"
+import { Button, Select } from "./ui"
 
 interface Props {
   owner: string
@@ -74,8 +74,7 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
       <div className="spawn-agent">
         <label className="spawn-agent__model">
           <span className="muted small">Model</span>
-          <select
-            className="select"
+          <Select
             value={model}
             disabled={spawn.isPending}
             onChange={(e) => setPicked(e.target.value as CIRunExecutionModel)}
@@ -85,12 +84,11 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
                 {m.label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="spawn-agent__model">
           <span className="muted small">Tools</span>
-          <select
-            className="select"
+          <Select
             value={profile}
             disabled={spawn.isPending}
             onChange={(e) => setProfile(e.target.value as CIRunToolProfile)}
@@ -100,7 +98,7 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
                 {p.label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <Button variant="primary" disabled={spawn.isPending} onClick={onSpawn}>
           {spawn.isPending ? "Spawning…" : "Spawn agent"}

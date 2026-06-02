@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useUpdateIssue } from "../api/mutations"
-import { Button } from "./ui"
+import { Button, Input, Textarea } from "./ui"
 
 interface Props {
   owner: string
@@ -40,17 +40,11 @@ export default function EditIssueForm({
     <form className="issue-edit" onSubmit={submit}>
       <label className="field">
         <span className="field__label">Title</span>
-        <input
-          className="input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
       </label>
       <label className="field">
         <span className="field__label">Description</span>
-        <textarea
-          className="textarea"
+        <Textarea
           placeholder="Leave a description"
           value={body}
           onChange={(e) => setBody(e.target.value)}

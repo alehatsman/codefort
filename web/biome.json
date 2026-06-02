@@ -3,6 +3,14 @@
   "extends": ["./biome.base.json"],
   "linter": {
     "rules": {
+      "a11y": {
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": ["Input", "Textarea", "Select"]
+          }
+        }
+      },
       "suspicious": {
         "noArrayIndexKey": "warn"
       },

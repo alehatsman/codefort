@@ -1,11 +1,11 @@
 import clsx from "clsx"
-import type { InputHTMLAttributes } from "react"
+import type { ComponentPropsWithRef } from "react"
 
 /**
  * Text-style input — the `.input` block. A thin wrapper that defaults the
- * class and forwards every native prop, so call sites stop repeating
- * `className="input"` (26 raw usages). Pass `className` to extend, not replace.
+ * class and forwards every native prop (incl. `ref`), so call sites stop
+ * repeating `className="input"`. Pass `className` to extend, not replace.
  */
-export default function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+export default function Input({ className, ...rest }: ComponentPropsWithRef<"input">) {
   return <input className={clsx("input", className)} {...rest} />
 }

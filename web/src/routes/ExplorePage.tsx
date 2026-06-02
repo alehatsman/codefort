@@ -11,7 +11,7 @@ import {
   useRepo,
 } from "../api/queries"
 import OverviewCard from "../components/OverviewCard"
-import { Button, Spinner, EmptyState } from "../components/ui"
+import { Button, Spinner, EmptyState, Input } from "../components/ui"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import type {
   Commit,
@@ -732,8 +732,8 @@ function AskBox({ owner, repo }: { owner: string; repo: string }) {
               <option value="callees">Callees</option>
             </select>
           )}
-          <input
-            className="input explore-ask__input"
+          <Input
+            className="explore-ask__input"
             placeholder={placeholderFor(kind)}
             value={query}
             onChange={(e) => setQuery(e.target.value)}

@@ -10,7 +10,7 @@ import {
 } from "../api/mutations"
 import type { CIRunExecutionModel, CreatedToken, SSHKey, Token } from "../api/types"
 import ThemeSelect from "../components/ThemeSelect"
-import { Badge, Button, EmptyState, Spinner } from "../components/ui"
+import { Badge, Button, EmptyState, Input, Select, Spinner } from "../components/ui"
 
 // Sections of the settings surface. "tokens", "agent", "ssh", and "appearance"
 // are backed. "users" and "branches" are planned features whose server backends
@@ -158,8 +158,7 @@ function AgentSection() {
       </div>
 
       <form className="agent-token-form" onSubmit={save}>
-        <input
-          className="input"
+        <Input
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
@@ -189,8 +188,7 @@ function AgentSection() {
       <div className="agent-default-model">
         <label className="agent-default-model__label">
           <span>Default execution model</span>
-          <select
-            className="select"
+          <Select
             value={settingsQ.data?.execution_model ?? ""}
             disabled={update.isPending || settingsQ.isLoading}
             onChange={(e) =>
@@ -200,7 +198,7 @@ function AgentSection() {
             <option value="">Server default (claude-edit)</option>
             <option value="claude-edit">Claude (edit files)</option>
             <option value="mooncake-agent">Mooncake agent (run actions)</option>
-          </select>
+          </Select>
         </label>
         <p className="muted small">
           The model new agent runs use when “Spawn agent” doesn’t pick one. Per-run choices at spawn
@@ -220,8 +218,7 @@ function AgentSection() {
         </p>
 
         <form className="agent-token-form" onSubmit={saveBaseUrl}>
-          <input
-            className="input"
+          <Input
             type="url"
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
@@ -260,8 +257,7 @@ function AgentSection() {
         </div>
 
         <form className="agent-token-form" onSubmit={saveAuthToken}>
-          <input
-            className="input"
+          <Input
             type="password"
             value={authToken}
             onChange={(e) => setAuthToken(e.target.value)}
@@ -355,8 +351,7 @@ function TokensSection() {
       </p>
 
       <form className="settings__create" onSubmit={submit}>
-        <input
-          className="input"
+        <Input
           placeholder="token name (e.g. ci-bot)"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -501,8 +496,7 @@ function SSHKeysSection() {
           onChange={(e) => setPublicKey(e.target.value)}
           rows={3}
         />
-        <input
-          className="input"
+        <Input
           placeholder="label (optional — defaults to the key's comment)"
           value={comment}
           onChange={(e) => setComment(e.target.value)}

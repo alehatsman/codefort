@@ -4,7 +4,7 @@ import { ApiError } from "../api/client"
 import { useRepo } from "../api/queries"
 import { useDeleteRepo } from "../api/mutations"
 import NotFound from "../components/NotFound"
-import { Button, Spinner } from "../components/ui"
+import { Button, Input, Spinner } from "../components/ui"
 
 // Per-repo settings. Today it hosts a single Danger Zone — deleting the repo —
 // but it's the natural home for future per-repo settings (the CI opt-in could
@@ -68,8 +68,7 @@ function DangerZone({ owner, repo }: { owner: string; repo: string }) {
             <span className="muted small">
               Type <code>{slug}</code> to confirm:
             </span>
-            <input
-              className="input"
+            <Input
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder={slug}

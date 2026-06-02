@@ -1,11 +1,10 @@
-import clsx from "clsx"
 import { useRef } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useRepos } from "../api/queries"
 import CIStatusIcon from "../components/CIStatusIcon"
 import NewRepoForm from "../components/NewRepoForm"
 import StateIcon from "../components/StateIcon"
-import { EmptyState, Spinner } from "../components/ui"
+import { Card, EmptyState, Spinner } from "../components/ui"
 import { useListNav } from "../lib/keyboardNav"
 
 export default function ReposPage() {
@@ -43,9 +42,9 @@ export default function ReposPage() {
       {data && data.length > 0 && (
         <div className="card-grid" ref={gridRef}>
           {data.map((r, i) => (
-            <div
+            <Card
               key={r.id}
-              className={clsx("card", { "is-vim-selected": i === index })}
+              selected={i === index}
               data-vim-selected={i === index ? "true" : undefined}
             >
               <div className="card__title">
@@ -77,7 +76,7 @@ export default function ReposPage() {
                   </span>
                 </span>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}

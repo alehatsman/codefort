@@ -5,7 +5,7 @@ import { useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from "../api/mutation
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import type { Repo } from "../api/types"
 import CIStatusBadge from "../components/CIStatusBadge"
-import { Button, EmptyState, Spinner } from "../components/ui"
+import { Button, EmptyState, Input, Spinner } from "../components/ui"
 import AgentRunBody from "./AgentRunBody"
 import CIRunBody from "./CIRunBody"
 import {
@@ -82,8 +82,8 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
         {!isAgent && (
           <div className="pipelines__actions">
             <form className="pipelines__run" onSubmit={runPipeline}>
-              <input
-                className="input pipelines__run-ref"
+              <Input
+                className="pipelines__run-ref"
                 value={ref}
                 onChange={(e) => setRefInput(e.target.value)}
                 placeholder="branch, tag, or commit"

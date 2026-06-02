@@ -7,7 +7,7 @@ import {
   reviewTargetNeedsBase,
   reviewTargetNeedsPath,
 } from "../lib/reviewTemplates"
-import { Button } from "./ui"
+import { Button, Input, Select } from "./ui"
 
 interface Props {
   owner: string
@@ -106,23 +106,18 @@ export default function DraftReviewButton({ owner, repo, defaultRef }: Props) {
           <div className="modal__body">
             <label className="field">
               <span className="field__label">Target</span>
-              <select
-                className="select"
-                value={target}
-                onChange={(e) => setTarget(e.target.value as ReviewTarget)}
-              >
+              <Select value={target} onChange={(e) => setTarget(e.target.value as ReviewTarget)}>
                 {TARGETS.map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
 
             <label className="field">
               <span className="field__label">{target === "commit" ? "Commit" : "Ref"}</span>
-              <input
-                className="input"
+              <Input
                 placeholder={target === "commit" ? "commit SHA" : "branch / tag / SHA"}
                 value={ref}
                 onChange={(e) => setRef(e.target.value)}
@@ -133,8 +128,7 @@ export default function DraftReviewButton({ owner, repo, defaultRef }: Props) {
             {needsBase && (
               <label className="field">
                 <span className="field__label">Base ref</span>
-                <input
-                  className="input"
+                <Input
                   placeholder="base branch (diff is base..ref)"
                   value={base}
                   onChange={(e) => setBase(e.target.value)}
@@ -148,8 +142,7 @@ export default function DraftReviewButton({ owner, repo, defaultRef }: Props) {
                 <span className="field__label">
                   {target === "file" ? "File path" : "Directory"}
                 </span>
-                <input
-                  className="input"
+                <Input
                   placeholder={target === "file" ? "path/to/file.go" : "path/to/dir"}
                   value={path}
                   onChange={(e) => setPath(e.target.value)}

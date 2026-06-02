@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useCreateIssue } from "../api/mutations"
-import { Button } from "./ui"
+import { Button, Input, Textarea } from "./ui"
 
 interface Props {
   owner: string
@@ -97,9 +97,8 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
           <div className="modal__body">
             <label className="field">
               <span className="field__label">Title</span>
-              <input
+              <Input
                 ref={titleRef}
-                className="input"
                 placeholder="Short summary"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -108,8 +107,7 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
             </label>
             <label className="field">
               <span className="field__label">Description</span>
-              <textarea
-                className="textarea"
+              <Textarea
                 placeholder="Optional — what's the problem or task?"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}

@@ -1,14 +1,11 @@
 import clsx from "clsx"
-import type { TextareaHTMLAttributes } from "react"
+import type { ComponentPropsWithRef } from "react"
 
 /**
  * Monospace, vertically-resizable textarea — the `.textarea` block. Defaults
- * the class and forwards native props (7 raw usages: comment/issue/review
- * compose boxes).
+ * the class and forwards native props (incl. `ref`): comment/issue/review
+ * compose boxes.
  */
-export default function Textarea({
-  className,
-  ...rest
-}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export default function Textarea({ className, ...rest }: ComponentPropsWithRef<"textarea">) {
   return <textarea className={clsx("textarea", className)} {...rest} />
 }

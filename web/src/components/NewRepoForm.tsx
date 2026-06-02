@@ -1,7 +1,7 @@
 import { useRef, useState } from "react"
 import { useCreateRepo } from "../api/mutations"
 import { useWhoami } from "../api/queries"
-import { Button } from "./ui"
+import { Button, Input } from "./ui"
 
 interface Props {
   onCreated?: (owner: string, name: string) => void
@@ -88,9 +88,8 @@ export default function NewRepoForm({ onCreated }: Props) {
           <div className="modal__body">
             <label className="field">
               <span className="field__label">Owner</span>
-              <input
+              <Input
                 ref={ownerRef}
-                className="input"
                 placeholder="owner"
                 value={owner}
                 onChange={(e) => setOwner(e.target.value)}
@@ -99,8 +98,7 @@ export default function NewRepoForm({ onCreated }: Props) {
             </label>
             <label className="field">
               <span className="field__label">Name</span>
-              <input
-                className="input"
+              <Input
                 placeholder="repo-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
