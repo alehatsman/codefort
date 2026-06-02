@@ -305,7 +305,13 @@ interface MapProps {
 // falls back to the path-name grouping so those repos still render a map.
 function PackageMap(props: MapProps) {
   const { graph } = props
-  if (graph && graph.status === "ok" && graph.nodes.length > 0) {
+  // Prefer the graph map only when packages have real import edges (a Go-only
+  // DAG today). dex emits a node per non-Go dir too (web/src TS modules,
+  // testdata fixtures) but no package-level edges for them — a repo whose
+  // nodes are all isolated has no structure to draw, so fall back to the
+  // path-name summary listing.
+  const hasLinked = !!graph?.nodes.some((n) => n.in_degree > 0 || n.out_degree > 0)
+  if (graph && graph.status === "ok" && hasLinked) {
     return <GraphPackageMap {...props} graph={graph} />
   }
   return <FallbackPackageMap {...props} />
@@ -388,6 +394,12 @@ interface Tier {
   cards: PkgCard[]
 }
 
+interface MapModel {
+  tiers: Tier[]
+  linkedCount: number // packages with ≥1 import edge (the ones we draw)
+  hiddenCount: number // isolated nodes (non-Go / un-graphed) left out
+}
+
 function GraphPackageMap({
   owner,
   repo,
@@ -397,7 +409,7 @@ function GraphPackageMap({
   loading,
   error,
 }: MapProps & { graph: IntelPackageGraph }) {
-  const tiers = useMemo(
+  const { tiers, linkedCount, hiddenCount } = useMemo(
     () => buildTiers(graph, packages, lastCommitByPath),
     [graph, packages, lastCommitByPath]
   )
@@ -411,7 +423,8 @@ function GraphPackageMap({
       <h2 className="explore-section__heading">
         Map of the codebase{" "}
         <span className="muted small">
-          ({graph.nodes.length} packages · {graph.edges.length} import edges)
+          ({linkedCount} packages · {graph.edges.length} import edges
+          {hiddenCount > 0 ? ` · ${hiddenCount} unlinked hidden` : ""})
         </span>
       </h2>
       <p className="pkg-map__legend muted small">
@@ -500,12 +513,21 @@ function DepLink({ owner, repo, dep }: { owner: string; repo: string; dep: PkgRe
 
 // buildTiers turns dex's package graph into depth-layered, in-degree-ranked
 // cards joined to summaries + recency. Pure so it unit/UI-tests cleanly.
+//
+// Only packages that participate in the import DAG (in or out degree > 0) are
+// drawn: dex's package graph is Go-only, so non-Go dirs (web/src TS modules,
+// testdata fixtures) come back as isolated nodes that carry no structural
+// signal and would otherwise flood the map. They're counted in hiddenCount.
+// Deriving the module prefix from the linked set (not all nodes) also keeps
+// one stray fixture from collapsing it to "" and full-pathing every label.
 function buildTiers(
   graph: IntelPackageGraph,
   packages: IntelPackageSummary[],
   lastCommitByPath: Record<string, Commit>
-): Tier[] {
-  const prefix = commonPathPrefix(graph.nodes.map((n) => n.package))
+): MapModel {
+  const linked = graph.nodes.filter((n) => n.in_degree > 0 || n.out_degree > 0)
+  const hiddenCount = graph.nodes.length - linked.length
+  const prefix = commonPathPrefix(linked.map((n) => n.package))
   const refOf = (pkg: string): PkgRef => {
     if (prefix && pkg === prefix) return { label: ".", repoRel: ".", local: true }
     if (prefix && pkg.startsWith(`${prefix}/`)) {
@@ -525,11 +547,11 @@ function buildTiers(
     pushTo(usedBy, e.to_package, e.from_package)
   }
 
-  const depth = computeDepths(graph.nodes, uses)
-  const maxDepth = graph.nodes.reduce((m, n) => Math.max(m, depth.get(n.package) ?? 0), 0)
+  const depth = computeDepths(linked, uses)
+  const maxDepth = linked.reduce((m, n) => Math.max(m, depth.get(n.package) ?? 0), 0)
   const byLabel = (a: PkgRef, b: PkgRef) => a.label.localeCompare(b.label)
 
-  const cards: PkgCard[] = graph.nodes.map((n) => {
+  const cards: PkgCard[] = linked.map((n) => {
     const ref = refOf(n.package)
     return {
       ...ref,
@@ -550,7 +572,7 @@ function buildTiers(
     list.push(c)
     byDepth.set(d, list)
   }
-  return [...byDepth.keys()]
+  const tiers = [...byDepth.keys()]
     .sort((a, b) => b - a) // entry points (deep) first, foundation last
     .map((d) => ({
       depth: d,
@@ -559,6 +581,7 @@ function buildTiers(
         (a, b) => b.inDegree - a.inDegree || a.label.localeCompare(b.label)
       ),
     }))
+  return { tiers, linkedCount: linked.length, hiddenCount }
 }
 
 // computeDepths assigns each package the length of its longest import chain

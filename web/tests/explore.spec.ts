@@ -130,6 +130,10 @@ const PACKAGE_GRAPH = {
       out_degree: 0,
       page_rank: 0.05,
     },
+    // An isolated node — a non-Go dir dex graphed with no package edges. It
+    // must be hidden from the map (no structural signal) and must not drag the
+    // module-prefix derivation off the Go packages onto "".
+    { package: "web/src/App", in_degree: 0, out_degree: 0, page_rank: 0 },
   ],
   edges: [
     { from_package: "github.com/acme/demo/cmd/demo", to_package: "github.com/acme/demo/internal/server" },
@@ -185,6 +189,15 @@ test("Explore: package map layers by dex import graph with degree + cross-links"
 
   // The summary from the overview join still rides on the card.
   await expect(server.locator(".pkg-card__preview")).toContainText("HTTP server")
+
+  // Isolated nodes (web/src/App) are hidden, the heading counts only the 3
+  // linked packages and notes the hidden one, and the module prefix — derived
+  // from the linked Go packages — is stripped to clean repo-relative labels.
+  await expect(page.locator(".pkg-card__path", { hasText: "web/src/App" })).toHaveCount(0)
+  const mapHeading = page.locator(".explore-section__heading", { hasText: "Map of the codebase" })
+  await expect(mapHeading).toContainText("3 packages")
+  await expect(mapHeading).toContainText("1 unlinked hidden")
+  await expect(server.locator(".pkg-card__path")).toHaveText("internal/server")
 })
 
 test("Explore: ask box defaults to Ask; Advanced reveals the mode picker", async ({ page }) => {
