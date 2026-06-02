@@ -157,6 +157,7 @@ staying a single binary you fully own.
 | `MOONGIT_WEB_DIR` | Built web UI dir (`web/dist`); empty serves API + git only |
 | `MOONGIT_BASIC_USER` / `MOONGIT_BASIC_PASS` | Optional HTTP Basic gate on the UI + git |
 | `MOONGIT_SSH_ADDR` | Opt-in git SSH transport (e.g. `:2222`); empty keeps it one port |
+| `MOONGIT_SSH_HOST_KEY` | SSH host key path (default `$MOONGIT_DATA_DIR/ssh_host_ed25519_key`); generated if absent |
 | `MOONGIT_DEX_URL` / `MOONGIT_DEX_TOKEN` | dex server for the Intel tab; empty disables it |
 
 The client honors `MOONGIT_TOKEN` (identity) and `MOONGIT_SERVER`
