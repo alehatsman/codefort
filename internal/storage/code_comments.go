@@ -77,21 +77,19 @@ func SetCodeCommentResolved(db *sql.DB, id int64, resolved bool, requester strin
 }
 
 // DeleteCodeComment removes a comment by id, but only if requester matches the
-// author. Returns ErrNotFound or ErrForbidden, mirroring DeleteComment.
+// author. Returns ErrNotFound or ErrForbidden, mirroring DeleteComment — including
+// the single authorized DELETE that avoids the read-then-delete TOCTOU (#189).
 func DeleteCodeComment(db *sql.DB, id int64, requester string) error {
-	var author string
-	err := db.QueryRow(`SELECT author FROM code_comments WHERE id = ?`, id).Scan(&author)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	}
+	res, err := db.Exec(`DELETE FROM code_comments WHERE id = ? AND author = ?`, id, requester)
 	if err != nil {
 		return err
 	}
-	if author != requester {
-		return ErrForbidden
-	}
-	if _, err := db.Exec(`DELETE FROM code_comments WHERE id = ?`, id); err != nil {
+	n, err := res.RowsAffected()
+	if err != nil {
 		return err
+	}
+	if n == 0 {
+		return deleteMiss(db, `SELECT 1 FROM code_comments WHERE id = ?`, id)
 	}
 	return nil
 }

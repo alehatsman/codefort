@@ -46,22 +46,41 @@ func ListComments(db *sql.DB, issueID int64) ([]api.Comment, error) {
 // DeleteComment removes a comment by id, but only if requester matches
 // the comment's author. Returns ErrNotFound or ErrForbidden so the
 // handler can pick the right HTTP status.
+//
+// The authorization rides on the DELETE itself (WHERE id = ? AND author = ?)
+// rather than a separate read-then-delete, so there's no TOCTOU window and no
+// false "deleted" when the row vanished between the two statements. A zero
+// RowsAffected means the delete didn't happen; only then do we read the row to
+// tell "not found" from "forbidden" (#189).
 func DeleteComment(db *sql.DB, commentID int64, requester string) error {
-	var author string
-	err := db.QueryRow(`SELECT author FROM issue_comments WHERE id = ?`, commentID).Scan(&author)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	}
+	res, err := db.Exec(`DELETE FROM issue_comments WHERE id = ? AND author = ?`, commentID, requester)
 	if err != nil {
 		return err
 	}
-	if author != requester {
-		return ErrForbidden
-	}
-	if _, err := db.Exec(`DELETE FROM issue_comments WHERE id = ?`, commentID); err != nil {
+	n, err := res.RowsAffected()
+	if err != nil {
 		return err
 	}
+	if n == 0 {
+		return deleteMiss(db, `SELECT 1 FROM issue_comments WHERE id = ?`, commentID)
+	}
 	return nil
+}
+
+// deleteMiss classifies why an authorized DELETE matched no rows: the row never
+// existed (ErrNotFound) or it exists but belongs to someone else (ErrForbidden).
+// existsQuery must select any column for the row by its id. Run only on the
+// (rare) miss path, so the happy path stays a single statement.
+func deleteMiss(db *sql.DB, existsQuery string, id int64) error {
+	var x int
+	switch err := db.QueryRow(existsQuery, id).Scan(&x); {
+	case errors.Is(err, sql.ErrNoRows):
+		return ErrNotFound
+	case err != nil:
+		return err
+	default:
+		return ErrForbidden
+	}
 }
 
 func scanComment(s scanner) (api.Comment, error) {
