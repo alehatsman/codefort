@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useCreateIssue } from "../api/mutations"
+import { Button } from "./ui"
 
 interface Props {
   owner: string
@@ -73,9 +74,9 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
 
   return (
     <>
-      <button type="button" className="btn btn--primary" onClick={open}>
+      <Button variant="primary" onClick={open}>
         + New issue
-      </button>
+      </Button>
 
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click-to-dismiss only; <dialog> handles Esc/keyboard natively */}
       <dialog ref={dialogRef} className="modal" onClick={onBackdropClick}>
@@ -119,16 +120,12 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
           </div>
 
           <footer className="modal__foot">
-            <button type="button" className="btn" onClick={close} disabled={mutation.isPending}>
+            <Button onClick={close} disabled={mutation.isPending}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={!title.trim() || mutation.isPending}
-            >
+            </Button>
+            <Button type="submit" variant="primary" disabled={!title.trim() || mutation.isPending}>
               {mutation.isPending ? "Creating…" : "Submit new issue"}
-            </button>
+            </Button>
           </footer>
         </form>
       </dialog>

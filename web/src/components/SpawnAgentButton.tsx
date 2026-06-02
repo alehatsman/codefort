@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { useSpawnAgent } from "../api/mutations"
 import { useAgentSettings } from "../api/queries"
 import type { CIRunExecutionModel, CIRunToolProfile } from "../api/types"
+import { Button } from "./ui"
 
 interface Props {
   owner: string
@@ -101,14 +102,9 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
             ))}
           </select>
         </label>
-        <button
-          type="button"
-          className="btn btn--primary"
-          disabled={spawn.isPending}
-          onClick={onSpawn}
-        >
+        <Button variant="primary" disabled={spawn.isPending} onClick={onSpawn}>
           {spawn.isPending ? "Spawning…" : "Spawn agent"}
-        </button>
+        </Button>
       </div>
       {isMooncake && (
         <label className="spawn-agent__shell">

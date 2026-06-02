@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useCreateComment } from "../api/mutations"
+import { Button } from "./ui"
 
 interface Props {
   owner: string
@@ -44,13 +45,9 @@ export default function CommentForm({ owner, repo, number }: Props) {
       />
       {mutation.error && <div className="error">{(mutation.error as Error).message}</div>}
       <div className="row">
-        <button
-          type="submit"
-          className="btn btn--primary"
-          disabled={!body.trim() || mutation.isPending}
-        >
+        <Button type="submit" variant="primary" disabled={!body.trim() || mutation.isPending}>
           {mutation.isPending ? "Posting…" : "Comment"}
-        </button>
+        </Button>
       </div>
     </form>
   )

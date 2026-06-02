@@ -4,6 +4,7 @@ import type { CIRun, Commit } from "../api/types"
 import OverviewCard from "../components/OverviewCard"
 import Avatar from "../components/Avatar"
 import CommitCIStatus from "../components/CommitCIStatus"
+import { EmptyState, Spinner } from "../components/ui"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 
 const PER_PAGE = 30
@@ -35,11 +36,11 @@ export default function CommitsPage() {
       </div>
 
       {commitsQ.isLoading && commits.length === 0 ? (
-        <div className="loading">Loading…</div>
+        <Spinner />
       ) : commitsQ.error ? (
         <div className="error">{(commitsQ.error as Error).message}</div>
       ) : commits.length === 0 ? (
-        <div className="empty">No commit history.</div>
+        <EmptyState>No commit history.</EmptyState>
       ) : (
         <>
           {groups.map((g) => (

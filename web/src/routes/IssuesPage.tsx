@@ -8,6 +8,7 @@ import OverviewCard from "../components/OverviewCard"
 import StateIcon from "../components/StateIcon"
 import IssuesViewSwitch from "../components/IssuesViewSwitch"
 import { useListNav } from "../lib/keyboardNav"
+import { EmptyState, FilterChip, Spinner } from "../components/ui"
 
 export default function IssuesPage() {
   const { owner = "", repo = "" } = useParams()
@@ -133,15 +134,10 @@ export default function IssuesPage() {
         <div className="filter-row">
           <span className="filter-label">state:</span>
           {ISSUE_STATES.map((s) => (
-            <label key={s} className="chip">
-              <input
-                type="checkbox"
-                checked={activeStates.includes(s)}
-                onChange={() => toggleState(s)}
-              />
+            <FilterChip key={s} checked={activeStates.includes(s)} onChange={() => toggleState(s)}>
               <StateIcon state={s} size={12} />
               {s}
-            </label>
+            </FilterChip>
           ))}
         </div>
         <div className="filter-row">
@@ -191,10 +187,10 @@ export default function IssuesPage() {
         </div>
       </div>
 
-      {isLoading && <div className="loading">Loading…</div>}
+      {isLoading && <Spinner />}
       {error && <div className="error">{(error as Error).message}</div>}
 
-      {data && data.length === 0 && <div className="empty">No issues match these filters.</div>}
+      {data && data.length === 0 && <EmptyState>No issues match these filters.</EmptyState>}
 
       {data && data.length > 0 && (
         <ul className="issue-list">

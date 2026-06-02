@@ -7,6 +7,7 @@ import {
   reviewTargetNeedsBase,
   reviewTargetNeedsPath,
 } from "../lib/reviewTemplates"
+import { Button } from "./ui"
 
 interface Props {
   owner: string
@@ -84,9 +85,7 @@ export default function DraftReviewButton({ owner, repo, defaultRef }: Props) {
 
   return (
     <>
-      <button type="button" className="btn" onClick={open}>
-        Draft review issue
-      </button>
+      <Button onClick={open}>Draft review issue</Button>
 
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click-to-dismiss only; <dialog> handles Esc/keyboard natively */}
       <dialog ref={dialogRef} className="modal" onClick={onBackdropClick}>
@@ -167,12 +166,12 @@ export default function DraftReviewButton({ owner, repo, defaultRef }: Props) {
           </div>
 
           <footer className="modal__foot">
-            <button type="button" className="btn" onClick={close} disabled={draft.isPending}>
+            <Button onClick={close} disabled={draft.isPending}>
               Cancel
-            </button>
-            <button type="submit" className="btn btn--primary" disabled={!ready || draft.isPending}>
+            </Button>
+            <Button type="submit" variant="primary" disabled={!ready || draft.isPending}>
               {draft.isPending ? "Spawning…" : "Create + spawn review agent"}
-            </button>
+            </Button>
           </footer>
         </form>
       </dialog>

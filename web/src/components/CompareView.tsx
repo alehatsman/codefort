@@ -2,6 +2,7 @@ import clsx from "clsx"
 import { useState } from "react"
 import type { Compare } from "../api/types"
 import DiffView from "./DiffView"
+import { EmptyState } from "./ui"
 
 type Mode = "split" | "unified"
 
@@ -71,7 +72,7 @@ export default function CompareView({ compare }: Props) {
       )}
 
       {compare.files.length === 0 ? (
-        <div className="empty">No file changes between these branches.</div>
+        <EmptyState>No file changes between these branches.</EmptyState>
       ) : (
         compare.files.map((f) => <DiffView key={f.new_path || f.old_path} file={f} mode={mode} />)
       )}

@@ -3,6 +3,7 @@ import { Fragment, useMemo, useState } from "react"
 import CIStatusBadge from "../components/CIStatusBadge"
 import type { CIEvent, CIJob } from "../api/types"
 import { parseAnsi } from "../lib/ansi"
+import { EmptyState, Spinner } from "../components/ui"
 import { useJobEventStream } from "../lib/ciEvents"
 import { formatDuration } from "./runHelpers"
 
@@ -23,7 +24,7 @@ export default function CIRunBody({
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
 
   if (jobs.length === 0) {
-    return <div className="empty">No jobs — the run was gated or hasn't started.</div>
+    return <EmptyState>No jobs — the run was gated or hasn't started.</EmptyState>
   }
 
   // Default the open job to the first one that isn't skipped, falling back to
@@ -136,13 +137,13 @@ function JobLog({
   const steps = useMemo(() => foldSteps(events), [events])
 
   if (job.status === "skipped") {
-    return <div className="empty">Skipped — a dependency didn't succeed.</div>
+    return <EmptyState>Skipped — a dependency didn't succeed.</EmptyState>
   }
 
   return (
     <div className="ci-job-log">
       {error && <div className="error inline">{error}</div>}
-      {steps.length === 0 && !done && <div className="loading">Waiting for output…</div>}
+      {steps.length === 0 && !done && <Spinner label="Waiting for output…" />}
       {steps.map((step) => {
         const status = step.status ?? "running"
         const failed = status === "failed" || status === "error"

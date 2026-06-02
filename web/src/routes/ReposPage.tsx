@@ -5,6 +5,7 @@ import { useRepos } from "../api/queries"
 import CIStatusIcon from "../components/CIStatusIcon"
 import NewRepoForm from "../components/NewRepoForm"
 import StateIcon from "../components/StateIcon"
+import { EmptyState, Spinner } from "../components/ui"
 import { useListNav } from "../lib/keyboardNav"
 
 export default function ReposPage() {
@@ -32,11 +33,11 @@ export default function ReposPage() {
         <NewRepoForm onCreated={(owner, name) => navigate(`/${owner}/${name}`)} />
       </div>
 
-      {isLoading && <div className="loading">Loading…</div>}
+      {isLoading && <Spinner />}
       {error && <div className="error">{(error as Error).message}</div>}
 
       {!isLoading && !error && (!data || data.length === 0) && (
-        <div className="empty">No repos registered yet. Create one with the button above.</div>
+        <EmptyState>No repos registered yet. Create one with the button above.</EmptyState>
       )}
 
       {data && data.length > 0 && (

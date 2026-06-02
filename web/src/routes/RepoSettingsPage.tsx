@@ -4,6 +4,7 @@ import { ApiError } from "../api/client"
 import { useRepo } from "../api/queries"
 import { useDeleteRepo } from "../api/mutations"
 import NotFound from "../components/NotFound"
+import { Button, Spinner } from "../components/ui"
 
 // Per-repo settings. Today it hosts a single Danger Zone — deleting the repo —
 // but it's the natural home for future per-repo settings (the CI opt-in could
@@ -12,7 +13,7 @@ export default function RepoSettingsPage() {
   const { owner = "", repo = "" } = useParams()
   const repoQ = useRepo(owner, repo)
 
-  if (repoQ.isLoading) return <div className="loading">Loading…</div>
+  if (repoQ.isLoading) return <Spinner />
   if (repoQ.error) {
     const err = repoQ.error
     if (err instanceof ApiError && err.status === 404) {
@@ -76,14 +77,9 @@ function DangerZone({ owner, repo }: { owner: string; repo: string }) {
               autoComplete="off"
             />
           </label>
-          <button
-            type="button"
-            className="btn btn--danger"
-            disabled={!armed || del.isPending}
-            onClick={onDelete}
-          >
+          <Button variant="danger" disabled={!armed || del.isPending} onClick={onDelete}>
             {del.isPending ? "Deleting…" : "Delete repository"}
-          </button>
+          </Button>
         </div>
       </div>
       {del.error && <div className="error inline">{(del.error as Error).message}</div>}

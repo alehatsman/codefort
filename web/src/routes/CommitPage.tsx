@@ -5,6 +5,7 @@ import OverviewCard from "../components/OverviewCard"
 import Avatar from "../components/Avatar"
 import BranchTag from "../components/BranchTag"
 import DiffView from "../components/DiffView"
+import { EmptyState, Spinner } from "../components/ui"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 
 type Mode = "split" | "unified"
@@ -38,11 +39,11 @@ export default function CommitPage() {
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       {commitQ.isLoading ? (
-        <div className="loading">Loading…</div>
+        <Spinner />
       ) : commitQ.error ? (
         <div className="error">{(commitQ.error as Error).message}</div>
       ) : !detail ? (
-        <div className="empty">Commit not found.</div>
+        <EmptyState>Commit not found.</EmptyState>
       ) : (
         <>
           <header className="commit-detail__head">
@@ -115,7 +116,7 @@ export default function CommitPage() {
           )}
 
           {detail.files.length === 0 ? (
-            <div className="empty">No file changes in this commit.</div>
+            <EmptyState>No file changes in this commit.</EmptyState>
           ) : (
             detail.files.map((f) => (
               <DiffView key={f.new_path || f.old_path} file={f} mode={mode} />

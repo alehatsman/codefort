@@ -5,6 +5,7 @@ import { useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from "../api/mutation
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import type { Repo } from "../api/types"
 import CIStatusBadge from "../components/CIStatusBadge"
+import { Button, EmptyState, Spinner } from "../components/ui"
 import AgentRunBody from "./AgentRunBody"
 import CIRunBody from "./CIRunBody"
 import {
@@ -27,7 +28,7 @@ export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
   const numberParam = useParams().number
   const repoQ = useRepo(owner, repo)
 
-  if (repoQ.isLoading) return <div className="loading">Loading…</div>
+  if (repoQ.isLoading) return <Spinner />
   if (repoQ.error) return <div className="error">{(repoQ.error as Error).message}</div>
   if (!repoQ.data) return null
 
@@ -88,23 +89,23 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
                 placeholder="branch, tag, or commit"
                 aria-label="Ref to run"
               />
-              <button
+              <Button
                 type="submit"
-                className="btn btn--small btn--primary"
+                variant="primary"
+                size="small"
                 disabled={trigger.isPending || ref.trim() === ""}
               >
                 {trigger.isPending ? "Running…" : "Run pipeline"}
-              </button>
+              </Button>
             </form>
-            <button
-              type="button"
-              className="btn btn--small"
+            <Button
+              size="small"
               onClick={() => setEnabled.mutate(false)}
               disabled={setEnabled.isPending}
               title="Disable CI for this repo"
             >
               Disable CI
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -123,10 +124,10 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
       </p>
       {trigger.error && <div className="error inline">{(trigger.error as Error).message}</div>}
 
-      {runsQ.isLoading && <div className="loading">Loading…</div>}
+      {runsQ.isLoading && <Spinner />}
       {runsQ.error && <div className="error">{(runsQ.error as Error).message}</div>}
       {runsQ.data && runsQ.data.length === 0 && (
-        <div className="empty">
+        <EmptyState>
           {isAgent ? (
             <>No agent runs yet. Open an issue and click “Spawn agent” to start one.</>
           ) : (
@@ -134,7 +135,7 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
               No runs yet. Push a commit with an <code>mgitci.yml</code> to trigger the first one.
             </>
           )}
-        </div>
+        </EmptyState>
       )}
 
       {runsQ.data && runsQ.data.length > 0 && (
@@ -195,7 +196,7 @@ function CIDisabledCard({ owner, repo }: { owner: string; repo: string }) {
   return (
     <section className="pipelines">
       <h2 className="pipelines__title">Pipelines</h2>
-      <div className="empty">
+      <EmptyState>
         <p>
           <strong>CI is disabled for this repository.</strong>
         </p>
@@ -204,18 +205,17 @@ function CIDisabledCard({ owner, repo }: { owner: string; repo: string }) {
           Each job runs in a throwaway container off the configured CI image, so repo-authored
           commands stay isolated from the host.
         </p>
-        <button
-          type="button"
-          className="btn btn--primary"
+        <Button
+          variant="primary"
           onClick={() => setEnabled.mutate(true)}
           disabled={setEnabled.isPending}
         >
           {setEnabled.isPending ? "Enabling…" : "Enable CI"}
-        </button>
+        </Button>
         {setEnabled.error && (
           <div className="error inline">{(setEnabled.error as Error).message}</div>
         )}
-      </div>
+      </EmptyState>
     </section>
   )
 }
@@ -235,7 +235,7 @@ function RunDetail({
   const runQ = useCIRun(owner, repo, runNumber)
   const rerun = useRerunCIRun(owner, repo)
 
-  if (runQ.isLoading) return <div className="loading">Loading…</div>
+  if (runQ.isLoading) return <Spinner />
   if (runQ.error) return <div className="error">{(runQ.error as Error).message}</div>
   if (!runQ.data) return null
 
@@ -260,14 +260,9 @@ function RunDetail({
         </h2>
         {/* Re-run re-enqueues a CI run, which is meaningless for an agent run. */}
         {!isAgent && (
-          <button
-            type="button"
-            className="btn btn--small"
-            onClick={doRerun}
-            disabled={rerun.isPending}
-          >
+          <Button size="small" onClick={doRerun} disabled={rerun.isPending}>
             {rerun.isPending ? "Re-running…" : "Re-run"}
-          </button>
+          </Button>
         )}
       </div>
       {rerun.error && <div className="error inline">{(rerun.error as Error).message}</div>}

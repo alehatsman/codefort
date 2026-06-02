@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import type { Commit, TreeEntry } from "../api/types"
 import FileIcon from "./FileIcon"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
+import { EmptyState } from "./ui"
 
 interface Props {
   owner: string
@@ -38,7 +39,7 @@ export default function FileTree({
   const base = `/${owner}/${repo}`
 
   if (entries.length === 0) {
-    return <div className="empty">This directory is empty.</div>
+    return <EmptyState>This directory is empty.</EmptyState>
   }
 
   return (

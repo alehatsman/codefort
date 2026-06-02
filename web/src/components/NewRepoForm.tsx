@@ -1,6 +1,7 @@
 import { useRef, useState } from "react"
 import { useCreateRepo } from "../api/mutations"
 import { useWhoami } from "../api/queries"
+import { Button } from "./ui"
 
 interface Props {
   onCreated?: (owner: string, name: string) => void
@@ -64,9 +65,9 @@ export default function NewRepoForm({ onCreated }: Props) {
 
   return (
     <>
-      <button type="button" className="btn btn--primary" onClick={open}>
+      <Button variant="primary" onClick={open}>
         + New repo
-      </button>
+      </Button>
 
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click-to-dismiss only; <dialog> handles Esc/keyboard natively */}
       <dialog ref={dialogRef} className="modal" onClick={onBackdropClick}>
@@ -117,16 +118,12 @@ export default function NewRepoForm({ onCreated }: Props) {
           </div>
 
           <footer className="modal__foot">
-            <button type="button" className="btn" onClick={close} disabled={mutation.isPending}>
+            <Button onClick={close} disabled={mutation.isPending}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={!valid || mutation.isPending}
-            >
+            </Button>
+            <Button type="submit" variant="primary" disabled={!valid || mutation.isPending}>
               {mutation.isPending ? "Creating…" : "Create repository"}
-            </button>
+            </Button>
           </footer>
         </form>
       </dialog>

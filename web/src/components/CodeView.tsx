@@ -10,6 +10,7 @@ import {
 } from "../api/mutations"
 import type { CodeComment } from "../api/types"
 import Avatar from "./Avatar"
+import { Badge, Button } from "./ui"
 
 // The markdown renderer pulls in remark/rehype; load it lazily.
 const Markdown = lazy(() => import("./Markdown"))
@@ -238,17 +239,17 @@ function CodeCommentCard({
           <span className="muted">
             on lines {span} · {new Date(comment.created_at).toLocaleString()}
           </span>
-          {comment.resolved && <span className="badge badge--done">resolved</span>}
+          {comment.resolved && <Badge state="done">resolved</Badge>}
           {canManage && (
             <span className="comment__actions">
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
+              <Button
+                variant="ghost"
+                size="small"
                 disabled={resolve.isPending}
                 onClick={() => resolve.mutate({ id: comment.id, resolved: !comment.resolved })}
               >
                 {comment.resolved ? "Reopen" : "Resolve"}
-              </button>
+              </Button>
               <button
                 type="button"
                 className="comment__delete"
@@ -331,16 +332,12 @@ function ComposeForm({
       />
       {create.error && <div className="error">{(create.error as Error).message}</div>}
       <div className="row">
-        <button
-          type="submit"
-          className="btn btn--primary"
-          disabled={!body.trim() || create.isPending}
-        >
+        <Button type="submit" variant="primary" disabled={!body.trim() || create.isPending}>
           {create.isPending ? "Adding…" : "Add comment"}
-        </button>
-        <button type="button" className="btn btn--ghost" onClick={onDone}>
+        </Button>
+        <Button variant="ghost" onClick={onDone}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   )

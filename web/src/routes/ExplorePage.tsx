@@ -11,6 +11,7 @@ import {
   useRepo,
 } from "../api/queries"
 import OverviewCard from "../components/OverviewCard"
+import { Button, Spinner, EmptyState } from "../components/ui"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import type {
   Commit,
@@ -43,7 +44,7 @@ export default function ExplorePage() {
   const packages = overviewQ.data?.packages ?? []
   const lastCommitByPath = usePackageRecency(owner, repo, packages, isIndexed)
 
-  if (repoQ.isLoading) return <div className="loading">Loading…</div>
+  if (repoQ.isLoading) return <Spinner />
   if (repoQ.error) return <div className="error">{(repoQ.error as Error).message}</div>
   if (!repoQ.data) return null
 
@@ -54,11 +55,11 @@ export default function ExplorePage() {
     <div className="explore-page">
       <OverviewCard owner={r.owner} repo={r.name} path="" summaries={{}} />
 
-      {intelQ.isLoading && <div className="loading">Loading index status…</div>}
+      {intelQ.isLoading && <Spinner label="Loading index status…" />}
       {intelQ.error && <div className="error">{(intelQ.error as Error).message}</div>}
 
       {intel && !intel.enabled && (
-        <div className="empty" style={{ border: "1px solid var(--border)", borderRadius: 6 }}>
+        <EmptyState bordered>
           <p>
             <strong>Code intelligence is not configured.</strong>
           </p>
@@ -66,11 +67,11 @@ export default function ExplorePage() {
             Set <code>MOONGIT_DEX_URL</code> (and <code>MOONGIT_DEX_TOKEN</code> if dex requires
             one) to point at a running <code>dex serve</code> daemon, then restart moongitd.
           </p>
-        </div>
+        </EmptyState>
       )}
 
       {intel?.enabled && !intel.found && (
-        <div className="empty" style={{ border: "1px solid var(--border)", borderRadius: 6 }}>
+        <EmptyState bordered>
           <p>
             <strong>This repo is not indexed by dex.</strong>
           </p>
@@ -84,7 +85,7 @@ export default function ExplorePage() {
               {intel.service.reachable ? "embeddings reachable" : "embeddings unreachable"}
             </p>
           )}
-        </div>
+        </EmptyState>
       )}
 
       {isIndexed && intel?.project && (
@@ -322,7 +323,7 @@ function PackageMap(props: MapProps) {
   if (!graph && props.graphLoading) {
     return (
       <section className="explore-section">
-        <div className="loading">Loading map…</div>
+        <Spinner label="Loading map…" />
       </section>
     )
   }
@@ -346,7 +347,7 @@ function FallbackPackageMap({ owner, repo, packages, lastCommitByPath, loading, 
     }))
   }, [packages])
 
-  if (loading) return <div className="loading">Loading map…</div>
+  if (loading) return <Spinner label="Loading map…" />
   if (error) return <div className="error">{error.message}</div>
   if (groups.length === 0) return null
 
@@ -426,7 +427,7 @@ function GraphPackageMap({
     [graph, packages, lastCommitByPath]
   )
 
-  if (loading) return <div className="loading">Loading map…</div>
+  if (loading) return <Spinner label="Loading map…" />
   if (error) return <div className="error">{error.message}</div>
   if (tiers.length === 0) return null
 
@@ -737,13 +738,14 @@ function AskBox({ owner, repo }: { owner: string; repo: string }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button
+          <Button
             type="submit"
-            className="btn btn--primary explore-ask__go"
+            variant="primary"
+            className="explore-ask__go"
             disabled={!query.trim() || search.isPending}
           >
             {search.isPending ? "Working…" : verbFor(kind)}
-          </button>
+          </Button>
         </div>
         <button
           type="button"
@@ -795,9 +797,9 @@ function AskView({
 }) {
   if (result.status !== "ok") {
     return (
-      <div className="empty">
+      <EmptyState>
         <p className="muted small">{result.hint || `dex returned: ${result.status}`}</p>
-      </div>
+      </EmptyState>
     )
   }
   const reads = result.suggested_reads ?? []
@@ -909,9 +911,7 @@ function AskView({
       {!result.answer &&
         reads.length === 0 &&
         result.hits.length === 0 &&
-        (!result.graph || result.graph.nodes.length === 0) && (
-          <div className="empty">No matches.</div>
-        )}
+        (!result.graph || result.graph.nodes.length === 0) && <EmptyState>No matches.</EmptyState>}
     </div>
   )
 }
@@ -976,13 +976,13 @@ function SearchHits({
 }) {
   if (result.status !== "ok") {
     return (
-      <div className="empty">
+      <EmptyState>
         <p className="muted small">{result.hint || `dex returned: ${result.status}`}</p>
-      </div>
+      </EmptyState>
     )
   }
   if (result.hits.length === 0) {
-    return <div className="empty">No matches{result.hint ? ` (${result.hint})` : ""}.</div>
+    return <EmptyState>No matches{result.hint ? ` (${result.hint})` : ""}.</EmptyState>
   }
   return (
     <>
