@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from "react-router-dom"
 import { useAllPulls } from "../api/queries"
 import { PR_STATES, type PRState } from "../api/types"
+import { EmptyState, Spinner } from "../components/ui"
 
 const STATE_LABEL: Record<PRState, string> = {
   open: "open",
@@ -66,12 +67,10 @@ export default function GlobalPullsPage() {
         </div>
       </div>
 
-      {isLoading && <div className="loading">Loading…</div>}
+      {isLoading && <Spinner />}
       {error && <div className="error">{(error as Error).message}</div>}
 
-      {data && data.length === 0 && (
-        <div className="empty">No pull requests match this filter.</div>
-      )}
+      {data && data.length === 0 && <EmptyState>No pull requests match this filter.</EmptyState>}
 
       {data && data.length > 0 && (
         <ul className="issue-list">

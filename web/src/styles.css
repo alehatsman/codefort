@@ -1208,10 +1208,6 @@ a.file-tree__commit:hover {
   align-items: center;
   gap: var(--space-2);
 }
-.btn--sm {
-  padding: 1px var(--space-2);
-  font-size: var(--text-sm);
-}
 .code-compose {
   max-width: 720px;
 }
@@ -1994,6 +1990,18 @@ a.file-tree__commit:hover {
   background: var(--state-closed);
   border-color: var(--state-closed);
 }
+/* Ghost: a borderless secondary action (Cancel / inline Edit). Previously a
+   dead modifier with no rule — these rendered as plain .btn buttons. */
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-muted);
+}
+.btn--ghost:hover:not(:disabled) {
+  background: var(--bg-canvas);
+  border-color: transparent;
+  color: var(--fg);
+}
 
 .input,
 .textarea {
@@ -2274,6 +2282,12 @@ a.file-tree__commit:hover {
   padding: var(--space-5);
   text-align: center;
   color: var(--fg-muted);
+}
+/* EmptyState `bordered`: the framed variant. Folds the inline
+   { border, borderRadius } style that was copy-pasted onto bare `.empty`. */
+.empty--bordered {
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }
 
 /* Board view ---------------------------------------------------------- */
@@ -3795,4 +3809,40 @@ h3 {
   display: flex;
   justify-content: space-between;
   gap: var(--space-2);
+}
+
+/* /dev/ui primitives gallery ------------------------------------------- */
+.gallery {
+  max-width: 920px;
+}
+.gallery__lede {
+  color: var(--fg-muted);
+  margin-top: var(--space-2);
+}
+.gallery__section {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+.gallery__heading {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-md);
+  color: var(--fg-muted);
+  font-weight: var(--weight-semibold);
+}
+.gallery__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+/* Form/card rows read better stacked than inline. */
+.gallery__row .card,
+.gallery__row .input,
+.gallery__row .textarea {
+  min-width: 240px;
+}
+.gallery__muted {
+  color: var(--fg-muted);
+  margin: var(--space-1) 0 0;
 }

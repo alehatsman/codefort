@@ -3,6 +3,7 @@ import { usePulls } from "../api/queries"
 import { PR_STATES, type PRState } from "../api/types"
 import OverviewCard from "../components/OverviewCard"
 import PRStateIcon from "../components/PRStateIcon"
+import { Button, EmptyState, FilterChip, Spinner } from "../components/ui"
 
 const STATE_LABEL: Record<PRState, string> = {
   open: "open",
@@ -60,38 +61,27 @@ export default function PullsPage() {
         <div className="issues__header-left">
           <h2>Pull requests</h2>
         </div>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={() => navigate(`/${owner}/${repo}/compare`)}
-        >
+        <Button variant="primary" onClick={() => navigate(`/${owner}/${repo}/compare`)}>
           + New pr
-        </button>
+        </Button>
       </div>
 
       <div className="filters">
         <div className="filter-row">
           <span className="filter-label">state:</span>
           {PR_STATES.map((s) => (
-            <label key={s} className="chip">
-              <input
-                type="checkbox"
-                checked={activeStates.includes(s)}
-                onChange={() => toggleState(s)}
-              />
+            <FilterChip key={s} checked={activeStates.includes(s)} onChange={() => toggleState(s)}>
               <PRStateIcon state={s} size={12} />
               {s}
-            </label>
+            </FilterChip>
           ))}
         </div>
       </div>
 
-      {isLoading && <div className="loading">Loading…</div>}
+      {isLoading && <Spinner />}
       {error && <div className="error">{(error as Error).message}</div>}
 
-      {data && data.length === 0 && (
-        <div className="empty">No pull requests match this filter.</div>
-      )}
+      {data && data.length === 0 && <EmptyState>No pull requests match this filter.</EmptyState>}
 
       {data && data.length > 0 && (
         <ul className="issue-list">

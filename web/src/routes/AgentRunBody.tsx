@@ -3,6 +3,7 @@ import clsx from "clsx"
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useCancelAgentRun, useCreateAgentTurn, useFinishAgentRun } from "../api/mutations"
 import type { CIEvent, CIRunDetail } from "../api/types"
+import { Button, Spinner } from "../components/ui"
 import { useJobEventStream } from "../lib/ciEvents"
 import { formatDuration } from "./runHelpers"
 
@@ -169,7 +170,7 @@ function AgentTranscript({
   return (
     <div className="agent-transcript-wrap">
       {error && <div className="error inline">{error}</div>}
-      {cards.length === 0 && !done && <div className="loading">Waiting for the agent…</div>}
+      {cards.length === 0 && !done && <Spinner label="Waiting for the agent…" />}
       <div ref={scrollRef} className="agent-transcript" onScroll={onScroll}>
         <div className="agent-transcript__sizer" style={{ height: total }}>
           {virtualizer.getVirtualItems().map((vi) => (
@@ -370,31 +371,31 @@ function AgentMessageBox({
         rows={3}
       />
       <div className="agent-msgbox__actions">
-        <button
-          type="button"
-          className="btn btn--small"
+        <Button
+          size="small"
           onClick={() => finish.mutate()}
           disabled={finish.isPending || run.status === "running"}
           title="Hand off the agent's work: push agent/issue-N and comment on the issue"
         >
           {finish.isPending ? "Finishing…" : "Finish"}
-        </button>
-        <button
-          type="button"
-          className="btn btn--small btn--danger"
+        </Button>
+        <Button
+          size="small"
+          variant="danger"
           onClick={() => cancel.mutate()}
           disabled={cancel.isPending}
           title="Force-stop the run now: interrupt the agent and discard the workspace (no branch is handed off)"
         >
           {cancel.isPending ? "Stopping…" : "Stop"}
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
-          className="btn btn--small btn--primary"
+          size="small"
+          variant="primary"
           disabled={send.isPending || text.trim() === ""}
         >
           {send.isPending ? "Sending…" : "Send"}
-        </button>
+        </Button>
       </div>
       {send.error && <div className="error inline">{(send.error as Error).message}</div>}
       {finish.error && <div className="error inline">{(finish.error as Error).message}</div>}

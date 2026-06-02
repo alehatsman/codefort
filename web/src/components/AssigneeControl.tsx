@@ -1,6 +1,7 @@
 import { useClaimIssue, useUnclaimIssue } from "../api/mutations"
 import type { IssueState } from "../api/types"
 import Avatar from "./Avatar"
+import { Button } from "./ui"
 
 interface Props {
   owner: string
@@ -45,23 +46,13 @@ export default function AssigneeControl({ owner, repo, number, assignee, state, 
       ) : (
         <div className="assignee__row">
           {assignee === null ? (
-            <button
-              type="button"
-              className="btn btn--small"
-              disabled={inFlight}
-              onClick={() => claim.mutate({})}
-            >
+            <Button size="small" disabled={inFlight} onClick={() => claim.mutate({})}>
               {claim.isPending ? "Claiming…" : "Claim it"}
-            </button>
+            </Button>
           ) : (
-            <button
-              type="button"
-              className="btn btn--small"
-              disabled={inFlight}
-              onClick={() => unclaim.mutate()}
-            >
+            <Button size="small" disabled={inFlight} onClick={() => unclaim.mutate()}>
               {unclaim.isPending ? "Releasing…" : "Release"}
-            </button>
+            </Button>
           )}
         </div>
       )}

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom"
+import { EmptyState } from "./ui"
 
 interface Props {
   title?: string
@@ -9,12 +10,12 @@ interface Props {
 // a blank page or a raw backend error string.
 export default function NotFound({ title = "Page not found", detail }: Props) {
   return (
-    <div className="empty">
+    <EmptyState>
       <h2>{title}</h2>
       {detail && <p className="muted small">{detail}</p>}
       <p>
         <Link to="/">← Back to repositories</Link>
       </p>
-    </div>
+    </EmptyState>
   )
 }

@@ -16,6 +16,7 @@ import BoardColumn from "../components/BoardColumn"
 import NewIssueForm from "../components/NewIssueForm"
 import OverviewCard from "../components/OverviewCard"
 import IssuesViewSwitch from "../components/IssuesViewSwitch"
+import { Spinner } from "../components/ui"
 
 /**
  * Trello-style board view. Columns are the four issue states; cards
@@ -84,7 +85,7 @@ export default function BoardPage() {
     optimisticallyMoveAndPatch(owner, repo, issueNumber, currentState, targetState, qc)
   }
 
-  if (issuesQ.isLoading) return <div className="loading">Loading board…</div>
+  if (issuesQ.isLoading) return <Spinner label="Loading board…" />
   if (issuesQ.error) return <div className="error">{(issuesQ.error as Error).message}</div>
 
   return (

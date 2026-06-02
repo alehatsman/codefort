@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom"
 import { useAllRuns } from "../api/queries"
 import CIStatusBadge from "../components/CIStatusBadge"
+import { EmptyState, Spinner } from "../components/ui"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import {
   type RunKind,
@@ -31,10 +32,10 @@ export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
           : "Every pipeline run across all repos. Open one to see its job graph."}
       </p>
 
-      {isLoading && <div className="loading">Loading…</div>}
+      {isLoading && <Spinner />}
       {error && <div className="error">{(error as Error).message}</div>}
       {data && data.length === 0 && (
-        <div className="empty">{isAgent ? "No agent runs yet." : "No pipeline runs yet."}</div>
+        <EmptyState>{isAgent ? "No agent runs yet." : "No pipeline runs yet."}</EmptyState>
       )}
 
       {data && data.length > 0 && (

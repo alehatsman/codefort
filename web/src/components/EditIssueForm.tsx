@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useUpdateIssue } from "../api/mutations"
+import { Button } from "./ui"
 
 interface Props {
   owner: string
@@ -58,16 +59,12 @@ export default function EditIssueForm({
       </label>
       {mutation.error && <div className="error">{(mutation.error as Error).message}</div>}
       <div className="row">
-        <button
-          type="submit"
-          className="btn btn--primary"
-          disabled={!title.trim() || mutation.isPending}
-        >
+        <Button type="submit" variant="primary" disabled={!title.trim() || mutation.isPending}>
           {mutation.isPending ? "Saving…" : "Save"}
-        </button>
-        <button type="button" className="btn btn--ghost" onClick={onDone}>
+        </Button>
+        <Button variant="ghost" onClick={onDone}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   )

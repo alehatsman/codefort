@@ -10,6 +10,7 @@ import {
 } from "../api/mutations"
 import type { CIRunExecutionModel, CreatedToken, SSHKey, Token } from "../api/types"
 import ThemeSelect from "../components/ThemeSelect"
+import { Badge, Button, EmptyState, Spinner } from "../components/ui"
 
 // Sections of the settings surface. "tokens", "agent", "ssh", and "appearance"
 // are backed. "users" and "branches" are planned features whose server backends
@@ -88,9 +89,9 @@ function Placeholder({ title, note }: { title: string; note: string }) {
   return (
     <section className="settings__section">
       <h2 className="settings__title">{title}</h2>
-      <div className="empty">
+      <EmptyState>
         <strong>Planned.</strong> {note}
-      </div>
+      </EmptyState>
     </section>
   )
 }
@@ -169,22 +170,18 @@ function AgentSection() {
           autoComplete="off"
         />
         <div className="agent-token-form__actions">
-          <button
+          <Button
             type="submit"
-            className="btn btn--small btn--primary"
+            variant="primary"
+            size="small"
             disabled={update.isPending || token.trim() === ""}
           >
             {update.isPending ? "Saving…" : "Save token"}
-          </button>
+          </Button>
           {configured && (
-            <button
-              type="button"
-              className="btn btn--small btn--danger"
-              onClick={clear}
-              disabled={update.isPending}
-            >
+            <Button variant="danger" size="small" onClick={clear} disabled={update.isPending}>
               Clear
-            </button>
+            </Button>
           )}
         </div>
       </form>
@@ -233,22 +230,23 @@ function AgentSection() {
             autoComplete="off"
           />
           <div className="agent-token-form__actions">
-            <button
+            <Button
               type="submit"
-              className="btn btn--small btn--primary"
+              variant="primary"
+              size="small"
               disabled={update.isPending || baseUrl.trim() === savedBaseUrl}
             >
               {update.isPending ? "Saving…" : "Save base URL"}
-            </button>
+            </Button>
             {savedBaseUrl !== "" && (
-              <button
-                type="button"
-                className="btn btn--small btn--danger"
+              <Button
+                variant="danger"
+                size="small"
                 onClick={() => update.mutate({ llm_base_url: "" })}
                 disabled={update.isPending}
               >
                 Clear
-              </button>
+              </Button>
             )}
           </div>
         </form>
@@ -272,22 +270,23 @@ function AgentSection() {
             autoComplete="off"
           />
           <div className="agent-token-form__actions">
-            <button
+            <Button
               type="submit"
-              className="btn btn--small btn--primary"
+              variant="primary"
+              size="small"
               disabled={update.isPending || authToken.trim() === ""}
             >
               {update.isPending ? "Saving…" : "Save auth token"}
-            </button>
+            </Button>
             {authConfigured && (
-              <button
-                type="button"
-                className="btn btn--small btn--danger"
+              <Button
+                variant="danger"
+                size="small"
                 onClick={() => update.mutate({ anthropic_auth_token: "" })}
                 disabled={update.isPending}
               >
                 Clear
-              </button>
+              </Button>
             )}
           </div>
         </form>
@@ -363,9 +362,9 @@ function TokensSection() {
           onChange={(e) => setName(e.target.value)}
           maxLength={100}
         />
-        <button className="btn btn--primary" type="submit" disabled={!trimmed || create.isPending}>
+        <Button variant="primary" type="submit" disabled={!trimmed || create.isPending}>
           {create.isPending ? "Creating…" : "Create token"}
-        </button>
+        </Button>
       </form>
       {create.error && <div className="error inline">{(create.error as Error).message}</div>}
 
@@ -388,19 +387,19 @@ function TokensSection() {
           </p>
           <div className="token-reveal__secret">
             <code>{revealed.secret}</code>
-            <button type="button" className="btn btn--small" onClick={copySecret}>
+            <Button size="small" onClick={copySecret}>
               {copied ? "Copied" : "Copy"}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
-      {tokensQ.isLoading && <div className="loading">Loading…</div>}
+      {tokensQ.isLoading && <Spinner />}
       {tokensQ.error && <div className="error">{(tokensQ.error as Error).message}</div>}
       {revoke.error && <div className="error inline">{(revoke.error as Error).message}</div>}
 
       {tokensQ.data && tokensQ.data.length === 0 && (
-        <div className="empty">No tokens yet. Create one above.</div>
+        <EmptyState>No tokens yet. Create one above.</EmptyState>
       )}
 
       {tokensQ.data && tokensQ.data.length > 0 && (
@@ -419,7 +418,7 @@ function TokensSection() {
               <tr key={t.id} className={t.revoked_at ? "is-revoked" : ""}>
                 <td>
                   {t.name}
-                  {t.name === whoami.data?.name && <span className="badge">you</span>}
+                  {t.name === whoami.data?.name && <Badge>you</Badge>}
                 </td>
                 <td className="muted">{new Date(t.created_at).toLocaleDateString()}</td>
                 <td className="muted">
@@ -427,21 +426,21 @@ function TokensSection() {
                 </td>
                 <td>
                   {t.revoked_at ? (
-                    <span className="badge badge--closed">revoked</span>
+                    <Badge state="closed">revoked</Badge>
                   ) : (
-                    <span className="badge badge--done">active</span>
+                    <Badge state="done">active</Badge>
                   )}
                 </td>
                 <td className="token-table__actions">
                   {!t.revoked_at && (
-                    <button
-                      type="button"
-                      className="btn btn--small btn--danger"
+                    <Button
+                      variant="danger"
+                      size="small"
                       onClick={() => onRevoke(t)}
                       disabled={revoke.isPending}
                     >
                       Revoke
-                    </button>
+                    </Button>
                   )}
                 </td>
               </tr>
@@ -509,18 +508,18 @@ function SSHKeysSection() {
           onChange={(e) => setComment(e.target.value)}
           maxLength={100}
         />
-        <button className="btn btn--primary" type="submit" disabled={!trimmed || add.isPending}>
+        <Button variant="primary" type="submit" disabled={!trimmed || add.isPending}>
           {add.isPending ? "Adding…" : "Add SSH key"}
-        </button>
+        </Button>
       </form>
       {add.error && <div className="error inline">{(add.error as Error).message}</div>}
 
-      {keysQ.isLoading && <div className="loading">Loading…</div>}
+      {keysQ.isLoading && <Spinner />}
       {keysQ.error && <div className="error">{(keysQ.error as Error).message}</div>}
       {del.error && <div className="error inline">{(del.error as Error).message}</div>}
 
       {keysQ.data && keysQ.data.length === 0 && (
-        <div className="empty">No SSH keys yet. Add one above.</div>
+        <EmptyState>No SSH keys yet. Add one above.</EmptyState>
       )}
 
       {keysQ.data && keysQ.data.length > 0 && (
@@ -546,14 +545,14 @@ function SSHKeysSection() {
                   {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : "never"}
                 </td>
                 <td className="token-table__actions">
-                  <button
-                    type="button"
-                    className="btn btn--small btn--danger"
+                  <Button
+                    variant="danger"
+                    size="small"
                     onClick={() => onDelete(k)}
                     disabled={del.isPending}
                   >
                     Remove
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}

@@ -19,6 +19,7 @@ import CommitMeta from "../components/CommitMeta"
 import ReadmeCard from "../components/ReadmeCard"
 import OverviewCard from "../components/OverviewCard"
 import NotFound from "../components/NotFound"
+import { EmptyState, Spinner } from "../components/ui"
 import { findReadme } from "../lib/readme"
 import { useListNav } from "../lib/keyboardNav"
 import BranchSelector from "../components/BranchSelector"
@@ -41,7 +42,7 @@ export default function RepoPage() {
 
   const repoQ = useRepo(owner, repo)
 
-  if (repoQ.isLoading) return <div className="loading">Loading…</div>
+  if (repoQ.isLoading) return <Spinner />
   if (repoQ.error) {
     const err = repoQ.error
     if (err instanceof ApiError && err.status === 404) {
@@ -110,14 +111,14 @@ function TreeView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
     },
   })
 
-  if (treeQ.isLoading) return <div className="loading">Loading…</div>
+  if (treeQ.isLoading) return <Spinner />
   if (treeQ.error) return <div className="error">{(treeQ.error as Error).message}</div>
   if (!treeQ.data) return null
 
   // Empty root listing == unborn repo (no commits pushed yet).
   if (isRoot && treeQ.data.entries.length === 0) {
     return (
-      <div className="empty" style={{ border: "1px solid var(--border)", borderRadius: 6 }}>
+      <EmptyState bordered>
         <p>
           <strong>This repository is empty.</strong>
         </p>
@@ -127,7 +128,7 @@ function TreeView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
             git clone http://localhost:8080/{owner}/{repo}.git
           </code>
         </p>
-      </div>
+      </EmptyState>
     )
   }
 
@@ -181,7 +182,7 @@ function BlobView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   const commentsQ = useCodeComments(owner, repo, { ref: gitRef, path, state: "all" })
   const whoamiQ = useWhoami()
 
-  if (blobQ.isLoading) return <div className="loading">Loading…</div>
+  if (blobQ.isLoading) return <Spinner />
   if (blobQ.error) {
     const err = blobQ.error
     // A relative link in a rendered README (e.g. `examples/`) can point a
@@ -218,11 +219,11 @@ function BlobView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
           </span>
         </div>
         {b.too_large ? (
-          <div className="empty">File too large to display ({formatSize(b.size)}).</div>
+          <EmptyState>File too large to display ({formatSize(b.size)}).</EmptyState>
         ) : b.binary ? (
-          <div className="empty">Binary file not shown.</div>
+          <EmptyState>Binary file not shown.</EmptyState>
         ) : (
-          <Suspense fallback={<div className="loading">Loading…</div>}>
+          <Suspense fallback={<Spinner />}>
             <CodeView
               content={b.content}
               path={path}

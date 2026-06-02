@@ -14,6 +14,7 @@ import DeleteIssueButton from "../components/DeleteIssueButton"
 import BranchTag from "../components/BranchTag"
 import SpawnAgentButton from "../components/SpawnAgentButton"
 import NotFound from "../components/NotFound"
+import { Button, Spinner } from "../components/ui"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it only
 // when an issue with a body is actually shown.
@@ -41,7 +42,7 @@ export default function IssuePage() {
     )
   }
 
-  if (issueQ.isLoading) return <div className="loading">Loading…</div>
+  if (issueQ.isLoading) return <Spinner />
   if (issueQ.error) return <div className="error">{(issueQ.error as Error).message}</div>
   if (!issueQ.data) return null
 
@@ -54,13 +55,14 @@ export default function IssuePage() {
       {!editing && (
         <h2 className="issue-title">
           {iss.title} <span className="issue-title__num">#{iss.number}</span>
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm issue-title__edit"
+          <Button
+            variant="ghost"
+            size="small"
+            className="issue-title__edit"
             onClick={() => setEditing(true)}
           >
             Edit
-          </button>
+          </Button>
         </h2>
       )}
       <div className="issue-subtitle">
@@ -100,7 +102,7 @@ export default function IssuePage() {
             )
           )}
 
-          {commentsQ.isLoading && <div className="loading">Loading comments…</div>}
+          {commentsQ.isLoading && <Spinner label="Loading comments…" />}
           {commentsQ.data && commentsQ.data.length > 0 && (
             <ul className="comments">
               {commentsQ.data.map((c) => (

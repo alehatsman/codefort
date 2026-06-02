@@ -6,6 +6,7 @@ import { useDeleteCodeComment, useSetCodeCommentResolved } from "../api/mutation
 import BranchSelector from "../components/BranchSelector"
 import DraftReviewButton from "../components/DraftReviewButton"
 import Avatar from "../components/Avatar"
+import { Badge, Button, EmptyState, Spinner } from "../components/ui"
 import type { CodeComment, CodeCommentState } from "../api/types"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it lazily
@@ -81,10 +82,10 @@ export default function ReviewPage() {
         <DraftReviewButton owner={owner} repo={repo} defaultRef={gitRef} />
       </div>
 
-      {commentsQ.isLoading && <div className="loading">Loading…</div>}
+      {commentsQ.isLoading && <Spinner />}
       {commentsQ.error && <div className="error">{(commentsQ.error as Error).message}</div>}
       {commentsQ.data && comments.length === 0 && (
-        <div className="empty">No {state === "all" ? "" : `${state} `}comments on this branch.</div>
+        <EmptyState>No {state === "all" ? "" : `${state} `}comments on this branch.</EmptyState>
       )}
 
       {byPath.map(([path, list]) => (
@@ -144,17 +145,17 @@ function ReviewRow({
         >
           {comment.path}:{lines}
         </Link>
-        {comment.resolved && <span className="badge badge--done">resolved</span>}
+        {comment.resolved && <Badge state="done">resolved</Badge>}
         {canManage && (
           <span className="review-row__actions">
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
+            <Button
+              variant="ghost"
+              size="small"
               disabled={resolve.isPending}
               onClick={() => resolve.mutate({ id: comment.id, resolved: !comment.resolved })}
             >
               {comment.resolved ? "Reopen" : "Resolve"}
-            </button>
+            </Button>
             <button
               type="button"
               className="comment__delete"

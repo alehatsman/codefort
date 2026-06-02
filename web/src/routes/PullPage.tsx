@@ -6,6 +6,7 @@ import { usePull } from "../api/queries"
 import type { MergeConflictResponse } from "../api/types"
 import CompareView from "../components/CompareView"
 import OverviewCard from "../components/OverviewCard"
+import { Button, EmptyState, Spinner } from "../components/ui"
 
 const Markdown = lazy(() => import("../components/Markdown"))
 
@@ -40,11 +41,11 @@ export default function PullPage() {
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       {pullQ.isLoading ? (
-        <div className="loading">Loading…</div>
+        <Spinner />
       ) : pullQ.error ? (
         <div className="error">{(pullQ.error as Error).message}</div>
       ) : !pr ? (
-        <div className="empty">Pull request not found.</div>
+        <EmptyState>Pull request not found.</EmptyState>
       ) : (
         <>
           <header className="pull-head">
@@ -72,9 +73,8 @@ export default function PullPage() {
           {pr.state === "open" && (
             <div className="pull-merge">
               <div className="pull-merge__actions">
-                <button
-                  type="button"
-                  className="btn btn--primary"
+                <Button
+                  variant="primary"
                   disabled={!mergeable || mergePull.isPending}
                   onClick={() => mergePull.mutate({ method: ffOnly ? "ff-only" : "merge" })}
                 >
@@ -83,7 +83,7 @@ export default function PullPage() {
                     : ffOnly
                       ? "Fast-forward merge"
                       : "Merge pull request"}
-                </button>
+                </Button>
                 <label className="pull-merge__opt">
                   <input
                     type="checkbox"
@@ -92,17 +92,16 @@ export default function PullPage() {
                   />
                   fast-forward only
                 </label>
-                <button
-                  type="button"
-                  className="btn btn--danger"
+                <Button
+                  variant="danger"
                   disabled={updatePull.isPending}
                   onClick={() => updatePull.mutate({ state: "closed" })}
                 >
                   Close
-                </button>
+                </Button>
               </div>
               {!mergeable && pr.compare.ahead === 0 && (
-                <div className="empty">Nothing to merge — head is already in base.</div>
+                <EmptyState>Nothing to merge — head is already in base.</EmptyState>
               )}
               {conflicts.length > 0 ? (
                 <div className="error inline">
@@ -123,14 +122,12 @@ export default function PullPage() {
 
           {pr.state === "closed" && (
             <div className="pull-merge">
-              <button
-                type="button"
-                className="btn"
+              <Button
                 disabled={updatePull.isPending}
                 onClick={() => updatePull.mutate({ state: "open" })}
               >
                 Reopen
-              </button>
+              </Button>
             </div>
           )}
 

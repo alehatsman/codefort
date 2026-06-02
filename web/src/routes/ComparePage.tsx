@@ -5,6 +5,7 @@ import { useCompare, useRefs } from "../api/queries"
 import { useCreatePull } from "../api/mutations"
 import CompareView from "../components/CompareView"
 import OverviewCard from "../components/OverviewCard"
+import { Button, EmptyState, Spinner } from "../components/ui"
 
 /**
  * Compare two branches: pick base + head, see the ahead/behind + three-dot diff,
@@ -99,10 +100,10 @@ export default function ComparePage() {
         </label>
       </div>
 
-      {sameBranch && <div className="empty">Pick two different branches to compare.</div>}
-      {!head && !sameBranch && <div className="empty">Choose a head branch to compare.</div>}
+      {sameBranch && <EmptyState>Pick two different branches to compare.</EmptyState>}
+      {!head && !sameBranch && <EmptyState>Choose a head branch to compare.</EmptyState>}
 
-      {compareQ.isLoading && <div className="loading">Loading…</div>}
+      {compareQ.isLoading && <Spinner />}
       {compareQ.error && <div className="error">{(compareQ.error as Error).message}</div>}
 
       {compareQ.data && (
@@ -130,13 +131,9 @@ export default function ComparePage() {
                   : "Failed to create pull request."}
               </div>
             )}
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={!canCreate || createPull.isPending}
-            >
+            <Button type="submit" variant="primary" disabled={!canCreate || createPull.isPending}>
               {createPull.isPending ? "Creating…" : "Create pull request"}
-            </button>
+            </Button>
           </form>
 
           <CompareView compare={compareQ.data} />
