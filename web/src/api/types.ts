@@ -429,6 +429,29 @@ export interface IntelOverview {
   packages: IntelPackageSummary[]
 }
 
+// The internal package import DAG dex computed for the repo (its real
+// structure), used to rank and layer the Explore package map instead of
+// guessing roles from path names. status "no-graph" (with no nodes) means a
+// non-Go / un-graphed repo — the UI falls back to the flat summary listing.
+export interface IntelPackageGraphNode {
+  package: string // full Go import path
+  in_degree: number // distinct internal packages importing this one
+  out_degree: number // distinct internal packages it imports
+  page_rank: number
+}
+
+export interface IntelPackageGraphEdge {
+  from_package: string
+  to_package: string
+}
+
+export interface IntelPackageGraph {
+  status: string
+  hint?: string
+  nodes: IntelPackageGraphNode[]
+  edges: IntelPackageGraphEdge[]
+}
+
 export interface IntelFileSummary {
   path: string
   summary: string

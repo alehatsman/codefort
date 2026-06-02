@@ -98,3 +98,46 @@ func TestRespectsCallerDeadline(t *testing.T) {
 		t.Error("caller's tight deadline should win over the default, got nil error")
 	}
 }
+
+// PackageGraph decodes dex's /graph/packages shape: nodes with degree +
+// PageRank and the internal-only import edges, hitting the GET endpoint at
+// the project-scoped path.
+func TestPackageGraphDecodes(t *testing.T) {
+	const payload = `{
+		"status": "ok",
+		"nodes": [
+			{"package": "mod/store", "in_degree": 5, "out_degree": 1, "page_rank": 0.0503},
+			{"package": "mod/cmd",   "in_degree": 0, "out_degree": 12, "page_rank": 0.0234}
+		],
+		"edges": [
+			{"from_package": "mod/cmd", "to_package": "mod/store"}
+		]
+	}`
+	var gotPath, gotMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotMethod = r.URL.Path, r.Method
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(payload))
+	}))
+	defer srv.Close()
+
+	pg, err := New(srv.URL, "").PackageGraph(context.Background(), "pid")
+	if err != nil {
+		t.Fatalf("PackageGraph: %v", err)
+	}
+	if gotMethod != http.MethodGet || gotPath != "/v1/projects/pid/graph/packages" {
+		t.Errorf("called %s %s, want GET /v1/projects/pid/graph/packages", gotMethod, gotPath)
+	}
+	if pg.Status != "ok" || len(pg.Nodes) != 2 || len(pg.Edges) != 1 {
+		t.Fatalf("unexpected decode: %+v", pg)
+	}
+	if pg.Nodes[0].Package != "mod/store" || pg.Nodes[0].InDegree != 5 || pg.Nodes[0].OutDegree != 1 {
+		t.Errorf("node[0] = %+v", pg.Nodes[0])
+	}
+	if pg.Nodes[0].PageRank == 0 {
+		t.Errorf("page_rank not decoded: %+v", pg.Nodes[0])
+	}
+	if pg.Edges[0] != (PackageGraphEdge{FromPackage: "mod/cmd", ToPackage: "mod/store"}) {
+		t.Errorf("edge[0] = %+v", pg.Edges[0])
+	}
+}

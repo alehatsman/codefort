@@ -179,6 +179,7 @@ func (s *Server) apiHandler() http.Handler {
 
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel", s.handleIntel)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/overview", s.handleIntelOverview)
+	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/package-graph", s.handleIntelPackageGraph)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/file-summary", s.handleIntelFileSummary)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/summaries", s.handleIntelSummaries)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/intel/search", s.handleIntelSearch)

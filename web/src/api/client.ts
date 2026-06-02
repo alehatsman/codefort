@@ -34,6 +34,7 @@ import type {
   Intel,
   IntelFileSummary,
   IntelOverview,
+  IntelPackageGraph,
   IntelSummaries,
   IntelSearchInput,
   IntelSearchResult,
@@ -259,6 +260,8 @@ export const api = {
   getIntel: (owner: string, repo: string) => request<Intel>(`/api/repos/${owner}/${repo}/intel`),
   getIntelOverview: (owner: string, repo: string) =>
     request<IntelOverview>(`/api/repos/${owner}/${repo}/intel/overview`),
+  getIntelPackageGraph: (owner: string, repo: string) =>
+    request<IntelPackageGraph>(`/api/repos/${owner}/${repo}/intel/package-graph`),
   getIntelFileSummary: (owner: string, repo: string, path: string) =>
     request<IntelFileSummary>(
       `/api/repos/${owner}/${repo}/intel/file-summary?path=${encodeURIComponent(path)}`

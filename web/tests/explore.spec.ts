@@ -62,6 +62,15 @@ async function mockIndexed(page: import("@playwright/test").Page) {
       body: JSON.stringify({ summaries: {} }),
     })
   )
+  // No package graph by default → the map uses the path-name fallback. A later
+  // page.route for this pattern (the graph test below) overrides this.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/package-graph$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "no-graph", nodes: [], edges: [] }),
+    })
+  )
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/tree-commits(\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,
@@ -100,6 +109,82 @@ test("Explore: hero summary, layered package map, and hotspots render", async ({
   const hotspots = page.locator(".explore-section", { hasText: "Where work is happening" })
   await expect(hotspots).toBeVisible()
   await expect(hotspots.locator(".hotspot__path").first()).toHaveText("internal/server")
+})
+
+// dex's real package import DAG: cmd/demo → internal/server → internal/storage.
+// Import paths share the module prefix github.com/acme/demo, so the UI maps
+// each to its repo-relative dir to join summaries and link into the tree.
+const PACKAGE_GRAPH = {
+  status: "ok",
+  nodes: [
+    { package: "github.com/acme/demo/cmd/demo", in_degree: 0, out_degree: 1, page_rank: 0.02 },
+    {
+      package: "github.com/acme/demo/internal/server",
+      in_degree: 1,
+      out_degree: 1,
+      page_rank: 0.03,
+    },
+    {
+      package: "github.com/acme/demo/internal/storage",
+      in_degree: 1,
+      out_degree: 0,
+      page_rank: 0.05,
+    },
+  ],
+  edges: [
+    { from_package: "github.com/acme/demo/cmd/demo", to_package: "github.com/acme/demo/internal/server" },
+    {
+      from_package: "github.com/acme/demo/internal/server",
+      to_package: "github.com/acme/demo/internal/storage",
+    },
+  ],
+}
+
+test("Explore: package map layers by dex import graph with degree + cross-links", async ({
+  page,
+}) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockIndexed(page)
+  // Override the default no-graph stub with a real import DAG (last route wins).
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/package-graph$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(PACKAGE_GRAPH),
+    })
+  )
+
+  await page.goto("/alice/demo/explore")
+
+  // Topological layers replace the path-name buckets: entry points on top,
+  // foundation at the bottom — and the regex labels are gone.
+  await expect(page.locator(".pkg-layer__name").filter({ hasText: "Entry points" })).toBeVisible()
+  await expect(page.locator(".pkg-layer__name").filter({ hasText: "Foundation" })).toBeVisible()
+  await expect(page.locator(".pkg-layer__name").filter({ hasText: "HTTP / API" })).toHaveCount(0)
+
+  // The foundation card is internal/storage (in-degree 1, out-degree 0); its
+  // degree badge reflects the import counts. Scope by the card's own path so
+  // cards that merely cross-link to internal/storage don't match.
+  const storage = page.locator(".pkg-card", {
+    has: page.locator(".pkg-card__path", { hasText: "internal/storage" }),
+  })
+  await expect(storage.locator(".pkg-card__degree")).toHaveText("←1 →0")
+
+  // internal/server cross-links to the package it uses — a real navigable link
+  // into that package's tree, not a flat list. Expand the card (details) so
+  // the dep rows are revealed.
+  const server = page.locator(".pkg-card", {
+    has: page.locator(".pkg-card__path", { hasText: "internal/server" }),
+  })
+  await server.locator(".pkg-card__summary").click()
+  const usesLink = server
+    .locator(".pkg-card__deprow", { hasText: "uses" })
+    .getByRole("link", { name: "internal/storage" })
+  await expect(usesLink).toHaveAttribute("href", "/alice/demo/tree/internal/storage")
+
+  // The summary from the overview join still rides on the card.
+  await expect(server.locator(".pkg-card__preview")).toContainText("HTTP server")
 })
 
 test("Explore: ask box defaults to Ask; Advanced reveals the mode picker", async ({ page }) => {

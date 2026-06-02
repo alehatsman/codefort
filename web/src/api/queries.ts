@@ -40,6 +40,7 @@ export const keys = {
   comments: (owner: string, repo: string, n: number) => ["comments", owner, repo, n] as const,
   intel: (owner: string, repo: string) => ["intel", owner, repo] as const,
   intelOverview: (owner: string, repo: string) => ["intelOverview", owner, repo] as const,
+  intelPackageGraph: (owner: string, repo: string) => ["intelPackageGraph", owner, repo] as const,
   intelFileSummary: (owner: string, repo: string, path: string) =>
     ["intelFileSummary", owner, repo, path] as const,
   intelSummaries: (owner: string, repo: string) => ["intelSummaries", owner, repo] as const,
@@ -305,6 +306,18 @@ export function useIntelOverview(owner: string, repo: string, enabled: boolean) 
     queryFn: () => api.getIntelOverview(owner, repo),
     // Two dex round trips per fetch — only run when we know dex is up
     // and this repo is indexed (gated on useIntel's found flag).
+    enabled: enabled && !!owner && !!repo,
+    staleTime: 5 * 60_000,
+  })
+}
+
+// The internal package import DAG dex computed for the repo — backs the
+// Explore "Map of the codebase" layered ranking. One cheap (no-LLM) dex call,
+// gated on dex up + repo indexed and cached 5m alongside the overview.
+export function useIntelPackageGraph(owner: string, repo: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.intelPackageGraph(owner, repo),
+    queryFn: () => api.getIntelPackageGraph(owner, repo),
     enabled: enabled && !!owner && !!repo,
     staleTime: 5 * 60_000,
   })

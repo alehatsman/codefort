@@ -2,11 +2,19 @@ import { useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { useMutation, useQueries } from "@tanstack/react-query"
 import { api } from "../api/client"
-import { keys, useIntel, useIntelOverview, useIntelSummaries, useRepo } from "../api/queries"
+import {
+  keys,
+  useIntel,
+  useIntelOverview,
+  useIntelPackageGraph,
+  useIntelSummaries,
+  useRepo,
+} from "../api/queries"
 import OverviewCard from "../components/OverviewCard"
 import { absoluteTime, timeAgo } from "../lib/timeAgo"
 import type {
   Commit,
+  IntelPackageGraph,
   IntelPackageSummary,
   IntelProject,
   IntelSearchKind,
@@ -29,6 +37,7 @@ export default function ExplorePage() {
   const intelQ = useIntel(owner, repo)
   const isIndexed = !!(intelQ.data?.enabled && intelQ.data?.found)
   const overviewQ = useIntelOverview(owner, repo, isIndexed)
+  const packageGraphQ = useIntelPackageGraph(owner, repo, isIndexed)
   const summariesQ = useIntelSummaries(owner, repo, isIndexed)
 
   const packages = overviewQ.data?.packages ?? []
@@ -100,6 +109,7 @@ export default function ExplorePage() {
             owner={r.owner}
             repo={r.name}
             packages={packages}
+            graph={packageGraphQ.data}
             lastCommitByPath={lastCommitByPath}
             loading={overviewQ.isLoading}
             error={overviewQ.error as Error | null}
@@ -280,21 +290,28 @@ function layerOf(path: string): (typeof LAYER_ORDER)[number] {
   return "Other"
 }
 
-function PackageMap({
-  owner,
-  repo,
-  packages,
-  lastCommitByPath,
-  loading,
-  error,
-}: {
+interface MapProps {
   owner: string
   repo: string
   packages: IntelPackageSummary[]
+  graph?: IntelPackageGraph
   lastCommitByPath: Record<string, Commit>
   loading: boolean
   error: Error | null
-}) {
+}
+
+// PackageMap prefers dex's real package import DAG (graph-driven layering +
+// cross-links). When dex returns no graph — a non-Go or un-graphed repo — it
+// falls back to the path-name grouping so those repos still render a map.
+function PackageMap(props: MapProps) {
+  const { graph } = props
+  if (graph && graph.status === "ok" && graph.nodes.length > 0) {
+    return <GraphPackageMap {...props} graph={graph} />
+  }
+  return <FallbackPackageMap {...props} />
+}
+
+function FallbackPackageMap({ owner, repo, packages, lastCommitByPath, loading, error }: MapProps) {
   const groups = useMemo(() => {
     const byLayer = new Map<string, IntelPackageSummary[]>()
     for (const p of packages) {
@@ -340,6 +357,262 @@ function PackageMap({
       </div>
     </section>
   )
+}
+
+/* ── Graph-driven package map ────────────────────────────────────────────
+   dex's package import DAG is the real structure: rank by in-degree (how
+   load-bearing a package is), layer by import depth (foundation at the
+   bottom, entry points on top), and cross-link each card to the internal
+   packages it uses (→) and is used by (←). Summaries + git recency from the
+   existing joins still ride on each card. */
+
+interface PkgRef {
+  label: string
+  repoRel: string
+  local: boolean // false when we can't map the import path to a repo dir
+}
+
+interface PkgCard extends PkgRef {
+  pkg: string
+  summary: string
+  commit?: Commit
+  inDegree: number
+  outDegree: number
+  uses: PkgRef[]
+  usedBy: PkgRef[]
+}
+
+interface Tier {
+  depth: number
+  label: string
+  cards: PkgCard[]
+}
+
+function GraphPackageMap({
+  owner,
+  repo,
+  packages,
+  graph,
+  lastCommitByPath,
+  loading,
+  error,
+}: MapProps & { graph: IntelPackageGraph }) {
+  const tiers = useMemo(
+    () => buildTiers(graph, packages, lastCommitByPath),
+    [graph, packages, lastCommitByPath]
+  )
+
+  if (loading) return <div className="loading">Loading map…</div>
+  if (error) return <div className="error">{error.message}</div>
+  if (tiers.length === 0) return null
+
+  return (
+    <section className="explore-section">
+      <h2 className="explore-section__heading">
+        Map of the codebase{" "}
+        <span className="muted small">
+          ({graph.nodes.length} packages · {graph.edges.length} import edges)
+        </span>
+      </h2>
+      <p className="pkg-map__legend muted small">
+        Layered by import depth — entry points on top, foundation below. Each card shows how many
+        internal packages use it (←) and that it uses (→).
+      </p>
+      <div className="pkg-map">
+        {tiers.map((tier) => (
+          <div key={tier.depth} className="pkg-layer">
+            <h3 className="pkg-layer__name">
+              {tier.label} <span className="muted small">({tier.cards.length})</span>
+            </h3>
+            <div className="pkg-layer__cards">
+              {tier.cards.map((c) => (
+                <GraphPackageCard key={c.pkg} owner={owner} repo={repo} card={c} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function GraphPackageCard({ owner, repo, card }: { owner: string; repo: string; card: PkgCard }) {
+  return (
+    <details className="pkg-card">
+      <summary className="pkg-card__summary">
+        <span className="pkg-card__path">{card.label}</span>
+        <span
+          className="pkg-card__degree muted small"
+          title={`used by ${card.inDegree} · uses ${card.outDegree} internal packages`}
+        >
+          ←{card.inDegree} →{card.outDegree}
+        </span>
+        {card.commit && (
+          <span className="pkg-card__when muted small" title={absoluteTime(card.commit.date)}>
+            {timeAgo(card.commit.date)}
+          </span>
+        )}
+        {card.summary && (
+          <span className="pkg-card__preview muted small">{firstLine(card.summary)}</span>
+        )}
+      </summary>
+      {card.summary && <div className="pkg-card__body">{card.summary}</div>}
+      {(card.usedBy.length > 0 || card.uses.length > 0) && (
+        <div className="pkg-card__deps">
+          {card.usedBy.length > 0 && (
+            <div className="pkg-card__deprow">
+              <span className="pkg-card__deplabel muted small">used by ←</span>
+              {card.usedBy.map((r) => (
+                <DepLink key={r.label} owner={owner} repo={repo} dep={r} />
+              ))}
+            </div>
+          )}
+          {card.uses.length > 0 && (
+            <div className="pkg-card__deprow">
+              <span className="pkg-card__deplabel muted small">uses →</span>
+              {card.uses.map((r) => (
+                <DepLink key={r.label} owner={owner} repo={repo} dep={r} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {card.local && card.repoRel !== "." && (
+        <Link className="pkg-card__browse" to={`/${owner}/${repo}/tree/${card.repoRel}`}>
+          Browse files →
+        </Link>
+      )}
+    </details>
+  )
+}
+
+// DepLink renders a cross-link to another package's files, or plain text when
+// the import path couldn't be mapped to a repo directory (mixed-language /
+// vendored paths).
+function DepLink({ owner, repo, dep }: { owner: string; repo: string; dep: PkgRef }) {
+  if (!dep.local) return <span className="pkg-dep pkg-dep--plain">{dep.label}</span>
+  return (
+    <Link className="pkg-dep" to={`/${owner}/${repo}/tree/${dep.repoRel}`}>
+      {dep.label}
+    </Link>
+  )
+}
+
+// buildTiers turns dex's package graph into depth-layered, in-degree-ranked
+// cards joined to summaries + recency. Pure so it unit/UI-tests cleanly.
+function buildTiers(
+  graph: IntelPackageGraph,
+  packages: IntelPackageSummary[],
+  lastCommitByPath: Record<string, Commit>
+): Tier[] {
+  const prefix = commonPathPrefix(graph.nodes.map((n) => n.package))
+  const refOf = (pkg: string): PkgRef => {
+    if (prefix && pkg === prefix) return { label: ".", repoRel: ".", local: true }
+    if (prefix && pkg.startsWith(`${prefix}/`)) {
+      const repoRel = pkg.slice(prefix.length + 1)
+      return { label: repoRel, repoRel, local: true }
+    }
+    // No module-prefix match (mixed-language fixtures, vendored paths): keep
+    // the import path as the label and mark it non-navigable.
+    return { label: pkg, repoRel: pkg, local: false }
+  }
+
+  const summaryByPath = new Map(packages.map((p) => [p.path, p.summary]))
+  const uses = new Map<string, string[]>()
+  const usedBy = new Map<string, string[]>()
+  for (const e of graph.edges) {
+    pushTo(uses, e.from_package, e.to_package)
+    pushTo(usedBy, e.to_package, e.from_package)
+  }
+
+  const depth = computeDepths(graph.nodes, uses)
+  const maxDepth = graph.nodes.reduce((m, n) => Math.max(m, depth.get(n.package) ?? 0), 0)
+  const byLabel = (a: PkgRef, b: PkgRef) => a.label.localeCompare(b.label)
+
+  const cards: PkgCard[] = graph.nodes.map((n) => {
+    const ref = refOf(n.package)
+    return {
+      ...ref,
+      pkg: n.package,
+      summary: ref.local ? (summaryByPath.get(ref.repoRel) ?? "") : "",
+      commit: ref.local ? lastCommitByPath[ref.repoRel] : undefined,
+      inDegree: n.in_degree,
+      outDegree: n.out_degree,
+      uses: (uses.get(n.package) ?? []).map(refOf).sort(byLabel),
+      usedBy: (usedBy.get(n.package) ?? []).map(refOf).sort(byLabel),
+    }
+  })
+
+  const byDepth = new Map<number, PkgCard[]>()
+  for (const c of cards) {
+    const d = depth.get(c.pkg) ?? 0
+    const list = byDepth.get(d) ?? []
+    list.push(c)
+    byDepth.set(d, list)
+  }
+  return [...byDepth.keys()]
+    .sort((a, b) => b - a) // entry points (deep) first, foundation last
+    .map((d) => ({
+      depth: d,
+      label: tierLabel(d, maxDepth),
+      cards: (byDepth.get(d) as PkgCard[]).sort(
+        (a, b) => b.inDegree - a.inDegree || a.label.localeCompare(b.label)
+      ),
+    }))
+}
+
+// computeDepths assigns each package the length of its longest import chain
+// down to a leaf — 0 for packages that import no internal package (the
+// foundation). Go's import graph is acyclic; the visiting set guards against
+// a cycle anyway so a malformed graph can't loop forever.
+function computeDepths(
+  nodes: IntelPackageGraph["nodes"],
+  uses: Map<string, string[]>
+): Map<string, number> {
+  const depth = new Map<string, number>()
+  const visiting = new Set<string>()
+  const dfs = (pkg: string): number => {
+    const memo = depth.get(pkg)
+    if (memo !== undefined) return memo
+    if (visiting.has(pkg)) return 0
+    visiting.add(pkg)
+    let d = 0
+    for (const dep of uses.get(pkg) ?? []) d = Math.max(d, 1 + dfs(dep))
+    visiting.delete(pkg)
+    depth.set(pkg, d)
+    return d
+  }
+  for (const n of nodes) dfs(n.package)
+  return depth
+}
+
+function tierLabel(depth: number, maxDepth: number): string {
+  if (maxDepth === 0) return "Packages" // no internal import edges discovered
+  if (depth === maxDepth) return "Entry points"
+  if (depth === 0) return "Foundation"
+  return `Layer ${depth}`
+}
+
+// commonPathPrefix returns the longest segment-aligned shared prefix of the
+// import paths — the Go module path for a single-module repo, used to map an
+// import path to its repo-relative directory.
+function commonPathPrefix(paths: string[]): string {
+  if (paths.length === 0) return ""
+  let parts = paths[0].split("/")
+  for (const p of paths) {
+    const ps = p.split("/")
+    let i = 0
+    while (i < parts.length && i < ps.length && parts[i] === ps[i]) i++
+    parts = parts.slice(0, i)
+    if (parts.length === 0) return ""
+  }
+  return parts.join("/")
+}
+
+function pushTo(m: Map<string, string[]>, key: string, val: string) {
+  const a = m.get(key)
+  if (a) a.push(val)
+  else m.set(key, [val])
 }
 
 function PackageCard({

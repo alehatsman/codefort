@@ -122,6 +122,39 @@ func (s *Server) handleIntelOverview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, ov)
 }
 
+// handleIntelPackageGraph returns the internal package import DAG dex
+// computed for the repo, backing the Explore "Map of the codebase" so it
+// can rank and layer packages by real import structure. A non-Go or
+// un-graphed project comes back as a 200 with status "no-graph" and no
+// nodes (not an error) — the UI degrades to its flat package listing.
+func (s *Server) handleIntelPackageGraph(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+		return
+	}
+	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
+	if !s.dex.Enabled() {
+		writeError(w, http.StatusServiceUnavailable, "dex integration not configured")
+		return
+	}
+	proj, err := s.dex.ResolveProject(r.Context(), repo)
+	if errors.Is(err, dex.ErrProjectNotFound) {
+		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
+		return
+	}
+	if err != nil {
+		s.logger.Error("dex resolve project", "err", err)
+		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+		return
+	}
+	pg, err := s.dex.PackageGraph(r.Context(), proj.ID)
+	if err != nil {
+		s.logger.Error("dex package graph", "err", err)
+		writeError(w, http.StatusBadGateway, "dex package graph failed: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, pg)
+}
+
 // fileSummaryResponse is the payload for the per-file dex summary surfaced
 // on the Code tab's blob view. Summary is empty when dex has no summary for
 // the file (the common case — only some files are summarized), which the UI

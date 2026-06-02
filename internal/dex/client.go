@@ -365,6 +365,50 @@ func (c *Client) Callees(ctx context.Context, projectID, name string, k int) (*S
 	return c.callEdge(ctx, projectID, "callees", name, k)
 }
 
+// PackageGraph is the whole internal package import DAG dex computed for a
+// project: one node per internal package with import-graph centrality, and
+// the internal-only import edges between them. Field names match dex's
+// /graph/packages wire shape. Distinct from Graph above, which is the
+// per-symbol call-graph context returned alongside an /ask answer.
+type PackageGraph struct {
+	Status string             `json:"status"`
+	Hint   string             `json:"hint,omitempty"`
+	Nodes  []PackageGraphNode `json:"nodes"`
+	Edges  []PackageGraphEdge `json:"edges"`
+}
+
+// PackageGraphNode is one internal package. InDegree counts the distinct
+// internal packages that import it (how load-bearing it is); OutDegree the
+// distinct internal packages it imports; PageRank ranks it within the
+// import DAG (foundation floats up). All three are derived by dex from the
+// import edges — the call-graph centrality columns are zero on packages.
+type PackageGraphNode struct {
+	Package   string  `json:"package"`
+	InDegree  int     `json:"in_degree"`
+	OutDegree int     `json:"out_degree"`
+	PageRank  float64 `json:"page_rank"`
+}
+
+// PackageGraphEdge is one internal import: FromPackage imports ToPackage.
+type PackageGraphEdge struct {
+	FromPackage string `json:"from_package"`
+	ToPackage   string `json:"to_package"`
+}
+
+// PackageGraph fetches the internal package import DAG dex computed for the
+// project (GET /v1/projects/{id}/graph/packages). It lets the Explore "Map
+// of the codebase" rank and layer packages by real import structure instead
+// of guessing from path names. A non-Go or un-graphed project comes back
+// with Status "no-graph" and no nodes — the caller should fall back to its
+// flat summary listing.
+func (c *Client) PackageGraph(ctx context.Context, projectID string) (*PackageGraph, error) {
+	var out PackageGraph
+	if err := c.do(ctx, http.MethodGet, "/v1/projects/"+projectID+"/graph/packages", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *Client) callEdge(ctx context.Context, projectID, edge, name string, k int) (*SearchResult, error) {
 	body := map[string]any{"name": name}
 	if k > 0 {

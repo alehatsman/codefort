@@ -2583,6 +2583,43 @@ h3 {
   text-decoration: none;
 }
 
+/* Graph-driven map extras: in/out-degree badge + internal dependency links. */
+.pkg-map__legend {
+  margin: 0 0 var(--space-3);
+}
+.pkg-card__degree {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.pkg-card__deps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--space-3) var(--space-2);
+}
+.pkg-card__deprow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+}
+.pkg-card__deplabel {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+}
+.pkg-dep {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--accent);
+  text-decoration: none;
+}
+.pkg-dep:hover {
+  text-decoration: underline;
+}
+.pkg-dep--plain {
+  color: var(--fg-muted);
+}
+
 /* Hotspots: the most-recently-touched packages, newest first. */
 .hotspots {
   list-style: none;
