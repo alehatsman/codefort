@@ -19,7 +19,7 @@ import (
 // plane and merge endpoint, mirroring `moongit issue` / `moongit review`.
 func runPR(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit pr <create|list|show|merge>")
+		return errors.New("usage: moongit pr <create|list|show|merge|close|reopen>")
 	}
 	switch args[0] {
 	case "create":
@@ -30,6 +30,10 @@ func runPR(args []string) error {
 		return runPRShow(args[1:])
 	case "merge":
 		return runPRMerge(args[1:])
+	case "close":
+		return runPRSetState(args[1:], api.PRClosed)
+	case "reopen":
+		return runPRSetState(args[1:], api.PROpen)
 	default:
 		return fmt.Errorf("unknown pr subcommand: %s", args[0])
 	}
@@ -250,5 +254,49 @@ func runPRMerge(args []string) error {
 		sha = sha[:12]
 	}
 	fmt.Printf("#%d  merged (%s) into %s @ %s\n", res.Number, how, res.BaseRef, sha)
+	return nil
+}
+
+// runPRSetState backs `pr close` (→ closed) and `pr reopen` (→ open): a state
+// flip over the PR update endpoint (PATCH). Transitioning to "merged" is not
+// reachable here — that's the merge endpoint — and the server owns transition
+// validity (e.g. a merged PR can't be reopened), so we just surface its error.
+func runPRSetState(args []string, state api.PRState) error {
+	verb := "close"
+	if state == api.PROpen {
+		verb = "reopen"
+	}
+	if len(args) < 1 {
+		return fmt.Errorf("usage: moongit pr %s <number>", verb)
+	}
+	num, err := strconv.Atoi(args[0])
+	if err != nil || num <= 0 {
+		return fmt.Errorf("invalid pull request number: %s", args[0])
+	}
+	if len(args) > 1 {
+		return fmt.Errorf("unexpected extra args: %v", args[1:])
+	}
+
+	target, err := discoverTarget()
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(api.UpdatePullRequest{State: &state})
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/pulls/%d", target.server, target.owner, target.repo, num)
+	resp, raw, err := httpDo(http.MethodPatch, endpoint, bytes.NewReader(payload), "application/json")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	var pr api.PullRequest
+	if err := json.Unmarshal(raw, &pr); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	fmt.Printf("#%d  %s  [%s]\n", pr.Number, pr.Title, pr.State)
 	return nil
 }
