@@ -1196,6 +1196,58 @@ a.file-tree__commit:hover {
   font-size: var(--text-base);
 }
 
+/* Tooltip (@/ui Tooltip) — a hover/focus bubble, CSS-only reveal. The bubble
+   inverts fg/bg so it reads on either theme; pointer-events:none keeps it from
+   stealing hover. */
+.tooltip {
+  position: relative;
+  display: inline-flex;
+}
+.tooltip__bubble {
+  position: absolute;
+  z-index: 20;
+  padding: 2px var(--space-2);
+  background: var(--fg);
+  color: var(--bg);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.1s ease;
+}
+.tooltip:hover .tooltip__bubble,
+.tooltip:focus-within .tooltip__bubble {
+  opacity: 1;
+  visibility: visible;
+}
+.tooltip__bubble--top {
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: var(--space-1);
+}
+.tooltip__bubble--bottom {
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: var(--space-1);
+}
+.tooltip__bubble--left {
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-right: var(--space-1);
+}
+.tooltip__bubble--right {
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: var(--space-1);
+}
+
 .badge--todo {
   background: var(--state-todo-bg);
   color: var(--state-todo);

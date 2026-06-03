@@ -22,6 +22,7 @@ test("dev gallery renders every primitive section", async ({ page }) => {
     "Table",
     "Sidebar / SidebarSection",
     "Comment",
+    "Tooltip",
     "FilterChip",
     "Card",
     "Spinner",
@@ -35,6 +36,27 @@ test("dev gallery renders every primitive section", async ({ page }) => {
 
   // The primary button variant is present.
   await expect(page.getByRole("button", { name: "primary", exact: true })).toBeVisible()
+})
+
+test("dev gallery Tooltip reveals on focus and links via aria-describedby", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/dev/ui")
+
+  // role-based queries skip hidden nodes; use a plain locator so we can assert
+  // on the bubble while it's still CSS-hidden.
+  const tip = page.locator('[role="tooltip"]').filter({ hasText: "Hover or focus me" })
+  await expect(tip).toBeHidden()
+
+  const tipId = await tip.getAttribute("id")
+  expect(tipId).toBeTruthy()
+  const trigger = page.getByRole("button", { name: "Top (default)" })
+  // The trigger is linked to the bubble for screen readers.
+  await expect(trigger).toHaveAttribute("aria-describedby", tipId ?? "")
+
+  await trigger.focus()
+  await expect(tip).toBeVisible()
+  await trigger.blur()
+  await expect(tip).toBeHidden()
 })
 
 test("dev gallery shows the layout primitives", async ({ page }) => {

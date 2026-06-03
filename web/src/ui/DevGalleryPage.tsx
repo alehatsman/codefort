@@ -31,6 +31,7 @@ import {
   Tabs,
   Textarea,
   Toolbar,
+  Tooltip,
 } from "@/ui"
 import type { BadgeState, ButtonVariant, StatusGlyph } from "@/ui"
 
@@ -62,6 +63,7 @@ export default function DevGalleryPage() {
       <TableSection />
       <SidebarSectionDemo />
       <CommentSection />
+      <TooltipSection />
       <StatusIconSection />
       <SegmentedControlSection />
       <ChipsSection />
@@ -448,6 +450,22 @@ function CommentSection() {
         </Comment>
       </ul>
     </section>
+  )
+}
+
+function TooltipSection() {
+  return (
+    <Section title="Tooltip">
+      <Tooltip label="Hover or focus me">
+        <Button>Top (default)</Button>
+      </Tooltip>
+      <Tooltip label="Below the trigger" placement="bottom">
+        <Button>Bottom</Button>
+      </Tooltip>
+      <Tooltip label="Copied to clipboard" placement="right">
+        <Button variant="ghost">Right</Button>
+      </Tooltip>
+    </Section>
   )
 }
 
