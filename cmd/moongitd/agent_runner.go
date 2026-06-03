@@ -207,7 +207,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		mcpPath:     mcpPath,
 	}
 	turnCtx, h := r.registerAgentTurn(parent, run.ID)
-	status, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, 1, in)
+	status, finalText, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, 1, in)
 	r.unregisterAgentTurn(run.ID, h)
 	elog.Close()
 
@@ -228,15 +228,14 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		return
 	}
 
-	// A spec-verify run is one-shot: the single turn produced the classification
-	// (it rides the transcript for #220 to parse + stamp). Finalize and tear the
-	// container down now — no awaiting_input park, no issue handoff.
+	// A spec-verify run is one-shot: the single turn produced the classification.
+	// Parse it, stamp + record the result, and finalize — no awaiting_input park,
+	// no issue handoff.
 	if verify {
-		zero := 0
-		r.finishJob(job.ID, storage.JobSuccess, &zero)
-		r.tearDownAgent(run.ID, job.ID, workDir)
-		r.finish(run, storage.RunSuccess)
-		log.Info("spec-verify run finished", "turn1_status", status)
+		r.finalizeVerifyRun(parent, verifyFinalize{
+			run: run, jobID: job.ID, owner: owner, name: name,
+			workDir: workDir, specContent: specContent, finalText: finalText, turnStatus: status,
+		})
 		return
 	}
 
@@ -328,7 +327,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 		resume:    true,
 	}
 	turnCtx, h := r.registerAgentTurn(parent, run.ID)
-	status, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, turn.Seq+1, in)
+	status, _, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, turn.Seq+1, in)
 	r.unregisterAgentTurn(run.ID, h)
 	elog.Close()
 
@@ -372,7 +371,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 // cancelled), but does not itself finalize the run or job — the caller decides
 // whether to park or fail. The executor decides what runs (claude vs mooncake
 // agent) and how to translate its output.
-func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession, elog *ci.EventLog, exec agentExecutor, turnNum int, in turnInput) (status string, execErr error) {
+func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession, elog *ci.EventLog, exec agentExecutor, turnNum int, in turnInput) (status string, finalText string, execErr error) {
 	ctx := parent
 	if r.cfg.AgentTurnTimeout > 0 {
 		var cancel context.CancelFunc
@@ -416,9 +415,10 @@ func (r *ciRunner) runAgentTurn(parent context.Context, stream streamingSession,
 		turnData["num_turns"] = result.NumTurns
 		turnData["duration_ms"] = result.DurationMS
 		turnData["cost_usd"] = result.TotalCostUSD
+		finalText = result.FinalText
 	}
 	r.emit(elog, ci.EventAgentTurnCompleted, turnData)
-	return status, execErr
+	return status, finalText, execErr
 }
 
 // reapExpiredAgents finalizes agent runs parked past their lifetime cap, tearing

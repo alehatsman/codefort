@@ -16,6 +16,9 @@ type claudeResult struct {
 	NumTurns     int     `json:"num_turns"`
 	DurationMS   int     `json:"duration_ms"`
 	TotalCostUSD float64 `json:"total_cost_usd"`
+	// Result is claude's final assistant text — the spec-verify run's structured
+	// output is read from here (#220). Empty for non-success subtypes.
+	Result string `json:"result"`
 }
 
 // translateClaudeLine maps one line of claude's stream-json (NDJSON) output onto

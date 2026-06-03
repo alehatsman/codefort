@@ -78,6 +78,9 @@ type turnResult struct {
 	NumTurns     int     // claude only
 	DurationMS   int     // claude only
 	TotalCostUSD float64 // claude only
+	// FinalText is the agent's final assistant message — the verify run reads
+	// its structured JSON from here (#220). claude only; "" otherwise.
+	FinalText string
 }
 
 // agentExecutor is the per-model seam: it builds the command for a turn
@@ -141,5 +144,6 @@ func (claudeExecutor) Translate(line []byte) (string, map[string]any, *turnResul
 		NumTurns:     cr.NumTurns,
 		DurationMS:   cr.DurationMS,
 		TotalCostUSD: cr.TotalCostUSD,
+		FinalText:    cr.Result,
 	}
 }
