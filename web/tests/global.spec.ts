@@ -99,6 +99,44 @@ async function mockAggregates(page: import("@playwright/test").Page) {
   })
 }
 
+test("global pulls page shares the per-repo state-filter chips (with icons)", async ({ page }) => {
+  await mockApi(page)
+  await page.route(/\/api\/pulls(\?.*)?$/, (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
+  )
+
+  await page.goto("/pulls")
+  // The shared PullsFilters renders FilterChip + PRStateIcon, so each chip
+  // carries its glyph here just like the per-repo page — not a bare checkbox.
+  await expect(page.locator(".filter-row .chip .state-icon--merged")).toBeVisible()
+  await expect(page.locator(".filter-row .chip .state-icon")).toHaveCount(3)
+})
+
+test("open a pull request from the global pulls popup", async ({ page }) => {
+  const state = await mockApi(page, { branches: ["main", "feature"] })
+  await page.route(/\/api\/pulls(\?.*)?$/, (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
+  )
+
+  await page.goto("/pulls")
+
+  // Pick the project first, then its branches — the popup loads refs per repo.
+  await page.getByRole("button", { name: "+ New pr" }).click()
+  await page.getByLabel("Project").selectOption("alice/demo")
+  await page.getByLabel("Head branch").selectOption("feature")
+  await page.getByLabel("Title").fill("Cross-repo PR")
+  await page.getByRole("button", { name: "Create pull request" }).click()
+
+  // Recorded against the chosen repo and lands on its PR detail route.
+  await expect(page).toHaveURL(/\/alice\/demo\/pulls\/1$/)
+  expect(state.pulls).toHaveLength(1)
+  expect(state.pulls[0]).toMatchObject({
+    base_ref: "main",
+    head_ref: "feature",
+    title: "Cross-repo PR",
+  })
+})
+
 test("global nav links the cross-repo aggregate views", async ({ page }) => {
   await mockApi(page)
   await mockAggregates(page)

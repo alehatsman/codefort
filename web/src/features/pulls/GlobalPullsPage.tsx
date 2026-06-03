@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom"
 import "./pulls.css"
 import { useAllPulls } from "@/api/queries"
 import { PR_STATES, type PRState } from "@/api/types"
+import NewGlobalPullForm from "@/features/pulls/NewGlobalPullForm"
+import PullsFilters from "@/features/pulls/PullsFilters"
 import { EmptyState, ErrorMessage, Spinner } from "@/ui"
 
 const STATE_LABEL: Record<PRState, string> = {
@@ -72,31 +74,16 @@ export default function GlobalPullsPage() {
         <div className="issues__header-left">
           <h2>Pull requests</h2>
         </div>
+        <NewGlobalPullForm />
       </div>
 
-      <div className="filters">
-        <input
-          type="search"
-          className="list-search"
-          placeholder="Search title or body across all repos…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search pull requests"
-        />
-        <div className="filter-row">
-          <span className="filter-label">state:</span>
-          {PR_STATES.map((s) => (
-            <label key={s} className="chip">
-              <input
-                type="checkbox"
-                checked={activeStates.includes(s)}
-                onChange={() => toggleState(s)}
-              />
-              {s}
-            </label>
-          ))}
-        </div>
-      </div>
+      <PullsFilters
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search title or body across all repos…"
+        activeStates={activeStates}
+        onToggleState={toggleState}
+      />
 
       {isLoading && <Spinner />}
       <ErrorMessage error={error} />

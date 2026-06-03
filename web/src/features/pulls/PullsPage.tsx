@@ -4,8 +4,8 @@ import "./pulls.css"
 import { usePulls } from "@/api/queries"
 import { PR_STATES, type PRState } from "@/api/types"
 import OverviewCard from "@/shell/OverviewCard"
-import PRStateIcon from "@/features/pulls/PRStateIcon"
-import { Button, EmptyState, ErrorMessage, FilterChip, Spinner } from "@/ui"
+import PullsFilters from "@/features/pulls/PullsFilters"
+import { Button, EmptyState, ErrorMessage, Spinner } from "@/ui"
 
 const STATE_LABEL: Record<PRState, string> = {
   open: "open",
@@ -90,25 +90,12 @@ export default function PullsPage() {
         </Button>
       </div>
 
-      <div className="filters">
-        <input
-          type="search"
-          className="list-search"
-          placeholder="Search title or body…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search pull requests"
-        />
-        <div className="filter-row">
-          <span className="filter-label">state:</span>
-          {PR_STATES.map((s) => (
-            <FilterChip key={s} checked={activeStates.includes(s)} onChange={() => toggleState(s)}>
-              <PRStateIcon state={s} size={12} />
-              {s}
-            </FilterChip>
-          ))}
-        </div>
-      </div>
+      <PullsFilters
+        search={search}
+        onSearchChange={setSearch}
+        activeStates={activeStates}
+        onToggleState={toggleState}
+      />
 
       {isLoading && <Spinner />}
       {error && <ErrorMessage error={error} />}
