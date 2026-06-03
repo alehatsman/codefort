@@ -6,6 +6,8 @@
 # the static-analysis tools the gate needs).
 #
 # DAG:  quality      web        (two independent roots)
+#          \           /
+#           build-images (main only)
 #
 # `quality` runs the full Go gate via the shared go-quality module
 # (`mooncake task ci` → goq/ci; see tasks.yml). For the in-container mooncake to
@@ -18,6 +20,13 @@
 #   3. MOONCAKE_MODULE_INSECURE marks that host trusted for the http fetch.
 # The CI checkout is now a real working tree with .git (ci_runner.go), which the
 # gate's git-aware scripts (full.sh's `git rev-parse`) require.
+#
+# `build-images` rebuilds moongit-ci-dev:latest + moongit-agent:latest via the
+# host Docker daemon (docker_socket: true mounts /var/run/docker.sock). It only
+# runs on main after quality + web pass — no point rebuilding images off a
+# broken commit. Binaries baked into the agent image (mgit, dex, mooncake) are
+# compiled from the CI checkout; `mooncake task agent-image` handles that via
+# the agent-image task in tasks.yml.
 version: "1"
 on:
   push:
@@ -35,3 +44,21 @@ jobs:
     image: moongit-ci-dev:latest
     steps:
       - run: cd web && npm ci && npm run build
+
+  build-images:
+    image: moongit-ci-dev:latest
+    docker_socket: true
+    needs: [quality, web]
+    steps:
+      - shell:
+          # Clone sibling repos from the moongit server (anonymous HTTP).
+          # --vars overrides the default host paths that tasks.yml defaults to
+          # ("{{ home }}/projects/..."), which don't exist inside the container.
+          cmd: |
+            set -eu
+            git clone --depth=1 http://host.docker.internal:8080/alehatsman/mooncake.git /tmp/mooncake
+            git clone --depth=1 http://host.docker.internal:8080/alehatsman/dex.git /tmp/dex
+            mooncake task ci-images --vars '{"mooncake_src":"/tmp/mooncake"}'
+            mooncake task agent-image --vars '{"mooncake_src":"/tmp/mooncake","dex_src":"/tmp/dex"}'
+        env:
+          MOONCAKE_MODULE_INSECURE: host.docker.internal:8080

@@ -18,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/alehatsman/moongit/internal/ci"
@@ -82,7 +83,7 @@ type streamExecutor func(ctx context.Context, workDir string, argv []string, onL
 // docker-safe container name; workDir is the checked-out (bind-mountable)
 // workspace; image is the resolved container image (ignored by the host
 // session).
-type sessionFactory func(ctx context.Context, name, workDir, image string) (jobSession, error)
+type sessionFactory func(ctx context.Context, name, workDir, image string, extraVols []string) (jobSession, error)
 
 // ciRunner executes queued CI runs in-process, emitting the mooncake-shaped
 // event stream per job. Everything downstream (storage status, API, UI)
@@ -140,7 +141,7 @@ func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner 
 	}
 	if cfg.CIIsolation == "none" {
 		// Legacy path: steps run on the host as the moongitd user.
-		r.newSession = func(_ context.Context, _, workDir, _ string) (jobSession, error) {
+		r.newSession = func(_ context.Context, _, workDir, _ string, _ []string) (jobSession, error) {
 			return &hostSession{workDir: workDir, exec: runMooncakeStep, stream: runClaudeStreamHost}, nil
 		}
 		r.newAgentSession = func(_ context.Context, _, workDir, _ string, _ []string) (jobSession, error) {
@@ -152,8 +153,8 @@ func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner 
 		r.teardownContainer = func(string) {}
 	} else {
 		// Default: one throwaway container per job, steps run via docker exec.
-		r.newSession = func(ctx context.Context, name, workDir, image string) (jobSession, error) {
-			return openDockerSession(ctx, logger, name, workDir, image)
+		r.newSession = func(ctx context.Context, name, workDir, image string, extraVols []string) (jobSession, error) {
+			return openDockerSession(ctx, logger, name, workDir, image, extraVols)
 		}
 		// The agent's turn-1 container carries the per-run env + host reachability.
 		r.newAgentSession = func(ctx context.Context, name, workDir, image string, env []string) (jobSession, error) {
@@ -595,7 +596,11 @@ func (r *ciRunner) runJob(ctx context.Context, owner, repo string, runNum int, j
 	if image == "" {
 		image = r.cfg.CIDefaultImage
 	}
-	sess, err := r.newSession(ctx, containerName(jobID, jobName), workDir, image)
+	var extraVols []string
+	if job.DockerSocket {
+		extraVols = append(extraVols, "/var/run/docker.sock:/var/run/docker.sock")
+	}
+	sess, err := r.newSession(ctx, containerName(jobID, jobName), workDir, image, extraVols)
 	if err != nil {
 		// A shutdown mid-open cancels the session's context — interrupted, not a
 		// failure to provision the environment.
@@ -831,7 +836,7 @@ type dockerSession struct {
 // Host reachability (host.docker.internal -> the host gateway, same mapping the
 // agent path uses) lets a job reach this moongit — needed by `mooncake task ci`
 // to fetch the go-quality module over http from host.docker.internal:8080.
-func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, image string) (jobSession, error) {
+func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, image string, extraVols []string) (jobSession, error) {
 	args := []string{
 		"run", "-d", "--rm",
 		"--name", name,
@@ -839,9 +844,21 @@ func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, 
 		"-v", workDir + ":/work",
 		"-w", "/work",
 		"--add-host", "host.docker.internal:host-gateway",
-		"--entrypoint", "sleep",
-		image, "infinity",
 	}
+	for _, v := range extraVols {
+		args = append(args, "-v", v)
+		// When the Docker socket is mounted, add its owning GID so the
+		// container user can access the 0660 socket without knowing the
+		// group name inside the image.
+		if strings.HasPrefix(v, "/var/run/docker.sock:") {
+			if info, serr := os.Stat("/var/run/docker.sock"); serr == nil {
+				if st, ok := info.Sys().(*syscall.Stat_t); ok {
+					args = append(args, "--group-add", fmt.Sprintf("%d", st.Gid))
+				}
+			}
+		}
+	}
+	args = append(args, "--entrypoint", "sleep", image, "infinity")
 	out, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("docker run %s: %v (%s)", image, err, strings.TrimSpace(string(out)))
