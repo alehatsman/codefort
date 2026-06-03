@@ -275,6 +275,37 @@ test("Explore: package map falls back to in_degree-0 roots when dex omits is_mai
   await expect(page.locator(".pkg-layer__name").filter({ hasText: "Standalone" })).toHaveCount(0)
 })
 
+test("Explore: an oversized tier collapses its cards behind a toggle", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockIndexed(page)
+  // One main importing 16 sibling leaves — a plugin/handler fan-out. All 16
+  // land in one tier (> MAX_TIER_CARDS), which must collapse by default.
+  const leaves = Array.from({ length: 16 }, (_, i) => `github.com/acme/demo/internal/h${i}`)
+  const fanOut = {
+    status: "ok",
+    nodes: [
+      { package: "github.com/acme/demo/cmd/app", in_degree: 0, out_degree: 16, page_rank: 0.02, is_main: true },
+      ...leaves.map((p) => ({ package: p, in_degree: 1, out_degree: 0, page_rank: 0.01 })),
+    ],
+    edges: leaves.map((p) => ({ from_package: "github.com/acme/demo/cmd/app", to_package: p })),
+  }
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/package-graph$/, (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fanOut) })
+  )
+
+  await page.goto("/alice/demo/explore")
+
+  // The bulky tier's name + count stay visible (the spine), but its cards are
+  // hidden until the toggle is opened.
+  const fatLayer = page.locator(".pkg-layer", { has: page.locator(".pkg-layer__collapse") })
+  await expect(fatLayer.locator(".pkg-layer__name")).toContainText("(16)")
+  const aCard = fatLayer.locator(".pkg-card__path", { hasText: "internal/h0" })
+  await expect(aCard).toBeHidden()
+  await fatLayer.locator(".pkg-layer__collapse-summary").click()
+  await expect(aCard).toBeVisible()
+})
+
 test("Explore: ask box defaults to Ask; Advanced reveals the mode picker", async ({ page }) => {
   await seedToken(page)
   await mockApi(page)

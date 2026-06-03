@@ -411,6 +411,11 @@ interface MapModel {
   hiddenCount: number // isolated nodes (non-Go / un-graphed) left out
 }
 
+// A tier wider than this collapses its card grid behind a toggle. Deep graphs
+// with a plugin/handler fan-out pile dozens of siblings into one layer (e.g.
+// every action handler at the same import depth), which buries the spine.
+const MAX_TIER_CARDS = 14
+
 function GraphPackageMap({
   owner,
   repo,
@@ -445,18 +450,31 @@ function GraphPackageMap({
         it uses (→).
       </p>
       <div className="pkg-map">
-        {tiers.map((tier) => (
-          <div key={tier.rank} className="pkg-layer">
-            <h3 className="pkg-layer__name">
-              {tier.label} <span className="muted small">({tier.cards.length})</span>
-            </h3>
-            <div className="pkg-layer__cards">
-              {tier.cards.map((c) => (
-                <GraphPackageCard key={c.pkg} owner={owner} repo={repo} card={c} />
-              ))}
+        {tiers.map((tier) => {
+          const cards = tier.cards.map((c) => (
+            <GraphPackageCard key={c.pkg} owner={owner} repo={repo} card={c} />
+          ))
+          return (
+            <div key={tier.rank} className="pkg-layer">
+              <h3 className="pkg-layer__name">
+                {tier.label} <span className="muted small">({tier.cards.length})</span>
+              </h3>
+              {tier.cards.length > MAX_TIER_CARDS ? (
+                // Oversized tier (e.g. a plugin/handler fan-out): keep the
+                // layer name + count always visible so the spine stays
+                // scannable, but collapse the card grid behind a toggle.
+                <details className="pkg-layer__collapse">
+                  <summary className="pkg-layer__collapse-summary muted small">
+                    Show {tier.cards.length} packages
+                  </summary>
+                  <div className="pkg-layer__cards">{cards}</div>
+                </details>
+              ) : (
+                <div className="pkg-layer__cards">{cards}</div>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </section>
   )
