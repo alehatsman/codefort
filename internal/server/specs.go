@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/dex"
 	"github.com/alehatsman/moongit/internal/specs"
 	"github.com/alehatsman/moongit/internal/storage"
 )
@@ -300,14 +299,8 @@ func (s *Server) handleSearchSpecs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	proj, err := s.dex.ResolveProject(r.Context(), repo)
-	if errors.Is(err, dex.ErrProjectNotFound) {
-		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
-		return
-	}
-	if err != nil {
-		s.logger.Error("dex resolve project", "err", err)
-		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+	proj, ok2 := s.resolveDexProject(w, r, repo)
+	if !ok2 {
 		return
 	}
 

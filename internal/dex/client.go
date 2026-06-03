@@ -27,6 +27,10 @@ import (
 // project matches the repo name.
 var ErrProjectNotFound = errors.New("dex: no indexed project matches this repo")
 
+// ErrAmbiguousProject is returned by ResolveProject when more than one indexed
+// project shares the same basename, making the match ambiguous.
+var ErrAmbiguousProject = errors.New("dex: ambiguous repo name — multiple indexed projects match")
+
 const (
 	// defaultDexTimeout caps the cheap dex calls (status, search, symbol,
 	// summaries) — they answer in well under a second when healthy, so a tight
@@ -180,18 +184,27 @@ func (c *Client) Status(ctx context.Context) (*Status, error) {
 }
 
 // ResolveProject finds the indexed dex project whose root basename matches
-// repoName (case-insensitive). Returns ErrProjectNotFound when none match.
+// repoName (case-insensitive). Returns ErrProjectNotFound when none match,
+// ErrAmbiguousProject when more than one project shares the same basename.
 func (c *Client) ResolveProject(ctx context.Context, repoName string) (ProjectStatus, error) {
 	st, err := c.Status(ctx)
 	if err != nil {
 		return ProjectStatus{}, err
 	}
+	var matches []ProjectStatus
 	for _, p := range st.Projects {
 		if strings.EqualFold(filepath.Base(p.Root), repoName) {
-			return p, nil
+			matches = append(matches, p)
 		}
 	}
-	return ProjectStatus{}, ErrProjectNotFound
+	switch len(matches) {
+	case 0:
+		return ProjectStatus{}, ErrProjectNotFound
+	case 1:
+		return matches[0], nil
+	default:
+		return ProjectStatus{}, ErrAmbiguousProject
+	}
 }
 
 // Search runs a hybrid semantic search against the given dex project id.
