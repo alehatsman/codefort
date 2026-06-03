@@ -21,6 +21,11 @@ export interface Repo {
   // repo has no runs. Drives the at-a-glance CI icon on the repos list.
   ci_status?: CIRunStatus
   ci_number?: number
+  // At-a-glance counts for the repos-list metric grid: open PRs, unresolved
+  // code-review comments, and agent runs in a non-terminal state. Always present.
+  open_pulls: number
+  open_reviews: number
+  active_agents: number
 }
 
 export interface UpdateRepoInput {

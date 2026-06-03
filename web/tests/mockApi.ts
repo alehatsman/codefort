@@ -32,6 +32,16 @@ export interface Repo {
   open_issues: number
   total_issues: number
   ci_enabled: boolean
+  // Latest CI run status + per-repo number, surfaced by /api/repos. Optional
+  // (a repo with no runs omits them); drives the repos-list CI metric tile.
+  ci_status?: string
+  ci_number?: number
+  // Metric-grid counts (repos list). Optional here so the many sub-page specs
+  // that inline a repo seed don't have to set them; the real API always emits
+  // them, and the default seed below populates them.
+  open_pulls?: number
+  open_reviews?: number
+  active_agents?: number
 }
 
 export interface CodeComment {
@@ -231,6 +241,9 @@ function freshState(seed: Partial<State> = {}): State {
         open_issues: 0,
         total_issues: 0,
         ci_enabled: false,
+        open_pulls: 0,
+        open_reviews: 0,
+        active_agents: 0,
       },
     ],
     issues: [],

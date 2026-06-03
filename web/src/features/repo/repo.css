@@ -8,6 +8,57 @@
   gap: var(--space-4);
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
+/* Created date, demoted to the far end of the card title row. */
+.card__created {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  flex-shrink: 0;
+}
+/* The five at-a-glance metric tiles on a repo card: CI · Issues · PRs ·
+   Reviews · Agents, in source order. A 5-up grid where each tile shares the
+   width equally. */
+.repo-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.repo-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-2) 0;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius);
+  color: var(--fg);
+  text-align: center;
+  transition: border-color var(--transition);
+}
+.repo-metric:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+.repo-metric__value {
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+}
+/* A zero metric recedes so non-empty counts read first. */
+.repo-metric__value[data-zero="true"] {
+  color: var(--fg-muted);
+  font-weight: var(--weight-normal);
+}
+.repo-metric__label {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 /* Code browser --------------------------------------------------------- */
 .path-breadcrumb {
   font-size: var(--text-lg);
