@@ -14,7 +14,7 @@ import DeleteIssueButton from "@/features/issues/DeleteIssueButton"
 import BranchTag from "@/features/repo/BranchTag"
 import SpawnAgentButton from "@/features/agents/SpawnAgentButton"
 import NotFound from "@/shell/NotFound"
-import { Button, ErrorMessage, RelativeTime, Spinner } from "@/ui"
+import { Badge, Button, ErrorMessage, RelativeTime, Spinner } from "@/ui"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it only
 // when an issue with a body is actually shown.
@@ -66,10 +66,10 @@ export default function IssuePage() {
         </h2>
       )}
       <div className="issue-subtitle">
-        <span className={`badge badge--${iss.state}`}>
+        <Badge state={iss.state}>
           <StateIcon state={iss.state} size={14} />
           {iss.state.replace("_", " ")}
-        </span>
+        </Badge>
         <Avatar name={iss.author} />
         <strong>{iss.author}</strong>
         <span>opened this on {new Date(iss.created_at).toLocaleDateString()}</span>

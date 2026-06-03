@@ -31,16 +31,8 @@
   display: block;
 }
 /* Status pill — colors track issue-state vars by meaning. */
-.ci-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  line-height: var(--leading-none);
-  text-transform: capitalize;
-}
+/* Shape comes from the shared `.pill` (+ `--dense`/`--capitalize`) in styles.css;
+   these `.ci-badge--<status>` rules supply color only. */
 .ci-badge--success {
   background: var(--state-todo-bg);
   color: var(--state-todo);

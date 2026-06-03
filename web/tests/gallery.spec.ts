@@ -16,6 +16,7 @@ test("dev gallery renders every primitive section", async ({ page }) => {
   for (const section of [
     "Button",
     "Badge",
+    "StatusPill — CI statuses (dense)",
     "FilterChip",
     "Card",
     "Spinner",

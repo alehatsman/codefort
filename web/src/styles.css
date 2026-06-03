@@ -1134,7 +1134,9 @@ a.file-tree__commit:hover {
 }
 
 /* Badges (pill labels for state) --------------------------------------- */
-.badge {
+/* Status pill (@/ui StatusPill) — the shared shell behind Badge (.badge--<state>)
+   and CIStatusBadge (.ci-badge--<status>); those modifiers supply color only. */
+.pill {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -1143,6 +1145,14 @@ a.file-tree__commit:hover {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   line-height: var(--leading-none);
+}
+/* Compact CI look: tighter padding, no gap (single text node). */
+.pill--dense {
+  gap: 0;
+  padding: 2px 8px;
+}
+.pill--capitalize {
+  text-transform: capitalize;
 }
 .badge--todo {
   background: var(--state-todo-bg);
