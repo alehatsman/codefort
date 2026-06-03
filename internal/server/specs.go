@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alehatsman/moongit/internal/api"
 	"github.com/alehatsman/moongit/internal/dex"
@@ -86,7 +87,8 @@ func (s *Server) specBlobPaths(ctx context.Context, repoDir, ref string) []strin
 // frontmatter, sections, and checklist the renderer and truth gutter consume —
 // not just bytes. ?ref= selects the branch like the other read handlers.
 func (s *Server) handleGetSpec(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
 		return
 	}
 	repoDir, ok := s.repoDirOrFail(w, r)
@@ -145,7 +147,47 @@ func (s *Server) handleGetSpec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, specContent(ref, full, content))
+	out := specContent(ref, full, content)
+	out.Verification = s.latestVerification(r.Context(), repoDir, repoID, ref, full, content)
+	writeJSON(w, http.StatusOK, out)
+}
+
+// latestVerification loads a spec's most recent verify pass for the read view,
+// or nil when the spec is unparseable or never verified. Stale is true when the
+// spec file or its covered code changed since the verified commit — so a spec
+// that's drifted since its last green check still looks stale.
+func (s *Server) latestVerification(ctx context.Context, repoDir string, repoID int64, ref, full string, content []byte) *api.SpecVerification {
+	spec, err := specs.Parse(full, content)
+	if err != nil {
+		return nil
+	}
+	rec, err := storage.LatestVerification(s.rdb, repoID, spec.Frontmatter.ID)
+	if err != nil {
+		return nil // ErrNotFound (never verified) or a read error — show nothing
+	}
+
+	var res specs.VerificationResult
+	_ = json.Unmarshal([]byte(rec.Result), &res)
+
+	out := &api.SpecVerification{
+		Alignment:  rec.Alignment,
+		Conflicts:  res.Conflicts,
+		Notes:      res.Notes,
+		VerifiedAt: time.Unix(rec.CreatedAt, 0).UTC().Format(time.RFC3339),
+		Commit:     rec.CommitSHA,
+	}
+	for _, m := range res.Markers {
+		out.Markers = append(out.Markers, api.SpecVerificationMarker{
+			Line: m.Line, Text: m.Text, Marker: string(m.Marker), Note: m.Note,
+		})
+	}
+
+	// Stale when the spec itself or any governed path changed since the verified
+	// commit. A failed diff (gone commit) also reads as stale, never falsely fresh.
+	globs := append([]string{full}, spec.Frontmatter.Covers...)
+	changed, derr := gitDiffGlobs(ctx, repoDir, rec.CommitSHA, ref, globs)
+	out.Stale = derr != nil || len(changed) > 0
+	return out
 }
 
 // specContent parses a spec blob into the full content response. As with the

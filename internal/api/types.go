@@ -690,6 +690,31 @@ type SpecContent struct {
 	Body         string              `json:"body"`
 	Sections     []SpecSection       `json:"sections"`
 	Checklist    []SpecChecklistItem `json:"checklist"`
+	// Verification is the spec's latest verify pass (nil when never verified),
+	// surfaced so the read view can render the truth gutter + result panel.
+	Verification *SpecVerification `json:"verification,omitempty"`
+}
+
+// SpecVerificationMarker is one line's verify verdict for the truth gutter:
+// Line is 1-based file-absolute; Marker is aligned|drifted|unverifiable|unspecced.
+type SpecVerificationMarker struct {
+	Line   int    `json:"line"`
+	Text   string `json:"text,omitempty"`
+	Marker string `json:"marker"`
+	Note   string `json:"note,omitempty"`
+}
+
+// SpecVerification is a spec's latest recorded verify pass for the read view:
+// the alignment, per-line markers, conflicts, when/what it ran against, and
+// whether the spec or its governed code has changed since (Stale).
+type SpecVerification struct {
+	Alignment  float64                  `json:"alignment"`
+	Markers    []SpecVerificationMarker `json:"markers"`
+	Conflicts  []string                 `json:"conflicts,omitempty"`
+	Notes      string                   `json:"notes,omitempty"`
+	VerifiedAt string                   `json:"verified_at"`
+	Commit     string                   `json:"commit"`
+	Stale      bool                     `json:"stale"`
 }
 
 // SpecSearchHit is one semantic-search match within the spec corpus. Path is

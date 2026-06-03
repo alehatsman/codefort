@@ -671,6 +671,28 @@ export interface SpecContent {
   body: string
   sections: SpecSection[]
   checklist: SpecChecklistItem[]
+  /** The spec's latest verify pass (absent when never verified). */
+  verification?: SpecVerification
+}
+
+export type SpecMarker = "aligned" | "drifted" | "unverifiable" | "unspecced"
+
+export interface SpecVerificationMarker {
+  line: number
+  text?: string
+  marker: SpecMarker | string
+  note?: string
+}
+
+export interface SpecVerification {
+  alignment: number
+  markers: SpecVerificationMarker[]
+  conflicts?: string[]
+  notes?: string
+  verified_at: string
+  commit: string
+  /** The spec or its governed code changed since this pass — re-verify. */
+  stale: boolean
 }
 
 export interface SpecSearchHit {

@@ -9,7 +9,7 @@ import SpecSearch from "@/features/specs/SpecSearch"
 import Markdown from "@/shell/Markdown"
 import OverviewCard from "@/shell/OverviewCard"
 import { Button, EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
-import type { SpecContent, SpecListItem } from "@/api/types"
+import type { SpecContent, SpecListItem, SpecVerification } from "@/api/types"
 
 /**
  * Specs tab: in-repo, human-authored specifications under specs/ — the dual of
@@ -298,9 +298,63 @@ function SpecView({
           </div>
         }
       />
+      {data.verification && <VerificationPanel v={data.verification} />}
       <Markdown content={data.body} owner={owner} repo={repo} basePath={basePath} />
     </article>
   )
+}
+
+// VerificationPanel is the truth surface for the read view: a collapsible "Last
+// verification" card with the per-line markers (the gutter, listed by line),
+// conflicts, and when/what it ran against. Open by default when the spec is
+// stale or has drift, so a spec that needs attention shows it.
+function VerificationPanel({ v }: { v: SpecVerification }) {
+  const drift = v.markers.filter((m) => m.marker === "drifted")
+  const attention = v.stale || drift.length > 0
+  return (
+    <details className="spec-verify" open={attention}>
+      <summary className="spec-verify__summary">
+        <span className="spec-verify__title">Last verification</span>
+        <span className="muted small">
+          {Math.round(v.alignment * 100)}% aligned · {drift.length} drifted ·{" "}
+          <RelativeTime iso={v.verified_at} />
+          {v.stale && <span className="spec-verify__stale"> · stale</span>}
+        </span>
+      </summary>
+      {v.markers.length > 0 && (
+        <ul className="spec-verify__markers">
+          {v.markers.map((m) => (
+            <li key={`${m.line}:${m.marker}`} className="spec-marker">
+              <span
+                className={`spec-marker__dot spec-marker--${markerKey(m.marker)}`}
+                aria-hidden
+              />
+              <span className="spec-marker__line muted small">L{m.line}</span>
+              <span className="spec-marker__text">{m.text || m.marker}</span>
+              {m.note && <span className="spec-marker__note muted small">{m.note}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {v.conflicts && v.conflicts.length > 0 && (
+        <div className="spec-verify__conflicts">
+          <span className="muted small">Conflicts</span>
+          <ul>
+            {v.conflicts.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {v.notes && <p className="spec-verify__notes muted small">{v.notes}</p>}
+    </details>
+  )
+}
+
+// markerKey normalizes a (possibly unknown) marker into a known modifier class.
+function markerKey(marker: string): "aligned" | "drifted" | "unverifiable" | "unspecced" {
+  if (marker === "drifted" || marker === "unverifiable" || marker === "unspecced") return marker
+  return "aligned"
 }
 
 function SpecHeader({ spec, actions }: { spec: SpecContent; actions?: ReactNode }) {
@@ -311,6 +365,17 @@ function SpecHeader({ spec, actions }: { spec: SpecContent; actions?: ReactNode 
         <span className={`spec-dot spec-dot--${statusKey(spec.status)}`} aria-hidden />
         <h1 className="spec-view__title">{spec.title}</h1>
         {spec.status && <span className="spec-view__status muted small">{spec.status}</span>}
+        {spec.verification && (
+          <span
+            className={`spec-truth${spec.verification.stale ? " spec-truth--stale" : ""}`}
+            title={
+              spec.verification.stale ? "Code or spec changed since this was verified" : "Verified"
+            }
+          >
+            {Math.round(spec.verification.alignment * 100)}% aligned
+            {spec.verification.stale ? " · stale" : ""}
+          </span>
+        )}
         {actions}
       </div>
       {hasMeta && (

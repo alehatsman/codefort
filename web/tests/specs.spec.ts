@@ -344,3 +344,54 @@ test("Specs: empty repo offers New spec via the command palette", async ({ page 
   await page.getByRole("button", { name: "New spec" }).click()
   await expect(page.locator(".cmdk__item", { hasText: "New spec" })).toBeVisible()
 })
+
+test("Specs: a verified spec shows the truth panel + stale badge", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockSpecs(page, SPECS)
+  // Override the content route for the ssh spec to carry a verification.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/specs\/ssh-transport\.md(\?.*)?$/, (route) => {
+    if (route.request().method() !== "GET") return route.fallback()
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ref: "main",
+        path: "specs/ssh-transport.md",
+        id: "ssh-transport",
+        title: "SSH Transport",
+        status: "living",
+        content: "# SSH Transport\n## Behavior\nWHEN x THEN y.",
+        body: "# SSH Transport\n## Behavior\nWHEN x THEN y.",
+        sections: [],
+        checklist: [],
+        verification: {
+          alignment: 0.75,
+          markers: [
+            { line: 6, text: "WHEN x THEN y.", marker: "drifted", note: "server.go:10 differs" },
+            { line: 4, text: "# SSH Transport", marker: "aligned" },
+          ],
+          conflicts: ["behavior at L6 drifted"],
+          verified_at: new Date().toISOString(),
+          commit: "deadbeef",
+          stale: true,
+        },
+      }),
+    })
+  })
+
+  await page.goto("/alice/demo/specs?path=specs%2Fssh-transport.md")
+  await expect(page.locator(".spec-view__title")).toHaveText("SSH Transport")
+
+  // The header truth badge shows alignment + stale.
+  const badge = page.locator(".spec-truth")
+  await expect(badge).toContainText("75% aligned")
+  await expect(badge).toContainText("stale")
+
+  // The verification panel lists the per-line markers (the gutter) + conflict.
+  const panel = page.locator(".spec-verify")
+  await expect(panel).toContainText("Last verification")
+  await expect(panel.locator(".spec-marker--drifted")).toBeVisible()
+  await expect(panel).toContainText("server.go:10 differs")
+  await expect(panel).toContainText("behavior at L6 drifted")
+})

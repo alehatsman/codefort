@@ -141,6 +141,101 @@
   font-size: 13px;
 }
 
+/* ── Truth surface (verification badge + panel) ──────────────────────────── */
+
+.spec-truth {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--state-todo);
+  color: var(--state-todo);
+}
+
+.spec-truth--stale {
+  border-color: var(--state-in_progress);
+  color: var(--state-in_progress);
+}
+
+.spec-verify {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+}
+
+.spec-verify__summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.spec-verify__title {
+  font-weight: 600;
+}
+
+.spec-verify__stale {
+  color: var(--state-in_progress);
+}
+
+.spec-verify__markers {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.spec-marker {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.spec-marker__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  align-self: center;
+  background: var(--fg-muted);
+}
+
+.spec-marker--aligned {
+  background: var(--state-todo);
+}
+
+.spec-marker--drifted {
+  background: var(--state-closed);
+}
+
+.spec-marker--unverifiable {
+  background: var(--fg-muted);
+}
+
+.spec-marker--unspecced {
+  background: var(--accent);
+}
+
+.spec-marker__line {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.spec-marker__text {
+  flex: 1;
+}
+
+.spec-verify__conflicts {
+  margin-top: 10px;
+}
+
+.spec-verify__conflicts ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
 /* ── Editor (split textarea + live preview) ──────────────────────────────── */
 
 .spec-editor {
