@@ -117,6 +117,22 @@
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--space-2);
 }
+/* Oversized tier: the card grid lives inside a <details> toggle. */
+.pkg-layer__collapse-summary {
+  cursor: pointer;
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  user-select: none;
+}
+.pkg-layer__collapse-summary:hover {
+  color: var(--fg);
+}
+.pkg-layer__collapse[open] .pkg-layer__collapse-summary {
+  margin-bottom: var(--space-2);
+}
 .pkg-card {
   border: 1px solid var(--border);
   border-radius: var(--radius);
