@@ -11,7 +11,9 @@ import { useListNav } from "@/shell/keyboardNav"
 import {
   EmptyState,
   ErrorMessage,
+  FilterBar,
   FilterChip,
+  FilterRow,
   ListRow,
   PageHeader,
   Pagination,
@@ -151,26 +153,22 @@ export default function IssuesPage() {
         <IssuesViewSwitch />
       </PageHeader>
 
-      <div className="filters">
-        <input
-          type="search"
-          className="list-search"
-          placeholder="Search title or body, or #number…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={onSearchKeyDown}
-          aria-label="Search issues"
-        />
-        <div className="filter-row">
-          <span className="filter-label">state:</span>
+      <FilterBar
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder="Search title or body, or #number…"
+        searchAriaLabel="Search issues"
+        onSearchKeyDown={onSearchKeyDown}
+      >
+        <FilterRow label="state:">
           {ISSUE_STATES.map((s) => (
             <FilterChip key={s} checked={activeStates.includes(s)} onChange={() => toggleState(s)}>
               <StateIcon state={s} size={12} />
               {s}
             </FilterChip>
           ))}
-        </div>
-        <div className="filter-row">
+        </FilterRow>
+        <FilterRow>
           <label className="filter-select">
             <span className="filter-label">assignee:</span>
             <select
@@ -214,8 +212,8 @@ export default function IssuesPage() {
               <option value="recently-updated">recently updated</option>
             </select>
           </label>
-        </div>
-      </div>
+        </FilterRow>
+      </FilterBar>
 
       {isLoading && <SkeletonList />}
       {error && <ErrorMessage error={error} />}
