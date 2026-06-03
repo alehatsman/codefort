@@ -1107,6 +1107,57 @@ test("run detail surfaces commit context, the job DAG, and step commands", async
   await expect(page.getByText("go build ./...")).toBeVisible()
 })
 
+test("a running CI run can be force-stopped from the run header (#296)", async ({ page }) => {
+  const state = await mockApi(page, {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 0,
+        total_issues: 0,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 1,
+        kind: "ci",
+        commit_sha: "deadbeefcafe1234",
+        commit_msg: "feat: long build",
+        ref: "refs/heads/main",
+        event: "push",
+        trigger: "alice",
+        status: "running",
+        created_at: iso,
+        started_at: iso,
+        finished_at: null,
+        jobs: [{ name: "build", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+      },
+    ],
+  })
+  await page.goto("/alice/demo/pipelines/1")
+
+  // A live CI run offers Stop alongside Re-run.
+  const stop = page.getByRole("button", { name: "Stop" })
+  await expect(stop).toBeEnabled()
+
+  await stop.click()
+
+  // The run is canceled server-side; the header badge reflects it.
+  await expect.poll(() => state.ciRuns[0].status).toBe("canceled")
+  await expect(page.locator(".ci-badge--canceled")).toBeVisible()
+})
+
+test("a finished CI run shows no Stop button — only live runs can be stopped", async ({ page }) => {
+  await mockApi(page, enabledSeed()) // seed run #1 is success (terminal)
+  await page.goto("/alice/demo/pipelines/1")
+
+  await expect(page.getByRole("button", { name: "Re-run" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Stop" })).toHaveCount(0)
+})
+
 test("re-run enqueues a fresh run and navigates to it", async ({ page }) => {
   await mockApi(page, enabledSeed())
   await page.goto("/alice/demo/pipelines/1")

@@ -1,4 +1,10 @@
-import type { CIRun, CIRunExecutionModel, CIRunKind } from "@/api/types"
+import type { CIRun, CIRunExecutionModel, CIRunKind, CIRunStatus } from "@/api/types"
+
+// isRunActive is true while a run is still pre-terminal — queued (not yet
+// claimed) or running. Used to gate the Stop button on the run-detail view.
+export function isRunActive(status: CIRunStatus): boolean {
+  return status === "queued" || status === "running"
+}
 
 // kind selects which runs a *view* (tab) serves: "ci" is the Pipelines tab,
 // "agent" is the Agents tab. This is the tab dimension, distinct from a run's

@@ -321,7 +321,18 @@ export function useFinishAgentRun(owner: string, repo: string, n: number) {
 export function useCancelAgentRun(owner: string, repo: string, n: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () => api.cancelAgentRun(owner, repo, n),
+    mutationFn: () => api.cancelRun(owner, repo, n),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRun(owner, repo, n) }),
+  })
+}
+
+// useCancelCIRun force-stops a running or queued CI run (#296); once accepted,
+// refresh the run so it shows canceled. Same endpoint as the agent cancel — the
+// server picks the path by the run's kind.
+export function useCancelCIRun(owner: string, repo: string, n: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.cancelRun(owner, repo, n),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRun(owner, repo, n) }),
   })
 }

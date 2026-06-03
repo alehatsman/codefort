@@ -2,7 +2,7 @@ import { useState } from "react"
 import "./pipelines.css"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useCIRun, useCIRuns, useRefs, useRepo } from "@/api/queries"
-import { useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from "@/api/mutations"
+import { useCancelCIRun, useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from "@/api/mutations"
 import { absoluteTime, timeAgo } from "@/shell/timeAgo"
 import type { Repo } from "@/api/types"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
@@ -13,6 +13,7 @@ import {
   type RunKind,
   executionModelLabel,
   isAgentRun,
+  isRunActive,
   runDuration,
   runsBasePath,
   shortRef,
@@ -224,6 +225,7 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
   const navigate = useNavigate()
   const runQ = useCIRun(owner, repo, runNumber)
   const rerun = useRerunCIRun(owner, repo)
+  const cancel = useCancelCIRun(owner, repo, runNumber)
 
   if (runQ.isLoading) return <Spinner />
   if (runQ.error) return <ErrorMessage error={runQ.error} />
@@ -235,6 +237,9 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
   // a /pipelines/<n> link. One classifier (isAgentRun), no inline kind checks.
   const isAgent = isAgentRun(run.kind)
   const base = runsBasePath(isAgent ? "agent" : "ci")
+  // An agent run carries its own Stop in AgentRunBody (it also offers Finish);
+  // here we only stop CI runs, and only while they're still live.
+  const canStopCI = !isAgent && isRunActive(run.status)
 
   function doRerun() {
     rerun.mutate(runNumber, {
@@ -257,8 +262,20 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
             {rerun.isPending ? "Re-running…" : "Re-run"}
           </Button>
         )}
+        {canStopCI && (
+          <Button
+            size="small"
+            variant="danger"
+            onClick={() => cancel.mutate()}
+            disabled={cancel.isPending}
+            title="Force-stop the run now: interrupt its jobs and discard the workspace"
+          >
+            {cancel.isPending ? "Stopping…" : "Stop"}
+          </Button>
+        )}
       </div>
       <ErrorMessage error={rerun.error} inline />
+      <ErrorMessage error={cancel.error} inline />
 
       {run.commit_msg && <p className="ci-run-subject">{run.commit_msg}</p>}
 

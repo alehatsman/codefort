@@ -510,6 +510,26 @@ func (r *ciRunner) CancelAgentRun(runID int64) bool {
 	return true
 }
 
+// CancelCIRun force-stops a CI run (#296). A running run is interrupted by
+// flagging + canceling its registered handle, so executeRun unwinds its job
+// loop and — seeing the canceled flag — writes the single terminal status as
+// RunCanceled (executeRun owns the write; FinishRun has no CAS, so a second
+// writer here would clobber it). A run still queued has no goroutine yet, so
+// it's CAS'd queued -> canceled in the DB and the claim loop skips it. Returns
+// true if the run was non-terminal and is now (or will be) canceled, false if
+// it was already terminal.
+func (r *ciRunner) CancelCIRun(runID int64) bool {
+	if v, ok := r.runCancels.Load(runID); ok {
+		h, _ := v.(*agentTurnHandle) // map only ever holds *agentTurnHandle
+		h.canceled.Store(true)
+		h.cancel()
+		return true
+	}
+	// Not executing: try to cancel it while still queued. ErrNotFound means it
+	// was already claimed (now running — caller can retry) or terminal.
+	return storage.CancelCIRun(r.db, runID) == nil
+}
+
 // tearDownAgent releases a finished agent run's resources: remove the container
 // (best-effort), revoke its ephemeral moongit token, and delete the workspace.
 func (r *ciRunner) tearDownAgent(runID, jobID int64, workDir string) {

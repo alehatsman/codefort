@@ -111,12 +111,20 @@ type ciRunner struct {
 	// value is *agentTurnHandle; registered for the duration of a turn and
 	// deleted when it returns.
 	agentTurns sync.Map
+
+	// runCancels tracks in-flight CI runs so an operator force-stop (#296) can
+	// interrupt executeRun. Keyed by run ID, value *agentTurnHandle (a generic
+	// cancel handle): cancel unwinds the run's job loop, and the canceled flag
+	// tells executeRun to finalize as RunCanceled (operator) rather than
+	// RunInterrupted (shutdown). Registered for the duration of executeRun.
+	runCancels sync.Map
 }
 
-// agentTurnHandle lets CancelAgentRun interrupt an in-flight turn: cancel
-// unblocks the turn's ExecStream, and the canceled flag tells the turn
-// goroutine that the operator (not an infra error) ended it, so it skips its
-// own finalize — CancelAgentRun owns the terminal state + teardown.
+// agentTurnHandle is a generic cancel handle: cancel unblocks the work (an
+// agent turn's ExecStream, or a CI run's job loop), and the canceled flag tells
+// the owning goroutine that the operator (not an infra error) ended it — so an
+// agent turn skips its own finalize (CancelAgentRun owns teardown) and a CI run
+// finalizes terminal as canceled rather than interrupted.
 type agentTurnHandle struct {
 	cancel   context.CancelFunc
 	canceled atomic.Bool
@@ -434,12 +442,20 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	}
 	defer func() { _ = os.RemoveAll(workDir) }()
 
-	ctx := parent
+	// Always derive a cancelable ctx and register a handle so an operator
+	// force-stop (#296) can interrupt the run; layer the run timeout on top when
+	// configured. The handle's canceled flag distinguishes that operator stop
+	// from a shutdown in the finalizer below.
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
 	if r.cfg.CIRunTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(parent, r.cfg.CIRunTimeout)
-		defer cancel()
+		var timeoutCancel context.CancelFunc
+		ctx, timeoutCancel = context.WithTimeout(ctx, r.cfg.CIRunTimeout)
+		defer timeoutCancel()
 	}
+	handle := &agentTurnHandle{cancel: cancel}
+	r.runCancels.Store(run.ID, handle)
+	defer r.runCancels.Delete(run.ID)
 
 	if err := r.checkout(ctx, bareRepo, run.CommitSHA, workDir); err != nil {
 		log.Error("ci checkout", "err", err)
@@ -529,6 +545,11 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	// (DeadlineExceeded) is a genuine infrastructure failure (error).
 	final := storage.RunSuccess
 	switch {
+	case handle.canceled.Load():
+		// Operator force-stop (#296): terminal-and-intentional (canceled), distinct
+		// from a shutdown's neutral interrupted. Checked first since it also trips
+		// the context.Canceled case below.
+		final = storage.RunCanceled
 	case errors.Is(ctx.Err(), context.Canceled):
 		final = storage.RunInterrupted
 	case ctx.Err() != nil:

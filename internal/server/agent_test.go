@@ -251,19 +251,27 @@ func cancelRun(t *testing.T, s *Server, num int) *httptest.ResponseRecorder {
 	req.SetPathValue("number", strconv.Itoa(num))
 	req = req.WithContext(context.WithValue(req.Context(), tokenCtxKey{}, api.Token{Name: "alice"}))
 	rr := httptest.NewRecorder()
-	s.handleCancelAgentRun(rr, req)
+	s.handleCancelRun(rr, req)
 	return rr
 }
 
 // fakeCanceler stands in for the runner-backed AgentCanceler in handler tests.
+// It records which kind-specific path the handler took so a CI run and an agent
+// run can be told apart.
 type fakeCanceler struct {
-	ret    bool
-	gotID  int64
-	called bool
+	ret      bool
+	gotID    int64
+	called   bool // CancelAgentRun was invoked
+	ciCalled bool // CancelCIRun was invoked
 }
 
 func (f *fakeCanceler) CancelAgentRun(id int64) bool {
 	f.called, f.gotID = true, id
+	return f.ret
+}
+
+func (f *fakeCanceler) CancelCIRun(id int64) bool {
+	f.ciCalled, f.gotID = true, id
 	return f.ret
 }
 
@@ -319,17 +327,43 @@ func TestCancelAgentRun(t *testing.T) {
 		}
 	})
 
-	t.Run("non-agent run -> 400", func(t *testing.T) {
+	t.Run("cancels a CI run via the CI path -> 202", func(t *testing.T) {
 		s, repoID := newCITriggerServer(t)
-		s.SetAgentCanceler(&fakeCanceler{ret: true})
+		fc := &fakeCanceler{ret: true}
+		s.SetAgentCanceler(fc)
 		run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
 			Kind: storage.RunKindCI, CommitSHA: "a", Ref: "HEAD", Event: "push",
 		})
 		if err != nil {
 			t.Fatalf("EnqueueRun: %v", err)
 		}
-		if rr := cancelRun(t, s, run.Number); rr.Code != http.StatusBadRequest {
-			t.Errorf("code = %d, want 400", rr.Code)
+		rr := cancelRun(t, s, run.Number)
+		if rr.Code != http.StatusAccepted {
+			t.Fatalf("code = %d, want 202; body=%s", rr.Code, rr.Body.String())
+		}
+		if !fc.ciCalled || fc.called {
+			t.Errorf("want CI cancel path (ciCalled=true, called=false), got ciCalled=%v called=%v", fc.ciCalled, fc.called)
+		}
+		var got api.CIRun
+		if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if got.Status != "canceled" {
+			t.Errorf("status = %q, want canceled", got.Status)
+		}
+	})
+
+	t.Run("already-terminal CI run -> 409", func(t *testing.T) {
+		s, repoID := newCITriggerServer(t)
+		s.SetAgentCanceler(&fakeCanceler{ret: false}) // nothing to cancel
+		run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
+			Kind: storage.RunKindCI, CommitSHA: "a", Ref: "HEAD", Event: "push",
+		})
+		if err != nil {
+			t.Fatalf("EnqueueRun: %v", err)
+		}
+		if rr := cancelRun(t, s, run.Number); rr.Code != http.StatusConflict {
+			t.Errorf("code = %d, want 409", rr.Code)
 		}
 	})
 }

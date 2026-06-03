@@ -233,6 +233,21 @@ func CancelAgentRun(db *sql.DB, runID int64) error {
 	return affected(res, err)
 }
 
+// CancelCIRun force-cancels a CI run that is still queued — the operator
+// force-stop from the Pipelines view (#296). Only the pre-execution state is
+// CAS'd here: a CI run that's already running is finalized by its own executeRun
+// goroutine (which owns the single terminal write, since FinishRun has no CAS),
+// so the runner signals that goroutine instead of writing canceled here.
+// ErrNotFound means the run was already claimed/terminal (or not a CI run):
+// nothing to cancel at the storage layer.
+func CancelCIRun(db *sql.DB, runID int64) error {
+	res, err := db.Exec(`
+		UPDATE ci_runs SET status = ?, finished_at = strftime('%s','now')
+		 WHERE id = ? AND kind = 'ci' AND status = 'queued'
+	`, string(RunCanceled), runID)
+	return affected(res, err)
+}
+
 // ClaimNextFinishingRun atomically claims one agent run in the finishing state
 // for handoff, flipping it finishing -> running so a second runner pass won't
 // double-process it (the run goes terminal once handoff completes). Returns
