@@ -6,7 +6,17 @@ import { useBlob, useCodeComments, useWhoami } from "@/api/queries"
 import { useDeleteCodeComment, useSetCodeCommentResolved } from "@/api/mutations"
 import BranchSelector from "@/features/repo/BranchSelector"
 import DraftReviewButton from "@/features/pulls/DraftReviewButton"
-import { Avatar, Badge, Button, CodeSnippet, EmptyState, ErrorMessage, Spinner } from "@/ui"
+import OverviewCard from "@/shell/OverviewCard"
+import {
+  Avatar,
+  Badge,
+  Button,
+  Checkbox,
+  CodeSnippet,
+  EmptyState,
+  ErrorMessage,
+  Spinner,
+} from "@/ui"
 import type { CodeComment, CodeCommentState } from "@/api/types"
 
 // Lines of context shown above and below each comment's annotated range, so a
@@ -71,6 +81,7 @@ export default function ReviewPage() {
 
   return (
     <div className="repo">
+      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
       <h2 className="issue-title">Review comments</h2>
 
       <div className="repo-toolbar">
@@ -78,10 +89,13 @@ export default function ReviewPage() {
         <div className="filter-row">
           <span className="filter-label">state:</span>
           {COMMENT_STATES.map((s) => (
-            <label key={s} className="chip">
-              <input type="checkbox" checked={checked[s]} onChange={() => toggleState(s)} />
-              {s}
-            </label>
+            <Checkbox
+              key={s}
+              className="chip"
+              label={s}
+              checked={checked[s]}
+              onChange={() => toggleState(s)}
+            />
           ))}
         </div>
         <DraftReviewButton owner={owner} repo={repo} defaultRef={gitRef} />

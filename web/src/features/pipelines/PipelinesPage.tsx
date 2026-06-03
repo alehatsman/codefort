@@ -19,6 +19,7 @@ import {
 } from "@/ui"
 import AgentRunBody from "@/features/agents/AgentRunBody"
 import CIRunBody from "@/features/pipelines/CIRunBody"
+import OverviewCard from "@/shell/OverviewCard"
 import {
   type RunKind,
   executionModelLabel,
@@ -50,6 +51,7 @@ export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
 
   return (
     <div className="repo">
+      <OverviewCard owner={r.owner} repo={r.name} path="" summaries={{}} />
       {runNumber !== null && Number.isFinite(runNumber) ? (
         <RunDetail owner={r.owner} repo={r.name} runNumber={runNumber} />
       ) : (

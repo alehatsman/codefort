@@ -9,11 +9,34 @@ test("settings link in the header opens the tokens section", async ({ page }) =>
   await mockApi(page)
   await page.goto("/")
 
-  await page.getByRole("link", { name: "settings" }).click()
+  await page.getByRole("button", { name: "Account menu" }).click()
+  await page.getByRole("menuitem", { name: "settings" }).click()
   await expect(page).toHaveURL(/\/settings$/)
   await expect(page.getByRole("heading", { name: "API tokens" })).toBeVisible()
   // The seeded token is listed.
   await expect(page.getByRole("cell", { name: "test-user", exact: false })).toBeVisible()
+})
+
+test("the account menu exposes settings + sign out and dismisses on Escape", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/")
+
+  // Collapsed by default: items aren't in the DOM until the trigger opens it.
+  const trigger = page.getByRole("button", { name: "Account menu" })
+  await expect(trigger).toHaveAttribute("aria-haspopup", "menu")
+  await expect(trigger).toHaveAttribute("aria-expanded", "false")
+  await expect(page.getByRole("menuitem")).toHaveCount(0)
+
+  await trigger.click()
+  await expect(trigger).toHaveAttribute("aria-expanded", "true")
+  await expect(page.getByRole("menuitem", { name: "settings" })).toBeVisible()
+  await expect(page.getByRole("menuitem", { name: "sign out" })).toBeVisible()
+
+  // Escape dismisses without firing an item and returns focus to the trigger.
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("menuitem")).toHaveCount(0)
+  await expect(trigger).toBeFocused()
+  await expect(page).toHaveURL(/\/$/)
 })
 
 test("create a token reveals the secret once", async ({ page }) => {
