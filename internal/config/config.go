@@ -118,9 +118,10 @@ type Config struct {
 	// turn (`mooncake agent run --max-iterations`). Under --style step the loop
 	// is meant to end on its own terminal signal (goal reached / stall); this is
 	// just the ceiling for a planner that never converges, with the per-turn
-	// wall-clock (AgentTurnTimeout) as the real governor. Defaults high (run
-	// until done); set a lower value via MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS to
-	// pin a tighter cap. Only used by the mooncake-agent execution model (#110).
+	// wall-clock (AgentTurnTimeout) as the real governor. Defaults to 0
+	// (MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS unset) — the executor then applies
+	// its run-until-done backstop (mooncakeMaxIterationsDefault); a positive
+	// value pins a tighter cap. Only used by the mooncake-agent model (#110).
 	AgentMooncakeMaxIterations int
 
 	// mooncake-agent policy (#110/#11): mooncake enforces these per run at
@@ -293,7 +294,11 @@ func Load() (*Config, error) {
 	}
 	cfg.AgentTurnTimeout = agentTurnTimeout
 
-	mooncakeIters, err := strconv.Atoi(envOr("MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS", "3"))
+	// Default 0 (unset): newMooncakeExecutor applies mooncakeMaxIterationsDefault
+	// (the run-until-done backstop). A positive value pins a tighter cap. This is
+	// the single source of truth — the executor owns the high default, config
+	// only carries an explicit override.
+	mooncakeIters, err := strconv.Atoi(envOr("MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS", "0"))
 	if err != nil {
 		return nil, fmt.Errorf("MOONGIT_AGENT_MOONCAKE_MAX_ITERATIONS: %w", err)
 	}
