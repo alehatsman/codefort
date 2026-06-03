@@ -265,6 +265,7 @@ type ListFilter struct {
 	Query    string           // "" = any; case-insensitive substring of title or body
 	Sort     api.IssueSort    // "" = default (newest); see api.IssueSort
 	Limit    int              // 0 = default (100), capped at 1000
+	Offset   int              // rows to skip (page * limit); <=0 = none
 }
 
 // likeEscape neutralizes the LIKE wildcards (% and _) and the escape char
@@ -299,6 +300,10 @@ func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error
 	}
 	q.WriteString(" LIMIT ?")
 	args = append(args, limit)
+	if filter.Offset > 0 {
+		q.WriteString(" OFFSET ?")
+		args = append(args, filter.Offset)
+	}
 
 	rows, err := db.Query(q.String(), args...)
 	if err != nil {
@@ -418,6 +423,10 @@ func ListAllIssues(db *sql.DB, filter ListFilter) ([]api.IssueWithRepo, error) {
 	}
 	q.WriteString(" ORDER BY issues.updated_at DESC, issues.id DESC LIMIT ?")
 	args = append(args, limit)
+	if filter.Offset > 0 {
+		q.WriteString(" OFFSET ?")
+		args = append(args, filter.Offset)
+	}
 
 	rows, err := db.Query(q.String(), args...)
 	if err != nil {
@@ -442,4 +451,33 @@ func ListAllIssues(db *sql.DB, filter ListFilter) ([]api.IssueWithRepo, error) {
 		out = append(out, api.IssueWithRepo{Issue: iss, Repo: api.RepoRef{Owner: owner, Name: name}})
 	}
 	return out, rows.Err()
+}
+
+// CountIssues returns how many issues in a repo match the filter's
+// state/assignee/author/query predicates. Limit/Offset/Sort are ignored —
+// it's the total for pagination, not a page. Mirrors ListIssues' WHERE.
+func CountIssues(db *sql.DB, repoID int64, filter ListFilter) (int, error) {
+	q := strings.Builder{}
+	q.WriteString(`SELECT COUNT(*) FROM issues WHERE repo_id = ?`)
+	args := []any{repoID}
+	appendIssueFilters(&q, &args, filter)
+	var n int
+	err := db.QueryRow(q.String(), args...).Scan(&n)
+	return n, err
+}
+
+// CountAllIssues is the cross-repo analogue of CountIssues, backing the
+// X-Total-Count on GET /api/issues. Mirrors ListAllIssues' WHERE + join.
+func CountAllIssues(db *sql.DB, filter ListFilter) (int, error) {
+	q := strings.Builder{}
+	q.WriteString(`SELECT COUNT(*)
+		FROM issues
+		JOIN repos ON repos.id = issues.repo_id
+		JOIN users ON users.id = repos.owner_id
+		WHERE 1=1`)
+	args := []any{}
+	appendIssueFilters(&q, &args, filter)
+	var n int
+	err := db.QueryRow(q.String(), args...).Scan(&n)
+	return n, err
 }

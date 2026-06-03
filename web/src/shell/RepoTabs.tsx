@@ -88,7 +88,7 @@ export default function RepoTabs({ owner, repo }: Props) {
       <Tab to={`${base}/specs`} active={isSpecs} count={pill(specCount)}>
         Specs
       </Tab>
-      <Tab to={`${base}/issues`} active={isIssues} count={pill(openIssues)}>
+      <Tab to={`${base}/issues/board`} active={isIssues} count={pill(openIssues)}>
         Issues
       </Tab>
       <Tab to={`${base}/pulls`} active={isPulls}>

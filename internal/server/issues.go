@@ -59,6 +59,13 @@ func (s *Server) handleListIssues(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	total, err := storage.CountIssues(s.rdb, repoID, filter)
+	if err != nil {
+		s.logger.Error("count issues", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	w.Header().Set("X-Total-Count", strconv.Itoa(total))
 	writeJSON(w, http.StatusOK, issues)
 }
 
@@ -301,6 +308,13 @@ func parseListFilter(q map[string][]string) (storage.ListFilter, error) {
 			return f, errors.New("invalid limit")
 		}
 		f.Limit = n
+	}
+	if v := q["offset"]; len(v) > 0 {
+		n, err := strconv.Atoi(v[0])
+		if err != nil || n < 0 {
+			return f, errors.New("invalid offset")
+		}
+		f.Offset = n
 	}
 	return f, nil
 }

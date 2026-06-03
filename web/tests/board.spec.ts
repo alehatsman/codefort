@@ -83,3 +83,65 @@ test("drag a card to done and back to todo; no crash, state PATCHes both ways", 
 
   expect(pageErrors, "drag round-trip must not crash the page").toEqual([])
 })
+
+test("done column shows the 15 most recent and collapses the rest", async ({ page }) => {
+  const base = Date.parse("2026-01-01T00:00:00Z")
+  // 18 done issues with descending updated_at (newest = #18), so the visible
+  // 15 are the most-recent and the 3 oldest (#1–#3) are collapsed.
+  const issues = Array.from({ length: 18 }, (_, i) => {
+    const ts = new Date(base + i * 1000).toISOString()
+    return {
+      id: i + 1, number: i + 1, title: `Done ${i + 1}`, author: "alice",
+      state: "done" as const, assignee: null, created_at: ts, updated_at: ts,
+    }
+  })
+  await mockApi(page, { issues })
+
+  await page.goto("/alice/demo/issues/board")
+  const done = page.getByTestId("board-column-done")
+
+  // Header count is the full set; only 15 cards render until expanded.
+  await expect(done.locator(".board-col__count")).toHaveText("18")
+  await expect(done.locator(".board-card")).toHaveCount(15)
+  // The newest is shown, the oldest (collapsed) is not.
+  await expect(done.getByText("Done 18", { exact: true })).toBeVisible()
+  await expect(done.getByText("Done 1", { exact: true })).toHaveCount(0)
+
+  // Expand reveals all 18; toggle flips to "Show less".
+  await done.getByRole("button", { name: "Show 3 more" }).click()
+  await expect(done.locator(".board-card")).toHaveCount(18)
+  await expect(done.getByText("Done 1", { exact: true })).toBeVisible()
+  await expect(done.getByRole("button", { name: "Show less" })).toBeVisible()
+})
+
+test("global board groups every repo's issues into state columns", async ({ page }) => {
+  const now = new Date().toISOString()
+  await page.route(/\/api\/issues(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: 1, number: 7, title: "alice todo", author: "alice", state: "todo",
+          assignee: null, created_at: now, updated_at: now,
+          repo: { owner: "alice", name: "demo" },
+        },
+        {
+          id: 2, number: 3, title: "bob doing", author: "bob", state: "in_progress",
+          assignee: "bob", created_at: now, updated_at: now,
+          repo: { owner: "bob", name: "api" },
+        },
+      ]),
+    })
+  )
+
+  await page.goto("/issues/board")
+  const todo = page.getByTestId("board-column-todo")
+  const doing = page.getByTestId("board-column-in_progress")
+
+  // Each card lands in its state column, shows its repo, and links back into it.
+  const aliceCard = todo.locator(".board-card", { hasText: "alice todo" })
+  await expect(aliceCard.locator(".board-card__repo")).toHaveText("alice/demo")
+  const bobCard = doing.locator(".board-card", { hasText: "bob doing" })
+  await expect(bobCard.locator("a.board-card__link")).toHaveAttribute("href", "/bob/api/issues/3")
+})

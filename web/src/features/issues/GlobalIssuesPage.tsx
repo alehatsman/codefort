@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { useAllIssues } from "@/api/queries"
+import "./issues.css"
+import { useAllIssuesPage } from "@/api/queries"
 import { ISSUE_STATES, type IssueState } from "@/api/types"
+import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import StateIcon from "@/features/issues/StateIcon"
-import { EmptyState, ErrorMessage, ListRow, PageHeader, Spinner } from "@/ui"
+import { EmptyState, ErrorMessage, ListRow, PageHeader, Pagination, Spinner } from "@/ui"
 import { useListNav } from "@/shell/keyboardNav"
+
+const PAGE_SIZE = 25
 
 // Fleet-wide Issues view: every repo's issues in one list, newest-updated
 // first, each row tagged with and linking into its owning repo. Mirrors the
@@ -36,16 +40,32 @@ export default function GlobalIssuesPage() {
     return () => clearTimeout(t)
   }, [search, committedQuery, setSearchParams])
 
-  const query = new URLSearchParams()
-  if (activeStates.length > 0) query.set("state", activeStates.join(","))
-  if (committedQuery) query.set("q", committedQuery)
+  // Filter signature (no pagination); page resets to 1 when it changes.
+  const filterQuery = new URLSearchParams()
+  if (activeStates.length > 0) filterQuery.set("state", activeStates.join(","))
+  if (committedQuery) filterQuery.set("q", committedQuery)
+  const filterKey = filterQuery.toString()
 
-  const { data, isLoading, error } = useAllIssues(query.toString())
+  // Reset to page 1 when the filter changes (adjust-state-during-render).
+  const [page, setPage] = useState(1)
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey)
+    setPage(1)
+  }
+
+  const query = new URLSearchParams(filterKey)
+  query.set("limit", String(PAGE_SIZE))
+  if (page > 1) query.set("offset", String((page - 1) * PAGE_SIZE))
+
+  const { data, isLoading, error } = useAllIssuesPage(query.toString())
+  const issues = data?.items ?? []
+  const total = data?.total ?? 0
 
   const { index } = useListNav({
-    count: data?.length ?? 0,
+    count: issues.length,
     onActivate: (i) => {
-      const iss = data?.[i]
+      const iss = issues[i]
       if (iss) navigate(`/${iss.repo.owner}/${iss.repo.name}/issues/${iss.number}`)
     },
   })
@@ -59,7 +79,9 @@ export default function GlobalIssuesPage() {
       <PageHeader
         title="Issues"
         actions={<NewIssueForm onCreated={(n, o, r) => navigate(`/${o}/${r}/issues/${n}`)} />}
-      />
+      >
+        <IssuesViewSwitch />
+      </PageHeader>
 
       <div className="filters">
         <input
@@ -89,34 +111,37 @@ export default function GlobalIssuesPage() {
       {isLoading && <Spinner />}
       {error && <ErrorMessage error={error} />}
 
-      {data && data.length === 0 && <EmptyState>No issues match these filters.</EmptyState>}
+      {data && issues.length === 0 && <EmptyState>No issues match these filters.</EmptyState>}
 
-      {data && data.length > 0 && (
-        <ul className="issue-list">
-          {data.map((iss, i) => (
-            <ListRow
-              key={`${iss.repo.owner}/${iss.repo.name}#${iss.number}`}
-              to={`/${iss.repo.owner}/${iss.repo.name}/issues/${iss.number}`}
-              selected={i === index}
-              leading={
-                <span className="issue-row__icon">
-                  <StateIcon state={iss.state} />
-                </span>
-              }
-              title={iss.title}
-              meta={
-                <>
-                  <span className="issue-row__repo">
-                    {iss.repo.owner}/{iss.repo.name}
-                  </span>{" "}
-                  #{iss.number} opened {new Date(iss.created_at).toLocaleDateString()} by{" "}
-                  {iss.author}
-                </>
-              }
-              side={iss.assignee ? `@${iss.assignee}` : ""}
-            />
-          ))}
-        </ul>
+      {data && issues.length > 0 && (
+        <>
+          <ul className="issue-list">
+            {issues.map((iss, i) => (
+              <ListRow
+                key={`${iss.repo.owner}/${iss.repo.name}#${iss.number}`}
+                to={`/${iss.repo.owner}/${iss.repo.name}/issues/${iss.number}`}
+                selected={i === index}
+                leading={
+                  <span className="issue-row__icon">
+                    <StateIcon state={iss.state} />
+                  </span>
+                }
+                title={iss.title}
+                meta={
+                  <>
+                    <span className="issue-row__repo">
+                      {iss.repo.owner}/{iss.repo.name}
+                    </span>{" "}
+                    #{iss.number} opened {new Date(iss.created_at).toLocaleDateString()} by{" "}
+                    {iss.author}
+                  </>
+                }
+                side={iss.assignee ? `@${iss.assignee}` : ""}
+              />
+            ))}
+          </ul>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+        </>
       )}
     </div>
   )

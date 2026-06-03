@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState } from "react"
 import "./issues.css"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
-import { useIssues } from "@/api/queries"
+import { useIssuesPage } from "@/api/queries"
 import { ISSUE_STATES, type IssueState } from "@/api/types"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import OverviewCard from "@/shell/OverviewCard"
 import StateIcon from "@/features/issues/StateIcon"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import { useListNav } from "@/shell/keyboardNav"
-import { EmptyState, ErrorMessage, FilterChip, ListRow, PageHeader, Spinner } from "@/ui"
+import {
+  EmptyState,
+  ErrorMessage,
+  FilterChip,
+  ListRow,
+  PageHeader,
+  Pagination,
+  Spinner,
+} from "@/ui"
+
+const PAGE_SIZE = 25
 
 export default function IssuesPage() {
   const { owner = "", repo = "" } = useParams()
@@ -56,37 +66,56 @@ export default function IssuesPage() {
     return () => clearTimeout(t)
   }, [search, committedQuery, setSearchParams])
 
-  const query = new URLSearchParams()
-  if (activeStates.length > 0) query.set("state", activeStates.join(","))
-  if (assignee) query.set("assignee", assignee)
-  if (author) query.set("author", author)
-  if (committedQuery) query.set("q", committedQuery)
-  if (sort !== "newest") query.set("sort", sort)
+  // The filter signature (everything except pagination). Page resets to 1
+  // whenever it changes so a narrowed filter never strands you on a now-empty
+  // page.
+  const filterQuery = new URLSearchParams()
+  if (activeStates.length > 0) filterQuery.set("state", activeStates.join(","))
+  if (assignee) filterQuery.set("assignee", assignee)
+  if (author) filterQuery.set("author", author)
+  if (committedQuery) filterQuery.set("q", committedQuery)
+  if (sort !== "newest") filterQuery.set("sort", sort)
+  const filterKey = filterQuery.toString()
 
-  const { data, isLoading, error } = useIssues(owner, repo, query.toString())
+  // Reset to page 1 when the filter changes (React's adjust-state-during-render
+  // pattern — no effect needed for derived resets).
+  const [page, setPage] = useState(1)
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey)
+    setPage(1)
+  }
+
+  const query = new URLSearchParams(filterKey)
+  query.set("limit", String(PAGE_SIZE))
+  if (page > 1) query.set("offset", String((page - 1) * PAGE_SIZE))
+
+  const { data, isLoading, error } = useIssuesPage(owner, repo, query.toString())
+  const issues = data?.items ?? []
+  const total = data?.total ?? 0
 
   // Option lists are derived from the issues currently returned (no separate
   // endpoint — v1). The active selection is always included so it stays
   // visible even when the current filter excludes every row carrying it.
   const authorOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const iss of data ?? []) set.add(iss.author)
+    for (const iss of issues) set.add(iss.author)
     if (author) set.add(author)
     return [...set].sort()
-  }, [data, author])
+  }, [issues, author])
 
   const assigneeOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const iss of data ?? []) if (iss.assignee) set.add(iss.assignee)
+    for (const iss of issues) if (iss.assignee) set.add(iss.assignee)
     if (assignee && assignee !== "null") set.add(assignee)
     return [...set].sort()
-  }, [data, assignee])
+  }, [issues, assignee])
 
   // j/k select an issue row and Enter opens it. (h/l tab nav lives in RepoTabs.)
   const { index } = useListNav({
-    count: data?.length ?? 0,
+    count: issues.length,
     onActivate: (i) => {
-      const iss = data?.[i]
+      const iss = issues[i]
       if (iss) navigate(`/${owner}/${repo}/issues/${iss.number}`)
     },
   })
@@ -191,31 +220,34 @@ export default function IssuesPage() {
       {isLoading && <Spinner />}
       {error && <ErrorMessage error={error} />}
 
-      {data && data.length === 0 && <EmptyState>No issues match these filters.</EmptyState>}
+      {data && issues.length === 0 && <EmptyState>No issues match these filters.</EmptyState>}
 
-      {data && data.length > 0 && (
-        <ul className="issue-list">
-          {data.map((iss, i) => (
-            <ListRow
-              key={iss.id}
-              to={`/${owner}/${repo}/issues/${iss.number}`}
-              selected={i === index}
-              leading={
-                <span className="issue-row__icon">
-                  <StateIcon state={iss.state} />
-                </span>
-              }
-              title={iss.title}
-              meta={
-                <>
-                  #{iss.number} opened {new Date(iss.created_at).toLocaleDateString()} by{" "}
-                  {iss.author}
-                </>
-              }
-              side={iss.assignee ? `@${iss.assignee}` : ""}
-            />
-          ))}
-        </ul>
+      {data && issues.length > 0 && (
+        <>
+          <ul className="issue-list">
+            {issues.map((iss, i) => (
+              <ListRow
+                key={iss.id}
+                to={`/${owner}/${repo}/issues/${iss.number}`}
+                selected={i === index}
+                leading={
+                  <span className="issue-row__icon">
+                    <StateIcon state={iss.state} />
+                  </span>
+                }
+                title={iss.title}
+                meta={
+                  <>
+                    #{iss.number} opened {new Date(iss.created_at).toLocaleDateString()} by{" "}
+                    {iss.author}
+                  </>
+                }
+                side={iss.assignee ? `@${iss.assignee}` : ""}
+              />
+            ))}
+          </ul>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+        </>
       )}
     </div>
   )

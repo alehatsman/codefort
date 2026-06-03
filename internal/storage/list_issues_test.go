@@ -168,3 +168,56 @@ func TestListIssuesSort(t *testing.T) {
 		})
 	}
 }
+
+func TestListIssuesOffsetPaginates(t *testing.T) {
+	db, repoID := seedRepo(t)
+	for i := 1; i <= 5; i++ {
+		mustCreate(t, db, repoID, "issue", "")
+	}
+	// Default sort is number DESC: #5,#4,#3,#2,#1. Page size 2.
+	page1, err := ListIssues(db, repoID, ListFilter{Limit: 2, Offset: 0})
+	if err != nil {
+		t.Fatalf("page1: %v", err)
+	}
+	if g := order(page1); !slices.Equal(g, []int{5, 4}) {
+		t.Fatalf("page1 = %v, want [5 4]", g)
+	}
+	page2, err := ListIssues(db, repoID, ListFilter{Limit: 2, Offset: 2})
+	if err != nil {
+		t.Fatalf("page2: %v", err)
+	}
+	if g := order(page2); !slices.Equal(g, []int{3, 2}) {
+		t.Fatalf("page2 = %v, want [3 2]", g)
+	}
+	page3, err := ListIssues(db, repoID, ListFilter{Limit: 2, Offset: 4})
+	if err != nil {
+		t.Fatalf("page3: %v", err)
+	}
+	if g := order(page3); !slices.Equal(g, []int{1}) {
+		t.Fatalf("page3 = %v, want [1]", g)
+	}
+}
+
+func TestCountIssuesIgnoresLimitOffset(t *testing.T) {
+	db, repoID := seedRepo(t)
+	mustCreate(t, db, repoID, "Fix the parser", "")
+	mustCreate(t, db, repoID, "Unrelated", "")
+	mustCreate(t, db, repoID, "parser again", "")
+
+	// Total ignores Limit/Offset — it's the full matching set.
+	n, err := CountIssues(db, repoID, ListFilter{Limit: 1, Offset: 1})
+	if err != nil {
+		t.Fatalf("CountIssues: %v", err)
+	}
+	if n != 3 {
+		t.Fatalf("count = %d, want 3", n)
+	}
+	// Filters still apply: only the two 'parser' rows.
+	n, err = CountIssues(db, repoID, ListFilter{Query: "parser"})
+	if err != nil {
+		t.Fatalf("CountIssues filtered: %v", err)
+	}
+	if n != 2 {
+		t.Fatalf("filtered count = %d, want 2", n)
+	}
+}

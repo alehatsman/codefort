@@ -189,6 +189,24 @@
   text-align: center;
   font-size: var(--text-sm);
 }
+/* "Show N more / Show less" toggle for the collapsed done column. */
+.board-col__more {
+  appearance: none;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    color var(--transition);
+}
+.board-col__more:hover {
+  border-color: var(--accent);
+  color: var(--fg);
+}
 .board-card {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -211,6 +229,10 @@
 }
 .board-card__link:hover {
   text-decoration: none;
+}
+.board-card__repo {
+  font-size: var(--text-xs);
+  margin-bottom: 4px;
 }
 .board-card__title {
   font-weight: var(--weight-medium);

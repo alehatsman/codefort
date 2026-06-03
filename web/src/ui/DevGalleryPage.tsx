@@ -17,6 +17,7 @@ import {
   ListRow,
   Menu,
   PageHeader,
+  Pagination,
   Radio,
   RelativeTime,
   SegmentedControl,
@@ -69,6 +70,7 @@ export default function DevGalleryPage() {
       <TooltipSection />
       <MenuSection />
       <CodeSnippetSection />
+      <PaginationSection />
       <StatusIconSection />
       <SegmentedControlSection />
       <ChipsSection />
@@ -534,6 +536,18 @@ function ChipsSection() {
           {s}
         </FilterChip>
       ))}
+    </Section>
+  )
+}
+
+function PaginationSection() {
+  const [page, setPage] = useState(2)
+  return (
+    <Section title="Pagination">
+      <p className="gallery__sublabel">120 items, 25 per page — prev/next with range</p>
+      <Pagination page={page} pageSize={25} total={120} onPageChange={setPage} />
+      <p className="gallery__sublabel">Single page (total ≤ pageSize) renders nothing</p>
+      <Pagination page={1} pageSize={25} total={10} onPageChange={() => {}} />
     </Section>
   )
 }

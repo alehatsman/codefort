@@ -192,6 +192,66 @@ test("search narrows the list by title/body, and #number jumps to the issue", as
   await expect(page.getByRole("heading", { name: /Something else/ })).toBeVisible()
 })
 
+test("the issue list paginates at 25 per page", async ({ page }) => {
+  const now = new Date().toISOString()
+  const issues = Array.from({ length: 30 }, (_, i) => ({
+    id: i + 1, number: i + 1, title: `Task ${i + 1}`, author: "alice",
+    state: "todo" as const, assignee: null, created_at: now, updated_at: now,
+  }))
+  await mockApi(page, { issues })
+  await page.goto("/alice/demo/issues")
+
+  // Page 1: first 25 (newest-first → #30..#6), range + pager reflect the total.
+  await expect(page.locator(".issue-row")).toHaveCount(25)
+  await expect(page.locator(".pagination__range")).toHaveText("1–25 of 30")
+
+  // Next → page 2 with the remaining 5 (offset=25 on the wire).
+  const nextReq = page.waitForRequest((r) => r.url().includes("offset=25"))
+  await page.getByRole("button", { name: "Next" }).click()
+  await nextReq
+  await expect(page.locator(".issue-row")).toHaveCount(5)
+  await expect(page.locator(".pagination__range")).toHaveText("26–30 of 30")
+
+  // Prev returns to page 1.
+  await page.getByRole("button", { name: "Prev" }).click()
+  await expect(page.locator(".issue-row")).toHaveCount(25)
+
+  // Narrowing the filter resets to page 1 (no stranding on an empty page).
+  await page.getByRole("button", { name: "Next" }).click()
+  await expect(page.locator(".pagination__range")).toHaveText("26–30 of 30")
+  await page.getByRole("searchbox", { name: "Search issues" }).fill("Task 7")
+  await expect(page.locator(".issue-row")).toHaveCount(1)
+})
+
+test("the Board↔List toggle defaults to Board on the left and switches views", async ({ page }) => {
+  await mockApi(page, {
+    issues: [
+      {
+        id: 1, number: 1, title: "Toggle me", author: "alice", state: "todo",
+        assignee: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      },
+    ],
+  })
+
+  // The Issues nav tab points at the board, so that's the default landing.
+  await page.goto("/alice/demo/issues/board")
+  const sw = page.locator(".view-switch")
+  const tabs = sw.getByRole("tab")
+  // Board is the first (left) tab and is selected.
+  await expect(tabs.first()).toHaveText("Board")
+  await expect(tabs.first()).toHaveAttribute("aria-selected", "true")
+  await expect(page.getByTestId("board-column-todo")).toBeVisible()
+
+  // Switch to the list.
+  await sw.getByRole("tab", { name: "List" }).click()
+  await expect(page).toHaveURL(/\/alice\/demo\/issues$/)
+  await expect(page.locator(".issue-row", { hasText: "Toggle me" })).toBeVisible()
+
+  // And back to the board.
+  await sw.getByRole("tab", { name: "Board" }).click()
+  await expect(page).toHaveURL(/\/alice\/demo\/issues\/board$/)
+})
+
 test("delete own comment removes it; can't delete others'", async ({ page }) => {
   const now = new Date().toISOString()
   await mockApi(page, {

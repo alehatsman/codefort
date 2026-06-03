@@ -145,13 +145,14 @@ test("global nav links the cross-repo aggregate views", async ({ page }) => {
   const nav = page.locator("nav.tabs", { hasText: "Repos" })
   await expect(nav.getByRole("link", { name: "Repos" })).toHaveClass(/is-active/)
 
-  // Issues tab: both repos' issues, each tagged with its repo and linking back.
+  // Issues tab defaults to the board: both repos' issues as cards, each tagged
+  // with its repo and linking back into that repo's issue.
   await nav.getByRole("link", { name: "Issues" }).click()
-  await expect(page).toHaveURL(/\/issues$/)
-  await expect(page.locator(".issue-row", { hasText: "alice bug" })).toBeVisible()
-  const bobRow = page.locator(".issue-row", { hasText: "bob feature" })
-  await expect(bobRow.locator(".issue-row__repo")).toHaveText("bob/api")
-  await expect(bobRow.getByRole("link")).toHaveAttribute("href", "/bob/api/issues/3")
+  await expect(page).toHaveURL(/\/issues\/board$/)
+  await expect(page.locator(".board-card", { hasText: "alice bug" })).toBeVisible()
+  const bobCard = page.locator(".board-card", { hasText: "bob feature" })
+  await expect(bobCard.locator(".board-card__repo")).toHaveText("bob/api")
+  await expect(bobCard.locator("a.board-card__link")).toHaveAttribute("href", "/bob/api/issues/3")
 
   // Pull requests tab.
   await page.locator("nav.tabs").getByRole("link", { name: "Pull requests" }).click()

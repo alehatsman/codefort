@@ -7,6 +7,8 @@ interface Props {
   owner: string
   repo: string
   issue: Issue
+  // Show the owning repo on the card — used by the cross-repo (global) board.
+  showRepo?: boolean
 }
 
 /**
@@ -15,10 +17,12 @@ interface Props {
  * after a drop is swallowed by BoardPage's document-level capture listener,
  * which survives the card remounting into its new column.
  */
-export default function BoardCard({ owner, repo, issue }: Props) {
+export default function BoardCard({ owner, repo, issue, showRepo = false }: Props) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `issue-${issue.id}`,
-    data: { issueNumber: issue.number, currentState: issue.state },
+    // owner/repo ride along so the cross-repo board can PATCH the right repo on
+    // drop; the per-repo board ignores them and uses its own scope.
+    data: { issueNumber: issue.number, currentState: issue.state, owner, repo },
   })
 
   const style: React.CSSProperties = {
@@ -29,6 +33,11 @@ export default function BoardCard({ owner, repo, issue }: Props) {
   return (
     <div ref={setNodeRef} className="board-card" style={style} {...listeners} {...attributes}>
       <Link to={`/${owner}/${repo}/issues/${issue.number}`} className="board-card__link">
+        {showRepo && (
+          <div className="board-card__repo muted">
+            {owner}/{repo}
+          </div>
+        )}
         <div className="board-card__title">{issue.title}</div>
         <div className="board-card__meta">
           <span className="muted">#{issue.number}</span>

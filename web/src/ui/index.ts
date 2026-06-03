@@ -18,6 +18,7 @@ export { default as Input } from "@/ui/Input"
 export { default as ListRow } from "@/ui/ListRow"
 export { default as Menu, type MenuItem } from "@/ui/Menu"
 export { default as PageHeader } from "@/ui/PageHeader"
+export { default as Pagination } from "@/ui/Pagination"
 export { default as Radio } from "@/ui/Radio"
 export { default as RelativeTime } from "@/ui/RelativeTime"
 export {

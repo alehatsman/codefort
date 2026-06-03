@@ -12,6 +12,13 @@ export const keys = {
   agentSettings: () => ["agentSettings"] as const,
   repos: () => ["repos"] as const,
   allIssues: (query = "") => (query ? (["allIssues", query] as const) : (["allIssues"] as const)),
+  // Paginated list caches nest under the same prefix as their array siblings
+  // so the existing keys.issues / keys.allIssues invalidations still refresh
+  // them. The "page" segment keeps their Page<T> value from colliding with the
+  // bare Issue[] entries that placeholderData / the board read.
+  allIssuesPage: (query = "") => ["allIssues", "page", query] as const,
+  issuesPage: (owner: string, repo: string, query = "") =>
+    ["issues", owner, repo, "page", query] as const,
   allPulls: (state = "", query = "") => ["allPulls", state, query] as const,
   allRuns: (kind = "", query = "") => ["allRuns", kind, query] as const,
   repo: (owner: string, repo: string) => ["repo", owner, repo] as const,
@@ -110,6 +117,15 @@ export function useAllIssues(query: string) {
   return useQuery({
     queryKey: keys.allIssues(query),
     queryFn: () => api.listAllIssues(query),
+  })
+}
+
+// Paginated cross-repo list backing the global Issues list view.
+export function useAllIssuesPage(query: string) {
+  return useQuery({
+    queryKey: keys.allIssuesPage(query),
+    queryFn: () => api.listAllIssuesPage(query),
+    placeholderData: (prev) => prev,
   })
 }
 
@@ -256,6 +272,19 @@ export function useIssues(owner: string, repo: string, query: string) {
   })
 }
 
+// Paginated per-repo list — returns { items, total } so the list view can show
+// prev/next. The query string carries limit/offset, so each page is its own
+// cache entry; placeholderData keeps the previous page visible while the next
+// loads (no flash of empty list on page turn).
+export function useIssuesPage(owner: string, repo: string, query: string) {
+  return useQuery({
+    queryKey: keys.issuesPage(owner, repo, query),
+    queryFn: () => api.listIssuesPage(owner, repo, query),
+    enabled: !!owner && !!repo,
+    placeholderData: (prev) => prev,
+  })
+}
+
 export function useIssue(owner: string, repo: string, n: number) {
   const qc = useQueryClient()
   return useQuery({
@@ -269,7 +298,10 @@ export function useIssue(owner: string, repo: string, n: number) {
     placeholderData: () => {
       const lists = qc.getQueriesData<Issue[]>({ queryKey: keys.issues(owner, repo) })
       for (const [, data] of lists) {
-        const found = data?.find((i) => i.number === n)
+        // The prefix also matches paginated Page<Issue> entries (keys.issuesPage);
+        // only the bare-array list caches are seedable here.
+        if (!Array.isArray(data)) continue
+        const found = data.find((i) => i.number === n)
         if (found) return found
       }
       return undefined

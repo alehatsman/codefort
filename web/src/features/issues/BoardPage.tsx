@@ -13,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { api } from "@/api/client"
 import { keys, useIssues } from "@/api/queries"
 import { ISSUE_STATES, type Issue, type IssueState } from "@/api/types"
-import BoardColumn from "@/features/issues/BoardColumn"
+import BoardColumn, { type BoardItem } from "@/features/issues/BoardColumn"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import OverviewCard from "@/shell/OverviewCard"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
@@ -36,19 +36,20 @@ export default function BoardPage() {
   // the page — the board IS the visualization.
   const issuesQ = useIssues(owner, repo, "limit=1000")
 
-  // Group issues by state once per data change.
+  // Group issues by state once per data change. Each card carries this repo's
+  // owner/repo so BoardColumn stays repo-agnostic (shared with the global board).
   const grouped = useMemo(() => {
-    const map: Record<IssueState, Issue[]> = {
+    const map: Record<IssueState, BoardItem[]> = {
       todo: [],
       in_progress: [],
       done: [],
       closed: [],
     }
     issuesQ.data?.forEach((iss) => {
-      map[iss.state].push(iss)
+      map[iss.state].push({ issue: iss, owner, repo })
     })
     return map
-  }, [issuesQ.data])
+  }, [issuesQ.data, owner, repo])
 
   // 6px activation distance so quick clicks stay clicks. Trello convention.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
@@ -107,13 +108,7 @@ export default function BoardPage() {
       >
         <div className="board">
           {ISSUE_STATES.map((state) => (
-            <BoardColumn
-              key={state}
-              owner={owner}
-              repo={repo}
-              state={state}
-              issues={grouped[state]}
-            />
+            <BoardColumn key={state} state={state} items={grouped[state]} />
           ))}
         </div>
       </DndContext>
