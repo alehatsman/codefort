@@ -49,13 +49,19 @@ export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
   const r = repoQ.data
   const runNumber = numberParam ? Number(numberParam) : null
 
+  // The breadcrumb card sits above the run *list* (the tab landing). The run
+  // *detail* view fills the viewport (.pipelines--agent-run is sized to
+  // 100dvh - topbar - padding) and carries its own back-nav header, so a card
+  // above it would push the full-height section past the viewport (#322).
   return (
     <div className="repo">
-      <OverviewCard owner={r.owner} repo={r.name} path="" summaries={{}} />
       {runNumber !== null && Number.isFinite(runNumber) ? (
         <RunDetail owner={r.owner} repo={r.name} runNumber={runNumber} />
       ) : (
-        <RunList repo={r} kind={kind} />
+        <>
+          <OverviewCard owner={r.owner} repo={r.name} path="" summaries={{}} />
+          <RunList repo={r} kind={kind} />
+        </>
       )}
     </div>
   )
