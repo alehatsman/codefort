@@ -6,7 +6,7 @@ import { useCancelCIRun, useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from 
 import { absoluteTime, timeAgo } from "@/shell/timeAgo"
 import type { Repo } from "@/api/types"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
-import { Button, EmptyState, ErrorMessage, Input, Spinner } from "@/ui"
+import { Button, EmptyState, ErrorMessage, Input, Spinner, Table } from "@/ui"
 import AgentRunBody from "@/features/agents/AgentRunBody"
 import CIRunBody from "@/features/pipelines/CIRunBody"
 import {
@@ -142,7 +142,7 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
       )}
 
       {runsQ.data && runsQ.data.length > 0 && (
-        <table className="ci-runs">
+        <Table className="ci-runs">
           <thead>
             <tr>
               <th>Run</th>
@@ -188,7 +188,7 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </section>
   )

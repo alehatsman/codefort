@@ -61,23 +61,8 @@
   background: var(--state-in_progress-bg);
   color: var(--state-in_progress);
 }
-/* Runs table */
-.ci-runs {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-sm);
-}
-.ci-runs th {
-  text-align: left;
-  font-weight: var(--weight-medium);
-  color: var(--fg-muted);
-  padding: var(--space-2);
-  border-bottom: 1px solid var(--border);
-}
-.ci-runs td {
-  padding: var(--space-2);
-  border-bottom: 1px solid var(--border-muted);
-}
+/* Runs table — base density/dividers come from the shared `.table` (@/ui Table);
+   these are the Pipelines-specific columns. */
 .ci-runs__num {
   font-weight: var(--weight-medium);
 }

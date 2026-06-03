@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 import "./pipelines.css"
 import { useAllRuns } from "@/api/queries"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
-import { EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { EmptyState, ErrorMessage, Spinner, Table } from "@/ui"
 import { absoluteTime, timeAgo } from "@/shell/timeAgo"
 import {
   type RunKind,
@@ -40,7 +40,7 @@ export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
       )}
 
       {data && data.length > 0 && (
-        <table className="ci-runs">
+        <Table className="ci-runs">
           <thead>
             <tr>
               <th>Repo</th>
@@ -95,7 +95,7 @@ export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
               )
             })}
           </tbody>
-        </table>
+        </Table>
       )}
     </section>
   )

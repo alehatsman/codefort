@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import type { CIRun } from "@/api/types"
+import { Table } from "@/ui"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
 import { executionModelLabel, runDuration, shortSHA } from "@/features/pipelines/runHelpers"
 import { absoluteTime, timeAgo } from "@/shell/timeAgo"
@@ -25,7 +26,7 @@ export default function AgentRunsTable({
   showRepo: boolean
 }) {
   return (
-    <table className="agent-runs">
+    <Table className="agent-runs">
       <thead>
         <tr>
           {showRepo && <th>Repo</th>}
@@ -89,6 +90,6 @@ export default function AgentRunsTable({
           )
         })}
       </tbody>
-    </table>
+    </Table>
   )
 }

@@ -741,6 +741,26 @@ a.file-tree__commit:hover {
 .markdown-body pre {
   margin: 0 0 var(--space-4);
 }
+
+/* Data table (@/ui Table) — full width, collapsed borders, muted header row,
+   per-row dividers. The runs grids (.ci-runs / .agent-runs) extend this with
+   their own column classes; they shared this exact base before. */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.table th {
+  text-align: left;
+  font-weight: var(--weight-medium);
+  color: var(--fg-muted);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+.table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border-muted);
+}
 .markdown-body ul,
 .markdown-body ol {
   padding-left: var(--space-6);
