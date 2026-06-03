@@ -1,23 +1,32 @@
 import { test, expect } from "@playwright/test"
 import { mockApi, seedToken } from "./mockApi"
 
+// Per-repo settings (the delete-repo Danger Zone) now live in the global
+// /settings page under a "Repositories" section, not a per-repo Settings tab.
+
 test.beforeEach(async ({ page }) => {
   await seedToken(page)
 })
 
-test("Settings tab opens the repo Danger Zone", async ({ page }) => {
+test("Repositories section lists repos with a delete affordance", async ({ page }) => {
   await mockApi(page)
-  await page.goto("/alice/demo")
+  await page.goto("/settings")
 
-  await page.getByRole("link", { name: "Settings", exact: true }).click()
-  await expect(page).toHaveURL(/\/alice\/demo\/settings$/)
-  await expect(page.getByRole("heading", { name: "Danger Zone" })).toBeVisible()
-  await expect(page.getByText("Delete this repository")).toBeVisible()
+  await page.getByRole("button", { name: "Repositories" }).click()
+  await expect(page.getByRole("heading", { name: "Repositories" })).toBeVisible()
+  await expect(page.getByRole("cell", { name: "alice/demo" })).toBeVisible()
 })
 
 test("delete is gated behind type-to-confirm and removes the repo", async ({ page }) => {
   await mockApi(page)
-  await page.goto("/alice/demo/settings")
+  await page.goto("/settings")
+  await page.getByRole("button", { name: "Repositories" }).click()
+
+  // Arm the repo's confirm row.
+  await page
+    .getByRole("row", { name: /alice\/demo/ })
+    .getByRole("button", { name: "Delete" })
+    .click()
 
   const deleteBtn = page.getByRole("button", { name: "Delete repository" })
   const confirm = page.getByLabel("Type the repository name to confirm deletion")
@@ -29,15 +38,20 @@ test("delete is gated behind type-to-confirm and removes the repo", async ({ pag
   await confirm.fill("alice/demo")
   await expect(deleteBtn).toBeEnabled()
 
-  // Deleting navigates back to the repos list, where the repo is gone.
+  // Deleting drops the repo from the list, leaving the empty state.
   await deleteBtn.click()
-  await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByText("alice/demo")).toHaveCount(0)
+  await expect(page.getByRole("cell", { name: "alice/demo" })).toHaveCount(0)
+  await expect(page.getByText("No repositories yet.")).toBeVisible()
 })
 
 test("deleting a repo that's already gone surfaces the 404", async ({ page }) => {
   await mockApi(page)
-  await page.goto("/alice/demo/settings")
+  await page.goto("/settings")
+  await page.getByRole("button", { name: "Repositories" }).click()
+  await page
+    .getByRole("row", { name: /alice\/demo/ })
+    .getByRole("button", { name: "Delete" })
+    .click()
 
   const confirm = page.getByLabel("Type the repository name to confirm deletion")
   await confirm.fill("alice/demo")
@@ -53,5 +67,4 @@ test("deleting a repo that's already gone surfaces the 404", async ({ page }) =>
 
   await page.getByRole("button", { name: "Delete repository" }).click()
   await expect(page.getByText(/not registered/)).toBeVisible()
-  await expect(page).toHaveURL(/\/alice\/demo\/settings$/)
 })

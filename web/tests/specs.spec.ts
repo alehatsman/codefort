@@ -120,7 +120,8 @@ test("Specs: tab links to /specs; two-pane tree + status rail + rendered spec", 
   await page.goto("/alice/demo")
   await page.getByRole("link", { name: "Specs" }).click()
   await expect(page).toHaveURL(/\/alice\/demo\/specs/)
-  await expect(page.locator(".tab.is-active")).toHaveText("Specs")
+  // The active tab now carries a spec-count pill, so match the label loosely.
+  await expect(page.locator(".tab.is-active")).toContainText("Specs")
 
   // Status rail counts the lifecycle states (1 living, 1 draft).
   const rail = page.locator(".spec-rail")
