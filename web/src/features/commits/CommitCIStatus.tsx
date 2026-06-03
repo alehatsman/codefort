@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom"
 import type { CIRun } from "@/api/types"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
+import { Tooltip } from "@/ui"
 
 /**
  * The CI status of one commit, rendered as a badge linking to its run — shown
@@ -19,12 +20,10 @@ export default function CommitCIStatus({
 }) {
   if (!run) return null
   return (
-    <Link
-      to={`/${owner}/${repo}/pipelines/${run.number}`}
-      className="commit-ci"
-      title={`CI run #${run.number}: ${run.status}`}
-    >
-      <CIStatusBadge status={run.status} />
-    </Link>
+    <Tooltip label={`CI run #${run.number}: ${run.status}`}>
+      <Link to={`/${owner}/${repo}/pipelines/${run.number}`} className="commit-ci">
+        <CIStatusBadge status={run.status} />
+      </Link>
+    </Tooltip>
   )
 }
