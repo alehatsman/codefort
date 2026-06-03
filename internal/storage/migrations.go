@@ -338,6 +338,14 @@ var migrations = []string{
 	);
 	CREATE INDEX IF NOT EXISTS idx_spec_verifications_spec ON spec_verifications(repo_id, spec_id, id);
 	`,
+
+	// 20: spec-verify agent runs (#219). A run of kind 'spec-verify' targets a
+	// spec (spec_path) instead of an issue (issue_number stays NULL), reusing the
+	// agent run spine to classify code↔spec drift. Empty for CI/issue runs by the
+	// column default.
+	`
+	ALTER TABLE ci_runs ADD COLUMN spec_path TEXT NOT NULL DEFAULT '';
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alehatsman/moongit/internal/api"
 	"github.com/alehatsman/moongit/internal/ci"
 	"github.com/alehatsman/moongit/internal/storage"
 )
@@ -34,19 +35,35 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 	log = log.With("repo", owner+"/"+name)
 
-	// Gate: an agent run must serve a real issue — the issue is the work.
-	if run.IssueNumber == nil {
-		log.Error("agent run has no issue")
-		r.finish(run, storage.RunError)
-		return
+	// A spec-verify run targets a spec, not an issue, and finishes one-shot
+	// (no awaiting_input park, no issue handoff). It reuses everything else —
+	// workspace, container, dex MCP, the turn loop.
+	verify := run.Kind == storage.RunKindSpecVerify
+
+	// Gate the task. An issue agent run must serve a real issue (the issue is
+	// the work); a spec-verify run must name a spec.
+	var issue api.Issue
+	if verify {
+		if run.SpecPath == "" {
+			log.Error("spec-verify run has no spec path")
+			r.finish(run, storage.RunError)
+			return
+		}
+		log = log.With("spec", run.SpecPath)
+	} else {
+		if run.IssueNumber == nil {
+			log.Error("agent run has no issue")
+			r.finish(run, storage.RunError)
+			return
+		}
+		issue, err = storage.GetIssue(r.db, run.RepoID, *run.IssueNumber)
+		if err != nil {
+			log.Error("agent get issue", "issue", *run.IssueNumber, "err", err)
+			r.finish(run, storage.RunError)
+			return
+		}
+		log = log.With("issue", issue.Number)
 	}
-	issue, err := storage.GetIssue(r.db, run.RepoID, *run.IssueNumber)
-	if err != nil {
-		log.Error("agent get issue", "issue", *run.IssueNumber, "err", err)
-		r.finish(run, storage.RunError)
-		return
-	}
-	log = log.With("issue", issue.Number)
 
 	// Select the execution model up front so an unknown model fails before
 	// we spend a workspace + container on it (#110).
@@ -87,6 +104,21 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	moongitURL := agentServerURL(r.cfg) + "/" + owner + "/" + name + ".git"
 	if err := wireAgentMoongitRemote(parent, workDir, moongitURL); err != nil {
 		log.Warn("agent wire moongit remote", "err", err)
+	}
+
+	// For a spec-verify run, read the target spec from the checkout — it's the
+	// task. A missing spec is a definition error, not an infra one, but there's
+	// nothing to verify, so fail the run before spending a container.
+	var specContent string
+	if verify {
+		b, rerr := os.ReadFile(filepath.Join(workDir, run.SpecPath))
+		if rerr != nil {
+			log.Error("spec-verify read spec", "path", run.SpecPath, "err", rerr)
+			_ = os.RemoveAll(workDir)
+			r.finish(run, storage.RunError)
+			return
+		}
+		specContent = string(b)
 	}
 
 	// One synthetic job carries the whole agent session, so the run-detail UI,
@@ -164,12 +196,15 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 
 	in := turnInput{
-		sessionID: agentSessionID(run.ID),
-		owner:     owner,
-		repo:      name,
-		issue:     issue,
-		firstTurn: true,
-		mcpPath:   mcpPath,
+		sessionID:   agentSessionID(run.ID),
+		owner:       owner,
+		repo:        name,
+		issue:       issue,
+		verify:      verify,
+		specPath:    run.SpecPath,
+		specContent: specContent,
+		firstTurn:   true,
+		mcpPath:     mcpPath,
 	}
 	turnCtx, h := r.registerAgentTurn(parent, run.ID)
 	status, execErr := r.runAgentTurn(turnCtx, stream, elog, exec, 1, in)
@@ -186,10 +221,25 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		// Infra failure (couldn't run claude / ctx cancel): the container is
 		// likely unusable — finalize and tear down.
 		log.Error("agent turn 1 exec", "err", execErr)
-		r.commentAgentFailure(run, "the first turn failed to run")
+		if !verify {
+			r.commentAgentFailure(run, "the first turn failed to run")
+		}
 		r.failAgentRun(run.ID, job.ID, workDir)
 		return
 	}
+
+	// A spec-verify run is one-shot: the single turn produced the classification
+	// (it rides the transcript for #220 to parse + stamp). Finalize and tear the
+	// container down now — no awaiting_input park, no issue handoff.
+	if verify {
+		zero := 0
+		r.finishJob(job.ID, storage.JobSuccess, &zero)
+		r.tearDownAgent(run.ID, job.ID, workDir)
+		r.finish(run, storage.RunSuccess)
+		log.Info("spec-verify run finished", "turn1_status", status)
+		return
+	}
+
 	// The turn ran to completion. Whatever its verdict — success, a soft stop
 	// (converged / no_progress), or a genuine step failure — park awaiting_input
 	// and leave the container alive so the operator can click Continue and

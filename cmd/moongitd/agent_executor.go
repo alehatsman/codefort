@@ -42,12 +42,20 @@ type turnInput struct {
 	firstTurn bool      // first turn works the issue; later turns work message
 	mcpPath   string    // dex MCP config path, "" to omit
 	resume    bool      // follow-up turn resumes the session (claude-edit; mooncake ignores)
+	// verify marks a spec-verify run: a one-shot turn whose task is to classify
+	// the spec at specPath (its content carried verbatim) against the code.
+	verify      bool
+	specPath    string
+	specContent string
 }
 
-// goal is the turn's user message / goal text: the issue title+body on the
-// first turn, the human follow-up message thereafter. Both executors build
-// their command on it.
+// goal is the turn's user message / goal text: for a spec-verify run the verify
+// task; otherwise the issue title+body on the first turn, the human follow-up
+// message thereafter. Both executors build their command on it.
 func (in turnInput) goal() string {
+	if in.verify {
+		return composeVerifyTurnPrompt(in.specPath, in.specContent)
+	}
 	if in.firstTurn {
 		return composeTurnPrompt(in.issue)
 	}
@@ -112,7 +120,9 @@ func (claudeExecutor) Model() string { return agentModelClaudeEdit }
 
 func (claudeExecutor) Argv(in turnInput) []string {
 	var sys string
-	if in.firstTurn {
+	if in.verify {
+		sys = composeVerifySystemPrompt(in.owner, in.repo)
+	} else if in.firstTurn {
 		// The system prompt orients claude for the whole session, so it rides
 		// only the first turn; a --resume turn already carries it.
 		sys = composeAgentSystemPrompt(in.owner, in.repo, in.issue)

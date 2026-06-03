@@ -757,3 +757,11 @@ type SpecDriftReport struct {
 	Ref   string          `json:"ref"`
 	Specs []SpecDriftItem `json:"specs"`
 }
+
+// VerifySpecRequest is the body of POST .../specs/verify: kick off a verify
+// agent run for one spec. Ref selects the commit to verify against (default
+// branch when empty).
+type VerifySpecRequest struct {
+	Path string `json:"path"`
+	Ref  string `json:"ref,omitempty"`
+}

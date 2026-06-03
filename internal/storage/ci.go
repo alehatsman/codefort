@@ -81,6 +81,11 @@ type RunKind string
 const (
 	RunKindCI    RunKind = "ci"
 	RunKindAgent RunKind = "agent"
+	// RunKindSpecVerify is an agent run that verifies a spec against the code it
+	// governs instead of working an issue (#219). It reuses the agent spine but
+	// targets SpecPath, not IssueNumber, and finishes one-shot (no awaiting_input
+	// park, no issue handoff).
+	RunKindSpecVerify RunKind = "spec-verify"
 )
 
 // Agent execution models (#110): the pluggable strategy an agent run uses
@@ -154,7 +159,9 @@ type CIRun struct {
 	MooncakeAllowShell bool
 	// ToolProfile names the mgit MCP toolset slice this agent run sees
 	// ('full' | 'review'); 'full' for CI rows by the column default (#184).
-	ToolProfile  string
+	ToolProfile string
+	// SpecPath is the repo-relative spec a spec-verify run targets; "" otherwise.
+	SpecPath     string
 	CommitSHA    string
 	CommitMsg    string // commit subject, frozen at enqueue (may be empty)
 	CommitAuthor string // commit author name, frozen at enqueue (may be empty)
@@ -196,7 +203,9 @@ type NewRun struct {
 	// ToolProfile names the mgit MCP toolset slice for this agent run
 	// ('full' | 'review'); empty falls back to the column default ('full').
 	// Set only for agent runs (#184).
-	ToolProfile  string
+	ToolProfile string
+	// SpecPath targets a spec-verify run at a spec; empty otherwise (#219).
+	SpecPath     string
 	CommitSHA    string
 	CommitMsg    string
 	CommitAuthor string
@@ -239,10 +248,10 @@ func EnqueueRun(db *sql.DB, repoID int64, r NewRun) (CIRun, error) {
 		profile = DefaultToolProfile
 	}
 	run, err := scanRun(tx.QueryRow(`
-		INSERT INTO ci_runs(repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, tool_profile, commit_sha, commit_msg, commit_author, ref, event, trigger, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO ci_runs(repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, tool_profile, commit_sha, commit_msg, commit_author, ref, event, trigger, status, spec_path)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING `+runColumns+`
-	`, repoID, next, string(kind), r.IssueNumber, execModel, allowShell, profile, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued)))
+	`, repoID, next, string(kind), r.IssueNumber, execModel, allowShell, profile, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued), r.SpecPath))
 	if err != nil {
 		return CIRun{}, err
 	}
@@ -655,7 +664,7 @@ func affected(res sql.Result, err error) error {
 	return nil
 }
 
-const runColumns = "id, repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, tool_profile, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at"
+const runColumns = "id, repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, tool_profile, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at, spec_path"
 
 func scanRun(s scanner) (CIRun, error) {
 	var r CIRun
@@ -666,7 +675,7 @@ func scanRun(s scanner) (CIRun, error) {
 	if err := s.Scan(
 		&r.ID, &r.RepoID, &r.Number, &kind, &issueNum, &r.ExecutionModel, &allowShell, &r.ToolProfile, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
 		&r.Ref, &r.Event, &r.Trigger,
-		&status, &claimed, &created, &started, &finished,
+		&status, &claimed, &created, &started, &finished, &r.SpecPath,
 	); err != nil {
 		return r, err
 	}

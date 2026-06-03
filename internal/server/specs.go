@@ -600,3 +600,75 @@ func gitDiffGlobs(ctx context.Context, repoDir, base, ref string, covers []strin
 	}
 	return changed, nil
 }
+
+// handleVerifySpec kicks off a spec-verify agent run for one spec: it resolves
+// the spec + the commit to verify against, then enqueues a kind=spec-verify run
+// on the agent spine (read-only tool profile, claude-edit). The run streams over
+// the same run/job event endpoints; #220 parses its output and stamps the result.
+func (s *Server) handleVerifySpec(w http.ResponseWriter, r *http.Request) {
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+	repoDir, ok := s.repoDirOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	var req api.VerifySpecRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	specPath, err := cleanTreePath(req.Path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if specPath == "" || !strings.HasPrefix(specPath, specsDir+"/") || !strings.EqualFold(path.Ext(specPath), ".md") {
+		writeError(w, http.StatusBadRequest, "path must be a .md file under specs/")
+		return
+	}
+
+	ref := strings.TrimSpace(req.Ref)
+	if ref == "" {
+		ref = headRef(r.Context(), repoDir)
+	}
+	if strings.HasPrefix(ref, "-") {
+		writeError(w, http.StatusBadRequest, "invalid ref")
+		return
+	}
+	// Resolve to an immutable commit (same peel as the issue-agent trigger).
+	out, err := gitOutput(r.Context(), repoDir, "rev-parse", "-q", "--verify", ref+"^{commit}")
+	sha := strings.TrimSpace(string(out))
+	if err != nil || sha == "" {
+		writeError(w, http.StatusBadRequest, "cannot resolve ref "+ref)
+		return
+	}
+	// The spec must exist at that commit.
+	if _, err := gitOutput(r.Context(), repoDir, "cat-file", "-e", sha+":"+specPath); err != nil {
+		writeError(w, http.StatusNotFound, "spec not found: "+specPath)
+		return
+	}
+
+	msg, author := gitCommitMeta(repoDir, sha)
+	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
+		Kind:           storage.RunKindSpecVerify,
+		SpecPath:       specPath,
+		ExecutionModel: storage.ExecModelClaudeEdit,
+		ToolProfile:    storage.ToolProfileReview, // read-only
+		CommitSHA:      sha,
+		CommitMsg:      msg,
+		CommitAuthor:   author,
+		Ref:            ref,
+		Event:          "spec-verify",
+		Trigger:        identityFromContext(r),
+	})
+	if err != nil {
+		s.logger.Error("spec verify enqueue", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	s.logger.Info("spec-verify run spawned", "spec", specPath, "run", run.Number, "ref", ref)
+	writeJSON(w, http.StatusAccepted, toAPIRun(run))
+}

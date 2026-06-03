@@ -91,3 +91,50 @@ func composeAgentSystemPrompt(owner, repo string, issue api.Issue) string {
 	b.WriteString("message, and a human will answer in the next turn.\n")
 	return b.String()
 }
+
+// composeVerifyTurnPrompt is the spec-verify task: hand the agent the spec and
+// ask for a per-line drift classification as structured JSON. The spec content
+// is inlined so the agent doesn't have to find it; covers[] tells it which code
+// to read (via dex + the checkout).
+func composeVerifyTurnPrompt(specPath, content string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Verify the spec at %s against the code it governs.\n\n", specPath)
+	b.WriteString("The spec's full content (frontmatter + body):\n\n```markdown\n")
+	b.WriteString(content)
+	if !strings.HasSuffix(content, "\n") {
+		b.WriteByte('\n')
+	}
+	b.WriteString("```\n\n")
+	b.WriteString("Read the code under the spec's `covers` globs (use the dex tools to search/summarize, ")
+	b.WriteString("and read files under /work). For each behavior and checklist line, decide whether the ")
+	b.WriteString("code bears it out.\n\n")
+	b.WriteString("Output ONLY a single fenced ```json block (no prose outside it) of this shape:\n")
+	b.WriteString("{\n")
+	b.WriteString(`  "alignment": 0.0,` + "  // fraction in [0,1] of verifiable lines that are aligned\n")
+	b.WriteString(`  "markers": [ {"line": <int>, "text": "<line>", "marker": "aligned|drifted|unverifiable|unspecced", "note": "<evidence>"} ],` + "\n")
+	b.WriteString(`  "conflicts": ["<short description of each drifted point>"],` + "\n")
+	b.WriteString(`  "notes": "<optional overall remarks>"` + "\n")
+	b.WriteString("}\n\n")
+	b.WriteString("Use the line numbers from the spec content above (1-based, frontmatter included).\n")
+	return b.String()
+}
+
+// composeVerifySystemPrompt orients the agent for a read-only verify pass and,
+// critically, fences off the anti-pattern: it reports spec↔code AGREEMENT, never
+// whether the spec is *correct* (quality is judged separately). Marker meanings
+// follow the spec-kit-sync taxonomy.
+func composeVerifySystemPrompt(owner, repo string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "You are a spec-verification agent for the moongit repository %s/%s.\n", owner, repo)
+	b.WriteString("Your job is to check whether the code MATCHES the spec — not whether the spec is a good ")
+	b.WriteString("or correct spec. Never judge the spec's correctness, design, or completeness; only report ")
+	b.WriteString("agreement between what the spec says and what the code does.\n\n")
+	b.WriteString("This is READ-ONLY. Do not edit, create, or delete any file; do not run mutating commands. ")
+	b.WriteString("Read /work and use the dex tools to find and summarize the governed code.\n\n")
+	b.WriteString("Marker meanings: aligned = code bears out the line; drifted = code contradicts it; ")
+	b.WriteString("unverifiable = can't tell from the code; unspecced = code behavior the spec doesn't cover.\n")
+	b.WriteString("Base every verdict on evidence you actually found (cite file:line in the note). If you ")
+	b.WriteString("cannot find the governed code, mark lines unverifiable rather than guessing.\n")
+	b.WriteString("End your turn with the single JSON block and nothing else.\n")
+	return b.String()
+}
