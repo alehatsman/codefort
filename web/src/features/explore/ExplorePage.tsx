@@ -377,10 +377,11 @@ function FallbackPackageMap({ owner, repo, packages, lastCommitByPath, loading, 
 
 /* ── Graph-driven package map ────────────────────────────────────────────
    dex's package import DAG is the real structure: rank by in-degree (how
-   load-bearing a package is), layer by import depth (foundation at the
-   bottom, entry points on top), and cross-link each card to the internal
-   packages it uses (→) and is used by (←). Summaries + git recency from the
-   existing joins still ride on each card. */
+   load-bearing a package is), layer top-down by distance from the entry
+   points (every root nothing imports sits on top, each import hop one layer
+   deeper), and cross-link each card to the internal packages it uses (→) and
+   is used by (←). Summaries + git recency from the existing joins still ride
+   on each card. */
 
 interface PkgRef {
   label: string
@@ -399,7 +400,7 @@ interface PkgCard extends PkgRef {
 }
 
 interface Tier {
-  depth: number
+  rank: number
   label: string
   cards: PkgCard[]
 }
@@ -438,12 +439,13 @@ function GraphPackageMap({
         </span>
       </h2>
       <p className="pkg-map__legend muted small">
-        Layered by import depth — entry points on top, foundation below. Each card shows how many
-        internal packages use it (←) and that it uses (→).
+        Layered by distance from the entry points — roots (imported by nothing) on top, each layer
+        one import-hop deeper. Each card shows how many internal packages use it (←) and that it
+        uses (→).
       </p>
       <div className="pkg-map">
         {tiers.map((tier) => (
-          <div key={tier.depth} className="pkg-layer">
+          <div key={tier.rank} className="pkg-layer">
             <h3 className="pkg-layer__name">
               {tier.label} <span className="muted small">({tier.cards.length})</span>
             </h3>
@@ -519,8 +521,9 @@ function DepLink({ owner, repo, dep }: { owner: string; repo: string; dep: PkgRe
   )
 }
 
-// buildTiers turns dex's package graph into depth-layered, in-degree-ranked
-// cards joined to summaries + recency. Pure so it unit/UI-tests cleanly.
+// buildTiers turns dex's package graph into rank-layered (top-down from the
+// entry points), in-degree-ranked cards joined to summaries + recency. Pure so
+// it unit/UI-tests cleanly.
 //
 // Only packages that participate in the import DAG (in or out degree > 0) are
 // drawn: dex's package graph is Go-only, so non-Go dirs (web/src TS modules,
@@ -555,8 +558,8 @@ function buildTiers(
     pushTo(usedBy, e.to_package, e.from_package)
   }
 
-  const depth = computeDepths(linked, uses)
-  const maxDepth = linked.reduce((m, n) => Math.max(m, depth.get(n.package) ?? 0), 0)
+  const rank = computeRanks(linked, usedBy)
+  const maxRank = linked.reduce((m, n) => Math.max(m, rank.get(n.package) ?? 0), 0)
   const byLabel = (a: PkgRef, b: PkgRef) => a.label.localeCompare(b.label)
 
   const cards: PkgCard[] = linked.map((n) => {
@@ -573,55 +576,59 @@ function buildTiers(
     }
   })
 
-  const byDepth = new Map<number, PkgCard[]>()
+  const byRank = new Map<number, PkgCard[]>()
   for (const c of cards) {
-    const d = depth.get(c.pkg) ?? 0
-    const list = byDepth.get(d) ?? []
+    const r = rank.get(c.pkg) ?? 0
+    const list = byRank.get(r) ?? []
     list.push(c)
-    byDepth.set(d, list)
+    byRank.set(r, list)
   }
-  const tiers = [...byDepth.keys()]
-    .sort((a, b) => b - a) // entry points (deep) first, foundation last
-    .map((d) => ({
-      depth: d,
-      label: tierLabel(d, maxDepth),
-      cards: (byDepth.get(d) as PkgCard[]).sort(
+  const tiers = [...byRank.keys()]
+    .sort((a, b) => a - b) // entry points (rank 0) on top, deepest layer last
+    .map((r) => ({
+      rank: r,
+      label: tierLabel(r, maxRank),
+      cards: (byRank.get(r) as PkgCard[]).sort(
         (a, b) => b.inDegree - a.inDegree || a.label.localeCompare(b.label)
       ),
     }))
   return { tiers, linkedCount: linked.length, hiddenCount }
 }
 
-// computeDepths assigns each package the length of its longest import chain
-// down to a leaf — 0 for packages that import no internal package (the
-// foundation). Go's import graph is acyclic; the visiting set guards against
-// a cycle anyway so a malformed graph can't loop forever.
-function computeDepths(
+// computeRanks assigns each package its distance from the entry points — the
+// length of the longest import chain from a root (a package nothing else
+// imports, in_degree 0) down to it. Roots are rank 0 (drawn on top); each
+// import hop deeper adds 1. Walking importers (usedBy) rather than imports
+// top-aligns the layout, so every main/entry package lands on the top row
+// regardless of how tall the subtree beneath it happens to be. Go's import
+// graph is acyclic; the visiting set guards against a cycle anyway so a
+// malformed graph can't loop forever.
+function computeRanks(
   nodes: IntelPackageGraph["nodes"],
-  uses: Map<string, string[]>
+  usedBy: Map<string, string[]>
 ): Map<string, number> {
-  const depth = new Map<string, number>()
+  const rank = new Map<string, number>()
   const visiting = new Set<string>()
   const dfs = (pkg: string): number => {
-    const memo = depth.get(pkg)
+    const memo = rank.get(pkg)
     if (memo !== undefined) return memo
     if (visiting.has(pkg)) return 0
     visiting.add(pkg)
-    let d = 0
-    for (const dep of uses.get(pkg) ?? []) d = Math.max(d, 1 + dfs(dep))
+    let r = 0
+    for (const importer of usedBy.get(pkg) ?? []) r = Math.max(r, 1 + dfs(importer))
     visiting.delete(pkg)
-    depth.set(pkg, d)
-    return d
+    rank.set(pkg, r)
+    return r
   }
   for (const n of nodes) dfs(n.package)
-  return depth
+  return rank
 }
 
-function tierLabel(depth: number, maxDepth: number): string {
-  if (maxDepth === 0) return "Packages" // no internal import edges discovered
-  if (depth === maxDepth) return "Entry points"
-  if (depth === 0) return "Foundation"
-  return `Layer ${depth}`
+function tierLabel(rank: number, maxRank: number): string {
+  if (maxRank === 0) return "Packages" // no internal import edges discovered
+  if (rank === 0) return "Entry points"
+  if (rank === maxRank) return "Foundation"
+  return `Layer ${rank}`
 }
 
 // deriveModulePrefix finds the repo's Go module path among the import paths.

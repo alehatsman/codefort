@@ -118,6 +118,12 @@ const PACKAGE_GRAPH = {
   status: "ok",
   nodes: [
     { package: "github.com/acme/demo/cmd/demo", in_degree: 0, out_degree: 1, page_rank: 0.02 },
+    // A second entry point (a main/root nothing imports) with a SHORT import
+    // chain: it imports the foundation directly, skipping the server layer.
+    // Under the old bottom-up depth metric its longest-chain-to-a-leaf was 1,
+    // so it sank into "Layer 1"; top-down ranking pins every in_degree-0 root
+    // to the Entry points row regardless of subtree height.
+    { package: "github.com/acme/demo/cmd/tool", in_degree: 0, out_degree: 1, page_rank: 0.01 },
     {
       package: "github.com/acme/demo/internal/server",
       in_degree: 1,
@@ -126,7 +132,7 @@ const PACKAGE_GRAPH = {
     },
     {
       package: "github.com/acme/demo/internal/storage",
-      in_degree: 1,
+      in_degree: 2,
       out_degree: 0,
       page_rank: 0.05,
     },
@@ -147,6 +153,8 @@ const PACKAGE_GRAPH = {
       from_package: "github.com/acme/demo/internal/server",
       to_package: "github.com/acme/demo/internal/storage",
     },
+    // cmd/tool imports the foundation directly — the short-tower entry point.
+    { from_package: "github.com/acme/demo/cmd/tool", to_package: "github.com/acme/demo/internal/storage" },
     { from_package: "fixtures.testdata.alpha", to_package: "fixtures.testdata.beta" },
   ],
 }
@@ -174,13 +182,22 @@ test("Explore: package map layers by dex import graph with degree + cross-links"
   await expect(page.locator(".pkg-layer__name").filter({ hasText: "Foundation" })).toBeVisible()
   await expect(page.locator(".pkg-layer__name").filter({ hasText: "HTTP / API" })).toHaveCount(0)
 
-  // The foundation card is internal/storage (in-degree 1, out-degree 0); its
+  // Top-down ranking: BOTH roots (in-degree 0) share the Entry points row,
+  // even though cmd/tool's import chain is one hop shorter than cmd/demo's.
+  // The old bottom-up depth metric would have dropped cmd/tool to "Layer 1".
+  const entryLayer = page.locator(".pkg-layer", {
+    has: page.locator(".pkg-layer__name", { hasText: "Entry points" }),
+  })
+  await expect(entryLayer.locator(".pkg-card__path", { hasText: "cmd/demo" })).toBeVisible()
+  await expect(entryLayer.locator(".pkg-card__path", { hasText: "cmd/tool" })).toBeVisible()
+
+  // The foundation card is internal/storage (in-degree 2, out-degree 0); its
   // degree badge reflects the import counts. Scope by the card's own path so
   // cards that merely cross-link to internal/storage don't match.
   const storage = page.locator(".pkg-card", {
     has: page.locator(".pkg-card__path", { hasText: "internal/storage" }),
   })
-  await expect(storage.locator(".pkg-card__degree")).toHaveText("←1 →0")
+  await expect(storage.locator(".pkg-card__degree")).toHaveText("←2 →0")
 
   // internal/server cross-links to the package it uses — a real navigable link
   // into that package's tree, not a flat list. Expand the card (details) so
@@ -202,8 +219,8 @@ test("Explore: package map layers by dex import graph with degree + cross-links"
   // from the linked Go packages — is stripped to clean repo-relative labels.
   await expect(page.locator(".pkg-card__path", { hasText: "web/src/App" })).toHaveCount(0)
   const mapHeading = page.locator(".explore-section__heading", { hasText: "Map of the codebase" })
-  // 3 Go + 2 linked fixture packages drawn; the 1 isolated node hidden.
-  await expect(mapHeading).toContainText("5 packages")
+  // 4 Go + 2 linked fixture packages drawn; the 1 isolated node hidden.
+  await expect(mapHeading).toContainText("6 packages")
   await expect(mapHeading).toContainText("1 unlinked hidden")
   // The Go label stays repo-relative even though linked off-module fixtures are
   // present — the prefix is derived from the dominant (Go) group, not a global
