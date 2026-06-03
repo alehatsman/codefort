@@ -188,13 +188,16 @@
 }
 
 .spec-marker {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
   align-items: baseline;
-  gap: 8px;
+  column-gap: 8px;
+  row-gap: 2px;
 }
 
 .spec-marker__dot {
-  flex: none;
+  grid-column: 1;
+  grid-row: 1;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -219,12 +222,21 @@
 }
 
 .spec-marker__line {
-  flex: none;
+  grid-column: 2;
+  grid-row: 1;
   font-variant-numeric: tabular-nums;
 }
 
 .spec-marker__text {
-  flex: 1;
+  grid-column: 3;
+  grid-row: 1;
+}
+
+/* The evidence note drops to its own line under the marker text (col 3), so the
+   text reads as one horizontal line instead of being squeezed beside the note. */
+.spec-marker__note {
+  grid-column: 3;
+  grid-row: 2;
 }
 
 .spec-verify__conflicts {
