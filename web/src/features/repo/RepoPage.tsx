@@ -34,7 +34,7 @@ const CodeView = lazy(() => import("@/features/repo/CodeView"))
  * and a file (`/blob/*`) — distinguished by the URL. The splat param ("*")
  * carries the path within the repo.
  */
-const RepoPage = () => {
+export default function RepoPage() {
   const { owner = "", repo = "" } = useParams()
   const path = useParams()["*"] ?? ""
   const isBlob = useLocation().pathname.includes(`/${owner}/${repo}/blob/`)
@@ -88,7 +88,7 @@ interface ViewProps {
   ciEnabled: boolean
 }
 
-const TreeView = ({ owner, repo, path, gitRef, ciEnabled }: ViewProps) => {
+function TreeView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   const navigate = useNavigate()
   const treeQ = useTree(owner, repo, path, gitRef)
   // Every dex summary for the repo (one cached map): the breadcrumb reads the
@@ -166,7 +166,7 @@ const TreeView = ({ owner, repo, path, gitRef, ciEnabled }: ViewProps) => {
   )
 }
 
-const BlobView = ({ owner, repo, path, gitRef, ciEnabled }: ViewProps) => {
+function BlobView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   const blobQ = useBlob(owner, repo, path, gitRef)
   // The repo's full summary map (one cached query); the breadcrumb reads the
   // repo + ancestor dirs + this file from it. Crumbs dex has nothing for stay
@@ -252,5 +252,3 @@ function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
-
-export default RepoPage

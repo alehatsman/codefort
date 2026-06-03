@@ -17,7 +17,7 @@ const DEFAULT_STATES: readonly PRState[] = ["open"]
 // Fleet-wide Pull requests view: every repo's PRs in one list, newest-updated
 // first, each row tagged with and linking into its owning repo. Mirrors the
 // per-repo PullsPage state chips minus the repo-scoped chrome.
-const GlobalPullsPage = () => {
+export default function GlobalPullsPage() {
   const [params, setParams] = useSearchParams()
 
   const raw = params.get("state")
@@ -130,5 +130,3 @@ const GlobalPullsPage = () => {
     </div>
   )
 }
-
-export default GlobalPullsPage

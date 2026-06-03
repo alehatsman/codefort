@@ -10,7 +10,7 @@ import { EmptyState, ErrorMessage, Spinner } from "@/ui"
 // CI opt-in, so (unlike Pipelines) there's no CI-disabled gate. Status + keyword
 // filters mirror the per-repo Issues page; the run detail stays on the shared
 // run shell (PipelinesPage), reached via the grid's #number links.
-const AgentsPage = () => {
+export default function AgentsPage() {
   const { owner = "", repo = "" } = useParams()
   const { search, setSearch, activeStates, toggleState, query } = useRunFilters()
   const { data, isLoading, error } = useCIRuns(owner, repo, "agent", query)
@@ -48,5 +48,3 @@ const AgentsPage = () => {
     </div>
   )
 }
-
-export default AgentsPage

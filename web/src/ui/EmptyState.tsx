@@ -16,8 +16,6 @@ interface Props {
  * The muted, centered "nothing here" placeholder — the `.empty` block, used
  * ~34 times for empty lists and not-found states.
  */
-const EmptyState = ({ children, bordered, className }: Props) => {
+export default function EmptyState({ children, bordered, className }: Props) {
   return <div className={clsx("empty", { "empty--bordered": bordered }, className)}>{children}</div>
 }
-
-export default EmptyState

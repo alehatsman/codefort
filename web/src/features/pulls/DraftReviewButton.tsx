@@ -32,7 +32,7 @@ const TARGETS: { value: ReviewTarget; label: string }[] = [
  * codeComments query invalidates on each review_create write). On success we
  * navigate to the agent run's transcript under Pipelines.
  */
-const DraftReviewButton = ({ owner, repo, defaultRef }: Props) => {
+export default function DraftReviewButton({ owner, repo, defaultRef }: Props) {
   const navigate = useNavigate()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const draft = useDraftReviewAgent(owner, repo)
@@ -150,5 +150,3 @@ const DraftReviewButton = ({ owner, repo, defaultRef }: Props) => {
     </>
   )
 }
-
-export default DraftReviewButton

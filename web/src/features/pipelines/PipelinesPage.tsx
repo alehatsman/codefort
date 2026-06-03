@@ -24,7 +24,7 @@ import {
 // "ci" is Pipelines, "agent" is Agents. The run resource, list chrome, and run
 // header are shared; the run *body* splits into CIRunBody (job DAG) vs
 // AgentRunBody (transcript + message box).
-const PipelinesPage = ({ kind = "ci" }: { kind?: RunKind }) => {
+export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
   const { owner = "", repo = "" } = useParams()
   const numberParam = useParams().number
   const repoQ = useRepo(owner, repo)
@@ -47,7 +47,7 @@ const PipelinesPage = ({ kind = "ci" }: { kind?: RunKind }) => {
   )
 }
 
-const RunList = ({ repo, kind }: { repo: Repo; kind: RunKind }) => {
+function RunList({ repo, kind }: { repo: Repo; kind: RunKind }) {
   const { owner, name } = repo
   // Agent runs are spawned from issues regardless of the CI opt-in, so the
   // Agents tab never shows the CI-disabled gate.
@@ -56,7 +56,7 @@ const RunList = ({ repo, kind }: { repo: Repo; kind: RunKind }) => {
   return <EnabledRunList owner={owner} repo={name} kind={kind} />
 }
 
-const EnabledRunList = ({ owner, repo, kind }: { owner: string; repo: string; kind: RunKind }) => {
+function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; kind: RunKind }) {
   const runsQ = useCIRuns(owner, repo, kind)
   const setEnabled = useSetCIEnabled(owner, repo)
   const refsQ = useRefs(owner, repo)
@@ -192,7 +192,7 @@ const EnabledRunList = ({ owner, repo, kind }: { owner: string; repo: string; ki
   )
 }
 
-const CIDisabledCard = ({ owner, repo }: { owner: string; repo: string }) => {
+function CIDisabledCard({ owner, repo }: { owner: string; repo: string }) {
   const setEnabled = useSetCIEnabled(owner, repo)
   return (
     <section className="pipelines">
@@ -219,7 +219,7 @@ const CIDisabledCard = ({ owner, repo }: { owner: string; repo: string }) => {
   )
 }
 
-const RunDetail = ({
+function RunDetail({
   owner,
   repo,
   runNumber,
@@ -229,7 +229,7 @@ const RunDetail = ({
   repo: string
   runNumber: number
   kind: RunKind
-}) => {
+}) {
   const navigate = useNavigate()
   const runQ = useCIRun(owner, repo, runNumber)
   const rerun = useRerunCIRun(owner, repo)
@@ -324,5 +324,3 @@ const RunDetail = ({
     </section>
   )
 }
-
-export default PipelinesPage

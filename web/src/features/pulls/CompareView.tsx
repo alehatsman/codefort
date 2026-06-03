@@ -16,7 +16,7 @@ interface Props {
  * a DiffView per changed file. Shared by the standalone Compare screen and the
  * PR detail screen, which both render the three-dot diff identically.
  */
-const CompareView = ({ compare }: Props) => {
+export default function CompareView({ compare }: Props) {
   const [mode, setMode] = useState<Mode>("split")
 
   return (
@@ -79,5 +79,3 @@ const CompareView = ({ compare }: Props) => {
     </div>
   )
 }
-
-export default CompareView

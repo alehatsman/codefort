@@ -16,7 +16,7 @@ interface Props {
  * the body lists draggable cards. Visual highlight when something
  * is hovering over it.
  */
-const BoardColumn = ({ owner, repo, state, issues }: Props) => {
+export default function BoardColumn({ owner, repo, state, issues }: Props) {
   const { setNodeRef, isOver } = useDroppable({
     id: `column-${state}`,
     data: { state },
@@ -42,5 +42,3 @@ const BoardColumn = ({ owner, repo, state, issues }: Props) => {
     </div>
   )
 }
-
-export default BoardColumn

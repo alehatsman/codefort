@@ -10,7 +10,7 @@ import { Button, ErrorMessage, Input, Spinner } from "@/ui"
 // Per-repo settings. Today it hosts a single Danger Zone — deleting the repo —
 // but it's the natural home for future per-repo settings (the CI opt-in could
 // move here). Mirrors the global SettingsPage's section layout.
-const RepoSettingsPage = () => {
+export default function RepoSettingsPage() {
   const { owner = "", repo = "" } = useParams()
   const repoQ = useRepo(owner, repo)
 
@@ -40,7 +40,7 @@ const RepoSettingsPage = () => {
 // must type the repo's exact owner/name slug before the Delete button enables.
 // Stricter than the issue-delete window.confirm because this removes a whole
 // repo and all its data. On success it navigates to the repos list.
-const DangerZone = ({ owner, repo }: { owner: string; repo: string }) => {
+function DangerZone({ owner, repo }: { owner: string; repo: string }) {
   const navigate = useNavigate()
   const del = useDeleteRepo()
   const [confirmText, setConfirmText] = useState("")
@@ -86,5 +86,3 @@ const DangerZone = ({ owner, repo }: { owner: string; repo: string }) => {
     </div>
   )
 }
-
-export default RepoSettingsPage

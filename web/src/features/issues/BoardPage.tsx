@@ -28,7 +28,7 @@ import { ErrorMessage, Spinner } from "@/ui"
  * cap. The board view is targeted at personal projects, not at repos
  * with thousands of issues.
  */
-const BoardPage = () => {
+export default function BoardPage() {
   const { owner = "", repo = "" } = useParams()
   const qc = useQueryClient()
 
@@ -167,5 +167,3 @@ function optimisticallyMoveAndPatch(
   // Suppress unused-from warning — kept for symmetry / future telemetry.
   void fromState
 }
-
-export default BoardPage

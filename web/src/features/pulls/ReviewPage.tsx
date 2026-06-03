@@ -33,7 +33,7 @@ function deriveState(open: boolean, resolved: boolean): CodeCommentState {
  * filters open / resolved / all. This is the surface a reviewer — or Claude via
  * `mgit review list` — works through.
  */
-const ReviewPage = () => {
+export default function ReviewPage() {
   const { owner = "", repo = "" } = useParams()
   const [params, setParams] = useSearchParams()
   const gitRef = params.get("ref") ?? ""
@@ -115,7 +115,7 @@ const ReviewPage = () => {
   )
 }
 
-const ReviewRow = ({
+function ReviewRow({
   owner,
   repo,
   gitRef,
@@ -127,7 +127,7 @@ const ReviewRow = ({
   gitRef: string
   comment: CodeComment
   canManage: boolean
-}) => {
+}) {
   const resolve = useSetCodeCommentResolved(owner, repo)
   const del = useDeleteCodeComment(owner, repo)
   const lines =
@@ -196,5 +196,3 @@ function blobHref(owner: string, repo: string, path: string, gitRef: string): st
   const base = `/${owner}/${repo}/blob/${path}`
   return gitRef ? `${base}?ref=${encodeURIComponent(gitRef)}` : base
 }
-
-export default ReviewPage

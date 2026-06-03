@@ -8,7 +8,7 @@ import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
  * when the commit has no run (CI off, or the commit predates/skipped CI), so
  * callers can drop it in unconditionally.
  */
-const CommitCIStatus = ({
+export default function CommitCIStatus({
   owner,
   repo,
   run,
@@ -16,7 +16,7 @@ const CommitCIStatus = ({
   owner: string
   repo: string
   run: CIRun | undefined
-}) => {
+}) {
   if (!run) return null
   return (
     <Link
@@ -28,5 +28,3 @@ const CommitCIStatus = ({
     </Link>
   )
 }
-
-export default CommitCIStatus

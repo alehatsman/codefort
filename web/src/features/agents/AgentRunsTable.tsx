@@ -17,7 +17,13 @@ export interface AgentRunRow {
 // AgentRunsTable is the Agents-owned run grid (replacing the shared pipelines
 // table for agents): Repo (cross-repo only) · Run · Status · Hash · Trigger ·
 // Duration · When. Trigger surfaces the spawning issue/review, linked to it.
-const AgentRunsTable = ({ rows, showRepo }: { rows: AgentRunRow[]; showRepo: boolean }) => {
+export default function AgentRunsTable({
+  rows,
+  showRepo,
+}: {
+  rows: AgentRunRow[]
+  showRepo: boolean
+}) {
   return (
     <table className="agent-runs">
       <thead>
@@ -86,5 +92,3 @@ const AgentRunsTable = ({ rows, showRepo }: { rows: AgentRunRow[]; showRepo: boo
     </table>
   )
 }
-
-export default AgentRunsTable
