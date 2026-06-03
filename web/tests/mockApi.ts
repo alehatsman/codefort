@@ -69,7 +69,7 @@ export interface AgentTurn {
 
 export interface CIRun {
   number: number
-  kind?: "ci" | "agent"
+  kind?: "ci" | "agent" | "spec-verify"
   issue_number?: number
   execution_model?: "claude-edit" | "mooncake-agent"
   mooncake_allow_shell?: boolean

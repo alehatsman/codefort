@@ -506,8 +506,9 @@ export type CIJobStatus =
   | "error"
   | "interrupted"
 
-// Mirrors storage.RunKind: a normal pipeline run vs. an issue-spawned agent run.
-export type CIRunKind = "ci" | "agent"
+// Mirrors storage.RunKind: a CI run, an issue-spawned agent run, or a
+// spec-verify agent run (#219). Must list every kind the server can emit.
+export type CIRunKind = "ci" | "agent" | "spec-verify"
 
 // Agent execution model (#110): which strategy an agent run uses in its
 // container. claude-edit = Claude edits files directly; mooncake-agent =

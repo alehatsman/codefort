@@ -88,6 +88,24 @@ const (
 	RunKindSpecVerify RunKind = "spec-verify"
 )
 
+// AgentRunKinds is the agent family: run kinds that execute via the agent spine
+// (a containerized session) rather than a translated mgitci.yml. The single
+// source of truth for "is this an agent run" — every classification (list
+// filter, runner dispatch, run-viewer body, retention) goes through this or
+// IsAgent(), so adding an agent kind is one edit here, not a scattered hunt for
+// `kind == agent` checks (#270).
+var AgentRunKinds = []RunKind{RunKindAgent, RunKindSpecVerify}
+
+// IsAgent reports whether k is an agent-family run kind (vs. a CI run).
+func (k RunKind) IsAgent() bool {
+	for _, a := range AgentRunKinds {
+		if k == a {
+			return true
+		}
+	}
+	return false
+}
+
 // Agent execution models (#110): the pluggable strategy an agent run uses
 // inside its container. Canonical here so storage (default), the server
 // (validation), and the runner (executor selection) share one vocabulary.
@@ -299,12 +317,18 @@ func (f RunFilter) clampLimit() int {
 // aggregate query adds (matching appendIssueFilters).
 func appendRunFilters(q *strings.Builder, args *[]any, f RunFilter) {
 	if f.Kind == RunKindAgent {
-		// The Agents tab is the agent *family*: ordinary issue agent runs plus
-		// spec-verify runs (#219), which reuse the agent spine but carry their own
-		// kind. Match both so verify runs are visible there, not stranded in no
-		// list. kind=ci stays exact; an empty kind matches everything.
-		q.WriteString(" AND kind IN (?, ?)")
-		*args = append(*args, string(RunKindAgent), string(RunKindSpecVerify))
+		// The Agents tab is the agent *family* (agent + spec-verify, …): one
+		// source of truth in AgentRunKinds, so a new agent kind is visible here
+		// without editing this filter. kind=ci stays exact; empty matches all.
+		q.WriteString(" AND kind IN (")
+		for i, k := range AgentRunKinds {
+			if i > 0 {
+				q.WriteString(",")
+			}
+			q.WriteString("?")
+			*args = append(*args, string(k))
+		}
+		q.WriteString(")")
 	} else if f.Kind != "" {
 		q.WriteString(" AND kind = ?")
 		*args = append(*args, string(f.Kind))

@@ -216,10 +216,12 @@ func (r *ciRunner) run(ctx context.Context) {
 	for {
 		// Dispatch every claimable run of each kind before sleeping.
 		r.drainKind(ctx, &wg, ciSem, storage.RunKindCI, r.runLease())
-		r.drainKind(ctx, &wg, agentSem, storage.RunKindAgent, r.agentLease())
-		// spec-verify runs share the agent pool/lease (they're agent runs that
-		// target a spec); claimed and dispatched the same way.
-		r.drainKind(ctx, &wg, agentSem, storage.RunKindSpecVerify, r.agentLease())
+		// The agent family (agent, spec-verify, …) shares the agent pool/lease;
+		// drain each kind in AgentRunKinds so a new agent kind is picked up
+		// without editing this loop (#270).
+		for _, k := range storage.AgentRunKinds {
+			r.drainKind(ctx, &wg, agentSem, k, r.agentLease())
+		}
 		// Reap lifetime-expired parked agent sessions, then dispatch any
 		// queued follow-up turns. Turns share the agent pool: a parked run
 		// holds no slot, and dispatching its next turn briefly takes one.
@@ -372,7 +374,7 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	// containerized Claude session against an issue instead of a translated
 	// mgitci.yml. Branch here so everything upstream (claiming, concurrency,
 	// reconcile, retention) stays shared.
-	if run.Kind == storage.RunKindAgent || run.Kind == storage.RunKindSpecVerify {
+	if run.Kind.IsAgent() {
 		r.executeAgentRun(parent, run)
 		return
 	}
@@ -748,7 +750,7 @@ func (r *ciRunner) finish(run storage.CIRun, status storage.RunStatus) {
 	// agent runs reuse this spine but aren't CI, so emitting ci.run.finished for
 	// them would be misleading. Best-effort: a feed write must not mask the
 	// run's real outcome.
-	if run.Kind == storage.RunKindAgent || run.Kind == storage.RunKindSpecVerify {
+	if run.Kind.IsAgent() {
 		return
 	}
 	payload, _ := json.Marshal(map[string]any{

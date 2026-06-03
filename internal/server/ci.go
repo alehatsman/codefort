@@ -105,8 +105,9 @@ func (s *Server) handleGetCIRun(w http.ResponseWriter, r *http.Request) {
 	for i, j := range jobs {
 		detail.Jobs[i] = toAPIJob(j)
 	}
-	// An agent run's conversation: the follow-up turns (issue body is turn 1).
-	if run.Kind == storage.RunKindAgent {
+	// An agent-family run's conversation: the follow-up turns (issue body is
+	// turn 1). spec-verify runs have none, so this is empty for them.
+	if run.Kind.IsAgent() {
 		turns, err := storage.ListTurns(s.rdb, run.ID)
 		if err != nil {
 			s.logger.Error("ci list turns", "err", err)

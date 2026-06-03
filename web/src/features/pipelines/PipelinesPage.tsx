@@ -12,6 +12,7 @@ import CIRunBody from "@/features/pipelines/CIRunBody"
 import {
   type RunKind,
   executionModelLabel,
+  isAgentRun,
   runDuration,
   runsBasePath,
   shortRef,
@@ -39,7 +40,7 @@ export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
   return (
     <div className="repo">
       {runNumber !== null && Number.isFinite(runNumber) ? (
-        <RunDetail owner={r.owner} repo={r.name} runNumber={runNumber} kind={kind} />
+        <RunDetail owner={r.owner} repo={r.name} runNumber={runNumber} />
       ) : (
         <RunList repo={r} kind={kind} />
       )}
@@ -219,17 +220,7 @@ function CIDisabledCard({ owner, repo }: { owner: string; repo: string }) {
   )
 }
 
-function RunDetail({
-  owner,
-  repo,
-  runNumber,
-  kind,
-}: {
-  owner: string
-  repo: string
-  runNumber: number
-  kind: RunKind
-}) {
+function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; runNumber: number }) {
   const navigate = useNavigate()
   const runQ = useCIRun(owner, repo, runNumber)
   const rerun = useRerunCIRun(owner, repo)
@@ -239,8 +230,11 @@ function RunDetail({
   if (!runQ.data) return null
 
   const run = runQ.data
-  const base = runsBasePath(kind)
-  const isAgent = kind === "agent"
+  // Follow the run's *own* kind, not the route it was opened by: a spec-verify
+  // run (#219) is an agent-family run (transcript body, Agents header) even via
+  // a /pipelines/<n> link. One classifier (isAgentRun), no inline kind checks.
+  const isAgent = isAgentRun(run.kind)
+  const base = runsBasePath(isAgent ? "agent" : "ci")
 
   function doRerun() {
     rerun.mutate(runNumber, {
@@ -316,7 +310,7 @@ function RunDetail({
         </div>
       </dl>
 
-      {run.kind === "agent" ? (
+      {isAgent ? (
         <AgentRunBody owner={owner} repo={repo} runNumber={runNumber} run={run} />
       ) : (
         <CIRunBody owner={owner} repo={repo} runNumber={runNumber} jobs={run.jobs} />

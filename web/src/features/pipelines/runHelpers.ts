@@ -1,13 +1,21 @@
-import type { CIRun, CIRunExecutionModel } from "@/api/types"
+import type { CIRun, CIRunExecutionModel, CIRunKind } from "@/api/types"
 
-// kind selects which runs a view serves: "ci" is the Pipelines tab, "agent" is
-// the Agents tab. The run resource and its event stream are shared; the body
-// rendering (CIRunBody vs AgentRunBody) and a few list/detail labels diverge.
+// kind selects which runs a *view* (tab) serves: "ci" is the Pipelines tab,
+// "agent" is the Agents tab. This is the tab dimension, distinct from a run's
+// own kind (CIRunKind, which also has "spec-verify").
 export type RunKind = "ci" | "agent"
 
-// runsBasePath is the route segment a kind's runs live under.
+// runsBasePath is the route segment a tab's runs live under.
 export function runsBasePath(kind: RunKind): string {
   return kind === "agent" ? "agents" : "pipelines"
+}
+
+// isAgentRun is the single web-side classifier for the agent family — the
+// counterpart to storage.RunKind.IsAgent(). Drives the run viewer's body +
+// header so it follows the run's *own* kind, not the route it was opened by
+// (#270). Add a new agent kind here once, not at every call site.
+export function isAgentRun(kind: CIRunKind): boolean {
+  return kind === "agent" || kind === "spec-verify"
 }
 
 // executionModelLabel is the human label for an agent run's execution model

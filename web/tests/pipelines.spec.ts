@@ -335,6 +335,78 @@ test("agent run renders the claude transcript instead of the job DAG", async ({ 
   await expect(page.locator(".ci-dag")).toHaveCount(0)
 })
 
+test("a spec-verify run renders the agent transcript, not the CI job view (#270)", async ({
+  page,
+}) => {
+  await mockApi(page, {
+    repos: [
+      {
+        id: 1,
+        owner: "alice",
+        name: "demo",
+        created_at: iso,
+        open_issues: 0,
+        total_issues: 0,
+        ci_enabled: true,
+      },
+    ],
+    ciRuns: [
+      {
+        number: 1,
+        kind: "spec-verify",
+        commit_sha: "deadbeefcafe1234",
+        ref: "main",
+        event: "spec-verify",
+        trigger: "agent#17",
+        status: "success",
+        created_at: iso,
+        started_at: iso,
+        finished_at: iso,
+        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        events: {
+          agent: [
+            { seq: 1, type: "run.started", time: 0, data: { total_steps: 1 } },
+            {
+              seq: 2,
+              type: "agent.turn.started",
+              time: 0,
+              data: { turn: 1, prompt: "Verify the spec at specs/x.md" },
+            },
+            {
+              seq: 3,
+              type: "agent.message",
+              time: 0,
+              data: {
+                claude: {
+                  type: "assistant",
+                  message: { role: "assistant", content: [{ type: "text", text: "classifying spec" }] },
+                },
+              },
+            },
+            {
+              seq: 4,
+              type: "agent.turn.completed",
+              time: 0,
+              data: { turn: 1, status: "success", num_turns: 1 },
+            },
+            { seq: 5, type: "run.completed", time: 0, data: { total_steps: 1 } },
+          ],
+        },
+      },
+    ],
+  })
+  // Opened via the /pipelines route — the viewer must still follow the run's own
+  // kind (agent family) and render the transcript, not the CI job DAG.
+  await page.goto("/alice/demo/pipelines/1")
+
+  await expect(page.getByRole("heading", { name: /Run #1/ })).toBeVisible()
+  await expect(page.getByText("classifying spec")).toBeVisible()
+  await expect(page.locator(".agent-transcript")).toBeVisible()
+  await expect(page.locator(".ci-dag")).toHaveCount(0)
+  // Header reflects the agent family (back-link to Agents), not Pipelines.
+  await expect(page.locator(".ci-run-head__back")).toHaveText(/Agents/)
+})
+
 test("a mooncake-agent run renders its steps, not a blank transcript", async ({ page }) => {
   await mockApi(page, {
     repos: [
