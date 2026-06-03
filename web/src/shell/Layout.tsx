@@ -1,7 +1,6 @@
 import { Link, useLocation } from "react-router-dom"
 import "./shell.css"
 import { clearToken } from "@/api/client"
-import { useRepo } from "@/api/queries"
 import GlobalTabs from "@/shell/GlobalTabs"
 import RepoTabs from "@/shell/RepoTabs"
 
@@ -21,9 +20,6 @@ function repoFromPath(pathname: string): { owner: string; repo: string } | null 
 export default function Layout({ children, onSignOut }: Props) {
   const { pathname } = useLocation()
   const ctx = repoFromPath(pathname)
-  // Shares the repos-list / repo cache key, so this never fires an extra
-  // request — it just reads the open-issue count the active page already loads.
-  const repoQ = useRepo(ctx?.owner ?? "", ctx?.repo ?? "")
 
   function signOut() {
     clearToken()
@@ -37,11 +33,7 @@ export default function Layout({ children, onSignOut }: Props) {
           <Link to="/" className="brand">
             moongit
           </Link>
-          {ctx ? (
-            <RepoTabs owner={ctx.owner} repo={ctx.repo} openIssues={repoQ.data?.open_issues} />
-          ) : (
-            <GlobalTabs />
-          )}
+          {ctx ? <RepoTabs owner={ctx.owner} repo={ctx.repo} /> : <GlobalTabs />}
         </div>
         <div className="topbar__actions">
           <Link to="/settings" className="topbar__signout" title="Settings">

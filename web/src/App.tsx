@@ -23,7 +23,6 @@ import ExplorePage from "@/features/explore/ExplorePage"
 import SpecsPage from "@/features/specs/SpecsPage"
 import ReviewPage from "@/features/pulls/ReviewPage"
 import PipelinesPage from "@/features/pipelines/PipelinesPage"
-import RepoSettingsPage from "@/features/settings/RepoSettingsPage"
 import SettingsPage from "@/features/settings/SettingsPage"
 import DevGalleryPage from "@/ui/DevGalleryPage"
 
@@ -71,7 +70,6 @@ export default function App() {
         <Route path="/:owner/:repo/pipelines/:number" element={<PipelinesPage />} />
         <Route path="/:owner/:repo/agents" element={<AgentsPage />} />
         <Route path="/:owner/:repo/agents/:number" element={<PipelinesPage kind="agent" />} />
-        <Route path="/:owner/:repo/settings" element={<RepoSettingsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         {/* Living gallery of the base UI primitives (src/ui). Dev tool. */}
         <Route path="/dev/ui" element={<DevGalleryPage />} />

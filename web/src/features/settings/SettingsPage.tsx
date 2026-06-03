@@ -1,22 +1,23 @@
 import clsx from "clsx"
 import "./settings.css"
 import { useEffect, useState } from "react"
-import { useAgentSettings, useSSHKeys, useTokens, useWhoami } from "@/api/queries"
+import { useAgentSettings, useRepos, useSSHKeys, useTokens, useWhoami } from "@/api/queries"
 import {
   useAddSSHKey,
   useCreateToken,
+  useDeleteRepo,
   useDeleteSSHKey,
   useRevokeToken,
   useUpdateAgentSettings,
 } from "@/api/mutations"
-import type { CIRunExecutionModel, CreatedToken, SSHKey, Token } from "@/api/types"
+import type { CIRunExecutionModel, CreatedToken, Repo, SSHKey, Token } from "@/api/types"
 import ThemeSelect from "@/features/settings/ThemeSelect"
 import { Badge, Button, EmptyState, ErrorMessage, Input, Select, Spinner } from "@/ui"
 
 // Sections of the settings surface. "tokens", "agent", "ssh", and "appearance"
 // are backed. "users" and "branches" are planned features whose server backends
 // aren't built yet, so they render as roadmap placeholders (not dead ends).
-type Section = "tokens" | "agent" | "users" | "ssh" | "branches" | "appearance"
+type Section = "tokens" | "agent" | "users" | "ssh" | "branches" | "repos" | "appearance"
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: "tokens", label: "API tokens" },
@@ -24,6 +25,7 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: "users", label: "Users" },
   { id: "ssh", label: "SSH keys" },
   { id: "branches", label: "Branch rules" },
+  { id: "repos", label: "Repositories" },
   { id: "appearance", label: "Appearance" },
 ]
 
@@ -63,9 +65,126 @@ export default function SettingsPage() {
               enforces them on the push path; until then any token can push any branch."
           />
         )}
+        {section === "repos" && <ReposSection />}
         {section === "appearance" && <AppearanceSection />}
       </div>
     </div>
+  )
+}
+
+// ReposSection manages the repos hosted here. Today that's the Danger Zone —
+// deleting a repo and everything under it — which used to live on a per-repo
+// Settings tab. Folding it in here keeps one settings surface; the delete is
+// gated behind a type-to-confirm of the exact owner/name slug (stricter than a
+// window.confirm, since it removes a whole repo).
+function ReposSection() {
+  const reposQ = useRepos()
+  const del = useDeleteRepo()
+  // The repo armed for deletion, by slug. Picking one opens its confirm row;
+  // a successful delete clears it (the repo's gone from the list anyway).
+  const [target, setTarget] = useState<Repo | null>(null)
+  const [confirmText, setConfirmText] = useState("")
+
+  function arm(repo: Repo) {
+    setTarget(repo)
+    setConfirmText("")
+  }
+
+  const slug = target ? `${target.owner}/${target.name}` : ""
+  const armed = !!target && confirmText.trim() === slug
+
+  function onDelete() {
+    if (!armed || !target || del.isPending) return
+    del.mutate(
+      { owner: target.owner, repo: target.name },
+      {
+        onSuccess: () => {
+          setTarget(null)
+          setConfirmText("")
+        },
+      }
+    )
+  }
+
+  return (
+    <section className="settings__section">
+      <h2 className="settings__title">Repositories</h2>
+      <p className="muted settings__lead">
+        Every repository hosted here. Deleting one removes it and all its issues, pipeline runs,
+        comments, pull requests, and git data — this cannot be undone.
+      </p>
+
+      {reposQ.isLoading && <Spinner />}
+      <ErrorMessage error={reposQ.error} />
+
+      {reposQ.data && reposQ.data.length === 0 && <EmptyState>No repositories yet.</EmptyState>}
+
+      {reposQ.data && reposQ.data.length > 0 && (
+        <table className="token-table">
+          <thead>
+            <tr>
+              <th>Repository</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {reposQ.data.map((r) => (
+              <tr key={r.id}>
+                <td>{`${r.owner}/${r.name}`}</td>
+                <td className="muted">{new Date(r.created_at).toLocaleDateString()}</td>
+                <td className="token-table__actions">
+                  <Button
+                    variant="danger"
+                    size="small"
+                    onClick={() => arm(r)}
+                    disabled={del.isPending}
+                  >
+                    Delete
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {target && (
+        <div className="danger-zone">
+          <h3 className="danger-zone__title">Delete {slug}</h3>
+          <div className="danger-zone__item">
+            <div className="danger-zone__copy">
+              <strong>This permanently deletes the repository.</strong>
+              <p className="muted small">
+                Removes <code>{slug}</code> and all its issues, pipeline runs, comments, pull
+                requests, and git data. This cannot be undone.
+              </p>
+            </div>
+            <div className="danger-zone__action">
+              <label className="danger-zone__confirm">
+                <span className="muted small">
+                  Type <code>{slug}</code> to confirm:
+                </span>
+                <Input
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  placeholder={slug}
+                  aria-label="Type the repository name to confirm deletion"
+                  autoComplete="off"
+                />
+              </label>
+              <Button variant="danger" disabled={!armed || del.isPending} onClick={onDelete}>
+                {del.isPending ? "Deleting…" : "Delete repository"}
+              </Button>
+              <Button variant="ghost" disabled={del.isPending} onClick={() => setTarget(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+          {del.error && <ErrorMessage error={del.error} inline />}
+        </div>
+      )}
+    </section>
   )
 }
 

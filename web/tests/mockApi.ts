@@ -812,6 +812,13 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     json(route, 200, { default: "main", branches: state.branches })
   )
 
+  // Specs list. RepoTabs reads this on every repo page for its count pill, so
+  // serve an empty list by default; specs.spec.ts registers a richer route
+  // after this one (last match wins) when it needs real specs.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/specs(\?.*)?$/, (route) =>
+    json(route, 200, { ref: "main", specs: [] })
+  )
+
   // Code review comments collection (GET list / POST create). An absent ?ref=
   // means the default branch ("main"), matching the server.
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/code-comments(\?.*)?$/, async (route) => {
