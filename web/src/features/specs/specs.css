@@ -151,6 +151,105 @@
   margin-top: 6px;
 }
 
+/* ── Jump button (opens the quick-open palette) ──────────────────────────── */
+
+.spec-jump {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.spec-jump:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.spec-jump__kbd {
+  font-size: 11px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* ── Quick-open palette ──────────────────────────────────────────────────── */
+
+.quickopen {
+  margin: 10vh auto auto;
+  width: min(560px, 92vw);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: inherit;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+.quickopen::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.quickopen__panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.quickopen__input {
+  border: none;
+  border-bottom: 1px solid var(--border-muted);
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 15px;
+  background: none;
+  color: inherit;
+  outline: none;
+}
+
+.quickopen__list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.quickopen__empty {
+  padding: 10px 8px;
+}
+
+.quickopen__item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quickopen__item.is-active {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+.quickopen__title {
+  font-weight: 600;
+}
+
 @media (max-width: 720px) {
   .specs-layout {
     grid-template-columns: 1fr;

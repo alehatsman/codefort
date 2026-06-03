@@ -1,7 +1,8 @@
 import "./specs.css"
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useSearchParams } from "react-router-dom"
 import { useRepo, useSpec, useSpecsList } from "@/api/queries"
+import QuickOpen from "@/features/specs/QuickOpen"
 import Markdown from "@/shell/Markdown"
 import OverviewCard from "@/shell/OverviewCard"
 import { EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
@@ -46,6 +47,9 @@ export default function SpecsPage() {
   }
   useSpecKeyboardNav(ordered, selectedPath, selectSpec)
 
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  useQuickOpenHotkey(() => setPaletteOpen(true))
+
   if (repoQ.isLoading) return <Spinner />
   if (repoQ.error) return <ErrorMessage error={repoQ.error} />
   if (!repoQ.data) return null
@@ -64,6 +68,15 @@ export default function SpecsPage() {
       {specs.length > 0 && (
         <div className="specs-layout">
           <aside className="specs-sidebar">
+            <button
+              type="button"
+              className="spec-jump"
+              onClick={() => setPaletteOpen(true)}
+              title="Jump to a spec"
+            >
+              <span>Jump to a spec…</span>
+              <kbd className="spec-jump__kbd">⌘P</kbd>
+            </button>
             <StatusRail specs={specs} />
             <SpecTree groups={groups} selectedPath={selectedPath} onSelect={selectSpec} />
           </aside>
@@ -72,6 +85,13 @@ export default function SpecsPage() {
           </main>
         </div>
       )}
+
+      <QuickOpen
+        open={paletteOpen}
+        specs={specs}
+        onSelect={selectSpec}
+        onClose={() => setPaletteOpen(false)}
+      />
     </div>
   )
 }
@@ -274,6 +294,24 @@ function useSpecKeyboardNav(
       const next = Math.min(Math.max((cur === -1 ? 0 : cur) + delta, 0), list.length - 1)
       if (list[next] && list[next].path !== selectedRef.current) {
         onSelectRef.current(list[next].path)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+}
+
+// useQuickOpenHotkey opens the quick-open palette on ⌘P / Ctrl-P, taking over
+// the browser's print shortcut while the Specs tab is mounted (the palette is
+// the page's primary "go to" affordance, Sublime-style).
+function useQuickOpenHotkey(onOpen: () => void) {
+  const onOpenRef = useRef(onOpen)
+  onOpenRef.current = onOpen
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "p" || e.key === "P")) {
+        e.preventDefault()
+        onOpenRef.current()
       }
     }
     window.addEventListener("keydown", onKey)

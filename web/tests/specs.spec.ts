@@ -141,3 +141,43 @@ test("Specs: empty repo shows the convention empty state", async ({ page }) => {
   await expect(page.locator(".empty")).toContainText("No specs yet")
   await expect(page.locator(".empty")).toContainText("docs/specs.md")
 })
+
+test("Specs: ⌘P quick-open fuzzy-jumps to a spec", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockSpecs(page, SPECS)
+
+  await page.goto("/alice/demo/specs")
+  await expect(page.locator(".spec-view__title")).toHaveText("SSH Transport")
+
+  // The print shortcut opens the palette instead.
+  await page.keyboard.press("Control+p")
+  await expect(page.locator(".quickopen__input")).toBeFocused()
+
+  // Fuzzy query narrows to the CI Pipeline spec; Enter opens it.
+  await page.locator(".quickopen__input").fill("pipe")
+  await expect(page.locator(".quickopen__item")).toHaveCount(1)
+  await expect(page.locator(".quickopen__item").first()).toContainText("CI Pipeline")
+  await page.keyboard.press("Enter")
+
+  // Palette closes and the chosen spec is now rendered + reflected in ?path.
+  await expect(page.locator(".quickopen__input")).toBeHidden()
+  await expect(page.locator(".spec-view__title")).toHaveText("CI Pipeline")
+  await expect(page).toHaveURL(/[?&]path=specs%2Fci%2Fpipeline\.md/)
+})
+
+test("Specs: the Jump button opens the palette and a click selects", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockSpecs(page, SPECS)
+
+  await page.goto("/alice/demo/specs")
+  await page.locator(".spec-jump").click()
+  await expect(page.locator(".quickopen__input")).toBeVisible()
+
+  // Empty query lists every spec; clicking one opens it.
+  await expect(page.locator(".quickopen__item")).toHaveCount(2)
+  await page.locator(".quickopen__item", { hasText: "CI Pipeline" }).click()
+  await expect(page.locator(".quickopen__input")).toBeHidden()
+  await expect(page.locator(".spec-view__title")).toHaveText("CI Pipeline")
+})
