@@ -1345,6 +1345,52 @@ a.file-tree__commit:hover {
   font-weight: var(--weight-semibold);
 }
 
+/* Toast / Notification (@/ui Toast) — a fixed bottom-right stack; per-variant
+   left accent. */
+.toast-stack {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 360px;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: var(--text-base);
+}
+.toast--success {
+  border-left-color: var(--state-done);
+}
+.toast--error {
+  border-left-color: var(--state-closed);
+}
+.toast__msg {
+  flex: 1;
+}
+.toast__close {
+  padding: 0 var(--space-1);
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  font-size: var(--text-lg);
+  line-height: var(--leading-none);
+  cursor: pointer;
+}
+.toast__close:hover {
+  color: var(--fg);
+}
+
 .badge--todo {
   background: var(--state-todo-bg);
   color: var(--state-todo);

@@ -34,6 +34,7 @@ import {
   Textarea,
   Toolbar,
   Tooltip,
+  useToast,
 } from "@/ui"
 import type { BadgeState, ButtonVariant, StatusGlyph } from "@/ui"
 
@@ -67,6 +68,7 @@ export default function DevGalleryPage() {
       <CommentSection />
       <TooltipSection />
       <MenuSection />
+      <ToastSection />
       <StatusIconSection />
       <SegmentedControlSection />
       <ChipsSection />
@@ -454,6 +456,24 @@ function CommentSection() {
         </Comment>
       </ul>
     </section>
+  )
+}
+
+function ToastSection() {
+  const toast = useToast()
+  return (
+    <Section title="Toast">
+      <Button onClick={() => toast("Saved your changes", { variant: "success" })}>Success</Button>
+      <Button onClick={() => toast("Heads up — double-check that input", { variant: "info" })}>
+        Info
+      </Button>
+      <Button
+        variant="danger"
+        onClick={() => toast("Failed to save — try again", { variant: "error" })}
+      >
+        Error
+      </Button>
+    </Section>
   )
 }
 
