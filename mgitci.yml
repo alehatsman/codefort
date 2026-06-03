@@ -30,7 +30,23 @@
 version: "1"
 on:
   push:
-    branches: [main, "feat/*"]
+    # Conventional-commit branch prefixes the fleet uses. Kept broad on
+    # purpose: #199 makes this filter enforced (it was dead code before), so an
+    # omitted prefix means that branch silently loses pre-merge CI. Add new
+    # prefixes here rather than narrowing.
+    branches:
+      [
+        main,
+        "feat/*",
+        "fix/*",
+        "chore/*",
+        "docs/*",
+        "refactor/*",
+        "test/*",
+        "build/*",
+        "ci/*",
+        "perf/*",
+      ]
 jobs:
   quality:
     image: moongit-ci-dev:latest
