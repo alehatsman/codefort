@@ -152,6 +152,14 @@ var hunkHeaderRe = regexp.MustCompile(`^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@ ?
 // budget is hit, remaining lines are dropped and CommitDetail.Truncated is set.
 const maxDiffLines = 20000
 
+// maxDiffBytes bounds the raw `git diff-tree` output buffered into memory before
+// parsing, complementing maxDiffLines (which only caps the parsed result). It
+// sits far above any diff maxDiffLines would keep, so a normal commit is never
+// byte-truncated; it exists only to stop a pathological patch (a huge generated
+// file, or tens of thousands of paths) from being fully buffered and OOMing the
+// handler. A byte-truncated diff sets Truncated, same as a line-truncated one.
+const maxDiffBytes = 10 << 20 // 10 MiB
+
 // handleCommit returns one commit's metadata plus its diff against the first
 // parent — the first parent for a merge, the empty tree for a root commit —
 // parsed into structured per-file hunks for the side-by-side diff view.
@@ -198,7 +206,7 @@ func (s *Server) handleCommit(w http.ResponseWriter, r *http.Request) {
 	} else {
 		args = append(args, parents[0], sha)
 	}
-	patch, err := gitOutput(r.Context(), repoDir, args...)
+	patch, rawTruncated, err := gitOutputLimited(r.Context(), repoDir, maxDiffBytes, args...)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "diff failed")
 		return
@@ -209,7 +217,7 @@ func (s *Server) handleCommit(w http.ResponseWriter, r *http.Request) {
 		Commit:    commits[0],
 		Parents:   parents,
 		Files:     files,
-		Truncated: truncated,
+		Truncated: truncated || rawTruncated,
 	}
 	for _, f := range files {
 		detail.Additions += f.Additions
@@ -296,7 +304,7 @@ func computeCompare(ctx context.Context, repoDir, base, head string) (api.Compar
 		}
 	}
 
-	patch, err := gitOutput(ctx, repoDir, "diff-tree", "--no-commit-id", "-p", "-r", "-M", "--no-color", diffBase, head)
+	patch, rawTruncated, err := gitOutputLimited(ctx, repoDir, maxDiffBytes, "diff-tree", "--no-commit-id", "-p", "-r", "-M", "--no-color", diffBase, head)
 	if err != nil {
 		return out, err
 	}
@@ -304,7 +312,7 @@ func computeCompare(ctx context.Context, repoDir, base, head string) (api.Compar
 	if len(files) > 0 {
 		out.Files = files
 	}
-	out.Truncated = truncated
+	out.Truncated = truncated || rawTruncated
 	for _, f := range files {
 		out.Additions += f.Additions
 		out.Deletions += f.Deletions

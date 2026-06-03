@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"mime"
 	"net/http"
 	"os"
@@ -426,6 +427,51 @@ func gitOutput(ctx context.Context, repoDir string, args ...string) ([]byte, err
 		return nil, errors.New("git " + args[0] + ": " + err.Error() + ": " + stderr.String())
 	}
 	return out, nil
+}
+
+// gitOutputLimited runs a read-only git command but stops once maxBytes of
+// stdout have been buffered, killing the process and reporting truncated=true.
+// gitOutput's cmd.Output() buffers the *entire* output first, so an endpoint
+// rendering attacker-influenceable output — a commit/compare diff, where anyone
+// who can push controls the patch size — could be OOM'd by one crafted commit
+// (a huge generated file, or tens of thousands of paths). This bounds the read
+// instead; gitOutput stays for fixed-size plumbing. A partial trailing line is
+// dropped so the diff parser never sees half a line.
+func gitOutputLimited(ctx context.Context, repoDir string, maxBytes int, args ...string) (out []byte, truncated bool, err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = repoDir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, false, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, false, errors.New("git " + args[0] + ": " + err.Error())
+	}
+	// Read one byte past the budget so an exactly-maxBytes output isn't flagged.
+	buf, rerr := io.ReadAll(io.LimitReader(stdout, int64(maxBytes)+1))
+	if len(buf) > maxBytes {
+		truncated = true
+		buf = buf[:maxBytes]
+		if i := bytes.LastIndexByte(buf, '\n'); i >= 0 {
+			buf = buf[:i+1]
+		}
+		cancel() // we have enough; stop git rather than draining the rest
+	}
+	werr := cmd.Wait()
+	if truncated {
+		return buf, true, nil // the kill from cancel() is expected
+	}
+	if rerr != nil {
+		return nil, false, errors.New("git " + args[0] + ": read: " + rerr.Error())
+	}
+	if werr != nil {
+		return nil, false, errors.New("git " + args[0] + ": " + werr.Error() + ": " + stderr.String())
+	}
+	return buf, false, nil
 }
 
 // isBinary applies git's heuristic: a NUL byte in the first 8000 bytes means
