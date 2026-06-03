@@ -100,6 +100,18 @@
   white-space: nowrap;
 }
 /* Run detail */
+/* An agent run view fills the viewport below the chrome so the transcript
+   scroll region grows to fit instead of sitting at a static max-height. The
+   section is bounded to (viewport − topbar − .main's top+bottom padding); its
+   head/subject/meta are content-sized and AgentRunBody's transcript-wrap takes
+   the slack (see .agent-transcript-wrap), with the message box pinned below.
+   Bounding here (not on .app/.main) keeps the change off every other page. */
+.pipelines--agent-run {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: calc(100dvh - var(--topbar-h) - 2 * var(--space-5));
+}
 .ci-run-subject {
   margin: var(--space-3) 0 0;
   font-size: var(--text-lg);

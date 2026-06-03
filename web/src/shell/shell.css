@@ -10,7 +10,7 @@
      active tab's underline lands on the bar's bottom border (see .tab). The
      brand and actions self-center via align-self. */
   padding: 0 var(--space-5);
-  min-height: 52px;
+  min-height: var(--topbar-h);
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow-sm);

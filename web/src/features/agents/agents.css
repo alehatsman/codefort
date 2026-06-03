@@ -63,14 +63,25 @@
 /* Agent run transcript — folded from the agent.* event stream and rendered
    like mooncake's terminal output: a tight monospace list, one line per step,
    the status glyph (▶ → ✓/~/✗/⊘) flipped in place (no duplicated row). */
+/* Flex column that takes the slack in the agent run view (.pipelines--agent-run
+   is a viewport-bounded flex column); the transcript scroll region grows to
+   fill, the "jump to latest" button overlays it (position: absolute).
+   min-height: 0 lets it shrink so the scroll happens inside .agent-transcript,
+   not the page. */
 .agent-transcript-wrap {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 /* The transcript is a bounded, windowed scroll region (react-virtual) that
    auto-follows the bottom; only on-screen rows are mounted, so the page never
-   grows unbounded as a long run streams. */
+   grows unbounded as a long run streams. It flexes to fill the wrap; a short
+   run leaves empty space below (terminal-style) rather than a static box. */
 .agent-transcript {
-  max-height: min(60vh, 42rem);
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-anchor: none;
   font-family: var(--font-mono);

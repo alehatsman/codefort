@@ -852,6 +852,18 @@ test("a long agent log virtualizes (windowed cards) and auto-follows the bottom"
   // even mounted in the DOM (only the on-screen window + overscan).
   const overflows = await box.evaluate((el) => el.scrollHeight > el.clientHeight + 50)
   expect(overflows).toBe(true)
+  // The transcript fills the viewport (not a static max-height): the long log
+  // scrolls *inside* the box, so the page itself grows no scrollbar and the
+  // message box stays on-screen at the bottom.
+  const pageScroll = await page.evaluate(
+    () => document.documentElement.scrollHeight - window.innerHeight
+  )
+  expect(pageScroll).toBeLessThanOrEqual(1)
+  const viewportH = page.viewportSize()?.height ?? 0
+  const msgboxBottom = await page
+    .locator(".agent-msgbox")
+    .evaluate((el) => el.getBoundingClientRect().bottom)
+  expect(msgboxBottom).toBeLessThanOrEqual(viewportH + 1)
   await expect(page.getByText("turn 01 prompt", { exact: true })).toHaveCount(0)
   // It auto-followed the bottom: the last turn's card is in view, scrolled down.
   await expect(page.getByText("step in turn 30", { exact: true })).toBeVisible()
