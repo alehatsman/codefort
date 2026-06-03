@@ -129,6 +129,74 @@
   border-bottom: 1px solid var(--border-muted);
 }
 
+.spec-view__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.spec-view__history {
+  font-size: 13px;
+}
+
+/* ── Editor (split textarea + live preview) ──────────────────────────────── */
+
+.spec-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.spec-editor__panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+  min-height: 60vh;
+}
+
+.spec-editor__input {
+  width: 100%;
+  min-height: 60vh;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+.spec-editor__preview {
+  overflow-y: auto;
+  max-height: 70vh;
+  padding: 0 4px;
+  border-left: 1px solid var(--border-muted);
+}
+
+.spec-editor__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.spec-editor__saved code {
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .spec-editor__panes {
+    grid-template-columns: 1fr;
+  }
+}
+
 .spec-view__title-row {
   display: flex;
   align-items: center;

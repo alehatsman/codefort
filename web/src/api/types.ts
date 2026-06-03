@@ -686,3 +686,19 @@ export interface SpecSearchResult {
   query: string
   hits: SpecSearchHit[]
 }
+
+export interface WriteSpecInput {
+  content: string
+  message?: string
+  /** Target branch; defaults server-side to spec/<stem>. Never the default branch. */
+  branch?: string
+  /** Branch to create the target from when it doesn't exist (default: repo default). */
+  base?: string
+}
+
+export interface WriteSpecResult {
+  branch: string
+  commit: string
+  /** True when the commit started a new branch (vs. extending one). */
+  created: boolean
+}

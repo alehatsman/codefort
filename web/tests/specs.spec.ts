@@ -70,6 +70,7 @@ async function mockSpecs(page: Page, list: unknown) {
   // Content endpoint (.../specs/<path>) — registered first; its regex requires
   // a trailing segment so it's disjoint from the list route below.
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/specs\/[^?]+/, (route) => {
+    if (route.request().method() !== "GET") return route.fallback()
     const rel = decodeURIComponent(new URL(route.request().url()).pathname.split("/specs/")[1])
     const c = CONTENT[rel]
     if (!c) return route.fulfill({ status: 404, body: "not found" })
@@ -93,6 +94,19 @@ async function mockSpecs(page: Page, list: unknown) {
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/specs(\?.*)?$/, (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(list) })
   )
+}
+
+// mockWrite intercepts PUT .../specs/<path>. Registered after mockSpecs so it
+// wins for PUT; non-PUT falls through to the GET content/list routes.
+async function mockWrite(page: Page, result: unknown) {
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/specs\/[^?]+/, (route) => {
+    if (route.request().method() !== "PUT") return route.fallback()
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(result),
+    })
+  })
 }
 
 test("Specs: tab links to /specs; two-pane tree + status rail + rendered spec", async ({
@@ -248,4 +262,43 @@ test("Specs: the Search button opens the semantic search palette", async ({ page
   await page.goto("/alice/demo/specs")
   await page.locator(".spec-jump", { hasText: "Search specs" }).click()
   await expect(page.locator(".specsearch .quickopen__input")).toBeVisible()
+})
+
+test("Specs: edit a spec — live preview, save to a branch, PR link", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockSpecs(page, SPECS)
+  await mockWrite(page, { branch: "spec/ssh-transport", commit: "abcdef1234567890", created: true })
+
+  await page.goto("/alice/demo/specs")
+  await expect(page.locator(".spec-view__title")).toHaveText("SSH Transport")
+
+  // A History link points at the spec's commit history.
+  await expect(page.locator(".spec-view__history")).toHaveAttribute(
+    "href",
+    "/alice/demo/commits/specs/ssh-transport.md"
+  )
+
+  // Enter edit mode → split editor with the raw content.
+  await page.locator(".spec-view__actions").getByRole("button", { name: "Edit" }).click()
+  const editor = page.locator(".spec-editor__input")
+  await expect(editor).toContainText("# SSH Transport")
+
+  // Editing updates the live preview.
+  await editor.fill("# SSH Transport\n## Extra\nbrand new section.")
+  await expect(page.locator(".spec-editor__preview")).toContainText("Extra")
+
+  // Save commits to a branch and surfaces a PR link.
+  await page.getByRole("button", { name: "Save to branch" }).click()
+  const saved = page.locator(".spec-editor__saved")
+  await expect(saved).toContainText("spec/ssh-transport")
+  await expect(saved.getByRole("link", { name: /pull request/ })).toHaveAttribute(
+    "href",
+    "/alice/demo/compare?head=spec%2Fssh-transport"
+  )
+
+  // Done returns to the read view.
+  await page.getByRole("button", { name: "Done" }).click()
+  await expect(page.locator(".spec-editor")).toHaveCount(0)
+  await expect(page.locator(".spec-view__title")).toHaveText("SSH Transport")
 })

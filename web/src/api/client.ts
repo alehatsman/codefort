@@ -47,6 +47,8 @@ import type {
   SpecList,
   SpecSearchResult,
   SSHKey,
+  WriteSpecInput,
+  WriteSpecResult,
   Token,
   Tree,
   UpdateIssueInput,
@@ -301,6 +303,14 @@ export const api = {
       method: "POST",
       body: { query },
     }),
+  writeSpec: (owner: string, repo: string, path: string, body: WriteSpecInput) => {
+    const rel = path.replace(/^specs\//, "")
+    const segs = rel.split("/").map(encodeURIComponent).join("/")
+    return request<WriteSpecResult>(`/api/repos/${owner}/${repo}/specs/${segs}`, {
+      method: "PUT",
+      body,
+    })
+  },
 
   listCodeComments: (
     owner: string,

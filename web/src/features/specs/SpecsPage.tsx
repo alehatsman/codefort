@@ -1,12 +1,13 @@
 import "./specs.css"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useParams, useSearchParams } from "react-router-dom"
+import { Link, useParams, useSearchParams } from "react-router-dom"
 import { useRepo, useSpec, useSpecsList } from "@/api/queries"
 import QuickOpen from "@/features/specs/QuickOpen"
+import SpecEditor from "@/features/specs/SpecEditor"
 import SpecSearch from "@/features/specs/SpecSearch"
 import Markdown from "@/shell/Markdown"
 import OverviewCard from "@/shell/OverviewCard"
-import { EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
+import { Button, EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
 import type { SpecContent, SpecListItem } from "@/api/types"
 
 /**
@@ -209,27 +210,55 @@ function SpecView({
 }) {
   const specQ = useSpec(owner, repo, path)
   const articleRef = useRef<HTMLElement>(null)
+  const [editing, setEditing] = useState(false)
   const data = specQ.data
+
+  // Leaving a spec drops out of edit mode so the next one opens in read view.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset edit mode on spec change
+  useEffect(() => {
+    setEditing(false)
+  }, [path])
 
   // Deep-link from spec search: once the spec has rendered, scroll the heading
   // matching ?section= into view (matched by its text, since the renderer's
   // headings carry no ids).
   useEffect(() => {
-    if (!section || !data) return
+    if (!section || !data || editing) return
     const root = articleRef.current
     if (!root) return
     const headings = Array.from(root.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"))
     const match = headings.find((h) => h.textContent?.trim() === section)
     match?.scrollIntoView({ block: "start" })
-  }, [section, data])
+  }, [section, data, editing])
 
   if (specQ.isLoading) return <Spinner label="Loading spec…" />
   if (specQ.error) return <ErrorMessage error={specQ.error} />
   if (!data) return null
+
+  if (editing) {
+    return (
+      <SpecEditor
+        owner={owner}
+        repo={repo}
+        path={path}
+        initialContent={data.content}
+        onDone={() => setEditing(false)}
+      />
+    )
+  }
+
   // The directory the spec lives in anchors its relative links/images.
   const basePath = path.split("/").slice(0, -1).join("/")
   return (
     <article ref={articleRef} className="spec-view">
+      <div className="spec-view__actions">
+        <Button variant="ghost" onClick={() => setEditing(true)}>
+          Edit
+        </Button>
+        <Link className="spec-view__history" to={`/${owner}/${repo}/commits/${path}`}>
+          History
+        </Link>
+      </div>
       <SpecHeader spec={data} />
       <Markdown content={data.body} owner={owner} repo={repo} basePath={basePath} />
     </article>
