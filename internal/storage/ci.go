@@ -298,7 +298,14 @@ func (f RunFilter) clampLimit() int {
 // so the clauses stay correct unqualified even under the repos/users join the
 // aggregate query adds (matching appendIssueFilters).
 func appendRunFilters(q *strings.Builder, args *[]any, f RunFilter) {
-	if f.Kind != "" {
+	if f.Kind == RunKindAgent {
+		// The Agents tab is the agent *family*: ordinary issue agent runs plus
+		// spec-verify runs (#219), which reuse the agent spine but carry their own
+		// kind. Match both so verify runs are visible there, not stranded in no
+		// list. kind=ci stays exact; an empty kind matches everything.
+		q.WriteString(" AND kind IN (?, ?)")
+		*args = append(*args, string(RunKindAgent), string(RunKindSpecVerify))
+	} else if f.Kind != "" {
 		q.WriteString(" AND kind = ?")
 		*args = append(*args, string(f.Kind))
 	}
