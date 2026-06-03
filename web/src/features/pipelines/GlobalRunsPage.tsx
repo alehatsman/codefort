@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 import "./pipelines.css"
 import { useAllRuns } from "@/api/queries"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
-import { EmptyState, ErrorMessage, Spinner, Table } from "@/ui"
+import { EmptyState, ErrorMessage, SkeletonTable, Table } from "@/ui"
 import { absoluteTime, timeAgo } from "@/shell/timeAgo"
 import {
   type RunKind,
@@ -33,7 +33,12 @@ export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
           : "Every pipeline run across all repos. Open one to see its job graph."}
       </p>
 
-      {isLoading && <Spinner />}
+      {isLoading && (
+        <SkeletonTable
+          className="ci-runs"
+          headers={["Repo", "Run", "Status", "Commit", "Ref", "Trigger", "Duration", "When"]}
+        />
+      )}
       {error && <ErrorMessage error={error} />}
       {data && data.length === 0 && (
         <EmptyState>{isAgent ? "No agent runs yet." : "No pipeline runs yet."}</EmptyState>

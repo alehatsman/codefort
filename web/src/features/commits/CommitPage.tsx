@@ -11,7 +11,7 @@ import {
   ErrorMessage,
   RelativeTime,
   SegmentedControl,
-  Spinner,
+  SkeletonText,
   Tooltip,
 } from "@/ui"
 
@@ -46,7 +46,7 @@ export default function CommitPage() {
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       {commitQ.isLoading ? (
-        <Spinner />
+        <SkeletonText lines={4} />
       ) : commitQ.error ? (
         <ErrorMessage error={commitQ.error} />
       ) : !detail ? (

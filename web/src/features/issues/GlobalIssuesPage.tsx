@@ -13,7 +13,7 @@ import {
   ListRow,
   PageHeader,
   Pagination,
-  Spinner,
+  SkeletonList,
 } from "@/ui"
 import { useListNav } from "@/shell/keyboardNav"
 
@@ -111,7 +111,7 @@ export default function GlobalIssuesPage() {
         </div>
       </div>
 
-      {isLoading && <Spinner />}
+      {isLoading && <SkeletonList />}
       {error && <ErrorMessage error={error} />}
 
       {data && issues.length === 0 && <EmptyState>No issues match these filters.</EmptyState>}
