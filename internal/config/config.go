@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -47,13 +48,12 @@ type Config struct {
 	// MOONGIT_CI_JOB_CONCURRENCY (default 4); values < 1 are treated as 1.
 	CIJobConcurrency int
 
-	// CIRunConcurrency caps how many CI runs execute at once. The runner
-	// claims and dispatches up to this many runs concurrently; each run still
-	// bounds its own jobs by CIJobConcurrency. Set via
-	// MOONGIT_CI_RUN_CONCURRENCY (default 1 — runs execute one at a time, the
-	// historical behavior); values < 1 are treated as 1. Raise it to use spare
-	// capacity, bearing in mind each running job is its own container.
-	CIRunConcurrency int
+	// MaxConcurrency caps how many runs execute at once across one shared budget
+	// that CI and agent runs both draw from. Set via MOONGIT_MAX_CONCURRENCY
+	// (default runtime.NumCPU()); values < 1 are treated as 1. A CI run still
+	// bounds its own jobs by CIJobConcurrency, so this caps concurrent *runs*,
+	// not strictly job containers. Replaces the former independent CI/agent caps.
+	MaxConcurrency int
 
 	// CISecret gates the loopback /internal/ci/events endpoint that the
 	// post-receive hook calls. Set via MOONGIT_CI_SECRET; empty means the
@@ -74,11 +74,11 @@ type Config struct {
 	// Set via MOONGIT_CI_DEFAULT_IMAGE.
 	CIDefaultImage string
 
-	// AgentRunConcurrency caps how many agent runs (kind=agent) execute at
-	// once, independent of CIRunConcurrency so a burst of issue-spawned agents
-	// never starves pipeline CI (and vice versa). Set via
-	// MOONGIT_AGENT_RUN_CONCURRENCY (default 1); values < 1 are treated as 1.
-	AgentRunConcurrency int
+	// AgentReserved is how many of MaxConcurrency's slots only agent-family runs
+	// may take, so a CI backlog can never lock out an agent spawn (the inverse
+	// starves too — see the runner's fair, non-blocking drain). Set via
+	// MOONGIT_AGENT_RESERVED (default 2); clamped to [0, MaxConcurrency].
+	AgentReserved int
 
 	// AgentRunTimeout is the whole-session lifetime cap for an agent run: a run
 	// parked in awaiting_input is reaped (container torn down, run finalized)
@@ -240,11 +240,11 @@ func Load() (*Config, error) {
 	}
 	cfg.CIJobConcurrency = jobConc
 
-	runConc, err := strconv.Atoi(envOr("MOONGIT_CI_RUN_CONCURRENCY", "1"))
+	maxConc, err := strconv.Atoi(envOr("MOONGIT_MAX_CONCURRENCY", strconv.Itoa(runtime.NumCPU())))
 	if err != nil {
-		return nil, fmt.Errorf("MOONGIT_CI_RUN_CONCURRENCY: %w", err)
+		return nil, fmt.Errorf("MOONGIT_MAX_CONCURRENCY: %w", err)
 	}
-	cfg.CIRunConcurrency = runConc
+	cfg.MaxConcurrency = maxConc
 
 	retainRuns, err := strconv.Atoi(envOr("MOONGIT_CI_RETAIN_RUNS", "50"))
 	if err != nil {
@@ -268,11 +268,11 @@ func Load() (*Config, error) {
 	}
 	cfg.CIDefaultImage = envOr("MOONGIT_CI_DEFAULT_IMAGE", "moongit-ci:latest")
 
-	agentConc, err := strconv.Atoi(envOr("MOONGIT_AGENT_RUN_CONCURRENCY", "1"))
+	agentReserved, err := strconv.Atoi(envOr("MOONGIT_AGENT_RESERVED", "2"))
 	if err != nil {
-		return nil, fmt.Errorf("MOONGIT_AGENT_RUN_CONCURRENCY: %w", err)
+		return nil, fmt.Errorf("MOONGIT_AGENT_RESERVED: %w", err)
 	}
-	cfg.AgentRunConcurrency = agentConc
+	cfg.AgentReserved = agentReserved
 
 	agentTimeout, err := time.ParseDuration(envOr("MOONGIT_AGENT_RUN_TIMEOUT", "60m"))
 	if err != nil {

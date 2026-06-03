@@ -391,9 +391,9 @@ jobs:
 	}
 }
 
-// TestRunDispatchesConcurrentRunsWithinCap verifies CIRunConcurrency caps how
-// many runs execute at once: with a backlog of 5 runs and a cap of 3, the runs
-// must overlap (peak >= 2) yet never exceed the cap (peak <= 3).
+// TestRunDispatchesConcurrentRunsWithinCap verifies the shared budget caps how
+// many runs execute at once: with a backlog of 5 runs and MaxConcurrency 3, the
+// runs must overlap (peak >= 2) yet never exceed the cap (peak <= 3).
 func TestRunDispatchesConcurrentRunsWithinCap(t *testing.T) {
 	pipeline := `
 version: "1"
@@ -403,7 +403,7 @@ jobs:
 `
 	exec, maxSeen := trackingExec(40 * time.Millisecond)
 	r, run := newTestRunner(t, pipeline, true, exec)
-	r.cfg.CIRunConcurrency = 3
+	r.cfg.MaxConcurrency = 3
 	enqueueExtraRuns(t, r, run.RepoID, 4) // 5 runs total: numbers 1..5
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -428,7 +428,7 @@ jobs:
 }
 
 // TestRunDefaultRunConcurrencyIsSequential pins the default: with
-// CIRunConcurrency unset (0 -> treated as 1), runs execute strictly one at a
+// MaxConcurrency unset (0 -> treated as 1), runs execute strictly one at a
 // time, preserving the historical single-worker behavior.
 func TestRunDefaultRunConcurrencyIsSequential(t *testing.T) {
 	pipeline := `
@@ -438,7 +438,7 @@ jobs:
     steps: [{run: echo build}]
 `
 	exec, maxSeen := trackingExec(20 * time.Millisecond)
-	r, run := newTestRunner(t, pipeline, true, exec) // CIRunConcurrency left 0
+	r, run := newTestRunner(t, pipeline, true, exec) // MaxConcurrency left 0 -> 1
 	enqueueExtraRuns(t, r, run.RepoID, 3)            // 4 runs total: numbers 1..4
 
 	ctx, cancel := context.WithCancel(context.Background())

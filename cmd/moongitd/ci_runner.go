@@ -161,8 +161,9 @@ func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner 
 }
 
 // runCIRunner launches the in-process CI runner beside the reapers. It claims
-// and dispatches up to CIRunConcurrency runs at a time (default 1). Runs until
-// ctx is cancelled.
+// and dispatches runs from one shared budget (MaxConcurrency, default NumCPU)
+// that CI and agent runs share, with AgentReserved slots kept for agents. Runs
+// until ctx is cancelled.
 func runCIRunner(ctx context.Context, r *ciRunner) {
 	r.run(ctx)
 }
@@ -172,9 +173,8 @@ func (r *ciRunner) run(ctx context.Context) {
 	if interval <= 0 {
 		interval = 5 * time.Second
 	}
-	runConc := max(r.cfg.CIRunConcurrency, 1)
-	agentConc := max(r.cfg.AgentRunConcurrency, 1)
-	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout, "isolation", r.cfg.CIIsolation, "run_concurrency", runConc, "agent_concurrency", agentConc)
+	maxConc := max(r.cfg.MaxConcurrency, 1)
+	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout, "isolation", r.cfg.CIIsolation, "max_concurrency", maxConc, "agent_reserved", r.cfg.AgentReserved)
 
 	// A restart can strand runs mid-flight: their status writes never committed,
 	// so they sit 'running' with no goroutine driving them. Nothing can be
@@ -201,33 +201,34 @@ func (r *ciRunner) run(ctx context.Context) {
 		sweepOrphanContainers(ctx, r.logger)
 	}
 
-	// CI and agent runs drain from independent pools so a burst of one kind
-	// never starves the other. wg tracks in-flight runs across both pools so
-	// shutdown drains them: run() returns only once every dispatched
-	// executeRun has finalized its run against the still-open DB (the
-	// restart-drain contract — see cmd/moongitd/main.go).
-	ciSem := make(chan struct{}, runConc)
-	agentSem := make(chan struct{}, agentConc)
+	// CI and agent-family runs draw from one shared budget (#293): up to
+	// MaxConcurrency runs in flight, with AgentReserved slots only agents may
+	// take so a CI backlog can't lock out a spawn. The drain is non-blocking
+	// (try-acquire), so neither kind ever blocks the loop behind the other (the
+	// #268 starvation). wg tracks in-flight runs so shutdown drains them: run()
+	// returns only once every dispatched executeRun has finalized its run
+	// against the still-open DB (the restart-drain contract — see main.go).
+	budget := newWorkBudget(maxConc, r.cfg.AgentReserved)
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
-		// Dispatch every claimable run of each kind before sleeping.
-		r.drainKind(ctx, &wg, ciSem, storage.RunKindCI, r.runLease())
-		// The agent family (agent, spec-verify, …) shares the agent pool/lease;
+		// Dispatch every claimable run that fits the budget before sleeping.
+		r.drainKind(ctx, &wg, budget.tryAcquireCI, budget.releaseCI, storage.RunKindCI, r.runLease())
+		// The agent family (agent, spec-verify, …) draws the agent budget side;
 		// drain each kind in AgentRunKinds so a new agent kind is picked up
 		// without editing this loop (#270).
 		for _, k := range storage.AgentRunKinds {
-			r.drainKind(ctx, &wg, agentSem, k, r.agentLease())
+			r.drainKind(ctx, &wg, budget.tryAcquireAgent, budget.releaseAgent, k, r.agentLease())
 		}
-		// Reap lifetime-expired parked agent sessions, then dispatch any
-		// queued follow-up turns. Turns share the agent pool: a parked run
-		// holds no slot, and dispatching its next turn briefly takes one.
+		// Reap lifetime-expired parked agent sessions, then dispatch queued
+		// follow-up turns + accepted handoffs. Both are agent-family work: a
+		// parked run holds no slot; dispatching briefly takes one.
 		r.reapExpiredAgents(ctx)
-		r.drainTurns(ctx, &wg, agentSem)
-		r.drainFinishing(ctx, &wg, agentSem)
+		r.drainTurns(ctx, &wg, budget.tryAcquireAgent, budget.releaseAgent)
+		r.drainFinishing(ctx, &wg, budget.tryAcquireAgent, budget.releaseAgent)
 		if ctx.Err() != nil {
 			return
 		}
@@ -240,21 +241,20 @@ func (r *ciRunner) run(ctx context.Context) {
 }
 
 // drainTurns claims and dispatches every currently-dispatchable follow-up turn
-// (a parked run's next pending message), bounded by the agent pool, returning
-// when nothing more is claimable or the context is cancelled. Mirrors drainKind.
-func (r *ciRunner) drainTurns(ctx context.Context, wg *sync.WaitGroup, sem chan struct{}) {
+// (a parked run's next pending message) that fits the agent budget, returning
+// when nothing more is claimable, the budget is full, or the context is
+// cancelled. Mirrors drainKind.
+func (r *ciRunner) drainTurns(ctx context.Context, wg *sync.WaitGroup, acquire func() bool, release func()) {
 	for {
 		if ctx.Err() != nil {
 			return
 		}
-		select {
-		case sem <- struct{}{}:
-		case <-ctx.Done():
-			return
+		if !acquire() {
+			return // budget full — retry next poll
 		}
 		turn, run, err := storage.ClaimNextTurn(r.db, r.turnLease())
 		if err != nil {
-			<-sem
+			release()
 			if !errors.Is(err, storage.ErrNoTurnPending) {
 				r.logger.Error("agent claim turn", "err", err)
 			}
@@ -263,28 +263,26 @@ func (r *ciRunner) drainTurns(ctx context.Context, wg *sync.WaitGroup, sem chan 
 		wg.Add(1)
 		go func(turn storage.AgentTurn, run storage.CIRun) {
 			defer wg.Done()
-			defer func() { <-sem }()
+			defer release()
 			r.dispatchTurn(ctx, turn, run)
 		}(turn, run)
 	}
 }
 
 // drainFinishing claims and dispatches every agent run the human has accepted
-// (state finishing), bounded by the agent pool, performing handoff for each.
+// (state finishing) that fits the agent budget, performing handoff for each.
 // Mirrors drainKind/drainTurns.
-func (r *ciRunner) drainFinishing(ctx context.Context, wg *sync.WaitGroup, sem chan struct{}) {
+func (r *ciRunner) drainFinishing(ctx context.Context, wg *sync.WaitGroup, acquire func() bool, release func()) {
 	for {
 		if ctx.Err() != nil {
 			return
 		}
-		select {
-		case sem <- struct{}{}:
-		case <-ctx.Done():
-			return
+		if !acquire() {
+			return // budget full — retry next poll
 		}
 		run, err := storage.ClaimNextFinishingRun(r.db)
 		if err != nil {
-			<-sem
+			release()
 			if !errors.Is(err, storage.ErrNoRunQueued) {
 				r.logger.Error("agent claim finishing", "err", err)
 			}
@@ -293,18 +291,20 @@ func (r *ciRunner) drainFinishing(ctx context.Context, wg *sync.WaitGroup, sem c
 		wg.Add(1)
 		go func(run storage.CIRun) {
 			defer wg.Done()
-			defer func() { <-sem }()
+			defer release()
 			r.finishAgentRun(ctx, run)
 		}(run)
 	}
 }
 
-// drainKind claims and dispatches every currently-claimable run of one kind,
-// bounded by its pool's slots, returning when nothing more is claimable or the
-// context is cancelled. A slot is taken *before* claiming so a claimed run is
-// never held without a slot to execute it (its lease would tick while it
-// waited). Each dispatched run is tracked on wg for the shutdown drain.
-func (r *ciRunner) drainKind(ctx context.Context, wg *sync.WaitGroup, sem chan struct{}, kind storage.RunKind, lease time.Duration) {
+// drainKind claims and dispatches every currently-claimable run of one kind
+// that fits the shared budget, returning when nothing more is claimable, the
+// budget is full, or the context is cancelled. acquire is non-blocking — a full
+// budget returns false so this kind never blocks the loop behind another
+// (#268); the slot is taken *before* claiming so a claimed run always has a slot
+// to run in (its lease never ticks while it waits). Each dispatched run is
+// tracked on wg for the shutdown drain.
+func (r *ciRunner) drainKind(ctx context.Context, wg *sync.WaitGroup, acquire func() bool, release func(), kind storage.RunKind, lease time.Duration) {
 	for {
 		// Once shutdown starts, stop claiming new work; in-flight runs drain
 		// via the caller's wg.Wait. Guarding here also keeps us from claiming a
@@ -312,14 +312,12 @@ func (r *ciRunner) drainKind(ctx context.Context, wg *sync.WaitGroup, sem chan s
 		if ctx.Err() != nil {
 			return
 		}
-		select {
-		case sem <- struct{}{}:
-		case <-ctx.Done():
-			return
+		if !acquire() {
+			return // budget full — retry next poll
 		}
 		run, err := storage.ClaimNextRunOfKind(r.db, kind, lease)
 		if err != nil {
-			<-sem // release the unused slot
+			release() // release the unused slot
 			if !errors.Is(err, storage.ErrNoRunQueued) {
 				r.logger.Error("ci claim", "kind", kind, "err", err)
 			}
@@ -328,7 +326,7 @@ func (r *ciRunner) drainKind(ctx context.Context, wg *sync.WaitGroup, sem chan s
 		wg.Add(1)
 		go func(run storage.CIRun) {
 			defer wg.Done()
-			defer func() { <-sem }()
+			defer release()
 			r.executeRun(ctx, run)
 		}(run)
 	}
