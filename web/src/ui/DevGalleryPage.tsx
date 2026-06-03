@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Comment,
   Dialog,
   EmptyState,
   ErrorMessage,
@@ -60,6 +61,7 @@ export default function DevGalleryPage() {
       <ListRowSection />
       <TableSection />
       <SidebarSectionDemo />
+      <CommentSection />
       <StatusIconSection />
       <SegmentedControlSection />
       <ChipsSection />
@@ -415,6 +417,36 @@ function SidebarSectionDemo() {
           </Button>
         </SidebarSection>
       </Sidebar>
+    </section>
+  )
+}
+
+// Comment renders an <li>; wrap in a <ul> and show a plain + a resolved one.
+function CommentSection() {
+  return (
+    <section className="gallery__section">
+      <h3 className="gallery__heading">Comment</h3>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        <Comment
+          author="trooper"
+          meta="commented just now"
+          actions={
+            <button type="button" className="comment__delete" title="Delete" aria-label="Delete">
+              ×
+            </button>
+          }
+        >
+          A comment body — markdown renders here in the real app.
+        </Comment>
+        <Comment
+          author="alice"
+          meta="on lines 10–12 · yesterday"
+          resolved
+          actions={<Badge state="done">resolved</Badge>}
+        >
+          A resolved review comment (dimmed).
+        </Comment>
+      </ul>
     </section>
   )
 }
