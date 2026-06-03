@@ -24,6 +24,7 @@ test("dev gallery renders every primitive section", async ({ page }) => {
     "Comment",
     "Tooltip",
     "Menu",
+    "Toast",
     "FilterChip",
     "Card",
     "Spinner",
@@ -96,6 +97,26 @@ test("dev gallery Menu opens, keyboard-selects, and dismisses", async ({ page })
   await expect(menu).toBeVisible()
   await page.getByRole("heading", { name: "Menu", exact: true }).click()
   await expect(menu).toBeHidden()
+})
+
+test("dev gallery Toast appears, stacks, and dismisses", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/dev/ui")
+
+  // Fire a success toast (role=status) and an error toast (role=alert).
+  await page.getByRole("button", { name: "Success", exact: true }).click()
+  const success = page.locator(".toast").filter({ hasText: "Saved your changes" })
+  await expect(success).toBeVisible()
+
+  await page.getByRole("button", { name: "Error", exact: true }).click()
+  await expect(page.getByRole("alert").filter({ hasText: "Failed to save" })).toBeVisible()
+  // Both stack at once.
+  await expect(page.locator(".toast")).toHaveCount(2)
+
+  // The × on the success toast dismisses just it.
+  await success.getByRole("button", { name: "Dismiss notification" }).click()
+  await expect(success).toBeHidden()
+  await expect(page.locator(".toast")).toHaveCount(1)
 })
 
 test("dev gallery shows the layout primitives", async ({ page }) => {
