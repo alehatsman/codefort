@@ -7,7 +7,7 @@ import { usePull } from "@/api/queries"
 import type { MergeConflictResponse } from "@/api/types"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
-import { Button, Checkbox, EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { Button, Checkbox, EmptyState, ErrorMessage, Spinner, useToast } from "@/ui"
 
 const Markdown = lazy(() => import("@/shell/Markdown"))
 
@@ -28,6 +28,7 @@ export default function PullPage() {
   const pullQ = usePull(owner, repo, n)
   const mergePull = useMergePull(owner, repo, n)
   const updatePull = useUpdatePull(owner, repo, n)
+  const toast = useToast()
   const [ffOnly, setFFOnly] = useState(false)
 
   const pr = pullQ.data
@@ -77,7 +78,14 @@ export default function PullPage() {
                 <Button
                   variant="primary"
                   disabled={!mergeable || mergePull.isPending}
-                  onClick={() => mergePull.mutate({ method: ffOnly ? "ff-only" : "merge" })}
+                  onClick={() =>
+                    mergePull.mutate(
+                      { method: ffOnly ? "ff-only" : "merge" },
+                      {
+                        onSuccess: () => toast(`Pull request #${n} merged`, { variant: "success" }),
+                      }
+                    )
+                  }
                 >
                   {mergePull.isPending
                     ? "Merging…"

@@ -1,6 +1,6 @@
 import { useClaimIssue, useUnclaimIssue } from "@/api/mutations"
 import type { IssueState } from "@/api/types"
-import { Avatar, Button, ErrorMessage } from "@/ui"
+import { Avatar, Button, ErrorMessage, useToast } from "@/ui"
 
 interface Props {
   owner: string
@@ -23,6 +23,7 @@ interface Props {
 export default function AssigneeControl({ owner, repo, number, assignee, state, me }: Props) {
   const claim = useClaimIssue(owner, repo, number)
   const unclaim = useUnclaimIssue(owner, repo, number)
+  const toast = useToast()
   const inFlight = claim.isPending || unclaim.isPending
   const error = claim.error || unclaim.error
   const terminal = state === "done" || state === "closed"
@@ -45,11 +46,28 @@ export default function AssigneeControl({ owner, repo, number, assignee, state, 
       ) : (
         <div className="assignee__row">
           {assignee === null ? (
-            <Button size="small" disabled={inFlight} onClick={() => claim.mutate({})}>
+            <Button
+              size="small"
+              disabled={inFlight}
+              onClick={() =>
+                claim.mutate(
+                  {},
+                  { onSuccess: () => toast(`Claimed #${number}`, { variant: "success" }) }
+                )
+              }
+            >
               {claim.isPending ? "Claiming…" : "Claim it"}
             </Button>
           ) : (
-            <Button size="small" disabled={inFlight} onClick={() => unclaim.mutate()}>
+            <Button
+              size="small"
+              disabled={inFlight}
+              onClick={() =>
+                unclaim.mutate(undefined, {
+                  onSuccess: () => toast(`Released #${number}`, { variant: "success" }),
+                })
+              }
+            >
               {unclaim.isPending ? "Releasing…" : "Release"}
             </Button>
           )}
