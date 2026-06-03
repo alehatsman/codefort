@@ -9,7 +9,9 @@ import StateIcon from "@/features/issues/StateIcon"
 import {
   EmptyState,
   ErrorMessage,
+  FilterBar,
   FilterChip,
+  FilterRow,
   ListRow,
   PageHeader,
   Pagination,
@@ -91,25 +93,21 @@ export default function GlobalIssuesPage() {
         <IssuesViewSwitch />
       </PageHeader>
 
-      <div className="filters">
-        <input
-          type="search"
-          className="list-search"
-          placeholder="Search title or body across all repos…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search issues"
-        />
-        <div className="filter-row">
-          <span className="filter-label">state:</span>
+      <FilterBar
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder="Search title or body across all repos…"
+        searchAriaLabel="Search issues"
+      >
+        <FilterRow label="state:">
           {ISSUE_STATES.map((s) => (
             <FilterChip key={s} checked={activeStates.includes(s)} onChange={() => toggleState(s)}>
               <StateIcon state={s} size={12} />
               {s}
             </FilterChip>
           ))}
-        </div>
-      </div>
+        </FilterRow>
+      </FilterBar>
 
       {isLoading && <SkeletonList />}
       {error && <ErrorMessage error={error} />}

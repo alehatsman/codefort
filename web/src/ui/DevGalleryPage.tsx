@@ -11,7 +11,9 @@ import {
   EmptyState,
   ErrorMessage,
   Field,
+  FilterBar,
   FilterChip,
+  FilterRow,
   FormField,
   Inline,
   Input,
@@ -80,6 +82,7 @@ export default function DevGalleryPage() {
       <StatusIconSection />
       <SegmentedControlSection />
       <ChipsSection />
+      <FilterBarSection />
       <CardsSection />
       <FeedbackSection />
       <SkeletonSection />
@@ -561,6 +564,48 @@ function ChipsSection() {
           {s}
         </FilterChip>
       ))}
+    </Section>
+  )
+}
+
+function FilterBarSection() {
+  const [checked, setChecked] = useState<Record<string, boolean>>({ todo: true, in_progress: true })
+  const [search, setSearch] = useState("")
+  return (
+    <Section title="FilterBar / FilterRow">
+      <p className="gallery__sublabel">Search + chip row</p>
+      <FilterBar
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder="Search…"
+        searchAriaLabel="Gallery search"
+      >
+        <FilterRow label="state:">
+          {["todo", "in_progress", "done"].map((s) => (
+            <FilterChip
+              key={s}
+              checked={checked[s] ?? false}
+              onChange={() => setChecked((c) => ({ ...c, [s]: !c[s] }))}
+            >
+              {s}
+            </FilterChip>
+          ))}
+        </FilterRow>
+      </FilterBar>
+      <p className="gallery__sublabel">No search input (chip rows only)</p>
+      <FilterBar>
+        <FilterRow label="status:">
+          {["running", "success", "failed"].map((s) => (
+            <FilterChip
+              key={s}
+              checked={checked[s] ?? false}
+              onChange={() => setChecked((c) => ({ ...c, [s]: !c[s] }))}
+            >
+              {s}
+            </FilterChip>
+          ))}
+        </FilterRow>
+      </FilterBar>
     </Section>
   )
 }

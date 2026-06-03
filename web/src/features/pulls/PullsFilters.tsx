@@ -1,6 +1,6 @@
 import { PR_STATES, type PRState } from "@/api/types"
 import PRStateIcon from "@/features/pulls/PRStateIcon"
-import { FilterChip } from "@/ui"
+import { FilterBar, FilterChip, FilterRow } from "@/ui"
 
 interface Props {
   search: string
@@ -11,11 +11,8 @@ interface Props {
 }
 
 /**
- * The PR list `.filters` block — keyword search + state chips — shared by the
- * per-repo PullsPage and the fleet-wide GlobalPullsPage so both render the same
- * FilterChip + PRStateIcon row (the global page used bare checkboxes with no
- * icons before this). The owning page keeps its own URL-param state and passes
- * the value + handlers down; this is purely presentational.
+ * PR list filter bar — keyword search + state chips — shared by PullsPage and
+ * GlobalPullsPage. State is owned by the caller; this is purely presentational.
  */
 export default function PullsFilters({
   search,
@@ -25,24 +22,20 @@ export default function PullsFilters({
   onToggleState,
 }: Props) {
   return (
-    <div className="filters">
-      <input
-        type="search"
-        className="list-search"
-        placeholder={searchPlaceholder}
-        value={search}
-        onChange={(e) => onSearchChange(e.target.value)}
-        aria-label="Search pull requests"
-      />
-      <div className="filter-row">
-        <span className="filter-label">state:</span>
+    <FilterBar
+      search={search}
+      onSearch={onSearchChange}
+      searchPlaceholder={searchPlaceholder}
+      searchAriaLabel="Search pull requests"
+    >
+      <FilterRow label="state:">
         {PR_STATES.map((s) => (
           <FilterChip key={s} checked={activeStates.includes(s)} onChange={() => onToggleState(s)}>
             <PRStateIcon state={s} size={12} />
             {s}
           </FilterChip>
         ))}
-      </div>
-    </div>
+      </FilterRow>
+    </FilterBar>
   )
 }
