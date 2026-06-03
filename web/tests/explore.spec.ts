@@ -117,13 +117,12 @@ test("Explore: hero summary, layered package map, and hotspots render", async ({
 const PACKAGE_GRAPH = {
   status: "ok",
   nodes: [
-    { package: "github.com/acme/demo/cmd/demo", in_degree: 0, out_degree: 1, page_rank: 0.02 },
-    // A second entry point (a main/root nothing imports) with a SHORT import
-    // chain: it imports the foundation directly, skipping the server layer.
-    // Under the old bottom-up depth metric its longest-chain-to-a-leaf was 1,
-    // so it sank into "Layer 1"; top-down ranking pins every in_degree-0 root
-    // to the Entry points row regardless of subtree height.
-    { package: "github.com/acme/demo/cmd/tool", in_degree: 0, out_degree: 1, page_rank: 0.01 },
+    { package: "github.com/acme/demo/cmd/demo", in_degree: 0, out_degree: 1, page_rank: 0.02, is_main: true },
+    // A second entry point (a `main`) with a SHORT import chain: it imports the
+    // foundation directly, skipping the server layer. Its longest chain is one
+    // hop, but is_main pins every executable to the Entry points row regardless
+    // of subtree height.
+    { package: "github.com/acme/demo/cmd/tool", in_degree: 0, out_degree: 1, page_rank: 0.01, is_main: true },
     {
       package: "github.com/acme/demo/internal/server",
       in_degree: 1,
@@ -182,14 +181,26 @@ test("Explore: package map layers by dex import graph with degree + cross-links"
   await expect(page.locator(".pkg-layer__name").filter({ hasText: "Foundation" })).toBeVisible()
   await expect(page.locator(".pkg-layer__name").filter({ hasText: "HTTP / API" })).toHaveCount(0)
 
-  // Top-down ranking: BOTH roots (in-degree 0) share the Entry points row,
-  // even though cmd/tool's import chain is one hop shorter than cmd/demo's.
-  // The old bottom-up depth metric would have dropped cmd/tool to "Layer 1".
+  // Entry points = `main` packages (is_main). BOTH executables share the top
+  // row even though cmd/tool's import chain is one hop shorter than cmd/demo's.
   const entryLayer = page.locator(".pkg-layer", {
     has: page.locator(".pkg-layer__name", { hasText: "Entry points" }),
   })
   await expect(entryLayer.locator(".pkg-card__path", { hasText: "cmd/demo" })).toBeVisible()
   await expect(entryLayer.locator(".pkg-card__path", { hasText: "cmd/tool" })).toBeVisible()
+
+  // The off-module fixture pair is non-main and no entry point imports it, so
+  // it drops to a Standalone island — NOT Entry points, even though alpha has
+  // in_degree 0. (in_degree==0 alone would wrongly promote it to the top row.)
+  await expect(
+    entryLayer.locator(".pkg-card__path", { hasText: "fixtures.testdata.alpha" })
+  ).toHaveCount(0)
+  const standaloneLayer = page.locator(".pkg-layer", {
+    has: page.locator(".pkg-layer__name", { hasText: "Standalone" }),
+  })
+  await expect(
+    standaloneLayer.locator(".pkg-card__path", { hasText: "fixtures.testdata.alpha" })
+  ).toBeVisible()
 
   // The foundation card is internal/storage (in-degree 2, out-degree 0); its
   // degree badge reflects the import counts. Scope by the card's own path so
@@ -228,6 +239,40 @@ test("Explore: package map layers by dex import graph with degree + cross-links"
   await expect(server.locator(".pkg-card__path")).toHaveText("internal/server")
   // The off-module fixture is shown with its full path (non-navigable).
   await expect(page.locator(".pkg-card__path", { hasText: "fixtures.testdata.alpha" })).toBeVisible()
+})
+
+test("Explore: package map falls back to in_degree-0 roots when dex omits is_main", async ({
+  page,
+}) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockIndexed(page)
+  // An older dex: a real DAG but no is_main on any node. The map must still
+  // layer — falling back to in_degree==0 roots as the entry points — instead
+  // of collapsing to a single "Packages" tier or hiding everything.
+  const noMainGraph = {
+    status: "ok",
+    nodes: [
+      { package: "github.com/acme/demo/cmd/demo", in_degree: 0, out_degree: 1, page_rank: 0.02 },
+      { package: "github.com/acme/demo/internal/storage", in_degree: 1, out_degree: 0, page_rank: 0.05 },
+    ],
+    edges: [
+      { from_package: "github.com/acme/demo/cmd/demo", to_package: "github.com/acme/demo/internal/storage" },
+    ],
+  }
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/package-graph$/, (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(noMainGraph) })
+  )
+
+  await page.goto("/alice/demo/explore")
+
+  // The root still anchors the top row; everything is reachable from it, so
+  // there is no Standalone island.
+  const entryLayer = page.locator(".pkg-layer", {
+    has: page.locator(".pkg-layer__name", { hasText: "Entry points" }),
+  })
+  await expect(entryLayer.locator(".pkg-card__path", { hasText: "cmd/demo" })).toBeVisible()
+  await expect(page.locator(".pkg-layer__name").filter({ hasText: "Standalone" })).toHaveCount(0)
 })
 
 test("Explore: ask box defaults to Ask; Advanced reveals the mode picker", async ({ page }) => {

@@ -107,7 +107,7 @@ func TestPackageGraphDecodes(t *testing.T) {
 		"status": "ok",
 		"nodes": [
 			{"package": "mod/store", "in_degree": 5, "out_degree": 1, "page_rank": 0.0503},
-			{"package": "mod/cmd",   "in_degree": 0, "out_degree": 12, "page_rank": 0.0234}
+			{"package": "mod/cmd",   "in_degree": 0, "out_degree": 12, "page_rank": 0.0234, "is_main": true}
 		],
 		"edges": [
 			{"from_package": "mod/cmd", "to_package": "mod/store"}
@@ -136,6 +136,10 @@ func TestPackageGraphDecodes(t *testing.T) {
 	}
 	if pg.Nodes[0].PageRank == 0 {
 		t.Errorf("page_rank not decoded: %+v", pg.Nodes[0])
+	}
+	// is_main decodes (the entry-point signal); absent → false.
+	if pg.Nodes[0].IsMain || !pg.Nodes[1].IsMain {
+		t.Errorf("is_main: node[0]=%v node[1]=%v, want false,true", pg.Nodes[0].IsMain, pg.Nodes[1].IsMain)
 	}
 	if pg.Edges[0] != (PackageGraphEdge{FromPackage: "mod/cmd", ToPackage: "mod/store"}) {
 		t.Errorf("edge[0] = %+v", pg.Edges[0])

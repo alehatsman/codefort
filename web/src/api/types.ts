@@ -438,6 +438,7 @@ export interface IntelPackageGraphNode {
   in_degree: number // distinct internal packages importing this one
   out_degree: number // distinct internal packages it imports
   page_rank: number
+  is_main?: boolean // executable entry point (Go `package main`); absent from older dex
 }
 
 export interface IntelPackageGraphEdge {

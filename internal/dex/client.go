@@ -387,6 +387,11 @@ type PackageGraphNode struct {
 	InDegree  int     `json:"in_degree"`
 	OutDegree int     `json:"out_degree"`
 	PageRank  float64 `json:"page_rank"`
+	// IsMain marks an executable entry point (Go `package main`). A reliable
+	// entry-point signal where in_degree==0 is not: a helper imported only by
+	// test files also has in_degree 0 in this DAG yet is no entry point.
+	// Absent (false) from older dex servers — consumers fall back accordingly.
+	IsMain bool `json:"is_main"`
 }
 
 // PackageGraphEdge is one internal import: FromPackage imports ToPackage.
