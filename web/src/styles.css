@@ -910,6 +910,71 @@ a.file-tree__commit:hover {
   padding: var(--space-3) var(--space-4);
 }
 
+/* Form controls (@/ui Checkbox / Radio / Switch) — a shared `.control` label
+   (inline control + caption); Checkbox/Radio use the native accent-colored
+   input, Switch renders a sliding toggle over a hidden checkbox. */
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--text-base);
+}
+.control:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.control__input {
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: inherit;
+}
+.control__text {
+  line-height: var(--leading-normal);
+}
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 16px;
+  flex: none;
+}
+.switch__input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.switch__track {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--border);
+  border-radius: var(--radius-pill);
+  transition: background 0.15s ease;
+}
+.switch__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: var(--bg);
+  border-radius: var(--radius-circle);
+  transition: transform 0.15s ease;
+}
+.switch__input:checked ~ .switch__track {
+  background: var(--accent);
+}
+.switch__input:checked ~ .switch__thumb {
+  transform: translateX(12px);
+}
+.switch__input:focus-visible ~ .switch__track {
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
 .filters {
   background: var(--bg);
   border: 1px solid var(--border);

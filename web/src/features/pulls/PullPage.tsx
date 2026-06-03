@@ -7,7 +7,7 @@ import { usePull } from "@/api/queries"
 import type { MergeConflictResponse } from "@/api/types"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
-import { Button, EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { Button, Checkbox, EmptyState, ErrorMessage, Spinner } from "@/ui"
 
 const Markdown = lazy(() => import("@/shell/Markdown"))
 
@@ -85,14 +85,12 @@ export default function PullPage() {
                       ? "Fast-forward merge"
                       : "Merge pull request"}
                 </Button>
-                <label className="pull-merge__opt">
-                  <input
-                    type="checkbox"
-                    checked={ffOnly}
-                    onChange={(e) => setFFOnly(e.target.checked)}
-                  />
-                  fast-forward only
-                </label>
+                <Checkbox
+                  className="pull-merge__opt"
+                  label="fast-forward only"
+                  checked={ffOnly}
+                  onChange={(e) => setFFOnly(e.target.checked)}
+                />
                 <Button
                   variant="danger"
                   disabled={updatePull.isPending}

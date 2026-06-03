@@ -210,9 +210,8 @@
   align-items: center;
   gap: var(--space-3);
 }
+/* Deltas over the @/ui Checkbox `.control` base: muted + smaller + tighter gap. */
 .pull-merge__opt {
-  display: flex;
-  align-items: center;
   gap: var(--space-1);
   color: var(--fg-muted);
   font-size: var(--text-sm);

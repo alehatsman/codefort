@@ -3,6 +3,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   Dialog,
   EmptyState,
   ErrorMessage,
@@ -11,12 +12,14 @@ import {
   Inline,
   Input,
   PageHeader,
+  Radio,
   RelativeTime,
   SegmentedControl,
   Select,
   Spinner,
   Stack,
   StatusIcon,
+  Switch,
   Tab,
   Tabs,
   Textarea,
@@ -52,6 +55,7 @@ export default function DevGalleryPage() {
       <CardsSection />
       <FeedbackSection />
       <FormSection />
+      <FormControlsSection />
       <RelativeTimeSection />
       <DialogSection />
     </div>
@@ -385,6 +389,32 @@ function FormSection() {
           onChange={(e) => setBody(e.target.value)}
         />
       </Field>
+    </Section>
+  )
+}
+
+function FormControlsSection() {
+  const [check, setCheck] = useState(true)
+  const [toggle, setToggle] = useState(false)
+  const [pick, setPick] = useState("a")
+  return (
+    <Section title="Checkbox / Radio / Switch">
+      <Checkbox label="Checkbox" checked={check} onChange={(e) => setCheck(e.target.checked)} />
+      <Checkbox label="Disabled" checked disabled />
+      <Inline gap={3}>
+        {["a", "b"].map((v) => (
+          <Radio
+            key={v}
+            name="gallery-radio"
+            label={`Radio ${v.toUpperCase()}`}
+            value={v}
+            checked={pick === v}
+            onChange={(e) => setPick(e.target.value)}
+          />
+        ))}
+      </Inline>
+      <Switch label="Switch" checked={toggle} onChange={(e) => setToggle(e.target.checked)} />
+      <Switch label="Disabled on" checked disabled />
     </Section>
   )
 }

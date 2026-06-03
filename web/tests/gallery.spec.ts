@@ -40,6 +40,29 @@ test("dev gallery shows the layout primitives", async ({ page }) => {
   await expect(page.getByRole("toolbar", { name: "Demo toolbar" })).toBeVisible()
 })
 
+test("dev gallery form controls — checkbox, radio, switch toggle", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/dev/ui")
+
+  // Checkbox (labelled, seeded checked) flips off.
+  const check = page.getByRole("checkbox", { name: "Checkbox", exact: true })
+  await expect(check).toBeChecked()
+  await check.click()
+  await expect(check).not.toBeChecked()
+
+  // Radios share a name: picking B deselects A.
+  const radioB = page.getByRole("radio", { name: "Radio B" })
+  await radioB.check()
+  await expect(radioB).toBeChecked()
+  await expect(page.getByRole("radio", { name: "Radio A" })).not.toBeChecked()
+
+  // Switch is a checkbox under the hood.
+  const toggle = page.getByRole("checkbox", { name: "Switch", exact: true })
+  await expect(toggle).not.toBeChecked()
+  await toggle.click()
+  await expect(toggle).toBeChecked()
+})
+
 test("dev gallery Dialog opens and closes", async ({ page }) => {
   await mockApi(page)
   await page.goto("/dev/ui")
