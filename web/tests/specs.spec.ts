@@ -33,9 +33,37 @@ const CONTENT: Record<string, { title: string; status: string; body: string; met
   "ssh-transport.md": {
     title: "SSH Transport",
     status: "living",
-    body: "## Intent\nGit over SSH as an opt-in second port.",
+    body: "## Intent\nGit over SSH as an opt-in second port.\n## Behavior\nWHEN pushed THEN verify.",
     meta: { owners: ["aleh"], covers: ["internal/ssh/**"], last_verified: "2026-06-02", alignment: 0.91 },
   },
+}
+
+// Semantic-search result for the ⌘⇧F flow (the dex-backed endpoint is mocked).
+const SEARCH = {
+  query: "verify",
+  hits: [
+    {
+      path: "specs/ssh-transport.md",
+      section: "Behavior",
+      line: 9,
+      snippet: "WHEN pushed THEN verify.",
+      score: 0.92,
+    },
+  ],
+}
+
+// mockSearch intercepts POST .../specs/search. Registered after mockSpecs so it
+// wins (Playwright matches newest-first); non-POST falls through to the GET
+// content/list routes.
+async function mockSearch(page: Page, result: unknown) {
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/specs\/search$/, (route) => {
+    if (route.request().method() !== "POST") return route.fallback()
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(result),
+    })
+  })
 }
 
 async function mockSpecs(page: Page, list: unknown) {
@@ -150,18 +178,19 @@ test("Specs: ⌘P quick-open fuzzy-jumps to a spec", async ({ page }) => {
   await page.goto("/alice/demo/specs")
   await expect(page.locator(".spec-view__title")).toHaveText("SSH Transport")
 
-  // The print shortcut opens the palette instead.
+  // The print shortcut opens the palette instead (the path-jump one, not search).
+  const input = page.locator(".quickopen:not(.specsearch) .quickopen__input")
   await page.keyboard.press("Control+p")
-  await expect(page.locator(".quickopen__input")).toBeFocused()
+  await expect(input).toBeFocused()
 
   // Fuzzy query narrows to the CI Pipeline spec; Enter opens it.
-  await page.locator(".quickopen__input").fill("pipe")
+  await input.fill("pipe")
   await expect(page.locator(".quickopen__item")).toHaveCount(1)
   await expect(page.locator(".quickopen__item").first()).toContainText("CI Pipeline")
   await page.keyboard.press("Enter")
 
   // Palette closes and the chosen spec is now rendered + reflected in ?path.
-  await expect(page.locator(".quickopen__input")).toBeHidden()
+  await expect(input).toBeHidden()
   await expect(page.locator(".spec-view__title")).toHaveText("CI Pipeline")
   await expect(page).toHaveURL(/[?&]path=specs%2Fci%2Fpipeline\.md/)
 })
@@ -172,12 +201,51 @@ test("Specs: the Jump button opens the palette and a click selects", async ({ pa
   await mockSpecs(page, SPECS)
 
   await page.goto("/alice/demo/specs")
-  await page.locator(".spec-jump").click()
-  await expect(page.locator(".quickopen__input")).toBeVisible()
+  await page.locator(".spec-jump", { hasText: "Jump to a spec" }).click()
+  await expect(page.locator(".quickopen:not(.specsearch) .quickopen__input")).toBeVisible()
 
   // Empty query lists every spec; clicking one opens it.
   await expect(page.locator(".quickopen__item")).toHaveCount(2)
   await page.locator(".quickopen__item", { hasText: "CI Pipeline" }).click()
-  await expect(page.locator(".quickopen__input")).toBeHidden()
+  await expect(page.locator(".quickopen:not(.specsearch) .quickopen__input")).toBeHidden()
   await expect(page.locator(".spec-view__title")).toHaveText("CI Pipeline")
+})
+
+test("Specs: ⌘⇧F semantic search lists hits and deep-links to a section", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockSpecs(page, SPECS)
+  await mockSearch(page, SEARCH)
+
+  await page.goto("/alice/demo/specs")
+  await page.keyboard.press("Control+Shift+F")
+  await expect(page.locator(".specsearch .quickopen__input")).toBeFocused()
+
+  // Query → results: a hit shows its section + snippet.
+  await page.locator(".specsearch .quickopen__input").fill("verify")
+  await page.keyboard.press("Enter")
+  const hit = page.locator(".specsearch__hit")
+  await expect(hit).toHaveCount(1)
+  await expect(hit).toContainText("Behavior")
+  await expect(hit).toContainText("WHEN pushed THEN verify.")
+
+  // Picking it opens the spec and deep-links to the section (?path + ?section).
+  await hit.click()
+  await expect(page.locator(".specsearch .quickopen__input")).toBeHidden()
+  await expect(page.locator(".spec-view__title")).toHaveText("SSH Transport")
+  await expect(page).toHaveURL(/[?&]path=specs%2Fssh-transport\.md/)
+  await expect(page).toHaveURL(/[?&]section=Behavior/)
+  // The targeted section heading is present in the rendered spec.
+  await expect(page.locator(".spec-view h2", { hasText: "Behavior" })).toBeVisible()
+})
+
+test("Specs: the Search button opens the semantic search palette", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockSpecs(page, SPECS)
+  await mockSearch(page, SEARCH)
+
+  await page.goto("/alice/demo/specs")
+  await page.locator(".spec-jump", { hasText: "Search specs" }).click()
+  await expect(page.locator(".specsearch .quickopen__input")).toBeVisible()
 })

@@ -672,3 +672,17 @@ export interface SpecContent {
   sections: SpecSection[]
   checklist: SpecChecklistItem[]
 }
+
+export interface SpecSearchHit {
+  path: string
+  /** Enclosing spec heading at/before the match line; empty when none. */
+  section?: string
+  line: number
+  snippet?: string
+  score: number
+}
+
+export interface SpecSearchResult {
+  query: string
+  hits: SpecSearchHit[]
+}

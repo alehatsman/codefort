@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useSearchParams } from "react-router-dom"
 import { useRepo, useSpec, useSpecsList } from "@/api/queries"
 import QuickOpen from "@/features/specs/QuickOpen"
+import SpecSearch from "@/features/specs/SpecSearch"
 import Markdown from "@/shell/Markdown"
 import OverviewCard from "@/shell/OverviewCard"
 import { EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
@@ -31,24 +32,34 @@ export default function SpecsPage() {
 
   const [searchParams, setSearchParams] = useSearchParams()
   const wanted = searchParams.get("path") ?? ""
+  const wantedSection = searchParams.get("section") ?? ""
   // The selected spec: the ?path= one if it's in the list, else the first.
   const selected = specs.find((s) => s.path === wanted) ?? ordered[0]
   const selectedPath = selected?.path ?? ""
 
-  function selectSpec(path: string) {
+  // Update the selection in the URL. A section anchors the deep-link from spec
+  // search; plain navigation (tree, ⌘P, ↑/↓) clears it so a stale anchor doesn't
+  // linger.
+  function setSelection(path: string, section?: string) {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev)
         next.set("path", path)
+        if (section) next.set("section", section)
+        else next.delete("section")
         return next
       },
       { replace: true }
     )
   }
+  function selectSpec(path: string) {
+    setSelection(path)
+  }
   useSpecKeyboardNav(ordered, selectedPath, selectSpec)
 
   const [paletteOpen, setPaletteOpen] = useState(false)
-  useQuickOpenHotkey(() => setPaletteOpen(true))
+  const [searchOpen, setSearchOpen] = useState(false)
+  useSpecHotkeys({ onJump: () => setPaletteOpen(true), onSearch: () => setSearchOpen(true) })
 
   if (repoQ.isLoading) return <Spinner />
   if (repoQ.error) return <ErrorMessage error={repoQ.error} />
@@ -68,20 +79,31 @@ export default function SpecsPage() {
       {specs.length > 0 && (
         <div className="specs-layout">
           <aside className="specs-sidebar">
-            <button
-              type="button"
-              className="spec-jump"
-              onClick={() => setPaletteOpen(true)}
-              title="Jump to a spec"
-            >
-              <span>Jump to a spec…</span>
-              <kbd className="spec-jump__kbd">⌘P</kbd>
-            </button>
+            <div className="spec-actions">
+              <button
+                type="button"
+                className="spec-jump"
+                onClick={() => setPaletteOpen(true)}
+                title="Jump to a spec"
+              >
+                <span>Jump to a spec…</span>
+                <kbd className="spec-jump__kbd">⌘P</kbd>
+              </button>
+              <button
+                type="button"
+                className="spec-jump"
+                onClick={() => setSearchOpen(true)}
+                title="Search specs"
+              >
+                <span>Search specs…</span>
+                <kbd className="spec-jump__kbd">⌘⇧F</kbd>
+              </button>
+            </div>
             <StatusRail specs={specs} />
             <SpecTree groups={groups} selectedPath={selectedPath} onSelect={selectSpec} />
           </aside>
           <main className="specs-main">
-            <SpecView owner={r.owner} repo={r.name} path={selectedPath} />
+            <SpecView owner={r.owner} repo={r.name} path={selectedPath} section={wantedSection} />
           </main>
         </div>
       )}
@@ -91,6 +113,13 @@ export default function SpecsPage() {
         specs={specs}
         onSelect={selectSpec}
         onClose={() => setPaletteOpen(false)}
+      />
+      <SpecSearch
+        open={searchOpen}
+        owner={r.owner}
+        repo={r.name}
+        onPick={(path, section) => setSelection(path, section)}
+        onClose={() => setSearchOpen(false)}
       />
     </div>
   )
@@ -167,18 +196,42 @@ function SpecTree({
 }
 
 // ── Spec view (center) ───────────────────────────────────────────────────
-function SpecView({ owner, repo, path }: { owner: string; repo: string; path: string }) {
+function SpecView({
+  owner,
+  repo,
+  path,
+  section,
+}: {
+  owner: string
+  repo: string
+  path: string
+  section: string
+}) {
   const specQ = useSpec(owner, repo, path)
+  const articleRef = useRef<HTMLElement>(null)
+  const data = specQ.data
+
+  // Deep-link from spec search: once the spec has rendered, scroll the heading
+  // matching ?section= into view (matched by its text, since the renderer's
+  // headings carry no ids).
+  useEffect(() => {
+    if (!section || !data) return
+    const root = articleRef.current
+    if (!root) return
+    const headings = Array.from(root.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"))
+    const match = headings.find((h) => h.textContent?.trim() === section)
+    match?.scrollIntoView({ block: "start" })
+  }, [section, data])
+
   if (specQ.isLoading) return <Spinner label="Loading spec…" />
   if (specQ.error) return <ErrorMessage error={specQ.error} />
-  if (!specQ.data) return null
-  const spec = specQ.data
+  if (!data) return null
   // The directory the spec lives in anchors its relative links/images.
   const basePath = path.split("/").slice(0, -1).join("/")
   return (
-    <article className="spec-view">
-      <SpecHeader spec={spec} />
-      <Markdown content={spec.body} owner={owner} repo={repo} basePath={basePath} />
+    <article ref={articleRef} className="spec-view">
+      <SpecHeader spec={data} />
+      <Markdown content={data.body} owner={owner} repo={repo} basePath={basePath} />
     </article>
   )
 }
@@ -301,17 +354,25 @@ function useSpecKeyboardNav(
   }, [])
 }
 
-// useQuickOpenHotkey opens the quick-open palette on ⌘P / Ctrl-P, taking over
-// the browser's print shortcut while the Specs tab is mounted (the palette is
-// the page's primary "go to" affordance, Sublime-style).
-function useQuickOpenHotkey(onOpen: () => void) {
-  const onOpenRef = useRef(onOpen)
-  onOpenRef.current = onOpen
+// useSpecHotkeys wires the Specs tab's palette shortcuts, taking over the
+// browser defaults while the tab is mounted: ⌘P / Ctrl-P opens path quick-open
+// (Sublime-style "go to"), ⌘⇧F / Ctrl-Shift-F opens semantic spec search.
+function useSpecHotkeys({ onJump, onSearch }: { onJump: () => void; onSearch: () => void }) {
+  const jumpRef = useRef(onJump)
+  jumpRef.current = onJump
+  const searchRef = useRef(onSearch)
+  searchRef.current = onSearch
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "p" || e.key === "P")) {
+      const mod = e.metaKey || e.ctrlKey
+      if (!mod || e.altKey) return
+      const key = e.key.toLowerCase()
+      if (key === "p" && !e.shiftKey) {
         e.preventDefault()
-        onOpenRef.current()
+        jumpRef.current()
+      } else if (key === "f" && e.shiftKey) {
+        e.preventDefault()
+        searchRef.current()
       }
     }
     window.addEventListener("keydown", onKey)

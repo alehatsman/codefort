@@ -45,6 +45,7 @@ import type {
   Repo,
   SpecContent,
   SpecList,
+  SpecSearchResult,
   SSHKey,
   Token,
   Tree,
@@ -295,6 +296,11 @@ export const api = {
     const qs = q.toString()
     return request<SpecContent>(`/api/repos/${owner}/${repo}/specs/${segs}${qs ? `?${qs}` : ""}`)
   },
+  searchSpecs: (owner: string, repo: string, query: string) =>
+    request<SpecSearchResult>(`/api/repos/${owner}/${repo}/specs/search`, {
+      method: "POST",
+      body: { query },
+    }),
 
   listCodeComments: (
     owner: string,
