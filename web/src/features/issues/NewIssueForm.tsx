@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useCreateIssue } from "@/api/mutations"
 import { useRepos } from "@/api/queries"
-import { Button, Dialog, ErrorMessage, Field, Input, Select, Textarea } from "@/ui"
+import { Button, Dialog, ErrorMessage, FormField, Input, Select, Textarea } from "@/ui"
 
 interface Props {
   // Repo-scoped use (the per-repo Issues/Board pages) pins the target via
@@ -116,34 +116,50 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
         }
       >
         {needsPicker && (
-          <Field label="Repository">
-            <Select value={target} onChange={(e) => setTarget(e.target.value)} required>
-              {(!repos || repos.length === 0) && <option value="">No repositories</option>}
-              {repos?.map((r) => (
-                <option key={`${r.owner}/${r.name}`} value={`${r.owner}/${r.name}`}>
-                  {r.owner}/{r.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <FormField label="Repository">
+            {({ controlId, describedBy }) => (
+              <Select
+                id={controlId}
+                aria-describedby={describedBy}
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                required
+              >
+                {(!repos || repos.length === 0) && <option value="">No repositories</option>}
+                {repos?.map((r) => (
+                  <option key={`${r.owner}/${r.name}`} value={`${r.owner}/${r.name}`}>
+                    {r.owner}/{r.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
         )}
-        <Field label="Title">
-          <Input
-            ref={titleRef}
-            placeholder="Short summary"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-          />
-        </Field>
-        <Field label="Description">
-          <Textarea
-            placeholder="Optional — what's the problem or task?"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={8}
-          />
-        </Field>
+        <FormField label="Title">
+          {({ controlId, describedBy }) => (
+            <Input
+              id={controlId}
+              aria-describedby={describedBy}
+              ref={titleRef}
+              placeholder="Short summary"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          )}
+        </FormField>
+        <FormField label="Description">
+          {({ controlId, describedBy }) => (
+            <Textarea
+              id={controlId}
+              aria-describedby={describedBy}
+              placeholder="Optional — what's the problem or task?"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={8}
+            />
+          )}
+        </FormField>
         <ErrorMessage error={mutation.error} />
       </Dialog>
     </>

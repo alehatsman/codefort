@@ -1757,6 +1757,15 @@ a.file-tree__commit:hover {
   font-weight: var(--weight-semibold);
   color: var(--fg);
 }
+.field__hint {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+/* Negate the .field gap so hint/error sit tight under the control. */
+.field__hint,
+.field__error {
+  margin-top: calc(-1 * var(--space-1));
+}
 
 /* Comments ------------------------------------------------------------ */
 .comments {

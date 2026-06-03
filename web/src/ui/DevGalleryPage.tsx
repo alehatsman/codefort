@@ -12,6 +12,7 @@ import {
   ErrorMessage,
   Field,
   FilterChip,
+  FormField,
   Inline,
   Input,
   ListRow,
@@ -80,6 +81,7 @@ export default function DevGalleryPage() {
       <FeedbackSection />
       <SkeletonSection />
       <FormSection />
+      <FormFieldSection />
       <FormControlsSection />
       <RelativeTimeSection />
       <DialogSection />
@@ -676,6 +678,36 @@ function FormSection() {
           onChange={(e) => setBody(e.target.value)}
         />
       </Field>
+    </Section>
+  )
+}
+
+function FormFieldSection() {
+  const [name, setName] = useState("")
+  const [slug, setSlug] = useState("bad slug")
+  return (
+    <Section title="FormField">
+      <FormField label="Repository name" hint="Letters, digits, . _ - only.">
+        {({ controlId, describedBy }) => (
+          <Input
+            id={controlId}
+            aria-describedby={describedBy}
+            placeholder="repo-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        )}
+      </FormField>
+      <FormField label="Slug" error={/\s/.test(slug) ? "Slug cannot contain spaces." : undefined}>
+        {({ controlId, describedBy }) => (
+          <Input
+            id={controlId}
+            aria-describedby={describedBy}
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+          />
+        )}
+      </FormField>
     </Section>
   )
 }

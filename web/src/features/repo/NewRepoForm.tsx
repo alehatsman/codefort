@@ -1,7 +1,7 @@
 import { useRef, useState } from "react"
 import { useCreateRepo } from "@/api/mutations"
 import { useWhoami } from "@/api/queries"
-import { Button, Dialog, ErrorMessage, Field, Input } from "@/ui"
+import { Button, Dialog, ErrorMessage, FormField, Input } from "@/ui"
 
 interface Props {
   onCreated?: (owner: string, name: string) => void
@@ -81,30 +81,42 @@ export default function NewRepoForm({ onCreated }: Props) {
           </>
         }
       >
-        <Field label="Owner">
-          <Input
-            ref={ownerRef}
-            placeholder="owner"
-            value={owner}
-            onChange={(e) => setOwner(e.target.value)}
-            required
-          />
-        </Field>
-        <Field label="Name">
-          <Input
-            placeholder="repo-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-        </Field>
-        <div className="field__label muted">
-          Creates a bare git repo at{" "}
-          <code>
-            {trimmedOwner || "owner"}/{trimmedName || "name"}
-          </code>
-          . Allowed characters: letters, digits, <code>. _ -</code>
-        </div>
+        <FormField label="Owner">
+          {({ controlId, describedBy }) => (
+            <Input
+              id={controlId}
+              aria-describedby={describedBy}
+              ref={ownerRef}
+              placeholder="owner"
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+              required
+            />
+          )}
+        </FormField>
+        <FormField
+          label="Name"
+          hint={
+            <>
+              Creates a bare git repo at{" "}
+              <code>
+                {trimmedOwner || "owner"}/{trimmedName || "name"}
+              </code>
+              . Allowed characters: letters, digits, <code>. _ -</code>
+            </>
+          }
+        >
+          {({ controlId, describedBy }) => (
+            <Input
+              id={controlId}
+              aria-describedby={describedBy}
+              placeholder="repo-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          )}
+        </FormField>
         <ErrorMessage error={mutation.error} />
       </Dialog>
     </>

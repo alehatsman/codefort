@@ -26,6 +26,7 @@ test("dev gallery renders every primitive section", async ({ page }) => {
     "Menu",
     "Toast",
     "FilterChip",
+    "FormField",
     "Card",
     "Spinner",
     "EmptyState",
@@ -39,6 +40,23 @@ test("dev gallery renders every primitive section", async ({ page }) => {
 
   // The primary button variant is present.
   await expect(page.getByRole("button", { name: "primary", exact: true })).toBeVisible()
+})
+
+test("dev gallery FormField wires label + hint + error to the control", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/dev/ui")
+
+  // Label associates by htmlFor/id, and the hint is linked via aria-describedby.
+  const named = page.getByLabel("Repository name")
+  await expect(named).toBeVisible()
+  const hintId = await named.getAttribute("aria-describedby")
+  expect(hintId).toBeTruthy()
+  await expect(page.locator(`#${hintId}`)).toHaveText("Letters, digits, . _ - only.")
+
+  // The error field renders its inline message and links it for assistive tech.
+  const slug = page.getByLabel("Slug")
+  await expect(page.getByText("Slug cannot contain spaces.")).toBeVisible()
+  await expect(slug).toHaveAttribute("aria-describedby", /-error$/)
 })
 
 test("dev gallery Tooltip reveals on focus and links via aria-describedby", async ({ page }) => {

@@ -12,7 +12,17 @@ import {
 } from "@/api/mutations"
 import type { CIRunExecutionModel, CreatedToken, Repo, SSHKey, Token } from "@/api/types"
 import ThemeSelect from "@/features/settings/ThemeSelect"
-import { Badge, Button, EmptyState, ErrorMessage, Input, Select, Spinner, useToast } from "@/ui"
+import {
+  Badge,
+  Button,
+  EmptyState,
+  ErrorMessage,
+  FormField,
+  Input,
+  Select,
+  Spinner,
+  useToast,
+} from "@/ui"
 
 // Sections of the settings surface. "tokens", "agent", "ssh", and "appearance"
 // are backed. "users" and "branches" are planned features whose server backends
@@ -309,24 +319,27 @@ function AgentSection() {
       </form>
 
       <div className="agent-default-model">
-        <label className="agent-default-model__label">
-          <span>Default execution model</span>
-          <Select
-            value={settingsQ.data?.execution_model ?? ""}
-            disabled={update.isPending || settingsQ.isLoading}
-            onChange={(e) =>
-              update.mutate({ execution_model: e.target.value as "" | CIRunExecutionModel })
-            }
-          >
-            <option value="">Server default (claude-edit)</option>
-            <option value="claude-edit">Claude (edit files)</option>
-            <option value="mooncake-agent">Mooncake agent (run actions)</option>
-          </Select>
-        </label>
-        <p className="muted small">
-          The model new agent runs use when “Spawn agent” doesn’t pick one. Per-run choices at spawn
-          still win.
-        </p>
+        <FormField
+          className="agent-default-model__label"
+          label="Default execution model"
+          hint="The model new agent runs use when “Spawn agent” doesn’t pick one. Per-run choices at spawn still win."
+        >
+          {({ controlId, describedBy }) => (
+            <Select
+              id={controlId}
+              aria-describedby={describedBy}
+              value={settingsQ.data?.execution_model ?? ""}
+              disabled={update.isPending || settingsQ.isLoading}
+              onChange={(e) =>
+                update.mutate({ execution_model: e.target.value as "" | CIRunExecutionModel })
+              }
+            >
+              <option value="">Server default (claude-edit)</option>
+              <option value="claude-edit">Claude (edit files)</option>
+              <option value="mooncake-agent">Mooncake agent (run actions)</option>
+            </Select>
+          )}
+        </FormField>
       </div>
 
       <div className="agent-endpoint">
