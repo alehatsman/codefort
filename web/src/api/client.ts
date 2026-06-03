@@ -144,6 +144,43 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   return JSON.parse(raw) as T
 }
 
+// A page of a list endpoint plus its full (unpaged) match count, read from the
+// X-Total-Count response header. Used by the paginated list views.
+export interface Page<T> {
+  items: T[]
+  total: number
+}
+
+// requestPage mirrors request() but also surfaces X-Total-Count so callers can
+// drive pagination. The body shape is unchanged (a bare array), keeping the
+// mgit CLI and other array consumers working against the same endpoint.
+async function requestPage<T>(path: string): Promise<Page<T>> {
+  const token = getToken()
+  const headers = new Headers()
+  headers.set("Accept", "application/json")
+  if (token) headers.set("Authorization", `Bearer ${token}`)
+
+  const resp = await fetch(path, { headers })
+  const raw = await resp.text()
+  if (!resp.ok) {
+    let message = raw || resp.statusText
+    let body: unknown
+    try {
+      body = JSON.parse(raw)
+      if (body && typeof (body as { error?: unknown }).error === "string") {
+        message = (body as { error: string }).error
+      }
+    } catch {
+      // raw stays as message; body stays undefined
+    }
+    throw new ApiError(resp.status, message, body)
+  }
+  const items = raw ? (JSON.parse(raw) as T[]) : []
+  const header = resp.headers.get("X-Total-Count")
+  const total = header === null ? items.length : Number(header)
+  return { items, total }
+}
+
 export const api = {
   whoami: () => request<Whoami>("/api/whoami"),
 
@@ -161,6 +198,8 @@ export const api = {
   // Each row carries its owning repo (`repo`) so it can link to the per-repo
   // detail route. Query params mirror the per-repo list endpoints.
   listAllIssues: (query = "") => request<IssueWithRepo[]>(`/api/issues${query ? `?${query}` : ""}`),
+  listAllIssuesPage: (query = "") =>
+    requestPage<IssueWithRepo>(`/api/issues${query ? `?${query}` : ""}`),
   listAllPulls: (state = "", query = "") => {
     const q = new URLSearchParams()
     if (state) q.set("state", state)
@@ -239,6 +278,10 @@ export const api = {
 
   listIssues: (owner: string, repo: string, query = "") =>
     request<Issue[]>(`/api/repos/${owner}/${repo}/issues${query ? `?${query}` : ""}`),
+  // Paginated variant of listIssues — returns the page plus the full match
+  // count (X-Total-Count) so the list view can render prev/next.
+  listIssuesPage: (owner: string, repo: string, query = "") =>
+    requestPage<Issue>(`/api/repos/${owner}/${repo}/issues${query ? `?${query}` : ""}`),
   getIssue: (owner: string, repo: string, n: number) =>
     request<Issue>(`/api/repos/${owner}/${repo}/issues/${n}`),
   getIssueCommits: (owner: string, repo: string, n: number) =>

@@ -140,6 +140,17 @@ func TestParseListFilter(t *testing.T) {
 			errSubstr: "invalid limit",
 		},
 		{
+			name: "offset",
+			raw:  "offset=40",
+			want: storage.ListFilter{Offset: 40},
+		},
+		{
+			name:      "negative offset rejected",
+			raw:       "offset=-1",
+			wantErr:   true,
+			errSubstr: "invalid offset",
+		},
+		{
 			name: "author plain",
 			raw:  "author=alice",
 			want: storage.ListFilter{Author: "alice"},

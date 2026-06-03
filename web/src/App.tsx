@@ -6,6 +6,7 @@ import NotFound from "@/shell/NotFound"
 import { getToken } from "@/api/client"
 import ReposPage from "@/features/repo/ReposPage"
 import GlobalIssuesPage from "@/features/issues/GlobalIssuesPage"
+import GlobalBoardPage from "@/features/issues/GlobalBoardPage"
 import GlobalPullsPage from "@/features/pulls/GlobalPullsPage"
 import GlobalRunsPage from "@/features/pipelines/GlobalRunsPage"
 import GlobalAgentsPage from "@/features/agents/GlobalAgentsPage"
@@ -47,6 +48,7 @@ export default function App() {
         {/* Top-level cross-repo aggregate views (the global nav tabs). Static
             paths, so they rank above the /:owner/:repo dynamic route. */}
         <Route path="/issues" element={<GlobalIssuesPage />} />
+        <Route path="/issues/board" element={<GlobalBoardPage />} />
         <Route path="/pulls" element={<GlobalPullsPage />} />
         <Route path="/pipelines" element={<GlobalRunsPage kind="ci" />} />
         <Route path="/agents" element={<GlobalAgentsPage />} />

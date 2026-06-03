@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/alehatsman/moongit/internal/api"
@@ -28,6 +29,13 @@ func (s *Server) handleListAllIssues(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	total, err := storage.CountAllIssues(s.rdb, filter)
+	if err != nil {
+		s.logger.Error("count all issues", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	w.Header().Set("X-Total-Count", strconv.Itoa(total))
 	writeJSON(w, http.StatusOK, issues)
 }
 

@@ -9,11 +9,19 @@ interface Props {
   onSignOut: () => void
 }
 
+// First path segments owned by top-level (non-repo) routes. A repo can never be
+// named one of these, so a path starting with one is never a repo context —
+// this keeps multi-segment aggregate routes like /issues/board from being read
+// as owner="issues"/repo="board" (which would show RepoTabs by mistake).
+const TOP_LEVEL_SEGMENTS = new Set(["issues", "pulls", "pipelines", "agents", "settings", "dev"])
+
 // Derive the repo context from the URL. Repo routes are /:owner/:repo/…;
-// top-level routes (/, /settings) have no repo, so the tabs are hidden there.
+// top-level routes (/, /settings, /issues/board, …) have no repo, so the tabs
+// are hidden / global there.
 function repoFromPath(pathname: string): { owner: string; repo: string } | null {
   const segs = pathname.split("/").filter(Boolean)
   if (segs.length < 2) return null
+  if (TOP_LEVEL_SEGMENTS.has(segs[0])) return null
   return { owner: segs[0], repo: segs[1] }
 }
 

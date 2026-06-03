@@ -21,7 +21,7 @@ export default function GlobalTabs() {
       <Tab to="/" active={isRepos}>
         Repos
       </Tab>
-      <Tab to="/issues" active={isIssues}>
+      <Tab to="/issues/board" active={isIssues}>
         Issues
       </Tab>
       <Tab to="/pulls" active={isPulls}>

@@ -326,6 +326,7 @@ function parseQuery(url: URL): {
   query?: string
   sort?: string
   limit?: number
+  offset?: number
 } {
   const stateRaw = url.searchParams.getAll("state").flatMap((s) => s.split(","))
   const states = stateRaw.filter(Boolean) as IssueState[]
@@ -334,6 +335,7 @@ function parseQuery(url: URL): {
   const query = url.searchParams.get("q")?.trim() || undefined
   const sort = url.searchParams.get("sort") ?? undefined
   const limitRaw = url.searchParams.get("limit")
+  const offsetRaw = url.searchParams.get("offset")
   return {
     states: states.length ? states : undefined,
     assignee: assignee ?? undefined,
@@ -341,6 +343,7 @@ function parseQuery(url: URL): {
     query,
     sort: sort ?? undefined,
     limit: limitRaw ? Number(limitRaw) : undefined,
+    offset: offsetRaw ? Number(offsetRaw) : undefined,
   }
 }
 
@@ -361,7 +364,6 @@ function applyIssueFilters(issues: Issue[], q: ReturnType<typeof parseQuery>): I
   else if (q.sort === "recently-updated")
     out.sort((a, b) => b.updated_at.localeCompare(a.updated_at) || b.number - a.number)
   else out.sort((a, b) => b.number - a.number) // newest (default)
-  if (q.limit && q.limit > 0) out = out.slice(0, q.limit)
   return out
 }
 
@@ -661,8 +663,19 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const req = route.request()
     const url = new URL(req.url())
     if (req.method() === "GET") {
+      // Mirror the server: filter+sort, return the requested page, and report
+      // the full match count in X-Total-Count (drives the list pager).
       const q = parseQuery(url)
-      return json(route, 200, applyIssueFilters(state.issues, q))
+      const filtered = applyIssueFilters(state.issues, q)
+      const offset = q.offset && q.offset > 0 ? q.offset : 0
+      const limit = q.limit && q.limit > 0 ? q.limit : filtered.length
+      const pageItems = filtered.slice(offset, offset + limit)
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "X-Total-Count": String(filtered.length) },
+        body: JSON.stringify(pageItems),
+      })
     }
     if (req.method() === "POST") {
       const body = req.postDataJSON() as { title: string; body?: string }
