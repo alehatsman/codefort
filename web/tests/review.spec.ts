@@ -153,8 +153,12 @@ test("review tab groups comments by file, deep-links, and filters by state", asy
   const link = page.getByRole("link", { name: "src/app.ts:L2-L3" })
   await expect(link).toHaveAttribute("href", "/alice/demo/blob/src/app.ts#L2-L3")
 
-  // The snippet is shown for review context.
-  await expect(page.locator(".review-row__snippet").first()).toContainText("la2")
+  // The comment renders as a snippet cut from the file (the blob is fetched and
+  // sliced), with its annotated lines (2–3) tinted as the focus.
+  const snippet = page.locator(".review-row__code").first()
+  await expect(snippet).toContainText("la2")
+  await expect(snippet).toContainText("la3")
+  await expect(snippet.locator(".code-snippet__line.is-focus")).toHaveCount(2)
 
   // Also checking "resolved" (open stays checked) → state=all, so the resolved
   // one appears too. One is open (Resolve), one is already resolved (Reopen).
@@ -170,6 +174,54 @@ test("review tab groups comments by file, deep-links, and filters by state", asy
   // Unchecking "resolved" leaves only the open filter, which is now empty.
   await page.getByRole("checkbox", { name: "resolved" }).click()
   await expect(page.getByText("open comment here")).toHaveCount(0)
+})
+
+test("review snippet shows ±context lines with the file's own line numbers", async ({ page }) => {
+  const content = `${Array.from({ length: 20 }, (_, i) => `line${i + 1}`).join("\n")}\n`
+  const seeded: CodeComment[] = [
+    {
+      id: 1,
+      repo_id: 1,
+      ref: "main",
+      path: "src/app.ts",
+      start_line: 10,
+      end_line: 11,
+      author: "test-user",
+      body: "context check",
+      resolved: false,
+      snippet: "line10\nline11",
+      created_at: new Date().toISOString(),
+    },
+  ]
+  await mockApi(page, { codeComments: seeded })
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/blob(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ref: "main",
+        path: "src/app.ts",
+        size: content.length,
+        binary: false,
+        too_large: false,
+        content,
+      }),
+    })
+  )
+  await routeIntelOff(page)
+
+  await page.goto("/alice/demo/review")
+
+  const snippet = page.locator(".review-row__code").first()
+  // ±3 lines around 10–11 → lines 7..14, numbered from the original file.
+  await expect(snippet.locator(".code-snippet__line")).toHaveCount(8)
+  await expect(snippet.locator(".code-snippet__num").first()).toHaveAttribute("data-line", "7")
+  await expect(snippet.locator(".code-snippet__num").last()).toHaveAttribute("data-line", "14")
+  // The annotated lines 10–11 are the tinted focus; context lines are not.
+  await expect(snippet.locator(".code-snippet__line.is-focus")).toHaveCount(2)
+  await expect(snippet).toContainText("line10")
+  await expect(snippet).not.toContainText("line6")
+  await expect(snippet).not.toContainText("line15")
 })
 
 test("review comment bodies render as markdown", async ({ page }) => {

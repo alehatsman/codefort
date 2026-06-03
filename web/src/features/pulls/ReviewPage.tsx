@@ -1,13 +1,18 @@
 import clsx from "clsx"
 import "./pulls.css"
-import { lazy, Suspense } from "react"
+import { lazy, Suspense, useMemo } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
-import { useCodeComments, useWhoami } from "@/api/queries"
+import { useBlob, useCodeComments, useWhoami } from "@/api/queries"
 import { useDeleteCodeComment, useSetCodeCommentResolved } from "@/api/mutations"
 import BranchSelector from "@/features/repo/BranchSelector"
 import DraftReviewButton from "@/features/pulls/DraftReviewButton"
-import { Avatar, Badge, Button, EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { Avatar, Badge, Button, CodeSnippet, EmptyState, ErrorMessage, Spinner } from "@/ui"
 import type { CodeComment, CodeCommentState } from "@/api/types"
+
+// Lines of context shown above and below each comment's annotated range, so a
+// snippet reads like a slice cut from the blob viewer rather than the bare
+// commented lines.
+const CONTEXT_LINES = 3
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it lazily
 // so the review list doesn't drag it into the main bundle.
@@ -89,27 +94,70 @@ export default function ReviewPage() {
       )}
 
       {byPath.map(([path, list]) => (
-        <div key={path} className="review-file">
-          <div className="review-file__head">
-            <Link to={blobHref(owner, repo, path, gitRef)} className="review-file__path">
-              {path}
-            </Link>
-            <span className="muted small">{list.length}</span>
-          </div>
-          <ul className="review-list">
-            {list.map((c) => (
-              <ReviewRow
-                key={c.id}
-                owner={owner}
-                repo={repo}
-                gitRef={gitRef}
-                comment={c}
-                canManage={!!whoamiQ.data && whoamiQ.data.name === c.author}
-              />
-            ))}
-          </ul>
-        </div>
+        <ReviewFile
+          key={path}
+          owner={owner}
+          repo={repo}
+          gitRef={gitRef}
+          path={path}
+          comments={list}
+          currentUser={whoamiQ.data?.name}
+        />
       ))}
+    </div>
+  )
+}
+
+// One file's comments, each shown as a snippet cut from the file with the
+// comment beneath it. The blob is fetched once per file and sliced per comment.
+function ReviewFile({
+  owner,
+  repo,
+  gitRef,
+  path,
+  comments,
+  currentUser,
+}: {
+  owner: string
+  repo: string
+  gitRef: string
+  path: string
+  comments: CodeComment[]
+  currentUser?: string
+}) {
+  const blobQ = useBlob(owner, repo, path, gitRef)
+
+  // The file's source lines on this ref, computed once for slicing each
+  // comment's context. Null while loading or when the blob can't render as text
+  // (binary / too large) — rows then fall back to the server-provided snippet.
+  const fileLines = useMemo(() => {
+    const b = blobQ.data
+    if (!b || b.binary || b.too_large) return null
+    const body = b.content.endsWith("\n") ? b.content.slice(0, -1) : b.content
+    return body.split("\n")
+  }, [blobQ.data])
+
+  return (
+    <div className="review-file">
+      <div className="review-file__head">
+        <Link to={blobHref(owner, repo, path, gitRef)} className="review-file__path">
+          {path}
+        </Link>
+        <span className="muted small">{comments.length}</span>
+      </div>
+      <ul className="review-list">
+        {comments.map((c) => (
+          <ReviewRow
+            key={c.id}
+            owner={owner}
+            repo={repo}
+            gitRef={gitRef}
+            comment={c}
+            canManage={!!currentUser && currentUser === c.author}
+            fileLines={fileLines}
+          />
+        ))}
+      </ul>
     </div>
   )
 }
@@ -120,12 +168,14 @@ function ReviewRow({
   gitRef,
   comment,
   canManage,
+  fileLines,
 }: {
   owner: string
   repo: string
   gitRef: string
   comment: CodeComment
   canManage: boolean
+  fileLines: string[] | null
 }) {
   const resolve = useSetCodeCommentResolved(owner, repo)
   const del = useDeleteCodeComment(owner, repo)
@@ -133,6 +183,17 @@ function ReviewRow({
     comment.end_line > comment.start_line
       ? `L${comment.start_line}-L${comment.end_line}`
       : `L${comment.start_line}`
+
+  // A slice cut from the file around the comment's range (±CONTEXT_LINES),
+  // clamped to the file bounds. Null when the blob isn't usable or the anchor
+  // points past the current file (a stale ref) — the row then falls back to the
+  // server snippet.
+  const context = useMemo(() => {
+    if (!fileLines || comment.start_line > fileLines.length) return null
+    const from = Math.max(1, comment.start_line - CONTEXT_LINES)
+    const to = Math.min(fileLines.length, comment.end_line + CONTEXT_LINES)
+    return { code: fileLines.slice(from - 1, to).join("\n"), from }
+  }, [fileLines, comment.start_line, comment.end_line])
 
   return (
     <li className={clsx("review-row", { "is-resolved": comment.resolved })}>
@@ -170,12 +231,22 @@ function ReviewRow({
           </span>
         )}
       </div>
+      {context ? (
+        <CodeSnippet
+          className="review-row__code"
+          code={context.code}
+          path={comment.path}
+          startLine={context.from}
+          focus={[comment.start_line, comment.end_line]}
+        />
+      ) : (
+        comment.snippet && <pre className="review-row__snippet">{comment.snippet}</pre>
+      )}
       <div className="review-row__body">
         <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
           <Markdown content={comment.body} owner={owner} repo={repo} basePath="" />
         </Suspense>
       </div>
-      {comment.snippet && <pre className="review-row__snippet">{comment.snippet}</pre>}
     </li>
   )
 }

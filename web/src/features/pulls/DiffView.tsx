@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import type { ReactNode } from "react"
 import type { DiffFile, DiffHunk, DiffLine } from "@/api/types"
-import { highlightLine, langFromPath } from "@/features/repo/highlight"
+import { highlightLine, langFromPath } from "@/ui/highlight"
 
 interface Props {
   file: DiffFile
