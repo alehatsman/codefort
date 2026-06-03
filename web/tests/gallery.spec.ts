@@ -21,6 +21,7 @@ test("dev gallery renders every primitive section", async ({ page }) => {
     "ListRow",
     "Table",
     "Sidebar / SidebarSection",
+    "Comment",
     "FilterChip",
     "Card",
     "Spinner",

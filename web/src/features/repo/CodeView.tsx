@@ -9,7 +9,7 @@ import {
   useSetCodeCommentResolved,
 } from "@/api/mutations"
 import type { CodeComment } from "@/api/types"
-import { Avatar, Badge, Button, ErrorMessage, Textarea } from "@/ui"
+import { Badge, Button, Comment, ErrorMessage, Textarea } from "@/ui"
 
 // The markdown renderer pulls in remark/rehype; load it lazily.
 const Markdown = lazy(() => import("@/shell/Markdown"))
@@ -228,16 +228,12 @@ function CodeCommentCard({
       : `${comment.start_line}`
 
   return (
-    <li className={`comment${comment.resolved ? " is-resolved" : ""}`}>
-      <span className="comment__avatar">
-        <Avatar name={comment.author} />
-      </span>
-      <div className="comment__card">
-        <div className="comment__head">
-          <strong>{comment.author}</strong>
-          <span className="muted">
-            on lines {span} · {new Date(comment.created_at).toLocaleString()}
-          </span>
+    <Comment
+      author={comment.author}
+      resolved={comment.resolved}
+      meta={`on lines ${span} · ${new Date(comment.created_at).toLocaleString()}`}
+      actions={
+        <>
           {comment.resolved && <Badge state="done">resolved</Badge>}
           {canManage && (
             <span className="comment__actions">
@@ -263,15 +259,14 @@ function CodeCommentCard({
               </button>
             </span>
           )}
-        </div>
-        <div className="comment__body">
-          <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
-            <Markdown content={comment.body} owner={owner} repo={repo} basePath="" />
-          </Suspense>
-        </div>
-        <ErrorMessage error={resolve.error || del.error} inline />
-      </div>
-    </li>
+        </>
+      }
+      footer={<ErrorMessage error={resolve.error || del.error} inline />}
+    >
+      <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
+        <Markdown content={comment.body} owner={owner} repo={repo} basePath="" />
+      </Suspense>
+    </Comment>
   )
 }
 
