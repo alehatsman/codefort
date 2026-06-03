@@ -21,6 +21,7 @@ import {
   Select,
   Sidebar,
   SidebarSection,
+  Skeleton,
   Spinner,
   Stack,
   StatusIcon,
@@ -69,6 +70,7 @@ export default function DevGalleryPage() {
       <ChipsSection />
       <CardsSection />
       <FeedbackSection />
+      <SkeletonSection />
       <FormSection />
       <FormControlsSection />
       <RelativeTimeSection />
@@ -546,6 +548,24 @@ function FeedbackSection() {
         <ErrorMessage error={new Error("Inline variant — sits within a form body.")} inline />
       </Section>
     </>
+  )
+}
+
+// A skeleton mimics a loading list row: avatar circle + two text lines.
+function SkeletonSection() {
+  return (
+    <section className="gallery__section">
+      <h3 className="gallery__heading">Skeleton</h3>
+      <Inline gap={3} align="start">
+        <Skeleton variant="circle" />
+        <Stack gap={2} style={{ width: 280 }}>
+          <Skeleton variant="line" width="60%" />
+          <Skeleton variant="line" width="90%" />
+        </Stack>
+      </Inline>
+      <p className="gallery__sublabel">block</p>
+      <Skeleton variant="block" width={240} height={48} />
+    </section>
   )
 }
 

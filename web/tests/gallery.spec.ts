@@ -28,6 +28,7 @@ test("dev gallery renders every primitive section", async ({ page }) => {
     "Spinner",
     "EmptyState",
     "ErrorMessage",
+    "Skeleton",
     "RelativeTime",
     "Dialog",
   ]) {
