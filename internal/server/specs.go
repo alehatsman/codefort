@@ -16,6 +16,7 @@ import (
 	"github.com/alehatsman/moongit/internal/api"
 	"github.com/alehatsman/moongit/internal/dex"
 	"github.com/alehatsman/moongit/internal/specs"
+	"github.com/alehatsman/moongit/internal/storage"
 )
 
 // specsDir is the conventional in-repo directory holding markdown specs.
@@ -40,25 +41,7 @@ func (s *Server) handleListSpecs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out := api.SpecList{Ref: ref, Specs: []api.SpecListItem{}}
-	if !hasCommits(r.Context(), repoDir) {
-		writeJSON(w, http.StatusOK, out)
-		return
-	}
-
-	// Recursively list blobs under specs/. "<ref>:specs" addresses that tree;
-	// when specs/ is absent the treeish doesn't resolve — that's an empty list,
-	// not an error. Names are relative to specs/.
-	raw, err := gitOutput(r.Context(), repoDir, "ls-tree", "-r", "-z", "--name-only", ref+":"+specsDir)
-	if err != nil {
-		writeJSON(w, http.StatusOK, out)
-		return
-	}
-
-	for rel := range strings.SplitSeq(string(raw), "\x00") {
-		if rel == "" || !strings.EqualFold(path.Ext(rel), ".md") {
-			continue
-		}
-		full := specsDir + "/" + rel
+	for _, full := range s.specBlobPaths(r.Context(), repoDir, ref) {
 		content, err := gitOutput(r.Context(), repoDir, "cat-file", "blob", ref+":"+full)
 		if err != nil {
 			s.logger.Error("read spec", "repo", repoDir, "path", full, "err", err)
@@ -71,6 +54,29 @@ func (s *Server) handleListSpecs(w http.ResponseWriter, r *http.Request) {
 		return out.Specs[i].Path < out.Specs[j].Path
 	})
 	writeJSON(w, http.StatusOK, out)
+}
+
+// specBlobPaths returns the repo-relative paths of every .md blob under specs/
+// on the ref, in git's listing order. An unborn repo or a missing specs/ dir
+// yields nil (callers render an empty list, not an error).
+func (s *Server) specBlobPaths(ctx context.Context, repoDir, ref string) []string {
+	if !hasCommits(ctx, repoDir) {
+		return nil
+	}
+	// "<ref>:specs" addresses that tree; when specs/ is absent the treeish
+	// doesn't resolve — nil, not an error. Names are relative to specs/.
+	raw, err := gitOutput(ctx, repoDir, "ls-tree", "-r", "-z", "--name-only", ref+":"+specsDir)
+	if err != nil {
+		return nil
+	}
+	var paths []string
+	for rel := range strings.SplitSeq(string(raw), "\x00") {
+		if rel == "" || !strings.EqualFold(path.Ext(rel), ".md") {
+			continue
+		}
+		paths = append(paths, specsDir+"/"+rel)
+	}
+	return paths
 }
 
 // handleGetSpec returns one spec's content and parsed structure. The path is
@@ -489,4 +495,108 @@ func writeTreeWithBlob(ctx context.Context, repoDir, baseTree, blobOID, path str
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// handleSpecsDrift reports each spec's deterministic drift status — whether the
+// code it governs (covers[]) changed since it was last verified. It is the
+// non-LLM backstop the research rule demands: never trust the agent alone. The
+// "unverified" + "stale" specs are the candidate set the verify agent pass runs
+// over; "fresh" specs are skipped (cost control + a deterministic signal).
+func (s *Server) handleSpecsDrift(w http.ResponseWriter, r *http.Request) {
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+	repoDir, ok := s.repoDirOrFail(w, r)
+	if !ok {
+		return
+	}
+	ref, ok := s.resolveRef(w, r, repoDir)
+	if !ok {
+		return
+	}
+
+	out := api.SpecDriftReport{Ref: ref, Specs: []api.SpecDriftItem{}}
+	for _, full := range s.specBlobPaths(r.Context(), repoDir, ref) {
+		content, err := gitOutput(r.Context(), repoDir, "cat-file", "blob", ref+":"+full)
+		if err != nil {
+			s.logger.Error("read spec", "repo", repoDir, "path", full, "err", err)
+			continue
+		}
+		out.Specs = append(out.Specs, s.specDriftItem(r.Context(), repoDir, repoID, ref, full, content))
+	}
+	sort.Slice(out.Specs, func(i, j int) bool { return out.Specs[i].Path < out.Specs[j].Path })
+	writeJSON(w, http.StatusOK, out)
+}
+
+// specDriftItem classifies one spec. A spec with no covers[] (or unparseable
+// frontmatter) is "uncovered" — drift can't be checked deterministically. With
+// covers[] but no prior verification it's "unverified". Otherwise it diffs the
+// governed globs between the last-verified commit and ref: any change → "stale"
+// (a failed diff, e.g. the baseline commit is gone, also errs toward "stale"
+// rather than falsely "fresh"); no change → "fresh".
+func (s *Server) specDriftItem(ctx context.Context, repoDir string, repoID int64, ref, full string, content []byte) api.SpecDriftItem {
+	item := api.SpecDriftItem{Path: full}
+	spec, err := specs.Parse(full, content)
+	if err != nil || spec == nil {
+		item.ID = strings.TrimSuffix(path.Base(full), path.Ext(full))
+		item.Status = "uncovered"
+		return item
+	}
+	item.ID = spec.Frontmatter.ID
+	item.Covers = spec.Frontmatter.Covers
+	item.LastVerified = spec.Frontmatter.LastVerified
+	if len(spec.Frontmatter.Covers) == 0 {
+		item.Status = "uncovered"
+		return item
+	}
+
+	latest, err := storage.LatestVerification(s.rdb, repoID, spec.Frontmatter.ID)
+	if errors.Is(err, storage.ErrNotFound) {
+		item.Status = "unverified"
+		return item
+	}
+	if err != nil {
+		s.logger.Error("latest verification", "repo", repoDir, "spec", spec.Frontmatter.ID, "err", err)
+		item.Status = "unverified"
+		return item
+	}
+	item.Base = latest.CommitSHA
+
+	changed, err := gitDiffGlobs(ctx, repoDir, latest.CommitSHA, ref, spec.Frontmatter.Covers)
+	if err != nil {
+		// Baseline unresolvable (rewritten history, gone commit): can't prove
+		// fresh, so flag for re-verify.
+		item.Status = "stale"
+		return item
+	}
+	if len(changed) > 0 {
+		item.Status = "stale"
+		item.Changed = changed
+	} else {
+		item.Status = "fresh"
+	}
+	return item
+}
+
+// gitDiffGlobs returns the governed paths that changed between base and ref.
+// covers[] are matched with git's :(glob) pathspec magic, so a pattern like
+// "internal/ssh/**" matches across directories — letting git do the globbing
+// rather than re-implementing gitignore semantics.
+func gitDiffGlobs(ctx context.Context, repoDir, base, ref string, covers []string) ([]string, error) {
+	args := []string{"diff", "--name-only", base + ".." + ref, "--"}
+	for _, c := range covers {
+		args = append(args, ":(glob)"+c)
+	}
+	raw, err := gitOutput(ctx, repoDir, args...)
+	if err != nil {
+		return nil, err
+	}
+	var changed []string
+	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			changed = append(changed, line)
+		}
+	}
+	return changed, nil
 }

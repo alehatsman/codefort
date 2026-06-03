@@ -731,3 +731,29 @@ type WriteSpecResult struct {
 	Commit  string `json:"commit"`
 	Created bool   `json:"created"`
 }
+
+// SpecDriftItem is one spec's deterministic (non-LLM) drift status: whether the
+// code it governs has changed since it was last verified. This is the backstop
+// that gates the agent pass — it never classifies *how* code drifted, only
+// whether a re-verify is warranted. Status is one of:
+//   - "uncovered": no covers[] globs, so drift can't be checked deterministically
+//   - "unverified": has covers[] but was never verified (no baseline) → candidate
+//   - "stale": a governed path changed since the baseline commit → candidate
+//   - "fresh": no governed path changed since the baseline → skip the agent
+type SpecDriftItem struct {
+	Path         string   `json:"path"`
+	ID           string   `json:"id"`
+	Status       string   `json:"status"`
+	Covers       []string `json:"covers,omitempty"`
+	Base         string   `json:"base,omitempty"`          // baseline commit (last verified), when known
+	Changed      []string `json:"changed,omitempty"`       // governed paths changed since base (when stale)
+	LastVerified string   `json:"last_verified,omitempty"` // date from the verification record
+}
+
+// SpecDriftReport is the response for GET .../specs/drift: the deterministic
+// drift status of every spec on the ref. The "unverified" + "stale" items are
+// the stale-candidate set the verify agent pass should run over.
+type SpecDriftReport struct {
+	Ref   string          `json:"ref"`
+	Specs []SpecDriftItem `json:"specs"`
+}
