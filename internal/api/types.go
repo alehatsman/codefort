@@ -651,3 +651,43 @@ type SpecList struct {
 	Ref   string         `json:"ref"`
 	Specs []SpecListItem `json:"specs"`
 }
+
+// SpecSection is one heading in a spec body and the markdown beneath it (up to
+// the next heading of the same or shallower level, so a section subsumes its
+// subsections). Line is the 1-based, file-absolute line of the heading — for
+// the editor and truth-gutter to deep-link to a section.
+type SpecSection struct {
+	Title string `json:"title"`
+	Level int    `json:"level"`
+	Body  string `json:"body"`
+	Line  int    `json:"line"`
+}
+
+// SpecChecklistItem is a GitHub-style task-list line found in a spec body. Line
+// is 1-based and file-absolute.
+type SpecChecklistItem struct {
+	Text    string `json:"text"`
+	Checked bool   `json:"checked"`
+	Line    int    `json:"line"`
+}
+
+// SpecContent is the response for GET /api/repos/{owner}/{repo}/specs/{path}:
+// one spec's metadata plus its content, both raw (Content — the whole file,
+// frontmatter included, for the editor) and structured (Body without the
+// frontmatter, Sections, Checklist — for rendering and the truth gutter).
+// Sections and Checklist are non-nil (empty, not null) when the body has none.
+type SpecContent struct {
+	Ref          string              `json:"ref"`
+	Path         string              `json:"path"`
+	ID           string              `json:"id"`
+	Title        string              `json:"title"`
+	Status       string              `json:"status,omitempty"`
+	Owners       []string            `json:"owners,omitempty"`
+	Covers       []string            `json:"covers,omitempty"`
+	LastVerified string              `json:"last_verified,omitempty"`
+	Alignment    *float64            `json:"alignment,omitempty"`
+	Content      string              `json:"content"`
+	Body         string              `json:"body"`
+	Sections     []SpecSection       `json:"sections"`
+	Checklist    []SpecChecklistItem `json:"checklist"`
+}
