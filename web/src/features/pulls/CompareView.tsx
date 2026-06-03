@@ -1,8 +1,7 @@
-import clsx from "clsx"
 import { useState } from "react"
 import type { Compare } from "@/api/types"
 import DiffView from "@/features/pulls/DiffView"
-import { EmptyState } from "@/ui"
+import { EmptyState, SegmentedControl } from "@/ui"
 
 type Mode = "split" | "unified"
 
@@ -44,25 +43,16 @@ export default function CompareView({ compare }: Props) {
           {compare.additions > 0 && <span className="diff-file__add"> +{compare.additions}</span>}
           {compare.deletions > 0 && <span className="diff-file__del"> −{compare.deletions}</span>}
         </span>
-        {/* biome-ignore lint/a11y/useSemanticElements: a labeled segmented toggle is a valid ARIA group; no native element fits */}
-        <div className="diff-summary__toggle" role="group" aria-label="Diff layout">
-          <button
-            type="button"
-            className={clsx({ "is-active": mode === "split" })}
-            aria-pressed={mode === "split"}
-            onClick={() => setMode("split")}
-          >
-            Split
-          </button>
-          <button
-            type="button"
-            className={clsx({ "is-active": mode === "unified" })}
-            aria-pressed={mode === "unified"}
-            onClick={() => setMode("unified")}
-          >
-            Unified
-          </button>
-        </div>
+        <SegmentedControl
+          label="Diff layout"
+          orientation="row"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "split", label: "Split" },
+            { value: "unified", label: "Unified" },
+          ]}
+        />
       </div>
 
       {compare.truncated && (

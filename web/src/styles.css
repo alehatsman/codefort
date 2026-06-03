@@ -525,28 +525,8 @@ a.file-tree__commit:hover {
 .diff-summary__counts {
   font-weight: 600;
 }
-.diff-summary__toggle {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.diff-summary__toggle button {
-  padding: var(--space-1) var(--space-3);
-  background: var(--bg);
-  border: none;
-  border-left: 1px solid var(--border);
-  color: var(--fg-muted);
-  cursor: pointer;
-  font-size: var(--text-sm);
-}
-.diff-summary__toggle button:first-child {
-  border-left: none;
-}
-.diff-summary__toggle button.is-active {
-  background: var(--accent);
-  color: #fff;
-}
+/* The Split/Unified toggle is now the SegmentedControl `--row` variant
+   (see the .segmented block). */
 .diff-truncated {
   margin-bottom: var(--space-3);
   padding: var(--space-2) var(--space-3);
@@ -1145,6 +1125,32 @@ a.file-tree__commit:hover {
 .segmented__btn--closed.is-active {
   color: var(--state-closed);
   background: var(--state-closed-bg);
+}
+/* Row variant: joined horizontal segments — the diff Split/Unified toggle. One
+   outer border with dividers between segments; the active segment fills accent. */
+.segmented--row {
+  flex-direction: row;
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.segmented--row .segmented__btn {
+  border: none;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+.segmented--row .segmented__btn:first-child {
+  border-left: none;
+}
+.segmented--row .segmented__btn.is-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 /* Monokai's --state-todo lime (#a6e22e) is too bright for white text;
    use a deeper green that keeps white legible (~4.6:1). */

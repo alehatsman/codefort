@@ -10,6 +10,7 @@ import {
   FilterChip,
   Input,
   RelativeTime,
+  SegmentedControl,
   Select,
   Spinner,
   StatusIcon,
@@ -40,6 +41,7 @@ export default function DevGalleryPage() {
       <TabsSection />
       <BadgesSection />
       <StatusIconSection />
+      <SegmentedControlSection />
       <ChipsSection />
       <CardsSection />
       <FeedbackSection />
@@ -152,6 +154,35 @@ function ChipsSection() {
           {s}
         </FilterChip>
       ))}
+    </Section>
+  )
+}
+
+function SegmentedControlSection() {
+  const [layout, setLayout] = useState<"split" | "unified">("split")
+  const [pick, setPick] = useState("one")
+  return (
+    <Section title="SegmentedControl">
+      <SegmentedControl
+        label="Row demo"
+        orientation="row"
+        value={layout}
+        onChange={setLayout}
+        options={[
+          { value: "split", label: "Split" },
+          { value: "unified", label: "Unified" },
+        ]}
+      />
+      <SegmentedControl
+        label="Column demo"
+        value={pick}
+        onChange={setPick}
+        options={[
+          { value: "one", label: "Option one" },
+          { value: "two", label: "Option two" },
+          { value: "three", label: "Option three" },
+        ]}
+      />
     </Section>
   )
 }
