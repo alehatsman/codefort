@@ -1,4 +1,5 @@
 import { type CIRunStatus, RUN_STATUSES } from "@/api/types"
+import { Checkbox } from "@/ui"
 
 // RunFilters is the search box + status chip row shared by the global and
 // per-repo Agents lists, matching the issues filter chrome (.filters/.chip).
@@ -29,14 +30,13 @@ export default function RunFilters({
       <div className="filter-row">
         <span className="filter-label">status:</span>
         {RUN_STATUSES.map((s) => (
-          <label key={s} className="chip">
-            <input
-              type="checkbox"
-              checked={activeStates.includes(s)}
-              onChange={() => onToggleState(s)}
-            />
-            {s.replace(/_/g, " ")}
-          </label>
+          <Checkbox
+            key={s}
+            className="chip"
+            label={s.replace(/_/g, " ")}
+            checked={activeStates.includes(s)}
+            onChange={() => onToggleState(s)}
+          />
         ))}
       </div>
     </div>
