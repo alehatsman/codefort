@@ -1,6 +1,5 @@
-/* Specs tab. Phase-1 shell: a flat list of the repo's specs with a status dot.
-   The two-pane tree + render + status rail (the real read UX) arrives in #209,
-   which will extend these blocks. */
+/* Specs tab — two-pane reader: a folder-grouped spec tree + status rail on the
+   left, the selected spec rendered as markdown on the right. */
 
 .specs-page {
   display: flex;
@@ -8,33 +7,101 @@
   gap: 16px;
 }
 
-.spec-list {
+.specs-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+/* ── Sidebar: status rail + tree ─────────────────────────────────────────── */
+
+.specs-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 16px;
+}
+
+.spec-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-muted);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.spec-rail__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: capitalize;
+}
+
+.spec-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.spec-tree__folder {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  margin-bottom: 4px;
+  padding: 0 8px;
+}
+
+.spec-tree__list {
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.spec-row {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border-muted);
+  flex-direction: column;
+  gap: 1px;
 }
 
-.spec-row:last-child {
-  border-bottom: none;
+.spec-tree__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
+
+.spec-tree__item:hover {
+  background: var(--bg-subtle, var(--accent-muted));
+}
+
+.spec-tree__item.is-active {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+.spec-tree__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Status dots (shared by rail, tree, and view header) ─────────────────── */
 
 .spec-dot {
   flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  align-self: center;
   background: var(--fg-muted);
 }
 
@@ -50,15 +117,45 @@
   background: var(--state-closed);
 }
 
-.spec-row__title {
-  font-weight: 600;
+/* ── Center: rendered spec ───────────────────────────────────────────────── */
+
+.spec-view {
+  min-width: 0;
 }
 
-.spec-row__path {
-  flex: 1;
+.spec-view__head {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-muted);
 }
 
-.spec-row__status {
-  flex: none;
+.spec-view__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spec-view__title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.spec-view__status {
   text-transform: capitalize;
+}
+
+.spec-view__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 6px;
+}
+
+@media (max-width: 720px) {
+  .specs-layout {
+    grid-template-columns: 1fr;
+  }
+  .specs-sidebar {
+    position: static;
+  }
 }
