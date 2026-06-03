@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/alehatsman/moongit/internal/ci"
 	"github.com/alehatsman/moongit/internal/storage"
 )
 
@@ -28,6 +29,21 @@ func gitCommitMeta(bareRepo, sha string) (subject, author string) {
 	}
 	subject, author, _ = strings.Cut(strings.TrimRight(string(out), "\n"), "\n")
 	return subject, author
+}
+
+// readPipelineAt reads mgitci.yml at sha from a bare repo, best-effort. ok=false
+// means the file is absent at that commit, or git failed for any reason; the
+// caller then falls through to enqueue and lets the runner gate/report. Mirrors
+// gitReadPipeline (the runner's reader) but collapses every failure to "no
+// pipeline to enforce here" since this is only the branch-filter pre-check.
+func readPipelineAt(bareRepo, sha string) (raw []byte, ok bool) {
+	out, err := exec.Command(
+		"git", "--git-dir", bareRepo, "show", sha+":mgitci.yml",
+	).Output()
+	if err != nil {
+		return nil, false
+	}
+	return out, true
 }
 
 // postReceiveHook is the generic hook installed into every bare repo. It
@@ -160,6 +176,22 @@ func (s *Server) handleCIEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bareRepo := filepath.Join(s.cfg.ReposDir, owner, name+".git")
+
+	// Honor the pipeline's on.push.branches filter at enqueue, mirroring the
+	// CI-disabled path above: a push to a branch the pipeline doesn't list
+	// enqueues nothing, so filtered branches don't accumulate canceled runs. We
+	// only skip when the pipeline parses cleanly AND its filter excludes the
+	// branch; an unreadable / unparseable / absent pipeline still enqueues so
+	// the runner surfaces the real outcome (parse error → errored run, no
+	// pipeline → gated/canceled), exactly as before.
+	if raw, ok := readPipelineAt(bareRepo, req.New); ok {
+		if p, perr := ci.Parse(raw); perr == nil && !p.On.Matches(req.Ref) {
+			s.logger.Info("ci run skipped (branch filter)", "repo", req.Repo, "ref", req.Ref)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	}
+
 	msg, author := gitCommitMeta(bareRepo, req.New)
 	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
 		CommitSHA: req.New, CommitMsg: msg, CommitAuthor: author,
