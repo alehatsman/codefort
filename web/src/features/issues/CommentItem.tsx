@@ -1,8 +1,7 @@
 import { lazy, Suspense } from "react"
 import { useDeleteComment } from "@/api/mutations"
 import type { Comment } from "@/api/types"
-import Avatar from "@/shell/Avatar"
-import { ErrorMessage } from "@/ui"
+import { Avatar, ErrorMessage } from "@/ui"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it lazily
 // so the comment list doesn't drag it into the main bundle.

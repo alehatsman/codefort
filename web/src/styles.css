@@ -1154,6 +1154,28 @@ a.file-tree__commit:hover {
 .pill--capitalize {
   text-transform: capitalize;
 }
+
+/* Avatar (@/ui Avatar) — initial-circle placeholder, sm (default) / lg. */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-circle);
+  background: var(--accent);
+  color: white;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.avatar--lg {
+  width: 28px;
+  height: 28px;
+  font-size: var(--text-base);
+}
+
 .badge--todo {
   background: var(--state-todo-bg);
   color: var(--state-todo);

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import {
+  Avatar,
   Badge,
   Button,
   Card,
@@ -49,6 +50,7 @@ export default function DevGalleryPage() {
       <TokensSection />
       <LayoutSection />
       <ButtonsSection />
+      <AvatarSection />
       <TabsSection />
       <BadgesSection />
       <StatusPillSection />
@@ -224,6 +226,16 @@ function ButtonsSection() {
         small
       </Button>
       <Button disabled>disabled</Button>
+    </Section>
+  )
+}
+
+function AvatarSection() {
+  return (
+    <Section title="Avatar">
+      <Avatar name="trooper" />
+      <Avatar name="trooper" size="lg" />
+      <Avatar name="" />
     </Section>
   )
 }

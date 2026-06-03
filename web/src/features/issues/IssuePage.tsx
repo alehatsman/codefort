@@ -8,13 +8,12 @@ import AssigneeControl from "@/features/issues/AssigneeControl"
 import CommentForm from "@/features/issues/CommentForm"
 import EditIssueForm from "@/features/issues/EditIssueForm"
 import StateIcon from "@/features/issues/StateIcon"
-import Avatar from "@/shell/Avatar"
 import CommentItem from "@/features/issues/CommentItem"
 import DeleteIssueButton from "@/features/issues/DeleteIssueButton"
 import BranchTag from "@/features/repo/BranchTag"
 import SpawnAgentButton from "@/features/agents/SpawnAgentButton"
 import NotFound from "@/shell/NotFound"
-import { Badge, Button, ErrorMessage, RelativeTime, Spinner } from "@/ui"
+import { Avatar, Badge, Button, ErrorMessage, RelativeTime, Spinner } from "@/ui"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it only
 // when an issue with a body is actually shown.

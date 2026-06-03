@@ -1,9 +1,8 @@
 import clsx from "clsx"
 import { Link } from "react-router-dom"
 import type { CIRun, Commit } from "@/api/types"
-import Avatar from "@/shell/Avatar"
 import CommitCIStatus from "@/features/commits/CommitCIStatus"
-import { RelativeTime } from "@/ui"
+import { Avatar, RelativeTime } from "@/ui"
 
 interface Props {
   owner: string

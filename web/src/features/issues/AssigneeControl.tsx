@@ -1,7 +1,6 @@
 import { useClaimIssue, useUnclaimIssue } from "@/api/mutations"
 import type { IssueState } from "@/api/types"
-import Avatar from "@/shell/Avatar"
-import { Button, ErrorMessage } from "@/ui"
+import { Avatar, Button, ErrorMessage } from "@/ui"
 
 interface Props {
   owner: string

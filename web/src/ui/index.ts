@@ -1,6 +1,7 @@
 // Base UI primitives — thin, typed wrappers over the shared BEM blocks in
 // styles.css. Prefer these over hand-written `className` strings; see the
 // living gallery at /dev/ui for every variant.
+export { default as Avatar } from "@/ui/Avatar"
 export { default as Badge, type BadgeState } from "@/ui/Badge"
 export { default as Button, type ButtonSize, type ButtonVariant } from "@/ui/Button"
 export { default as Card } from "@/ui/Card"

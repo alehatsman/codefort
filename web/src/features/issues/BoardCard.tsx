@@ -1,7 +1,7 @@
 import { useDraggable } from "@dnd-kit/core"
 import { Link } from "react-router-dom"
 import type { Issue } from "@/api/types"
-import Avatar from "@/shell/Avatar"
+import { Avatar } from "@/ui"
 
 interface Props {
   owner: string
