@@ -124,6 +124,11 @@ func TestRunPRDispatch(t *testing.T) {
 		{"merge no arg", []string{"merge"}, "usage: moongit pr merge"},
 		{"merge bad number", []string{"merge", "0"}, "invalid pull request number"},
 		{"merge extra args", []string{"merge", "1", "extra"}, "unexpected extra args"},
+		{"close no arg", []string{"close"}, "usage: moongit pr close"},
+		{"close bad number", []string{"close", "abc"}, "invalid pull request number"},
+		{"close extra args", []string{"close", "1", "extra"}, "unexpected extra args"},
+		{"reopen no arg", []string{"reopen"}, "usage: moongit pr reopen"},
+		{"reopen bad number", []string{"reopen", "0"}, "invalid pull request number"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
