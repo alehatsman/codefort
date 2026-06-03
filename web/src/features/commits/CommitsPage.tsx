@@ -4,7 +4,7 @@ import { useCommitCIStatus, useInfiniteCommits, useRepo } from "@/api/queries"
 import type { CIRun, Commit } from "@/api/types"
 import OverviewCard from "@/shell/OverviewCard"
 import CommitCIStatus from "@/features/commits/CommitCIStatus"
-import { Avatar, EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
+import { Avatar, EmptyState, ErrorMessage, RelativeTime, SkeletonList } from "@/ui"
 
 const PER_PAGE = 30
 
@@ -35,7 +35,7 @@ export default function CommitsPage() {
       </div>
 
       {commitsQ.isLoading && commits.length === 0 ? (
-        <Spinner />
+        <SkeletonList leading={false} />
       ) : commitsQ.error ? (
         <ErrorMessage error={commitsQ.error} />
       ) : commits.length === 0 ? (

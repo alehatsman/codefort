@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom"
 import { useRepos } from "@/api/queries"
 import CIStatusIcon from "@/features/pipelines/CIStatusIcon"
 import NewRepoForm from "@/features/repo/NewRepoForm"
-import { Card, EmptyState, ErrorMessage, PageHeader, Spinner } from "@/ui"
+import { Card, EmptyState, ErrorMessage, PageHeader, SkeletonText } from "@/ui"
 import type { Repo } from "@/api/types"
 import { useListNav } from "@/shell/keyboardNav"
 
@@ -31,7 +31,16 @@ export default function ReposPage() {
         actions={<NewRepoForm onCreated={(owner, name) => navigate(`/${owner}/${name}`)} />}
       />
 
-      {isLoading && <Spinner />}
+      {isLoading && (
+        <div className="card-grid" aria-hidden="true">
+          {Array.from({ length: 6 }, (_, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: fixed-count static placeholder, never reorders
+            <Card key={i}>
+              <SkeletonText lines={2} />
+            </Card>
+          ))}
+        </div>
+      )}
       {error && <ErrorMessage error={error} />}
 
       {!isLoading && !error && (!data || data.length === 0) && (

@@ -5,7 +5,14 @@ import { useCommit } from "@/api/queries"
 import OverviewCard from "@/shell/OverviewCard"
 import BranchTag from "@/features/repo/BranchTag"
 import DiffView from "@/features/pulls/DiffView"
-import { Avatar, EmptyState, ErrorMessage, RelativeTime, SegmentedControl, Spinner } from "@/ui"
+import {
+  Avatar,
+  EmptyState,
+  ErrorMessage,
+  RelativeTime,
+  SegmentedControl,
+  SkeletonText,
+} from "@/ui"
 
 type Mode = "split" | "unified"
 
@@ -38,7 +45,7 @@ export default function CommitPage() {
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       {commitQ.isLoading ? (
-        <Spinner />
+        <SkeletonText lines={4} />
       ) : commitQ.error ? (
         <ErrorMessage error={commitQ.error} />
       ) : !detail ? (

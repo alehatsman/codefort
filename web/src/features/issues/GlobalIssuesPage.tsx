@@ -6,7 +6,7 @@ import { ISSUE_STATES, type IssueState } from "@/api/types"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import StateIcon from "@/features/issues/StateIcon"
-import { EmptyState, ErrorMessage, ListRow, PageHeader, Pagination, Spinner } from "@/ui"
+import { EmptyState, ErrorMessage, ListRow, PageHeader, Pagination, SkeletonList } from "@/ui"
 import { useListNav } from "@/shell/keyboardNav"
 
 const PAGE_SIZE = 25
@@ -108,7 +108,7 @@ export default function GlobalIssuesPage() {
         </div>
       </div>
 
-      {isLoading && <Spinner />}
+      {isLoading && <SkeletonList />}
       {error && <ErrorMessage error={error} />}
 
       {data && issues.length === 0 && <EmptyState>No issues match these filters.</EmptyState>}

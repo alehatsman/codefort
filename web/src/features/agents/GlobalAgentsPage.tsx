@@ -3,7 +3,7 @@ import { useAllRuns } from "@/api/queries"
 import AgentRunsTable from "@/features/agents/AgentRunsTable"
 import RunFilters from "@/features/agents/RunFilters"
 import { useRunFilters } from "@/features/agents/useRunFilters"
-import { EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { EmptyState, ErrorMessage, SkeletonTable } from "@/ui"
 
 // Fleet-wide Agents view: every repo's agent runs in one grid, newest-created
 // first, filterable by status + keyword (like the global Issues view). Each row
@@ -30,7 +30,12 @@ export default function GlobalAgentsPage() {
         onToggleState={toggleState}
       />
 
-      {isLoading && <Spinner />}
+      {isLoading && (
+        <SkeletonTable
+          className="agent-runs"
+          headers={["Repo", "Run", "Status", "Hash", "Trigger", "Duration", "When"]}
+        />
+      )}
       {error && <ErrorMessage error={error} />}
       {data && data.length === 0 && <EmptyState>No agent runs match these filters.</EmptyState>}
       {data && data.length > 0 && (

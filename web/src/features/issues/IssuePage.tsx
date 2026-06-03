@@ -21,6 +21,7 @@ import {
   RelativeTime,
   Sidebar,
   SidebarSection,
+  SkeletonText,
   Spinner,
 } from "@/ui"
 
@@ -50,7 +51,7 @@ export default function IssuePage() {
     )
   }
 
-  if (issueQ.isLoading) return <Spinner />
+  if (issueQ.isLoading) return <SkeletonText lines={5} />
   if (issueQ.error) return <ErrorMessage error={issueQ.error} />
   if (!issueQ.data) return null
 

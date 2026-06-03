@@ -6,7 +6,7 @@ import { useCompare, useRefs } from "@/api/queries"
 import { useCreatePull } from "@/api/mutations"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
-import { Button, EmptyState, ErrorMessage, PageHeader, Spinner } from "@/ui"
+import { Button, EmptyState, ErrorMessage, PageHeader, SkeletonText } from "@/ui"
 
 /**
  * Compare two branches: pick base + head, see the ahead/behind + three-dot diff,
@@ -100,7 +100,7 @@ export default function ComparePage() {
       {sameBranch && <EmptyState>Pick two different branches to compare.</EmptyState>}
       {!head && !sameBranch && <EmptyState>Choose a head branch to compare.</EmptyState>}
 
-      {compareQ.isLoading && <Spinner />}
+      {compareQ.isLoading && <SkeletonText lines={4} />}
       {compareQ.error && <ErrorMessage error={compareQ.error} />}
 
       {compareQ.data && (
