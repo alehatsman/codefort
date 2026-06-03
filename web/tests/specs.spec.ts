@@ -395,3 +395,77 @@ test("Specs: a verified spec shows the truth panel + stale badge", async ({ page
   await expect(panel).toContainText("server.go:10 differs")
   await expect(panel).toContainText("behavior at L6 drifted")
 })
+
+// A running spec-verify run, returned by the verify trigger and the run detail.
+function verifyRun(number: number, status: string) {
+  return {
+    number,
+    kind: "spec-verify",
+    commit_sha: "abc123",
+    ref: "main",
+    event: "spec-verify",
+    status,
+    created_at: new Date().toISOString(),
+    started_at: null,
+    finished_at: null,
+    jobs: [],
+  }
+}
+
+test("Specs: Verify triggers a run and links to the SSE run viewer", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockSpecs(page, SPECS)
+  // The trigger returns a running run; the run detail keeps reporting running so
+  // the watcher's link stays put for the assertion.
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/specs\/verify$/, (route) =>
+    route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify(verifyRun(7, "running")) })
+  )
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/runs\/7$/, (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(verifyRun(7, "running")) })
+  )
+
+  await page.goto("/alice/demo/specs")
+  await page.locator(".spec-view__actions").getByRole("button", { name: "Verify" }).click()
+
+  const link = page.locator(".spec-verify-status").getByRole("link", { name: "run #7" })
+  await expect(link).toBeVisible()
+  await expect(link).toHaveAttribute("href", "/alice/demo/pipelines/7")
+})
+
+test("Specs: Verify all fans out over the stale-candidate set", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockSpecs(page, SPECS)
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/specs\/drift(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ref: "main",
+        specs: [
+          { path: "specs/ssh-transport.md", id: "ssh-transport", status: "stale" },
+          { path: "specs/ci/pipeline.md", id: "pipeline", status: "unverified" },
+          { path: "specs/fresh.md", id: "fresh", status: "fresh" },
+          { path: "specs/none.md", id: "none", status: "uncovered" },
+        ],
+      }),
+    })
+  )
+  let verifyPosts = 0
+  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/specs\/verify$/, (route) => {
+    verifyPosts++
+    return route.fulfill({
+      status: 202,
+      contentType: "application/json",
+      body: JSON.stringify(verifyRun(verifyPosts, "queued")),
+    })
+  })
+
+  await page.goto("/alice/demo/specs")
+  await page.getByRole("button", { name: "Verify all stale" }).click()
+
+  // Only the stale + unverified specs are queued (2), not fresh/uncovered.
+  await expect(page.locator(".spec-verify-all")).toContainText("Queued 2 run(s)")
+  expect(verifyPosts).toBe(2)
+})

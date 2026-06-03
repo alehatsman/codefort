@@ -1,7 +1,9 @@
 import "./specs.css"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
-import { useRepo, useSpec, useSpecsList } from "@/api/queries"
+import { api } from "@/api/client"
+import { useCIRun, useRepo, useSpec, useSpecsList } from "@/api/queries"
 import CommandPalette, { type Command } from "@/features/specs/CommandPalette"
 import QuickOpen from "@/features/specs/QuickOpen"
 import SpecEditor from "@/features/specs/SpecEditor"
@@ -9,7 +11,7 @@ import SpecSearch from "@/features/specs/SpecSearch"
 import Markdown from "@/shell/Markdown"
 import OverviewCard from "@/shell/OverviewCard"
 import { Button, EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
-import type { SpecContent, SpecListItem, SpecVerification } from "@/api/types"
+import type { CIRun, SpecContent, SpecListItem, SpecVerification } from "@/api/types"
 
 /**
  * Specs tab: in-repo, human-authored specifications under specs/ — the dual of
@@ -131,6 +133,7 @@ export default function SpecsPage() {
       ) : specs.length > 0 ? (
         <div className="specs-layout">
           <aside className="specs-sidebar">
+            <VerifyAllButton owner={r.owner} repo={r.name} />
             <StatusRail specs={specs} />
             <SpecTree groups={groups} selectedPath={selectedPath} onSelect={selectSpec} />
           </aside>
@@ -289,6 +292,7 @@ function SpecView({
         spec={data}
         actions={
           <div className="spec-view__actions">
+            <VerifyButton owner={owner} repo={repo} path={path} />
             <Button variant="ghost" onClick={() => setEditing(true)}>
               Edit
             </Button>
@@ -355,6 +359,104 @@ function VerificationPanel({ v }: { v: SpecVerification }) {
 function markerKey(marker: string): "aligned" | "drifted" | "unverifiable" | "unspecced" {
   if (marker === "drifted" || marker === "unverifiable" || marker === "unspecced") return marker
   return "aligned"
+}
+
+// terminalStatuses are the run states past which a verify run won't change — once
+// reached, the watcher refreshes the spec so the gutter/rail reflect the result.
+const terminalStatuses = new Set(["success", "failed", "canceled", "error", "interrupted"])
+
+// VerifyButton kicks off a spec-verify run and, while it runs, shows a link to
+// the SSE run viewer; on completion it refreshes the spec (gutter) and the list
+// (status rail) so the new verdict appears in place.
+function VerifyButton({ owner, repo, path }: { owner: string; repo: string; path: string }) {
+  const [runNumber, setRunNumber] = useState<number | null>(null)
+  const verify = useMutation<CIRun, Error, void>({
+    mutationFn: () => api.verifySpec(owner, repo, path),
+    onSuccess: (run) => setRunNumber(run.number),
+  })
+  return (
+    <>
+      <Button
+        variant="ghost"
+        disabled={verify.isPending || runNumber !== null}
+        onClick={() => verify.mutate()}
+      >
+        {verify.isPending ? "Verifying…" : "Verify"}
+      </Button>
+      {runNumber !== null && (
+        <VerifyWatch
+          owner={owner}
+          repo={repo}
+          path={path}
+          runNumber={runNumber}
+          onDone={() => setRunNumber(null)}
+        />
+      )}
+      <ErrorMessage error={verify.error} />
+    </>
+  )
+}
+
+function VerifyWatch({
+  owner,
+  repo,
+  path,
+  runNumber,
+  onDone,
+}: {
+  owner: string
+  repo: string
+  path: string
+  runNumber: number
+  onDone: () => void
+}) {
+  const qc = useQueryClient()
+  const runQ = useCIRun(owner, repo, runNumber)
+  const status = runQ.data?.status
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refresh once the watched run reaches a terminal state
+  useEffect(() => {
+    if (status && terminalStatuses.has(status)) {
+      qc.invalidateQueries({ queryKey: ["spec", owner, repo, path] })
+      qc.invalidateQueries({ queryKey: ["specs", owner, repo] })
+      onDone()
+    }
+  }, [status])
+  return (
+    <span className="spec-verify-status muted small">
+      Verifying — <Link to={`/${owner}/${repo}/pipelines/${runNumber}`}>run #{runNumber}</Link>{" "}
+      {status ?? "queued"}
+    </span>
+  )
+}
+
+// VerifyAllButton fans out: it reads the deterministic drift report and kicks
+// off a verify run for every stale-candidate spec (stale or never-verified).
+function VerifyAllButton({ owner, repo }: { owner: string; repo: string }) {
+  const qc = useQueryClient()
+  const verifyAll = useMutation<number, Error, void>({
+    mutationFn: async () => {
+      const drift = await api.specsDrift(owner, repo)
+      const stale = drift.specs.filter((s) => s.status === "stale" || s.status === "unverified")
+      await Promise.all(stale.map((s) => api.verifySpec(owner, repo, s.path)))
+      return stale.length
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["specs", owner, repo] })
+    },
+  })
+  return (
+    <div className="spec-verify-all">
+      <Button variant="ghost" disabled={verifyAll.isPending} onClick={() => verifyAll.mutate()}>
+        {verifyAll.isPending ? "Queuing…" : "Verify all stale"}
+      </Button>
+      {verifyAll.data !== undefined && (
+        <span className="muted small">
+          {verifyAll.data === 0 ? "Nothing stale" : `Queued ${verifyAll.data} run(s)`}
+        </span>
+      )}
+      <ErrorMessage error={verifyAll.error} />
+    </div>
+  )
 }
 
 function SpecHeader({ spec, actions }: { spec: SpecContent; actions?: ReactNode }) {

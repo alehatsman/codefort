@@ -695,6 +695,23 @@ export interface SpecVerification {
   stale: boolean
 }
 
+export type SpecDriftStatus = "fresh" | "stale" | "unverified" | "uncovered"
+
+export interface SpecDriftItem {
+  path: string
+  id: string
+  status: SpecDriftStatus | string
+  covers?: string[]
+  base?: string
+  changed?: string[]
+  last_verified?: string
+}
+
+export interface SpecDriftReport {
+  ref: string
+  specs: SpecDriftItem[]
+}
+
 export interface SpecSearchHit {
   path: string
   /** Enclosing spec heading at/before the match line; empty when none. */

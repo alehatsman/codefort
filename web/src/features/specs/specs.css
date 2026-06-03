@@ -236,6 +236,18 @@
   padding-left: 18px;
 }
 
+.spec-verify-status {
+  display: inline-flex;
+  gap: 4px;
+  align-items: baseline;
+}
+
+.spec-verify-all {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 /* ── Editor (split textarea + live preview) ──────────────────────────────── */
 
 .spec-editor {

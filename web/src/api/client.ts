@@ -44,6 +44,7 @@ import type {
   CIRunWithRepo,
   Repo,
   SpecContent,
+  SpecDriftReport,
   SpecList,
   SpecSearchResult,
   SSHKey,
@@ -288,6 +289,17 @@ export const api = {
     const qs = q.toString()
     return request<SpecList>(`/api/repos/${owner}/${repo}/specs${qs ? `?${qs}` : ""}`)
   },
+  specsDrift: (owner: string, repo: string, ref = "") => {
+    const q = new URLSearchParams()
+    if (ref) q.set("ref", ref)
+    const qs = q.toString()
+    return request<SpecDriftReport>(`/api/repos/${owner}/${repo}/specs/drift${qs ? `?${qs}` : ""}`)
+  },
+  verifySpec: (owner: string, repo: string, path: string, ref = "") =>
+    request<CIRun>(`/api/repos/${owner}/${repo}/specs/verify`, {
+      method: "POST",
+      body: ref ? { path, ref } : { path },
+    }),
   // path is repo-relative ("specs/ssh-transport.md"); the spec route's {path...}
   // is taken relative to specs/, so strip the leading "specs/" before appending.
   getSpec: (owner: string, repo: string, path: string, ref = "") => {
