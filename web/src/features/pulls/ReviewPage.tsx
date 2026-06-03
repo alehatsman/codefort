@@ -6,6 +6,7 @@ import { useBlob, useCodeComments, useWhoami } from "@/api/queries"
 import { useDeleteCodeComment, useSetCodeCommentResolved } from "@/api/mutations"
 import BranchSelector from "@/features/repo/BranchSelector"
 import DraftReviewButton from "@/features/pulls/DraftReviewButton"
+import OverviewCard from "@/shell/OverviewCard"
 import {
   Avatar,
   Badge,
@@ -80,6 +81,7 @@ export default function ReviewPage() {
 
   return (
     <div className="repo">
+      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
       <h2 className="issue-title">Review comments</h2>
 
       <div className="repo-toolbar">
