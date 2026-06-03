@@ -627,3 +627,27 @@ type CreateSSHKeyRequest struct {
 	PublicKey string `json:"public_key"`
 	Comment   string `json:"comment,omitempty"`
 }
+
+// SpecListItem is one in-repo spec's metadata in a SpecList. Path is
+// repo-relative (e.g. "specs/ssh-transport.md"); the remaining fields come
+// from the spec's optional frontmatter, with ID and Title defaulted from the
+// path/heading when absent. Alignment is a pointer so "never verified" (null)
+// is distinct from "0% aligned".
+type SpecListItem struct {
+	Path         string   `json:"path"`
+	ID           string   `json:"id"`
+	Title        string   `json:"title"`
+	Status       string   `json:"status,omitempty"`
+	Owners       []string `json:"owners,omitempty"`
+	Covers       []string `json:"covers,omitempty"`
+	LastVerified string   `json:"last_verified,omitempty"`
+	Alignment    *float64 `json:"alignment,omitempty"`
+}
+
+// SpecList is the response for GET /api/repos/{owner}/{repo}/specs: every
+// markdown spec under specs/ on the selected ref, with parsed metadata. Specs
+// is non-nil and empty (not null) when the repo has no specs/ directory.
+type SpecList struct {
+	Ref   string         `json:"ref"`
+	Specs []SpecListItem `json:"specs"`
+}

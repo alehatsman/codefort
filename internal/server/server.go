@@ -184,6 +184,8 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/summaries", s.handleIntelSummaries)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/intel/search", s.handleIntelSearch)
 
+	mux.HandleFunc("GET /api/repos/{owner}/{repo}/specs", s.handleListSpecs)
+
 	return mux
 }
 
