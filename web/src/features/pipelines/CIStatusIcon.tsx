@@ -1,4 +1,22 @@
 import type { CIRunStatus } from "@/api/types"
+import StatusIcon, { type StatusGlyph } from "@/ui/StatusIcon"
+
+// success: check; failed/error: ×; running: clock; canceled: slash;
+// stalled: alert (ran to completion but never converged); interrupted: pause
+// (runner went away). queued — and the agent-only awaiting_input / finishing
+// live states — show the open ring, matching the prior `default` branch.
+const GLYPH: Record<CIRunStatus, StatusGlyph> = {
+  queued: "dot-ring",
+  running: "clock",
+  awaiting_input: "dot-ring",
+  finishing: "dot-ring",
+  success: "check",
+  failed: "x",
+  canceled: "slash",
+  error: "x",
+  interrupted: "pause",
+  stalled: "alert",
+}
 
 interface Props {
   status: CIRunStatus
@@ -8,86 +26,18 @@ interface Props {
 
 /**
  * Inline SVG CI-status icon in GitHub Primer style — the compact counterpart to
- * CIStatusBadge for dense spots like the repos-list cards. Color comes from CSS
- * via `ci-icon--<status>` (reusing the ci-badge color meanings); `currentColor`
- * lets each glyph inherit it. The status string also becomes the icon's
- * accessible label and tooltip.
+ * CIStatusBadge for dense spots like the repos-list cards. A thin map from run
+ * status to a StatusIcon glyph; color comes from CSS via `ci-icon--<status>`
+ * (reusing the ci-badge color meanings), which `currentColor` inherits. The
+ * status string also becomes the icon's accessible label and tooltip.
  */
 export default function CIStatusIcon({ status, size = 16, className = "" }: Props) {
-  const cls = `ci-icon ci-icon--${status} ${className}`.trim()
-  const svgProps = {
-    className: cls,
-    width: size,
-    height: size,
-    viewBox: "0 0 16 16",
-    fill: "currentColor",
-    role: "img",
-    "aria-label": `CI ${status}`,
-  }
-  // success: check-circle; failed/error: x-circle; running: clock;
-  // queued: open circle; canceled: circle-slash; interrupted: pause-circle;
-  // stalled: alert-circle (agent gave up without converging).
-  switch (status) {
-    case "success":
-      return (
-        <svg {...svgProps}>
-          <title>{`CI ${status}`}</title>
-          <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z" />
-          <path d="M11.28 5.22a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 0 1-1.06 0l-2-2a.75.75 0 1 1 1.06-1.06L6.75 8.69l3.47-3.47a.75.75 0 0 1 1.06 0Z" />
-        </svg>
-      )
-    case "failed":
-    case "error":
-      return (
-        <svg {...svgProps}>
-          <title>{`CI ${status}`}</title>
-          <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z" />
-          <path d="M5.72 5.72a.75.75 0 0 1 1.06 0L8 6.94l1.22-1.22a.75.75 0 1 1 1.06 1.06L9.06 8l1.22 1.22a.75.75 0 1 1-1.06 1.06L8 9.06l-1.22 1.22a.75.75 0 1 1-1.06-1.06L6.94 8 5.72 6.78a.75.75 0 0 1 0-1.06Z" />
-        </svg>
-      )
-    case "running":
-      return (
-        <svg {...svgProps}>
-          <title>{`CI ${status}`}</title>
-          <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z" />
-          <path d="M8 4a.75.75 0 0 1 .75.75v3.19l2.03 2.03a.75.75 0 1 1-1.06 1.06L7.47 8.78A.75.75 0 0 1 7.25 8.25V4.75A.75.75 0 0 1 8 4Z" />
-        </svg>
-      )
-    case "canceled":
-      return (
-        <svg {...svgProps}>
-          <title>{`CI ${status}`}</title>
-          <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z" />
-          <path d="M4.97 4.97a.75.75 0 0 1 1.06 0l4.999 5a.75.75 0 0 1-1.06 1.06l-5-5a.75.75 0 0 1 0-1.06Z" />
-        </svg>
-      )
-    case "stalled":
-      // alert-circle (!) — the agent ran to completion but never converged; an
-      // attention state, not a hard failure (x-circle) or a no-op (pause-circle).
-      return (
-        <svg {...svgProps}>
-          <title>{`CI ${status}`}</title>
-          <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z" />
-          <path d="M8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 5.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
-        </svg>
-      )
-    case "interrupted":
-      // pause-circle — work cut short by the runner going away, not a verdict.
-      return (
-        <svg {...svgProps}>
-          <title>{`CI ${status}`}</title>
-          <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z" />
-          <path d="M6.25 5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 6.25 5Zm3.5 0a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 9.75 5Z" />
-        </svg>
-      )
-    default:
-      // queued — open ring, awaiting a runner.
-      return (
-        <svg {...svgProps}>
-          <title>{`CI ${status}`}</title>
-          <path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
-          <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z" />
-        </svg>
-      )
-  }
+  return (
+    <StatusIcon
+      glyph={GLYPH[status]}
+      label={`CI ${status}`}
+      size={size}
+      className={`ci-icon ci-icon--${status} ${className}`.trim()}
+    />
+  )
 }

@@ -12,11 +12,12 @@ import {
   RelativeTime,
   Select,
   Spinner,
+  StatusIcon,
   Tab,
   Tabs,
   Textarea,
 } from "@/ui"
-import type { BadgeState, ButtonVariant } from "@/ui"
+import type { BadgeState, ButtonVariant, StatusGlyph } from "@/ui"
 
 /**
  * Living gallery for the base UI primitives — an in-repo alternative to
@@ -38,6 +39,7 @@ export default function DevGalleryPage() {
       <ButtonsSection />
       <TabsSection />
       <BadgesSection />
+      <StatusIconSection />
       <ChipsSection />
       <CardsSection />
       <FeedbackSection />
@@ -97,6 +99,32 @@ function TabsSection() {
 }
 
 const BADGE_STATES: BadgeState[] = ["todo", "in_progress", "done", "closed"]
+
+const GLYPHS: StatusGlyph[] = [
+  "dot-ring",
+  "clock",
+  "check",
+  "x",
+  "slash",
+  "alert",
+  "pause",
+  "merge",
+]
+
+// Glyphs render in the current text color (currentColor) here; in the app the
+// domain icons pass a `*-icon--<status>` className that themes them.
+function StatusIconSection() {
+  return (
+    <Section title="StatusIcon">
+      {GLYPHS.map((glyph) => (
+        <span key={glyph} className="row" title={glyph}>
+          <StatusIcon glyph={glyph} label={glyph} size={20} />
+          <span className="gallery__muted">{glyph}</span>
+        </span>
+      ))}
+    </Section>
+  )
+}
 
 function BadgesSection() {
   return (
