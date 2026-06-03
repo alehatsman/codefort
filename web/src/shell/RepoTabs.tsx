@@ -40,6 +40,7 @@ export default function RepoTabs({ owner, repo, openIssues }: Props) {
     location.pathname.startsWith(`${base}/explore`) ||
     location.pathname.startsWith(`${base}/research`) ||
     location.pathname.startsWith(`${base}/summaries`)
+  const isSpecs = location.pathname.startsWith(`${base}/specs`)
   const isPipelines = location.pathname.startsWith(`${base}/pipelines`)
   const isAgents = location.pathname.startsWith(`${base}/agents`)
   const isSettings = location.pathname === `${base}/settings`
@@ -61,6 +62,9 @@ export default function RepoTabs({ owner, repo, openIssues }: Props) {
       </Link>
       <Link to={`${base}/explore`} className={clsx("tab", { "is-active": isExplore })}>
         Explore
+      </Link>
+      <Link to={`${base}/specs`} className={clsx("tab", { "is-active": isSpecs })}>
+        Specs
       </Link>
       <Link to={`${base}/pipelines`} className={clsx("tab", { "is-active": isPipelines })}>
         Pipelines

@@ -44,6 +44,9 @@ export const keys = {
   intelFileSummary: (owner: string, repo: string, path: string) =>
     ["intelFileSummary", owner, repo, path] as const,
   intelSummaries: (owner: string, repo: string) => ["intelSummaries", owner, repo] as const,
+  specs: (owner: string, repo: string, ref = "") => ["specs", owner, repo, ref] as const,
+  spec: (owner: string, repo: string, path: string, ref = "") =>
+    ["spec", owner, repo, path, ref] as const,
   ciRuns: (owner: string, repo: string) => ["ciRuns", owner, repo] as const,
   ciRun: (owner: string, repo: string, n: number) => ["ciRun", owner, repo, n] as const,
   compare: (owner: string, repo: string, base: string, head: string) =>
@@ -321,6 +324,27 @@ export function useIntelPackageGraph(owner: string, repo: string, enabled: boole
     queryFn: () => api.getIntelPackageGraph(owner, repo),
     enabled: enabled && !!owner && !!repo,
     staleTime: 5 * 60_000,
+  })
+}
+
+// The repo's in-repo specs (specs/ markdown + parsed metadata). Cheap git-tree
+// read; cached briefly so tab switches don't refetch on every visit.
+export function useSpecsList(owner: string, repo: string, ref = "") {
+  return useQuery({
+    queryKey: keys.specs(owner, repo, ref),
+    queryFn: () => api.listSpecs(owner, repo, ref),
+    enabled: !!owner && !!repo,
+    staleTime: 30_000,
+  })
+}
+
+// One spec's content + parsed structure. path is repo-relative ("specs/x.md").
+export function useSpec(owner: string, repo: string, path: string, ref = "") {
+  return useQuery({
+    queryKey: keys.spec(owner, repo, path, ref),
+    queryFn: () => api.getSpec(owner, repo, path, ref),
+    enabled: !!owner && !!repo && !!path,
+    staleTime: 30_000,
   })
 }
 

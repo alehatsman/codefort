@@ -20,6 +20,7 @@ import PullsPage from "@/features/pulls/PullsPage"
 import PullPage from "@/features/pulls/PullPage"
 import BoardPage from "@/features/issues/BoardPage"
 import ExplorePage from "@/features/explore/ExplorePage"
+import SpecsPage from "@/features/specs/SpecsPage"
 import ReviewPage from "@/features/pulls/ReviewPage"
 import PipelinesPage from "@/features/pipelines/PipelinesPage"
 import RepoSettingsPage from "@/features/settings/RepoSettingsPage"
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="/:owner/:repo/pulls" element={<PullsPage />} />
         <Route path="/:owner/:repo/pulls/:number" element={<PullPage />} />
         <Route path="/:owner/:repo/explore" element={<ExplorePage />} />
+        <Route path="/:owner/:repo/specs" element={<SpecsPage />} />
         <Route path="/:owner/:repo/research" element={<ExploreRedirect />} />
         <Route path="/:owner/:repo/summaries" element={<ExploreRedirect />} />
         <Route path="/:owner/:repo/review" element={<ReviewPage />} />

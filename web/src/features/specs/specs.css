@@ -1,0 +1,64 @@
+/* Specs tab. Phase-1 shell: a flat list of the repo's specs with a status dot.
+   The two-pane tree + render + status rail (the real read UX) arrives in #209,
+   which will extend these blocks. */
+
+.specs-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.spec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.spec-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.spec-row:last-child {
+  border-bottom: none;
+}
+
+.spec-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  align-self: center;
+  background: var(--fg-muted);
+}
+
+.spec-dot--living {
+  background: var(--state-todo);
+}
+
+.spec-dot--draft {
+  background: var(--state-in_progress);
+}
+
+.spec-dot--superseded {
+  background: var(--state-closed);
+}
+
+.spec-row__title {
+  font-weight: 600;
+}
+
+.spec-row__path {
+  flex: 1;
+}
+
+.spec-row__status {
+  flex: none;
+  text-transform: capitalize;
+}

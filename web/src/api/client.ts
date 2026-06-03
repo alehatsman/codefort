@@ -43,6 +43,8 @@ import type {
   PullRequestWithRepo,
   CIRunWithRepo,
   Repo,
+  SpecContent,
+  SpecList,
   SSHKey,
   Token,
   Tree,
@@ -276,6 +278,23 @@ export const api = {
       method: "POST",
       body,
     }),
+
+  listSpecs: (owner: string, repo: string, ref = "") => {
+    const q = new URLSearchParams()
+    if (ref) q.set("ref", ref)
+    const qs = q.toString()
+    return request<SpecList>(`/api/repos/${owner}/${repo}/specs${qs ? `?${qs}` : ""}`)
+  },
+  // path is repo-relative ("specs/ssh-transport.md"); the spec route's {path...}
+  // is taken relative to specs/, so strip the leading "specs/" before appending.
+  getSpec: (owner: string, repo: string, path: string, ref = "") => {
+    const rel = path.replace(/^specs\//, "")
+    const segs = rel.split("/").map(encodeURIComponent).join("/")
+    const q = new URLSearchParams()
+    if (ref) q.set("ref", ref)
+    const qs = q.toString()
+    return request<SpecContent>(`/api/repos/${owner}/${repo}/specs/${segs}${qs ? `?${qs}` : ""}`)
+  },
 
   listCodeComments: (
     owner: string,

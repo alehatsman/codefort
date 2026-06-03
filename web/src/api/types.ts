@@ -617,3 +617,58 @@ export interface IntelSearchResult {
   annotations?: Record<string, IntelAnnotation>
   graph?: IntelGraph
 }
+
+// ── Specs ──────────────────────────────────────────────────────────────────
+// In-repo markdown specs under specs/ (what the code *should* do). Mirrors the
+// Go api.Spec* wire types.
+
+export type SpecStatus = "living" | "draft" | "superseded"
+
+export interface SpecListItem {
+  path: string
+  id: string
+  title: string
+  status?: SpecStatus | string
+  owners?: string[]
+  covers?: string[]
+  last_verified?: string
+  /** Verify-agent code↔spec agreement in [0,1]; absent means never verified. */
+  alignment?: number
+}
+
+export interface SpecList {
+  ref: string
+  specs: SpecListItem[]
+}
+
+export interface SpecSection {
+  title: string
+  level: number
+  body: string
+  /** 1-based, file-absolute line of the heading (for deep-links). */
+  line: number
+}
+
+export interface SpecChecklistItem {
+  text: string
+  checked: boolean
+  line: number
+}
+
+export interface SpecContent {
+  ref: string
+  path: string
+  id: string
+  title: string
+  status?: SpecStatus | string
+  owners?: string[]
+  covers?: string[]
+  last_verified?: string
+  alignment?: number
+  /** Raw file, frontmatter included (for the editor). */
+  content: string
+  /** Markdown after the frontmatter (for rendering). */
+  body: string
+  sections: SpecSection[]
+  checklist: SpecChecklistItem[]
+}
