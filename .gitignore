@@ -6,6 +6,7 @@
 # Go build artifacts
 /bin/
 /moongitd
+/moongit
 *.test
 *.out
 
