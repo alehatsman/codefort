@@ -11,6 +11,7 @@ package ci
 import (
 	"bytes"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -35,6 +36,33 @@ type On struct {
 // Push filters which branches trigger a run. An empty Branches matches all.
 type Push struct {
 	Branches []string `yaml:"branches"`
+}
+
+// Matches reports whether a pushed ref should trigger the pipeline under its
+// `on.push.branches` filter. An empty filter matches every branch (the
+// documented default). A ref outside refs/heads/ (e.g. a tag) never matches a
+// branch filter. Each pattern is matched against the bare branch name as a
+// shell glob via path.Match — so "feat/*" matches "feat/x" but not the nested
+// "feat/x/y" (path.Match's '*' stops at '/') — and a plain name is an exact
+// match.
+func (o On) Matches(ref string) bool {
+	branches := o.Push.Branches
+	if len(branches) == 0 {
+		return true
+	}
+	name, ok := strings.CutPrefix(ref, "refs/heads/")
+	if !ok {
+		return false
+	}
+	for _, pat := range branches {
+		if pat == name {
+			return true
+		}
+		if matched, err := path.Match(pat, name); err == nil && matched {
+			return true
+		}
+	}
+	return false
 }
 
 // Job is one unit in the pipeline DAG: a list of steps plus the jobs it

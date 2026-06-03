@@ -7,6 +7,33 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func TestOnMatches(t *testing.T) {
+	cases := []struct {
+		name     string
+		branches []string
+		ref      string
+		want     bool
+	}{
+		{"empty filter matches any branch", nil, "refs/heads/anything", true},
+		{"empty filter matches a tag too", nil, "refs/tags/v1", true},
+		{"exact branch match", []string{"main"}, "refs/heads/main", true},
+		{"exact branch miss", []string{"main"}, "refs/heads/feat-x", false},
+		{"glob matches one segment", []string{"feat/*"}, "refs/heads/feat/x", true},
+		{"glob does not cross slash", []string{"feat/*"}, "refs/heads/feat/x/y", false},
+		{"one of several patterns", []string{"main", "feat/*"}, "refs/heads/feat/login", true},
+		{"non-branch ref never matches a filter", []string{"main"}, "refs/tags/main", false},
+		{"filter set but branch unlisted", []string{"main", "release/*"}, "refs/heads/chore/x", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			on := On{Push: Push{Branches: tc.branches}}
+			if got := on.Matches(tc.ref); got != tc.want {
+				t.Errorf("On{%v}.Matches(%q) = %v, want %v", tc.branches, tc.ref, got, tc.want)
+			}
+		})
+	}
+}
+
 // exampleYAML mirrors the spec in issue #14: version, push branch filter, two
 // jobs, `run:` sugar, a raw mooncake `cmd` step, and an explicit empty needs.
 const exampleYAML = `
