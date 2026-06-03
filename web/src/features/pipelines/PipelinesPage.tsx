@@ -7,7 +7,7 @@ import { useCancelCIRun, useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from 
 import { absoluteTime, timeAgo } from "@/shell/timeAgo"
 import type { Repo } from "@/api/types"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
-import { Button, EmptyState, ErrorMessage, Input, Spinner, Table } from "@/ui"
+import { Button, EmptyState, ErrorMessage, Input, Spinner, Table, useToast } from "@/ui"
 import AgentRunBody from "@/features/agents/AgentRunBody"
 import CIRunBody from "@/features/pipelines/CIRunBody"
 import {
@@ -64,6 +64,7 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
   const setEnabled = useSetCIEnabled(owner, repo)
   const refsQ = useRefs(owner, repo)
   const trigger = useTriggerCIRun(owner, repo)
+  const toast = useToast()
   // The input defaults to the repo's default branch until the user edits it
   // (null = untouched, so a freshly loaded default still flows through).
   const [refInput, setRefInput] = useState<string | null>(null)
@@ -73,7 +74,9 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
     e.preventDefault()
     const r = ref.trim()
     if (!r) return
-    trigger.mutate(r)
+    trigger.mutate(r, {
+      onSuccess: (run) => toast(`Pipeline run #${run.number} started`, { variant: "success" }),
+    })
   }
 
   const isAgent = kind === "agent"
@@ -227,6 +230,7 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
   const runQ = useCIRun(owner, repo, runNumber)
   const rerun = useRerunCIRun(owner, repo)
   const cancel = useCancelCIRun(owner, repo, runNumber)
+  const toast = useToast()
 
   if (runQ.isLoading) return <Spinner />
   if (runQ.error) return <ErrorMessage error={runQ.error} />
@@ -244,7 +248,10 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
 
   function doRerun() {
     rerun.mutate(runNumber, {
-      onSuccess: (created) => navigate(`/${owner}/${repo}/${base}/${created.number}`),
+      onSuccess: (created) => {
+        toast(`Re-run started as #${created.number}`, { variant: "success" })
+        navigate(`/${owner}/${repo}/${base}/${created.number}`)
+      },
     })
   }
 
@@ -267,7 +274,11 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
           <Button
             size="small"
             variant="danger"
-            onClick={() => cancel.mutate()}
+            onClick={() =>
+              cancel.mutate(undefined, {
+                onSuccess: () => toast(`Run #${runNumber} canceled`, { variant: "success" }),
+              })
+            }
             disabled={cancel.isPending}
             title="Force-stop the run now: interrupt its jobs and discard the workspace"
           >

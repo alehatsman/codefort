@@ -134,6 +134,8 @@ test("merge a pull request from its detail page", async ({ page }) => {
   // PR flips to merged, server-side and in the badge.
   await expect(page.locator(".pr-state--merged")).toBeVisible()
   expect(state.pulls[0].state).toBe("merged")
+  // A success toast confirms the merge (Toast adoption, #309).
+  await expect(page.locator(".toast--success")).toContainText("Pull request #1 merged")
 })
 
 test("merge surfaces conflicting paths and leaves the PR open", async ({ page }) => {

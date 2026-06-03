@@ -12,7 +12,7 @@ import {
 } from "@/api/mutations"
 import type { CIRunExecutionModel, CreatedToken, Repo, SSHKey, Token } from "@/api/types"
 import ThemeSelect from "@/features/settings/ThemeSelect"
-import { Badge, Button, EmptyState, ErrorMessage, Input, Select, Spinner } from "@/ui"
+import { Badge, Button, EmptyState, ErrorMessage, Input, Select, Spinner, useToast } from "@/ui"
 
 // Sections of the settings surface. "tokens", "agent", "ssh", and "appearance"
 // are backed. "users" and "branches" are planned features whose server backends
@@ -80,6 +80,7 @@ export default function SettingsPage() {
 function ReposSection() {
   const reposQ = useRepos()
   const del = useDeleteRepo()
+  const toast = useToast()
   // The repo armed for deletion, by slug. Picking one opens its confirm row;
   // a successful delete clears it (the repo's gone from the list anyway).
   const [target, setTarget] = useState<Repo | null>(null)
@@ -95,12 +96,14 @@ function ReposSection() {
 
   function onDelete() {
     if (!armed || !target || del.isPending) return
+    const deletedSlug = slug
     del.mutate(
       { owner: target.owner, repo: target.name },
       {
         onSuccess: () => {
           setTarget(null)
           setConfirmText("")
+          toast(`Deleted ${deletedSlug}`, { variant: "success" })
         },
       }
     )

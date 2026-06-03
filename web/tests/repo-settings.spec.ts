@@ -42,6 +42,8 @@ test("delete is gated behind type-to-confirm and removes the repo", async ({ pag
   await deleteBtn.click()
   await expect(page.getByRole("cell", { name: "alice/demo" })).toHaveCount(0)
   await expect(page.getByText("No repositories yet.")).toBeVisible()
+  // A success toast confirms the deletion (Toast adoption, #309).
+  await expect(page.locator(".toast--success")).toContainText("Deleted alice/demo")
 })
 
 test("deleting a repo that's already gone surfaces the 404", async ({ page }) => {
