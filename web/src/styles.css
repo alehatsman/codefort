@@ -1292,6 +1292,59 @@ a.file-tree__commit:hover {
   }
 }
 
+/* Menu / Dropdown (@/ui Menu) — a button trigger + an absolutely-positioned
+   popover of menuitem buttons. */
+.menu {
+  position: relative;
+  display: inline-flex;
+}
+.menu__popover {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  z-index: 30;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--space-1);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.menu__popover--start {
+  left: 0;
+}
+.menu__popover--end {
+  right: 0;
+}
+.menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.menu__item:hover:not(:disabled),
+.menu__item:focus-visible {
+  background: var(--bg-canvas);
+  outline: none;
+}
+.menu__item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.menu__item.is-selected {
+  font-weight: var(--weight-semibold);
+}
+
 .badge--todo {
   background: var(--state-todo-bg);
   color: var(--state-todo);
