@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm"
 import rehypeSanitize from "rehype-sanitize"
 import { Link } from "react-router-dom"
 import { api } from "@/api/client"
-import { highlight, highlightNodes } from "@/features/repo/highlight"
+import { highlight, highlightNodes } from "@/ui/highlight"
 import { isExternalRef, resolveRepoPath } from "@/features/repo/repoPath"
 
 interface Props {
