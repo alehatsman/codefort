@@ -110,3 +110,40 @@ func TestStampInsertsKeysAndBlock(t *testing.T) {
 		t.Errorf("alignment = %v, want 0", spec.Frontmatter.Alignment)
 	}
 }
+
+// Regression for #304: appending the verify keys to existing frontmatter must
+// not clobber the closing fence or the first body line via slice aliasing, and
+// must not duplicate the keys. The stamped output has to round-trip through
+// Parse with frontmatter and body intact.
+func TestStampAppendPreservesFenceAndBody(t *testing.T) {
+	src := "---\nid: agent-runs\nstatus: draft\nowners: [aleh]\ncovers:\n  - \"internal/server/agent.go\"\n---\n# Agent Runs\n\n## Intent\nbody text\n"
+	out := string(Stamp([]byte(src), "2026-06-03", 0.82))
+
+	if got := strings.Count(out, "last_verified:"); got != 1 {
+		t.Errorf("last_verified appears %d times, want 1:\n%s", got, out)
+	}
+	if got := strings.Count(out, "alignment:"); got != 1 {
+		t.Errorf("alignment appears %d times, want 1:\n%s", got, out)
+	}
+	// Two fences: opening + closing. Slice aliasing used to eat the closing one.
+	if got := strings.Count(out, "---"); got != 2 {
+		t.Errorf("fence count = %d, want 2 (open+close):\n%s", got, out)
+	}
+	if !strings.Contains(out, "# Agent Runs") {
+		t.Errorf("body heading clobbered:\n%s", out)
+	}
+
+	spec, err := Parse("specs/agent-runs.md", []byte(out))
+	if err != nil {
+		t.Fatalf("stamped spec does not re-parse: %v\n%s", err, out)
+	}
+	if spec.Frontmatter.Status != "draft" {
+		t.Errorf("status = %q, want draft (frontmatter delimiting broke)", spec.Frontmatter.Status)
+	}
+	if spec.Frontmatter.LastVerified != "2026-06-03" {
+		t.Errorf("last_verified = %q, want 2026-06-03", spec.Frontmatter.LastVerified)
+	}
+	if spec.Title != "Agent Runs" {
+		t.Errorf("title = %q, want Agent Runs", spec.Title)
+	}
+}
