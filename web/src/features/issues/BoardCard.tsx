@@ -11,6 +11,15 @@ interface Props {
   showRepo?: boolean
 }
 
+// Deterministic hue (0–359) from the repo key, so each project keeps a stable
+// tag color across renders and reloads — same repo → same color. Plain string
+// hash (djb2-ish), spread over the wheel.
+function repoHue(key: string): number {
+  let h = 0
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
+  return h % 360
+}
+
 /**
  * One issue rendered as a draggable card. The whole card is the drag handle;
  * clicking it navigates to the issue. The synthetic click the browser fires
@@ -34,9 +43,12 @@ export default function BoardCard({ owner, repo, issue, showRepo = false }: Prop
     <div ref={setNodeRef} className="board-card" style={style} {...listeners} {...attributes}>
       <Link to={`/${owner}/${repo}/issues/${issue.number}`} className="board-card__link">
         {showRepo && (
-          <div className="board-card__repo muted">
+          <span
+            className="repo-tag"
+            style={{ "--repo-hue": repoHue(`${owner}/${repo}`) } as React.CSSProperties}
+          >
             {owner}/{repo}
-          </div>
+          </span>
         )}
         <div className="board-card__title">{issue.title}</div>
         <div className="board-card__meta">
