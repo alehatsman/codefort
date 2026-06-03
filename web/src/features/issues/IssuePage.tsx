@@ -13,7 +13,16 @@ import DeleteIssueButton from "@/features/issues/DeleteIssueButton"
 import BranchTag from "@/features/repo/BranchTag"
 import SpawnAgentButton from "@/features/agents/SpawnAgentButton"
 import NotFound from "@/shell/NotFound"
-import { Avatar, Badge, Button, ErrorMessage, RelativeTime, Spinner } from "@/ui"
+import {
+  Avatar,
+  Badge,
+  Button,
+  ErrorMessage,
+  RelativeTime,
+  Sidebar,
+  SidebarSection,
+  Spinner,
+} from "@/ui"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it only
 // when an issue with a body is actually shown.
@@ -152,13 +161,11 @@ export default function IssuePage() {
           <CommentForm owner={owner} repo={repo} number={iss.number} />
         </div>
 
-        <aside className="sidebar">
-          <section className="sidebar__section">
-            <h3 className="sidebar__label">State</h3>
+        <Sidebar>
+          <SidebarSection label="State">
             <StateButtons owner={owner} repo={repo} number={iss.number} current={iss.state} />
-          </section>
-          <section className="sidebar__section">
-            <h3 className="sidebar__label">Assignee</h3>
+          </SidebarSection>
+          <SidebarSection label="Assignee">
             <AssigneeControl
               owner={owner}
               repo={repo}
@@ -167,16 +174,14 @@ export default function IssuePage() {
               state={iss.state}
               me={me.data?.name}
             />
-          </section>
-          <section className="sidebar__section">
-            <h3 className="sidebar__label">Agent</h3>
+          </SidebarSection>
+          <SidebarSection label="Agent">
             <SpawnAgentButton owner={owner} repo={repo} number={iss.number} />
-          </section>
-          <section className="sidebar__section">
-            <h3 className="sidebar__label">Danger zone</h3>
+          </SidebarSection>
+          <SidebarSection label="Danger zone">
             <DeleteIssueButton owner={owner} repo={repo} number={iss.number} />
-          </section>
-        </aside>
+          </SidebarSection>
+        </Sidebar>
       </div>
     </div>
   )
