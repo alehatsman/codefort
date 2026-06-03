@@ -1,10 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
+	"os/exec"
 	"path"
 	"sort"
 	"strconv"
@@ -315,4 +318,175 @@ func (s *Server) specSectionAt(
 		}
 	}
 	return title
+}
+
+// zeroOID is git's "ref must not exist" sentinel for an update-ref CAS — used to
+// create a branch atomically (fails if something raced us to create it).
+const zeroOID = "0000000000000000000000000000000000000000"
+
+// handleWriteSpec commits spec content to a feature branch and returns the
+// branch + commit so the UI can open a PR. The write happens in the bare repo
+// without a worktree (hash-object → temp-index tree → commit-tree → update-ref),
+// the same worktree-free style as the merge handler. It never writes to the
+// repo's default branch — specs reach main via a PR, honoring "never auto-push
+// main". Identity comes from the request token, stamped on the commit.
+func (s *Server) handleWriteSpec(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+		return
+	}
+	repoDir, ok := s.repoDirOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	rel, err := cleanTreePath(r.PathValue("path"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if rel == "" {
+		writeError(w, http.StatusBadRequest, "path is required")
+		return
+	}
+	if !strings.EqualFold(path.Ext(rel), ".md") {
+		writeError(w, http.StatusBadRequest, "spec path must end in .md")
+		return
+	}
+	full := specsDir + "/" + rel
+
+	var req api.WriteSpecRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	def := headRef(r.Context(), repoDir)
+	base := req.Base
+	if base == "" {
+		base = def
+	}
+	branch := strings.TrimSpace(req.Branch)
+	if branch == "" {
+		branch = "spec/" + strings.TrimSuffix(path.Base(rel), path.Ext(rel))
+	}
+	// Specs land via a PR; refuse to commit straight onto the default branch.
+	if branch == def {
+		writeError(w, http.StatusBadRequest, "refusing to write specs directly to the default branch "+def+"; use a feature branch")
+		return
+	}
+
+	// The commit's parent is the target branch tip if it exists (extend it),
+	// otherwise the base branch tip (start it). created drives the ref CAS below.
+	created := !branchExists(r.Context(), repoDir, branch)
+	parentRef := "refs/heads/" + branch
+	if created {
+		if !branchExists(r.Context(), repoDir, base) {
+			writeError(w, http.StatusNotFound, "base branch not found: "+base)
+			return
+		}
+		parentRef = "refs/heads/" + base
+	}
+	parent, err := revParse(r.Context(), repoDir, parentRef)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "resolve branch failed")
+		return
+	}
+	baseTree, err := revParse(r.Context(), repoDir, parent+"^{tree}")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "resolve tree failed")
+		return
+	}
+
+	blob, err := hashObject(r.Context(), repoDir, []byte(req.Content))
+	if err != nil {
+		s.logger.Error("spec hash-object", "repo", repoDir, "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	tree, err := writeTreeWithBlob(r.Context(), repoDir, baseTree, blob, full)
+	if err != nil {
+		s.logger.Error("spec write-tree", "repo", repoDir, "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if tree == baseTree {
+		writeError(w, http.StatusConflict, "spec content is unchanged")
+		return
+	}
+
+	msg := strings.TrimSpace(req.Message)
+	if msg == "" {
+		msg = "docs(specs): update " + full
+	}
+	commit, err := commitTree(r.Context(), repoDir, tree, msg, identityFromContext(r), []string{parent})
+	if err != nil {
+		s.logger.Error("spec commit-tree", "repo", repoDir, "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// CAS the ref: create-if-absent (zeroOID guard) or extend the existing tip.
+	old := parent
+	if created {
+		old = zeroOID
+	}
+	if err := updateRef(r.Context(), repoDir, "refs/heads/"+branch, commit, old); err != nil {
+		s.logger.Warn("spec update-ref", "repo", repoDir, "branch", branch, "err", err)
+		writeError(w, http.StatusConflict, "branch "+branch+" moved during write; retry")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, api.WriteSpecResult{Branch: branch, Commit: commit, Created: created})
+}
+
+// hashObject writes content to the object store as a blob and returns its OID.
+func hashObject(ctx context.Context, repoDir string, content []byte) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "hash-object", "-w", "--stdin")
+	cmd.Dir = repoDir
+	cmd.Stdin = bytes.NewReader(content)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return "", errors.New("git hash-object: " + err.Error() + ": " + stderr.String())
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// writeTreeWithBlob produces a new tree equal to baseTree but with path set to
+// blobOID, using a throwaway index (no worktree touched). Returns the new tree
+// OID — equal to baseTree when the blob already matched (no change).
+func writeTreeWithBlob(ctx context.Context, repoDir, baseTree, blobOID, path string) (string, error) {
+	idx, err := os.CreateTemp("", "moongit-index-*")
+	if err != nil {
+		return "", err
+	}
+	idxPath := idx.Name()
+	_ = idx.Close()
+	defer func() { _ = os.Remove(idxPath) }()
+
+	env := append(os.Environ(), "GIT_INDEX_FILE="+idxPath)
+	run := func(args ...string) ([]byte, error) {
+		cmd := exec.CommandContext(ctx, "git", args...)
+		cmd.Dir = repoDir
+		cmd.Env = env
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		out, err := cmd.Output()
+		if err != nil {
+			return nil, errors.New("git " + args[0] + ": " + err.Error() + ": " + stderr.String())
+		}
+		return out, nil
+	}
+	if _, err := run("read-tree", baseTree); err != nil {
+		return "", err
+	}
+	if _, err := run("update-index", "--add", "--cacheinfo", "100644,"+blobOID+","+path); err != nil {
+		return "", err
+	}
+	out, err := run("write-tree")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }

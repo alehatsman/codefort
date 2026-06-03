@@ -711,3 +711,23 @@ type SpecSearchResult struct {
 	Query string          `json:"query"`
 	Hits  []SpecSearchHit `json:"hits"`
 }
+
+// WriteSpecRequest is the body of PUT .../specs/{path}: commit spec content to a
+// feature branch. Branch defaults to "spec/<filename-stem>" and is never the
+// repo's default branch (specs land via a PR, not a direct push to main). Base
+// is the branch the target is created from when it doesn't yet exist (defaults
+// to the repo's default branch); committing onto an existing branch ignores it.
+type WriteSpecRequest struct {
+	Content string `json:"content"`
+	Message string `json:"message,omitempty"`
+	Branch  string `json:"branch,omitempty"`
+	Base    string `json:"base,omitempty"`
+}
+
+// WriteSpecResult reports where a spec write landed so the UI can offer a PR.
+// Created is true when the commit started a new branch (vs. extending one).
+type WriteSpecResult struct {
+	Branch  string `json:"branch"`
+	Commit  string `json:"commit"`
+	Created bool   `json:"created"`
+}
