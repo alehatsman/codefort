@@ -4,6 +4,7 @@ import { useCIRuns } from "@/api/queries"
 import AgentRunsTable from "@/features/agents/AgentRunsTable"
 import RunFilters from "@/features/agents/RunFilters"
 import { useRunFilters } from "@/features/agents/useRunFilters"
+import OverviewCard from "@/shell/OverviewCard"
 import { EmptyState, ErrorMessage, Spinner } from "@/ui"
 
 // Per-repo Agents tab list. Agent runs are spawned from issues regardless of the
@@ -17,6 +18,7 @@ export default function AgentsPage() {
 
   return (
     <div className="repo">
+      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
       <section className="pipelines">
         <div className="pipelines__head">
           <h2 className="pipelines__title">Agents</h2>
