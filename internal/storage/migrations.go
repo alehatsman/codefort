@@ -316,6 +316,28 @@ var migrations = []string{
 	`
 	ALTER TABLE ci_runs ADD COLUMN tool_profile TEXT NOT NULL DEFAULT 'full';
 	`,
+
+	// 19: spec verification history (#217). One row per verify pass over a spec:
+	// the code commit it was checked against, the resulting alignment, and the
+	// full VerificationResult JSON (per-line markers, conflicts, notes). spec_id
+	// is the spec's frontmatter id (stable across path moves); spec_path is the
+	// path at verify time. The frontmatter carries the latest at-a-glance result;
+	// this table is the queryable history behind it. A MATCH record — never a
+	// claim the spec is correct.
+	`
+	CREATE TABLE IF NOT EXISTS spec_verifications (
+	    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	    repo_id    INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+	    spec_id    TEXT NOT NULL,
+	    spec_path  TEXT NOT NULL,
+	    commit_sha TEXT NOT NULL,
+	    alignment  REAL NOT NULL,
+	    result     TEXT NOT NULL DEFAULT '{}',
+	    verifier   TEXT NOT NULL DEFAULT '',
+	    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+	);
+	CREATE INDEX IF NOT EXISTS idx_spec_verifications_spec ON spec_verifications(repo_id, spec_id, id);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —
