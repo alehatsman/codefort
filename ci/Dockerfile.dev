@@ -20,7 +20,7 @@
 #   docker build -t moongit-ci-dev:latest -f ci/Dockerfile.dev ci/
 FROM moongit-ci:latest
 
-ARG GO_VERSION=1.26.3
+ARG GO_VERSION=1.26.4
 ARG NODE_VERSION=22.21.0
 
 # Static-analysis tool versions — pinned to match the host toolchain so CI and
