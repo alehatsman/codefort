@@ -37,11 +37,14 @@ type Server struct {
 	agentCanceler AgentCanceler
 }
 
-// AgentCanceler force-stops a running agent run by id, returning true if the
-// run was non-terminal and is now canceled. Implemented by the CI runner; kept
-// as an interface here so internal/server doesn't depend on package main.
+// AgentCanceler force-stops a running run by id, returning true if the run was
+// non-terminal and is now (or will be) canceled. Both kinds are backed by the
+// in-process CI runner, which holds the in-memory handles needed to interrupt a
+// live container/job loop — a DB-only signal can't. Kept as an interface here
+// so internal/server doesn't depend on package main.
 type AgentCanceler interface {
 	CancelAgentRun(runID int64) bool
+	CancelCIRun(runID int64) bool
 }
 
 // SetAgentCanceler wires the runner-backed force-stop. Called once at startup.
@@ -173,7 +176,7 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/runs/{number}/rerun", s.handleRerunCIRun)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/runs/{number}/turns", s.handleCreateAgentTurn)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/runs/{number}/finish", s.handleFinishAgentRun)
-	mux.HandleFunc("POST /api/repos/{owner}/{repo}/runs/{number}/cancel", s.handleCancelAgentRun)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/runs/{number}/cancel", s.handleCancelRun)
 	mux.HandleFunc("GET /api/settings/agent", s.handleGetAgentSettings)
 	mux.HandleFunc("PUT /api/settings/agent", s.handleUpdateAgentSettings)
 

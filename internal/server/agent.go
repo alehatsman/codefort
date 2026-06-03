@@ -223,12 +223,13 @@ func (s *Server) handleFinishAgentRun(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, toAPIRun(run))
 }
 
-// handleCancelAgentRun force-stops a running agent run (#146). Unlike finish —
-// which only accepts a parked (awaiting_input) run and keeps the work — cancel
-// is valid from any non-terminal state (queued/running/awaiting_input/
-// finishing), interrupts an in-flight turn, and discards the workspace. A run
-// that's already terminal is a 409; a non-agent run is a 400.
-func (s *Server) handleCancelAgentRun(w http.ResponseWriter, r *http.Request) {
+// handleCancelRun force-stops a running run — agent (#146) or CI (#296). Unlike
+// finish — which only accepts a parked (awaiting_input) agent run and keeps the
+// work — cancel is valid from any non-terminal state, interrupts the in-flight
+// work, and discards the workspace. The kind picks the runner path: an agent
+// run cancels from any non-terminal state; a CI run cancels while queued or
+// running. A run that's already terminal is a 409.
+func (s *Server) handleCancelRun(w http.ResponseWriter, r *http.Request) {
 	repoID, ok := s.lookupRepoOrFail(w, r)
 	if !ok {
 		return
@@ -244,19 +245,24 @@ func (s *Server) handleCancelAgentRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		s.logger.Error("agent cancel get run", "err", err)
+		s.logger.Error("cancel get run", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	if run.Kind != storage.RunKindAgent {
-		writeError(w, http.StatusBadRequest, "not an agent run")
 		return
 	}
 	if s.agentCanceler == nil {
 		writeError(w, http.StatusServiceUnavailable, "cancel unavailable (no runner)")
 		return
 	}
-	if !s.agentCanceler.CancelAgentRun(run.ID) {
+
+	// Spec-verify runs are agent-family (Kind.IsAgent); only a plain CI run takes
+	// the CI cancel path.
+	canceled := false
+	if run.Kind.IsAgent() {
+		canceled = s.agentCanceler.CancelAgentRun(run.ID)
+	} else {
+		canceled = s.agentCanceler.CancelCIRun(run.ID)
+	}
+	if !canceled {
 		writeError(w, http.StatusConflict, "run is already finished")
 		return
 	}

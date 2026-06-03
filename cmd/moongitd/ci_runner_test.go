@@ -391,6 +391,90 @@ jobs:
 	}
 }
 
+// TestCancelCIRunInterruptsInFlight is the operator force-stop (#296): a running
+// CI run, when CancelCIRun fires, unwinds its job loop and finalizes RunCanceled
+// — distinct from the RunInterrupted a shutdown produces over the same
+// ctx-cancelled path.
+func TestCancelCIRunInterruptsInFlight(t *testing.T) {
+	pipeline := `
+version: "1"
+jobs:
+  build:
+    steps: [{run: echo build}]
+`
+	started := make(chan struct{})
+	blockingExec := func(ctx context.Context, _, _ string) (stepResult, error) {
+		close(started)
+		<-ctx.Done()
+		return stepResult{}, ctx.Err()
+	}
+	r, run := newTestRunner(t, pipeline, true, blockingExec)
+
+	done := make(chan struct{})
+	go func() {
+		r.executeRun(context.Background(), run)
+		close(done)
+	}()
+
+	<-started // run is claimed and mid-step; its cancel handle is registered
+	if _, ok := r.runCancels.Load(run.ID); !ok {
+		t.Fatal("running CI run did not register a cancel handle")
+	}
+	if !r.CancelCIRun(run.ID) {
+		t.Fatal("CancelCIRun returned false for a running run")
+	}
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("executeRun did not return after cancel — jobs not interrupted")
+	}
+
+	got, err := storage.GetRun(r.db, run.RepoID, run.Number)
+	if err != nil {
+		t.Fatalf("GetRun: %v", err)
+	}
+	if got.Status != storage.RunCanceled {
+		t.Errorf("run status = %q after operator stop, want canceled (not interrupted)", got.Status)
+	}
+	if got.FinishedAt == nil {
+		t.Error("canceled run has no FinishedAt")
+	}
+	jobs, _ := storage.ListJobs(r.db, run.ID)
+	for _, j := range jobs {
+		if j.Status != storage.JobInterrupted {
+			t.Errorf("job %q = %q after cancel, want interrupted", j.Name, j.Status)
+		}
+	}
+}
+
+// TestCancelCIRunQueued: a run still queued (no goroutine yet) is CAS'd straight
+// to canceled at the storage layer, and a second cancel no-ops (already
+// terminal).
+func TestCancelCIRunQueued(t *testing.T) {
+	pipeline := `
+version: "1"
+jobs:
+  build:
+    steps: [{run: echo build}]
+`
+	r, run := newTestRunner(t, pipeline, true, successExec) // seeded run, never executed
+
+	if !r.CancelCIRun(run.ID) {
+		t.Fatal("CancelCIRun returned false for a queued run")
+	}
+	got, err := storage.GetRun(r.db, run.RepoID, run.Number)
+	if err != nil {
+		t.Fatalf("GetRun: %v", err)
+	}
+	if got.Status != storage.RunCanceled {
+		t.Errorf("run status = %q, want canceled", got.Status)
+	}
+	if r.CancelCIRun(run.ID) {
+		t.Error("CancelCIRun returned true for an already-canceled run")
+	}
+}
+
 // TestRunDispatchesConcurrentRunsWithinCap verifies the shared budget caps how
 // many runs execute at once: with a backlog of 5 runs and MaxConcurrency 3, the
 // runs must overlap (peak >= 2) yet never exceed the cap (peak <= 3).
