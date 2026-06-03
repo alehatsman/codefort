@@ -20,7 +20,7 @@ import CommitMeta from "@/features/commits/CommitMeta"
 import ReadmeCard from "@/features/repo/ReadmeCard"
 import OverviewCard from "@/shell/OverviewCard"
 import NotFound from "@/shell/NotFound"
-import { EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { EmptyState, ErrorMessage, SkeletonText, Spinner } from "@/ui"
 import { findReadme } from "@/features/repo/readme"
 import { useListNav } from "@/shell/keyboardNav"
 import BranchSelector from "@/features/repo/BranchSelector"
@@ -43,7 +43,7 @@ export default function RepoPage() {
 
   const repoQ = useRepo(owner, repo)
 
-  if (repoQ.isLoading) return <Spinner />
+  if (repoQ.isLoading) return <SkeletonText lines={4} />
   if (repoQ.error) {
     const err = repoQ.error
     if (err instanceof ApiError && err.status === 404) {
@@ -112,7 +112,7 @@ function TreeView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
     },
   })
 
-  if (treeQ.isLoading) return <Spinner />
+  if (treeQ.isLoading) return <SkeletonText heading={false} lines={6} />
   if (treeQ.error) return <ErrorMessage error={treeQ.error} />
   if (!treeQ.data) return null
 
@@ -183,7 +183,7 @@ function BlobView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   const commentsQ = useCodeComments(owner, repo, { ref: gitRef, path, state: "all" })
   const whoamiQ = useWhoami()
 
-  if (blobQ.isLoading) return <Spinner />
+  if (blobQ.isLoading) return <SkeletonText heading={false} lines={8} />
   if (blobQ.error) {
     const err = blobQ.error
     // A relative link in a rendered README (e.g. `examples/`) can point a

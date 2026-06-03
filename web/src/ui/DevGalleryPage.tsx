@@ -26,6 +26,9 @@ import {
   Sidebar,
   SidebarSection,
   Skeleton,
+  SkeletonList,
+  SkeletonTable,
+  SkeletonText,
   Spinner,
   Stack,
   StatusIcon,
@@ -651,6 +654,16 @@ function SkeletonSection() {
       </Inline>
       <p className="gallery__sublabel">block</p>
       <Skeleton variant="block" width={240} height={48} />
+      <p className="gallery__sublabel">SkeletonText — detail / prose block</p>
+      <div style={{ maxWidth: 480 }}>
+        <SkeletonText lines={3} />
+      </div>
+      <p className="gallery__sublabel">SkeletonList — list-row fallback (issues / PRs)</p>
+      <div style={{ maxWidth: 480 }}>
+        <SkeletonList rows={3} />
+      </div>
+      <p className="gallery__sublabel">SkeletonTable — runs / agents grid fallback</p>
+      <SkeletonTable rows={3} headers={["Run", "Status", "Commit", "When"]} />
     </section>
   )
 }

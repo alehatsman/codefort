@@ -9,7 +9,7 @@ import {
   useSetCodeCommentResolved,
 } from "@/api/mutations"
 import type { CodeComment } from "@/api/types"
-import { Badge, Button, Comment, ErrorMessage, Textarea } from "@/ui"
+import { Badge, Button, Comment, ErrorMessage, Textarea, Tooltip } from "@/ui"
 
 // The markdown renderer pulls in remark/rehype; load it lazily.
 const Markdown = lazy(() => import("@/shell/Markdown"))
@@ -245,18 +245,20 @@ function CodeCommentCard({
               >
                 {comment.resolved ? "Reopen" : "Resolve"}
               </Button>
-              <button
-                type="button"
-                className="comment__delete"
-                disabled={del.isPending}
-                onClick={() => {
-                  if (confirm("Delete this comment? This cannot be undone.")) del.mutate(comment.id)
-                }}
-                title="Delete comment"
-                aria-label="Delete comment"
-              >
-                {del.isPending ? "…" : "×"}
-              </button>
+              <Tooltip label="Delete comment">
+                <button
+                  type="button"
+                  className="comment__delete"
+                  disabled={del.isPending}
+                  onClick={() => {
+                    if (confirm("Delete this comment? This cannot be undone."))
+                      del.mutate(comment.id)
+                  }}
+                  aria-label="Delete comment"
+                >
+                  {del.isPending ? "…" : "×"}
+                </button>
+              </Tooltip>
             </span>
           )}
         </>

@@ -6,7 +6,15 @@ import { ISSUE_STATES, type IssueState } from "@/api/types"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import StateIcon from "@/features/issues/StateIcon"
-import { EmptyState, ErrorMessage, ListRow, PageHeader, Pagination, Spinner } from "@/ui"
+import {
+  EmptyState,
+  ErrorMessage,
+  FilterChip,
+  ListRow,
+  PageHeader,
+  Pagination,
+  SkeletonList,
+} from "@/ui"
 import { useListNav } from "@/shell/keyboardNav"
 
 const PAGE_SIZE = 25
@@ -95,20 +103,15 @@ export default function GlobalIssuesPage() {
         <div className="filter-row">
           <span className="filter-label">state:</span>
           {ISSUE_STATES.map((s) => (
-            <label key={s} className="chip">
-              <input
-                type="checkbox"
-                checked={activeStates.includes(s)}
-                onChange={() => toggleState(s)}
-              />
+            <FilterChip key={s} checked={activeStates.includes(s)} onChange={() => toggleState(s)}>
               <StateIcon state={s} size={12} />
               {s}
-            </label>
+            </FilterChip>
           ))}
         </div>
       </div>
 
-      {isLoading && <Spinner />}
+      {isLoading && <SkeletonList />}
       {error && <ErrorMessage error={error} />}
 
       {data && issues.length === 0 && <EmptyState>No issues match these filters.</EmptyState>}

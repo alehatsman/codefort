@@ -15,7 +15,7 @@ import {
   ListRow,
   PageHeader,
   Pagination,
-  Spinner,
+  SkeletonList,
 } from "@/ui"
 
 const PAGE_SIZE = 25
@@ -217,7 +217,7 @@ export default function IssuesPage() {
         </div>
       </div>
 
-      {isLoading && <Spinner />}
+      {isLoading && <SkeletonList />}
       {error && <ErrorMessage error={error} />}
 
       {data && issues.length === 0 && <EmptyState>No issues match these filters.</EmptyState>}

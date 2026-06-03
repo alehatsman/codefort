@@ -5,7 +5,7 @@ import { usePulls } from "@/api/queries"
 import { PR_STATES, type PRState } from "@/api/types"
 import OverviewCard from "@/shell/OverviewCard"
 import PullsFilters from "@/features/pulls/PullsFilters"
-import { Button, EmptyState, ErrorMessage, ListRow, PageHeader, Spinner } from "@/ui"
+import { Button, EmptyState, ErrorMessage, ListRow, PageHeader, SkeletonList } from "@/ui"
 
 const STATE_LABEL: Record<PRState, string> = {
   open: "open",
@@ -97,7 +97,7 @@ export default function PullsPage() {
         onToggleState={toggleState}
       />
 
-      {isLoading && <Spinner />}
+      {isLoading && <SkeletonList />}
       {error && <ErrorMessage error={error} />}
 
       {data && data.length === 0 && <EmptyState>No pull requests match this filter.</EmptyState>}

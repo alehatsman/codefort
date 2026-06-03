@@ -7,7 +7,7 @@ import { usePull } from "@/api/queries"
 import type { MergeConflictResponse } from "@/api/types"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
-import { Button, Checkbox, EmptyState, ErrorMessage, Spinner, useToast } from "@/ui"
+import { Button, Checkbox, EmptyState, ErrorMessage, SkeletonText, useToast } from "@/ui"
 
 const Markdown = lazy(() => import("@/shell/Markdown"))
 
@@ -43,7 +43,7 @@ export default function PullPage() {
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       {pullQ.isLoading ? (
-        <Spinner />
+        <SkeletonText lines={4} />
       ) : pullQ.error ? (
         <ErrorMessage error={pullQ.error} />
       ) : !pr ? (

@@ -5,7 +5,15 @@ import { useCommit } from "@/api/queries"
 import OverviewCard from "@/shell/OverviewCard"
 import BranchTag from "@/features/repo/BranchTag"
 import DiffView from "@/features/pulls/DiffView"
-import { Avatar, EmptyState, ErrorMessage, RelativeTime, SegmentedControl, Spinner } from "@/ui"
+import {
+  Avatar,
+  EmptyState,
+  ErrorMessage,
+  RelativeTime,
+  SegmentedControl,
+  SkeletonText,
+  Tooltip,
+} from "@/ui"
 
 type Mode = "split" | "unified"
 
@@ -38,7 +46,7 @@ export default function CommitPage() {
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
       {commitQ.isLoading ? (
-        <Spinner />
+        <SkeletonText lines={4} />
       ) : commitQ.error ? (
         <ErrorMessage error={commitQ.error} />
       ) : !detail ? (
@@ -54,14 +62,11 @@ export default function CommitPage() {
               {" committed "}
               <RelativeTime iso={detail.commit.date} />
               <span className="commit-detail__sha-group">
-                <button
-                  type="button"
-                  className="commit-detail__sha"
-                  title={copied ? "Copied!" : "Copy full SHA"}
-                  onClick={copySha}
-                >
-                  {copied ? "✓ copied" : detail.commit.short_sha}
-                </button>
+                <Tooltip label={copied ? "Copied!" : "Copy full SHA"}>
+                  <button type="button" className="commit-detail__sha" onClick={copySha}>
+                    {copied ? "✓ copied" : detail.commit.short_sha}
+                  </button>
+                </Tooltip>
               </span>
               {detail.commit.branch && <BranchTag branch={detail.commit.branch} />}
               {detail.parents.length > 0 && (

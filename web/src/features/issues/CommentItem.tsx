@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react"
 import { useDeleteComment } from "@/api/mutations"
 import type { Comment as CommentData } from "@/api/types"
-import { Comment, ErrorMessage } from "@/ui"
+import { Comment, ErrorMessage, Tooltip } from "@/ui"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it lazily
 // so the comment list doesn't drag it into the main bundle.
@@ -36,16 +36,17 @@ export default function CommentItem({ owner, repo, issueNumber, comment, canDele
       meta={`commented on ${new Date(comment.created_at).toLocaleString()}`}
       actions={
         canDelete && (
-          <button
-            type="button"
-            className="comment__delete"
-            disabled={del.isPending}
-            onClick={onDelete}
-            title="Delete comment"
-            aria-label="Delete comment"
-          >
-            {del.isPending ? "…" : "×"}
-          </button>
+          <Tooltip label="Delete comment">
+            <button
+              type="button"
+              className="comment__delete"
+              disabled={del.isPending}
+              onClick={onDelete}
+              aria-label="Delete comment"
+            >
+              {del.isPending ? "…" : "×"}
+            </button>
+          </Tooltip>
         )
       }
       footer={del.error && <ErrorMessage error={del.error} inline />}

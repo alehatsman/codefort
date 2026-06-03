@@ -7,9 +7,19 @@ import { useCancelCIRun, useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from 
 import { absoluteTime, timeAgo } from "@/shell/timeAgo"
 import type { Repo } from "@/api/types"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
-import { Button, EmptyState, ErrorMessage, Input, Spinner, Table, useToast } from "@/ui"
+import {
+  Button,
+  EmptyState,
+  ErrorMessage,
+  Input,
+  SkeletonTable,
+  SkeletonText,
+  Table,
+  useToast,
+} from "@/ui"
 import AgentRunBody from "@/features/agents/AgentRunBody"
 import CIRunBody from "@/features/pipelines/CIRunBody"
+import OverviewCard from "@/shell/OverviewCard"
 import {
   type RunKind,
   executionModelLabel,
@@ -32,7 +42,7 @@ export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
   const numberParam = useParams().number
   const repoQ = useRepo(owner, repo)
 
-  if (repoQ.isLoading) return <Spinner />
+  if (repoQ.isLoading) return <SkeletonText lines={4} />
   if (repoQ.error) return <ErrorMessage error={repoQ.error} />
   if (!repoQ.data) return null
 
@@ -41,6 +51,7 @@ export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
 
   return (
     <div className="repo">
+      <OverviewCard owner={r.owner} repo={r.name} path="" summaries={{}} />
       {runNumber !== null && Number.isFinite(runNumber) ? (
         <RunDetail owner={r.owner} repo={r.name} runNumber={runNumber} />
       ) : (
@@ -131,7 +142,16 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
       </p>
       <ErrorMessage error={trigger.error} inline />
 
-      {runsQ.isLoading && <Spinner />}
+      {runsQ.isLoading && (
+        <SkeletonTable
+          className="ci-runs"
+          headers={
+            isAgent
+              ? ["Run", "Status", "Hash", "Trigger", "Duration", "When"]
+              : ["Run", "Status", "Commit", "Ref", "Trigger", "Duration", "When"]
+          }
+        />
+      )}
       <ErrorMessage error={runsQ.error} />
       {runsQ.data && runsQ.data.length === 0 && (
         <EmptyState>
@@ -232,7 +252,7 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
   const cancel = useCancelCIRun(owner, repo, runNumber)
   const toast = useToast()
 
-  if (runQ.isLoading) return <Spinner />
+  if (runQ.isLoading) return <SkeletonText lines={4} />
   if (runQ.error) return <ErrorMessage error={runQ.error} />
   if (!runQ.data) return null
 
