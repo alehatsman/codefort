@@ -12,6 +12,8 @@ import {
   RelativeTime,
   Select,
   Spinner,
+  Tab,
+  Tabs,
   Textarea,
 } from "@/ui"
 import type { BadgeState, ButtonVariant } from "@/ui"
@@ -34,6 +36,7 @@ export default function DevGalleryPage() {
       </header>
 
       <ButtonsSection />
+      <TabsSection />
       <BadgesSection />
       <ChipsSection />
       <CardsSection />
@@ -68,6 +71,27 @@ function ButtonsSection() {
         small
       </Button>
       <Button disabled>disabled</Button>
+    </Section>
+  )
+}
+
+// All tabs point at /dev/ui so clicking a demo tab is a no-op; `active` is set
+// by hand here since the gallery has no route to derive it from.
+function TabsSection() {
+  return (
+    <Section title="Tab / Tabs">
+      <Tabs label="Gallery demo tabs">
+        <Tab to="/dev/ui" active>
+          Active
+        </Tab>
+        <Tab to="/dev/ui">Default</Tab>
+        <Tab to="/dev/ui" count={12}>
+          With count
+        </Tab>
+        <Tab to="/dev/ui" disabled>
+          Disabled
+        </Tab>
+      </Tabs>
     </Section>
   )
 }

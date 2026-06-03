@@ -1,5 +1,5 @@
-import clsx from "clsx"
-import { Link, useLocation } from "react-router-dom"
+import { useLocation } from "react-router-dom"
+import { Tab, Tabs } from "@/ui"
 
 /**
  * Top-level (non-repo) navigation, rendered inline in the global top bar by
@@ -17,22 +17,22 @@ export default function GlobalTabs() {
   const isAgents = pathname.startsWith("/agents")
 
   return (
-    <nav className="tabs" aria-label="Global navigation">
-      <Link to="/" className={clsx("tab", { "is-active": isRepos })}>
+    <Tabs label="Global navigation">
+      <Tab to="/" active={isRepos}>
         Repos
-      </Link>
-      <Link to="/issues" className={clsx("tab", { "is-active": isIssues })}>
+      </Tab>
+      <Tab to="/issues" active={isIssues}>
         Issues
-      </Link>
-      <Link to="/pulls" className={clsx("tab", { "is-active": isPulls })}>
+      </Tab>
+      <Tab to="/pulls" active={isPulls}>
         Pull requests
-      </Link>
-      <Link to="/pipelines" className={clsx("tab", { "is-active": isPipelines })}>
+      </Tab>
+      <Tab to="/pipelines" active={isPipelines}>
         Pipelines
-      </Link>
-      <Link to="/agents" className={clsx("tab", { "is-active": isAgents })}>
+      </Tab>
+      <Tab to="/agents" active={isAgents}>
         Agents
-      </Link>
-    </nav>
+      </Tab>
+    </Tabs>
   )
 }

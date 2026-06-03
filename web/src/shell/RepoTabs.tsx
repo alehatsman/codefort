@@ -1,6 +1,6 @@
-import clsx from "clsx"
-import { Link, useLocation } from "react-router-dom"
+import { useLocation } from "react-router-dom"
 import { useTabNav } from "@/shell/keyboardNav"
+import { Tab, Tabs } from "@/ui"
 
 interface Props {
   owner: string
@@ -46,35 +46,34 @@ export default function RepoTabs({ owner, repo, openIssues }: Props) {
   const isSettings = location.pathname === `${base}/settings`
 
   return (
-    <nav className="tabs" aria-label="Repository navigation">
-      <Link to={base} className={clsx("tab", { "is-active": isCode })}>
+    <Tabs label="Repository navigation">
+      <Tab to={base} active={isCode}>
         Code
-      </Link>
-      <Link to={`${base}/issues`} className={clsx("tab", { "is-active": isIssues })}>
+      </Tab>
+      <Tab to={`${base}/issues`} active={isIssues} count={openIssues}>
         Issues
-        {openIssues !== undefined && <span className="tab__count">{openIssues}</span>}
-      </Link>
-      <Link to={`${base}/pulls`} className={clsx("tab", { "is-active": isPulls })}>
+      </Tab>
+      <Tab to={`${base}/pulls`} active={isPulls}>
         Pull requests
-      </Link>
-      <Link to={`${base}/review`} className={clsx("tab", { "is-active": isReview })}>
+      </Tab>
+      <Tab to={`${base}/review`} active={isReview}>
         Review
-      </Link>
-      <Link to={`${base}/explore`} className={clsx("tab", { "is-active": isExplore })}>
+      </Tab>
+      <Tab to={`${base}/explore`} active={isExplore}>
         Explore
-      </Link>
-      <Link to={`${base}/specs`} className={clsx("tab", { "is-active": isSpecs })}>
+      </Tab>
+      <Tab to={`${base}/specs`} active={isSpecs}>
         Specs
-      </Link>
-      <Link to={`${base}/pipelines`} className={clsx("tab", { "is-active": isPipelines })}>
+      </Tab>
+      <Tab to={`${base}/pipelines`} active={isPipelines}>
         Pipelines
-      </Link>
-      <Link to={`${base}/agents`} className={clsx("tab", { "is-active": isAgents })}>
+      </Tab>
+      <Tab to={`${base}/agents`} active={isAgents}>
         Agents
-      </Link>
-      <Link to={`${base}/settings`} className={clsx("tab", { "is-active": isSettings })}>
+      </Tab>
+      <Tab to={`${base}/settings`} active={isSettings}>
         Settings
-      </Link>
-    </nav>
+      </Tab>
+    </Tabs>
   )
 }
