@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Checkbox,
+  CodeSnippet,
   Comment,
   Dialog,
   EmptyState,
@@ -69,6 +70,7 @@ export default function DevGalleryPage() {
       <TooltipSection />
       <MenuSection />
       <ToastSection />
+      <CodeSnippetSection />
       <StatusIconSection />
       <SegmentedControlSection />
       <ChipsSection />
@@ -517,6 +519,24 @@ function TooltipSection() {
       <Tooltip label="Copied to clipboard" placement="right">
         <Button variant="ghost">Right</Button>
       </Tooltip>
+    </Section>
+  )
+}
+
+const SNIPPET_CODE = `func clamp(n, lo, hi int) int {
+	if n < lo {
+		return lo
+	}
+	if n > hi {
+		return hi
+	}
+	return n
+}`
+
+function CodeSnippetSection() {
+  return (
+    <Section title="CodeSnippet">
+      <CodeSnippet code={SNIPPET_CODE} path="clamp.go" startLine={42} focus={[45, 47]} />
     </Section>
   )
 }

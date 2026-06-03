@@ -2,7 +2,7 @@ import clsx from "clsx"
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import { useLocation } from "react-router-dom"
-import { highlight, langFromPath, splitLines } from "@/features/repo/highlight"
+import { highlight, langFromPath, splitLines } from "@/ui/highlight"
 import {
   useCreateCodeComment,
   useDeleteCodeComment,

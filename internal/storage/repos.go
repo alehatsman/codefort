@@ -61,7 +61,24 @@ type RepoSummary struct {
 	// per-repo follow-up query.
 	CIStatus string
 	CINumber int
+	// OpenPulls is the count of open pull requests (state='open'). OpenReviews
+	// is the count of unresolved code-review comments (resolved=0). ActiveAgents
+	// is the count of agent runs in a non-terminal state (queued/running/
+	// awaiting_input/finishing). All three are computed by correlated subqueries
+	// so the repos list can show the per-repo metric grid without follow-up
+	// queries.
+	OpenPulls    int
+	OpenReviews  int
+	ActiveAgents int
 }
+
+// repoMetricSubqueries are the three correlated counts shared by ListRepos and
+// GetRepoSummary, appended after the CI columns. Kept as one constant so both
+// queries — and the column order in scanRepoSummary — stay in lockstep.
+const repoMetricSubqueries = `
+	  (SELECT COUNT(*) FROM pull_requests p WHERE p.repo_id = repos.id AND p.state = 'open') AS open_pulls,
+	  (SELECT COUNT(*) FROM code_comments cc WHERE cc.repo_id = repos.id AND cc.resolved = 0) AS open_reviews,
+	  (SELECT COUNT(*) FROM ci_runs ar WHERE ar.repo_id = repos.id AND ar.kind = 'agent' AND ar.status IN ('queued','running','awaiting_input','finishing')) AS active_agents`
 
 // ListRepos returns every registered repo with issue counts, alphabetically
 // by owner/name. Intended for the repos list view.
@@ -76,7 +93,7 @@ func ListRepos(db *sql.DB) ([]RepoSummary, error) {
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
 		  repos.ci_enabled,
 		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_status,
-		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number
+		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number,` + repoMetricSubqueries + `
 		FROM repos
 		JOIN users ON users.id = repos.owner_id
 		LEFT JOIN issues ON issues.repo_id = repos.id
@@ -112,7 +129,7 @@ func GetRepoSummary(db *sql.DB, owner, name string) (RepoSummary, error) {
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
 		  repos.ci_enabled,
 		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_status,
-		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number
+		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number,`+repoMetricSubqueries+`
 		FROM repos
 		JOIN users ON users.id = repos.owner_id
 		LEFT JOIN issues ON issues.repo_id = repos.id
@@ -137,6 +154,7 @@ func scanRepoSummary(s scanner, r *RepoSummary) error {
 	if err := s.Scan(
 		&r.ID, &r.Owner, &r.Name, &r.CreatedAt, &r.OpenIssues, &r.TotalIssues, &r.CIEnabled,
 		&ciStatus, &ciNumber,
+		&r.OpenPulls, &r.OpenReviews, &r.ActiveAgents,
 	); err != nil {
 		return err
 	}

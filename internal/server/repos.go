@@ -139,15 +139,18 @@ func CreateRepo(db *sql.DB, reposDir, owner, name string) (int64, string, error)
 
 func toAPIRepo(r storage.RepoSummary) api.Repo {
 	return api.Repo{
-		ID:          r.ID,
-		Owner:       r.Owner,
-		Name:        r.Name,
-		CreatedAt:   time.Unix(r.CreatedAt, 0).UTC(),
-		OpenIssues:  r.OpenIssues,
-		TotalIssues: r.TotalIssues,
-		CIEnabled:   r.CIEnabled,
-		CIStatus:    r.CIStatus,
-		CINumber:    r.CINumber,
+		ID:           r.ID,
+		Owner:        r.Owner,
+		Name:         r.Name,
+		CreatedAt:    time.Unix(r.CreatedAt, 0).UTC(),
+		OpenIssues:   r.OpenIssues,
+		TotalIssues:  r.TotalIssues,
+		CIEnabled:    r.CIEnabled,
+		CIStatus:     r.CIStatus,
+		CINumber:     r.CINumber,
+		OpenPulls:    r.OpenPulls,
+		OpenReviews:  r.OpenReviews,
+		ActiveAgents: r.ActiveAgents,
 	}
 }
 

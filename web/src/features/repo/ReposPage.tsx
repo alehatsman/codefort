@@ -4,8 +4,8 @@ import { Link, useNavigate } from "react-router-dom"
 import { useRepos } from "@/api/queries"
 import CIStatusIcon from "@/features/pipelines/CIStatusIcon"
 import NewRepoForm from "@/features/repo/NewRepoForm"
-import StateIcon from "@/features/issues/StateIcon"
 import { Card, EmptyState, ErrorMessage, PageHeader, Spinner } from "@/ui"
+import type { Repo } from "@/api/types"
 import { useListNav } from "@/shell/keyboardNav"
 
 export default function ReposPage() {
@@ -51,35 +51,50 @@ export default function ReposPage() {
                   <span className="muted">{r.owner}/</span>
                   {r.name}
                 </Link>
-                {r.ci_status && (
-                  <Link
-                    to={`/${r.owner}/${r.name}/pipelines/${r.ci_number}`}
-                    className="card__ci"
-                    title={`CI ${r.ci_status}`}
-                  >
-                    <CIStatusIcon status={r.ci_status} />
-                  </Link>
-                )}
-              </div>
-              <div className="card__meta">
-                <span className="card__meta-item">
-                  <StateIcon state="todo" />
-                  {r.open_issues} open
-                </span>
-                <span className="card__meta-item">
-                  <span className="muted">{r.total_issues} total</span>
-                </span>
-                <span className="card__meta-item">
-                  <span className="muted">
-                    created {new Date(r.created_at).toLocaleDateString()}
-                  </span>
+                <span className="card__created muted">
+                  {new Date(r.created_at).toLocaleDateString()}
                 </span>
               </div>
+              <RepoMetrics repo={r} />
             </Card>
           ))}
         </div>
       )}
     </div>
+  )
+}
+
+// RepoMetrics renders the five at-a-glance metrics in fixed order —
+// CI · Issues · PRs · Reviews · Agents — as a labeled tile grid. Each tile
+// deep-links to the repo's matching sub-page; a zero count is dimmed so the
+// repos with live activity stand out at a glance.
+function RepoMetrics({ repo: r }: { repo: Repo }) {
+  const base = `/${r.owner}/${r.name}`
+  const ciTo = r.ci_status ? `${base}/pipelines/${r.ci_number}` : `${base}/pipelines`
+  return (
+    <div className="repo-metrics">
+      <Link className="repo-metric" to={ciTo} title={r.ci_status ? `CI ${r.ci_status}` : "CI"}>
+        <span className="repo-metric__value">
+          {r.ci_status ? <CIStatusIcon status={r.ci_status} /> : <span className="muted">—</span>}
+        </span>
+        <span className="repo-metric__label">CI</span>
+      </Link>
+      <MetricTile to={`${base}/issues`} value={r.open_issues} label="Issues" />
+      <MetricTile to={`${base}/pulls`} value={r.open_pulls} label="PRs" />
+      <MetricTile to={`${base}/review`} value={r.open_reviews} label="Reviews" />
+      <MetricTile to={`${base}/agents`} value={r.active_agents} label="Agents" />
+    </div>
+  )
+}
+
+function MetricTile({ to, value, label }: { to: string; value: number; label: string }) {
+  return (
+    <Link className="repo-metric" to={to} title={`${value} ${label.toLowerCase()}`}>
+      <span className="repo-metric__value" data-zero={value === 0 ? "true" : undefined}>
+        {value}
+      </span>
+      <span className="repo-metric__label">{label}</span>
+    </Link>
   )
 }
 

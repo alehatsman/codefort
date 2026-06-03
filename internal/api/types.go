@@ -166,6 +166,12 @@ type Repo struct {
 	// a CI status icon linking to that run.
 	CIStatus string `json:"ci_status,omitempty"`
 	CINumber int    `json:"ci_number,omitempty"`
+	// OpenPulls / OpenReviews / ActiveAgents are at-a-glance counts for the repos
+	// list metric grid: open PRs, unresolved code-review comments, and agent runs
+	// in a non-terminal state. Always emitted (a zero is a real "none", not absent).
+	OpenPulls    int `json:"open_pulls"`
+	OpenReviews  int `json:"open_reviews"`
+	ActiveAgents int `json:"active_agents"`
 }
 
 // UpdateRepoRequest is a partial update of a repo's settings. Only non-nil

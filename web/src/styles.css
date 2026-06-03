@@ -625,6 +625,51 @@ a.file-tree__commit:hover {
   padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border-muted);
 }
+
+/* CodeSnippet — read-only, line-numbered code region (a slice "cut from" the
+   blob viewer), used by the review list to show each comment's lines in
+   context. Mirrors the blob viewer's line table without the clickable gutter. */
+.code-snippet {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  color: var(--code-fg);
+  overflow-x: auto;
+}
+.code-snippet__table {
+  border-collapse: collapse;
+  width: 100%;
+  font: var(--text-sm) / 20px var(--font-mono);
+}
+.code-snippet__num {
+  width: 1%;
+  min-width: 50px;
+  padding: 0 var(--space-4) 0 10px;
+  text-align: right;
+  color: var(--fg-muted);
+  vertical-align: top;
+  user-select: none;
+  white-space: nowrap;
+}
+.code-snippet__num::before {
+  content: attr(data-line);
+}
+.code-snippet__text {
+  padding: 0 var(--space-4);
+  white-space: pre;
+  vertical-align: top;
+  width: 100%;
+}
+/* The lines this region focuses on (e.g. a review comment's range): a muted
+   tint + gutter bar so the annotated lines stand out from their context. */
+.code-snippet__line.is-focus .code-snippet__num,
+.code-snippet__line.is-focus .code-snippet__text {
+  background: color-mix(in srgb, var(--state-in_progress) 16%, transparent);
+}
+.code-snippet__line.is-focus .code-snippet__num {
+  box-shadow: inset 2px 0 0 var(--state-in_progress);
+}
+
 .comment.is-resolved {
   opacity: 0.6;
 }

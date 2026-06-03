@@ -1,6 +1,119 @@
 package storage
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/alehatsman/moongit/internal/api"
+)
+
+// The repos summary surfaces three at-a-glance metric counts: open PRs,
+// unresolved code-review comments, and non-terminal agent runs. Each must
+// count only its own domain — merged PRs, resolved comments, terminal/CI runs
+// are excluded — and match between GetRepoSummary and ListRepos.
+func TestRepoSummaryMetricCounts(t *testing.T) {
+	db, repoID := seedRepo(t)
+
+	// 2 open PRs + 1 merged (merged must not count toward open_pulls).
+	for i := 0; i < 3; i++ {
+		pr, err := CreatePull(db, repoID, api.CreatePullRequest{
+			Base: "main", Head: "feat", Title: "pr", Author: "alice",
+		})
+		if err != nil {
+			t.Fatalf("CreatePull %d: %v", i, err)
+		}
+		if i == 2 {
+			if _, err := MarkMerged(db, repoID, pr.Number, "base", "head"); err != nil {
+				t.Fatalf("MarkMerged: %v", err)
+			}
+		}
+	}
+
+	// 3 comments, resolve 1 → 2 unresolved count toward open_reviews.
+	for i := 0; i < 3; i++ {
+		c, err := CreateCodeComment(db, repoID, api.CreateCodeCommentRequest{
+			Ref: "main", Path: "f.go", StartLine: 1, EndLine: 1, Body: "nit", Author: "alice",
+		})
+		if err != nil {
+			t.Fatalf("CreateCodeComment %d: %v", i, err)
+		}
+		if i == 2 {
+			if _, err := SetCodeCommentResolved(db, c.ID, true, "alice"); err != nil {
+				t.Fatalf("SetCodeCommentResolved: %v", err)
+			}
+		}
+	}
+
+	// 2 non-terminal agent runs (one queued, one claimed→running) → active_agents=2.
+	// A finished agent run (terminal) and a CI run must both be excluded.
+	n := 1
+	for i := 0; i < 2; i++ {
+		if _, err := EnqueueRun(db, repoID, NewRun{
+			Kind: RunKindAgent, IssueNumber: &n, CommitSHA: "a", Ref: "HEAD", Event: "agent",
+		}); err != nil {
+			t.Fatalf("EnqueueRun agent %d: %v", i, err)
+		}
+	}
+	if _, err := ClaimNextRunOfKind(db, RunKindAgent, 0); err != nil { // queued → running
+		t.Fatalf("ClaimNextRunOfKind: %v", err)
+	}
+	doneAgent, err := EnqueueRun(db, repoID, NewRun{
+		Kind: RunKindAgent, IssueNumber: &n, CommitSHA: "b", Ref: "HEAD", Event: "agent",
+	})
+	if err != nil {
+		t.Fatalf("EnqueueRun done agent: %v", err)
+	}
+	if err := FinishRun(db, doneAgent.ID, RunSuccess); err != nil {
+		t.Fatalf("FinishRun done agent: %v", err)
+	}
+	ci, err := EnqueueRun(db, repoID, NewRun{CommitSHA: "c", Ref: "refs/heads/main", Event: "push"})
+	if err != nil {
+		t.Fatalf("EnqueueRun ci: %v", err)
+	}
+	if err := FinishRun(db, ci.ID, RunSuccess); err != nil {
+		t.Fatalf("FinishRun ci: %v", err)
+	}
+
+	check := func(label string, r RepoSummary) {
+		if r.OpenPulls != 2 {
+			t.Errorf("%s OpenPulls = %d, want 2", label, r.OpenPulls)
+		}
+		if r.OpenReviews != 2 {
+			t.Errorf("%s OpenReviews = %d, want 2", label, r.OpenReviews)
+		}
+		if r.ActiveAgents != 2 {
+			t.Errorf("%s ActiveAgents = %d, want 2", label, r.ActiveAgents)
+		}
+	}
+
+	got, err := GetRepoSummary(db, "alice", "repo")
+	if err != nil {
+		t.Fatalf("GetRepoSummary: %v", err)
+	}
+	check("GetRepoSummary", got)
+
+	repos, err := ListRepos(db)
+	if err != nil {
+		t.Fatalf("ListRepos: %v", err)
+	}
+	if len(repos) != 1 {
+		t.Fatalf("ListRepos len = %d, want 1", len(repos))
+	}
+	check("ListRepos", repos[0])
+}
+
+// A repo with no PRs/comments/agent runs reports zero for all three metrics.
+func TestRepoSummaryMetricCountsZero(t *testing.T) {
+	db, _ := seedRepo(t)
+
+	got, err := GetRepoSummary(db, "alice", "repo")
+	if err != nil {
+		t.Fatalf("GetRepoSummary: %v", err)
+	}
+	if got.OpenPulls != 0 || got.OpenReviews != 0 || got.ActiveAgents != 0 {
+		t.Errorf("empty repo metrics = (pulls %d, reviews %d, agents %d), want all 0",
+			got.OpenPulls, got.OpenReviews, got.ActiveAgents)
+	}
+}
 
 // A repo with no CI runs reports empty CI status — the repos list renders no
 // icon in that case, so the zero value must be distinguishable.
