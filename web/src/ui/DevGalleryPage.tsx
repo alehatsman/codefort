@@ -14,6 +14,7 @@ import {
   Inline,
   Input,
   ListRow,
+  Menu,
   PageHeader,
   Radio,
   RelativeTime,
@@ -65,6 +66,7 @@ export default function DevGalleryPage() {
       <SidebarSectionDemo />
       <CommentSection />
       <TooltipSection />
+      <MenuSection />
       <StatusIconSection />
       <SegmentedControlSection />
       <ChipsSection />
@@ -452,6 +454,34 @@ function CommentSection() {
         </Comment>
       </ul>
     </section>
+  )
+}
+
+function MenuSection() {
+  const [chosen, setChosen] = useState("—")
+  return (
+    <Section title="Menu">
+      <Menu
+        label="Row actions"
+        trigger="Actions ▾"
+        items={[
+          { label: "Edit", onSelect: () => setChosen("Edit") },
+          { label: "Duplicate", onSelect: () => setChosen("Duplicate") },
+          { label: "Archived", onSelect: () => setChosen("Archived"), disabled: true },
+          { label: "Delete", onSelect: () => setChosen("Delete") },
+        ]}
+      />
+      <Menu
+        label="Theme"
+        trigger="Theme ▾"
+        align="end"
+        items={[
+          { label: "GitHub", onSelect: () => setChosen("GitHub"), selected: true },
+          { label: "Monokai", onSelect: () => setChosen("Monokai") },
+        ]}
+      />
+      <span className="gallery__muted">chosen: {chosen}</span>
+    </Section>
   )
 }
 

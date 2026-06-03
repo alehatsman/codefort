@@ -23,6 +23,7 @@ test("dev gallery renders every primitive section", async ({ page }) => {
     "Sidebar / SidebarSection",
     "Comment",
     "Tooltip",
+    "Menu",
     "FilterChip",
     "Card",
     "Spinner",
@@ -58,6 +59,43 @@ test("dev gallery Tooltip reveals on focus and links via aria-describedby", asyn
   await expect(tip).toBeVisible()
   await trigger.blur()
   await expect(tip).toBeHidden()
+})
+
+test("dev gallery Menu opens, keyboard-selects, and dismisses", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/dev/ui")
+
+  const trigger = page.getByRole("button", { name: "Row actions" })
+  await expect(trigger).toHaveAttribute("aria-expanded", "false")
+
+  // Open → role=menu appears, focus lands on the first item.
+  await trigger.click()
+  const menu = page.getByRole("menu", { name: "Row actions" })
+  await expect(menu).toBeVisible()
+  await expect(trigger).toHaveAttribute("aria-expanded", "true")
+  await expect(page.getByRole("menuitem", { name: "Edit" })).toBeFocused()
+
+  // Arrow keys rove (skipping the disabled "Archived"); Enter selects + closes.
+  await page.keyboard.press("ArrowDown") // Duplicate
+  await expect(page.getByRole("menuitem", { name: "Duplicate" })).toBeFocused()
+  await page.keyboard.press("ArrowDown") // skips disabled Archived → Delete
+  await expect(page.getByRole("menuitem", { name: "Delete" })).toBeFocused()
+  await page.keyboard.press("Enter")
+  await expect(menu).toBeHidden()
+  await expect(page.getByText("chosen: Delete")).toBeVisible()
+  await expect(trigger).toBeFocused() // focus returns to the trigger
+
+  // Escape dismisses.
+  await trigger.click()
+  await expect(menu).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(menu).toBeHidden()
+
+  // Outside-click dismisses.
+  await trigger.click()
+  await expect(menu).toBeVisible()
+  await page.getByRole("heading", { name: "Menu", exact: true }).click()
+  await expect(menu).toBeHidden()
 })
 
 test("dev gallery shows the layout primitives", async ({ page }) => {
