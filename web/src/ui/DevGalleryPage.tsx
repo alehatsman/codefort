@@ -18,6 +18,8 @@ import {
   RelativeTime,
   SegmentedControl,
   Select,
+  Sidebar,
+  SidebarSection,
   Spinner,
   Stack,
   StatusIcon,
@@ -57,6 +59,7 @@ export default function DevGalleryPage() {
       <StatusPillSection />
       <ListRowSection />
       <TableSection />
+      <SidebarSectionDemo />
       <StatusIconSection />
       <SegmentedControlSection />
       <ChipsSection />
@@ -387,6 +390,31 @@ function TableSection() {
           </tr>
         </tbody>
       </Table>
+    </section>
+  )
+}
+
+// Sidebar is a flex-column rail; show it with a couple of labelled sections.
+function SidebarSectionDemo() {
+  return (
+    <section className="gallery__section">
+      <h3 className="gallery__heading">Sidebar / SidebarSection</h3>
+      <Sidebar>
+        <SidebarSection label="State">
+          <Badge state="in_progress">in progress</Badge>
+        </SidebarSection>
+        <SidebarSection label="Assignee">
+          <Inline gap={2}>
+            <Avatar name="trooper" />
+            <span>@trooper</span>
+          </Inline>
+        </SidebarSection>
+        <SidebarSection label="Danger zone">
+          <Button variant="danger" size="small">
+            Delete
+          </Button>
+        </SidebarSection>
+      </Sidebar>
     </section>
   )
 }

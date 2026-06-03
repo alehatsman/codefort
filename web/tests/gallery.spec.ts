@@ -20,6 +20,7 @@ test("dev gallery renders every primitive section", async ({ page }) => {
     "StatusPill — CI statuses (dense)",
     "ListRow",
     "Table",
+    "Sidebar / SidebarSection",
     "FilterChip",
     "Card",
     "Spinner",
