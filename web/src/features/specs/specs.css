@@ -326,6 +326,56 @@
   font-weight: 600;
 }
 
+/* ── Command palette (shares the quickopen shell) ────────────────────────── */
+
+.cmdk__list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.cmdk__empty {
+  padding: 10px 8px;
+}
+
+.cmdk__item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cmdk__item.is-active {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+.cmdk__title {
+  font-weight: 600;
+}
+
+.cmdk__subtitle {
+  flex: 1;
+}
+
+.cmdk__shortcut {
+  flex: none;
+  font-size: 11px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
 /* ── Semantic spec search (shares the quickopen shell) ───────────────────── */
 
 .specsearch__status {

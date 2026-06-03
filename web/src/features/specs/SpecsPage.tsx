@@ -2,6 +2,7 @@ import "./specs.css"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
 import { useRepo, useSpec, useSpecsList } from "@/api/queries"
+import CommandPalette, { type Command } from "@/features/specs/CommandPalette"
 import QuickOpen from "@/features/specs/QuickOpen"
 import SpecEditor from "@/features/specs/SpecEditor"
 import SpecSearch from "@/features/specs/SpecSearch"
@@ -60,7 +61,49 @@ export default function SpecsPage() {
 
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  useSpecHotkeys({ onJump: () => setPaletteOpen(true), onSearch: () => setSearchOpen(true) })
+  const [cmdkOpen, setCmdkOpen] = useState(false)
+  // A spec being created (not yet in the list): the editor opens on it directly.
+  const [draft, setDraft] = useState<{ path: string; content: string } | null>(null)
+  useSpecHotkeys({
+    onJump: () => setPaletteOpen(true),
+    onSearch: () => setSearchOpen(true),
+    onCommand: () => setCmdkOpen(true),
+  })
+
+  // The spec-workflow command registry. Later phases append their commands
+  // (Verify, Draft, Plan→Issues, Score, Ask); the palette stays generic.
+  const commands: Command[] = [
+    {
+      id: "new-spec",
+      title: "New spec…",
+      subtitle: "Create a spec under specs/",
+      prompt: {
+        placeholder: "spec name, e.g. ssh-transport",
+        onSubmit: (name) => {
+          const slug = name
+            .trim()
+            .replace(/\.md$/i, "")
+            .replace(/[^a-zA-Z0-9/_-]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+          if (slug) setDraft({ path: `specs/${slug}.md`, content: newSpecTemplate(slug) })
+        },
+      },
+    },
+    {
+      id: "jump",
+      title: "Jump to a spec…",
+      subtitle: "Quick-open by name",
+      shortcut: "⌘P",
+      run: () => setPaletteOpen(true),
+    },
+    {
+      id: "search",
+      title: "Search specs…",
+      subtitle: "Semantic search over the spec corpus",
+      shortcut: "⌘⇧F",
+      run: () => setSearchOpen(true),
+    },
+  ]
 
   if (repoQ.isLoading) return <Spinner />
   if (repoQ.error) return <ErrorMessage error={repoQ.error} />
@@ -75,12 +118,29 @@ export default function SpecsPage() {
       {specsQ.isLoading && <Spinner label="Loading specs…" />}
       <ErrorMessage error={specsQ.error} />
 
-      {specsQ.data && specs.length === 0 && <SpecsEmptyState />}
-
-      {specs.length > 0 && (
+      {draft ? (
+        <main className="specs-main">
+          <SpecEditor
+            owner={r.owner}
+            repo={r.name}
+            path={draft.path}
+            initialContent={draft.content}
+            onDone={() => setDraft(null)}
+          />
+        </main>
+      ) : specs.length > 0 ? (
         <div className="specs-layout">
           <aside className="specs-sidebar">
             <div className="spec-actions">
+              <button
+                type="button"
+                className="spec-jump"
+                onClick={() => setCmdkOpen(true)}
+                title="Run a spec command"
+              >
+                <span>Commands…</span>
+                <kbd className="spec-jump__kbd">⌘K</kbd>
+              </button>
               <button
                 type="button"
                 className="spec-jump"
@@ -107,7 +167,9 @@ export default function SpecsPage() {
             <SpecView owner={r.owner} repo={r.name} path={selectedPath} section={wantedSection} />
           </main>
         </div>
-      )}
+      ) : specsQ.data ? (
+        <SpecsEmptyState onNew={() => setCmdkOpen(true)} />
+      ) : null}
 
       <QuickOpen
         open={paletteOpen}
@@ -122,6 +184,7 @@ export default function SpecsPage() {
         onPick={(path, section) => setSelection(path, section)}
         onClose={() => setSearchOpen(false)}
       />
+      <CommandPalette open={cmdkOpen} commands={commands} onClose={() => setCmdkOpen(false)} />
     </div>
   )
 }
@@ -295,7 +358,7 @@ function SpecHeader({ spec }: { spec: SpecContent }) {
   )
 }
 
-function SpecsEmptyState() {
+function SpecsEmptyState({ onNew }: { onNew: () => void }) {
   return (
     <EmptyState bordered>
       <p>
@@ -308,8 +371,38 @@ function SpecsEmptyState() {
         sections <code>Intent</code> / <code>Behavior</code> / <code>Checklist</code> /{" "}
         <code>Non-goals</code>. See <code>docs/specs.md</code> for the convention.
       </p>
+      <Button variant="primary" onClick={onNew}>
+        New spec
+      </Button>
     </EmptyState>
   )
+}
+
+// newSpecTemplate seeds a draft spec with the convention's frontmatter +
+// sections so a fresh file starts well-formed (see docs/specs.md).
+function newSpecTemplate(slug: string): string {
+  const title = slug
+    .split(/[-_/]/)
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(" ")
+  return `---
+id: ${slug}
+status: draft
+owners: []
+covers: []
+---
+# ${title}
+
+## Intent
+
+## Behavior
+
+## Checklist
+- [ ]
+
+## Non-goals
+`
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -384,19 +477,32 @@ function useSpecKeyboardNav(
 }
 
 // useSpecHotkeys wires the Specs tab's palette shortcuts, taking over the
-// browser defaults while the tab is mounted: ⌘P / Ctrl-P opens path quick-open
-// (Sublime-style "go to"), ⌘⇧F / Ctrl-Shift-F opens semantic spec search.
-function useSpecHotkeys({ onJump, onSearch }: { onJump: () => void; onSearch: () => void }) {
+// browser defaults while the tab is mounted: ⌘K opens the command palette, ⌘P
+// path quick-open (Sublime "go to"), ⌘⇧F semantic spec search.
+function useSpecHotkeys({
+  onJump,
+  onSearch,
+  onCommand,
+}: {
+  onJump: () => void
+  onSearch: () => void
+  onCommand: () => void
+}) {
   const jumpRef = useRef(onJump)
   jumpRef.current = onJump
   const searchRef = useRef(onSearch)
   searchRef.current = onSearch
+  const commandRef = useRef(onCommand)
+  commandRef.current = onCommand
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey
       if (!mod || e.altKey) return
       const key = e.key.toLowerCase()
-      if (key === "p" && !e.shiftKey) {
+      if (key === "k" && !e.shiftKey) {
+        e.preventDefault()
+        commandRef.current()
+      } else if (key === "p" && !e.shiftKey) {
         e.preventDefault()
         jumpRef.current()
       } else if (key === "f" && e.shiftKey) {

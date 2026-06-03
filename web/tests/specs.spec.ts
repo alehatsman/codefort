@@ -193,7 +193,7 @@ test("Specs: ⌘P quick-open fuzzy-jumps to a spec", async ({ page }) => {
   await expect(page.locator(".spec-view__title")).toHaveText("SSH Transport")
 
   // The print shortcut opens the palette instead (the path-jump one, not search).
-  const input = page.locator(".quickopen:not(.specsearch) .quickopen__input")
+  const input = page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")
   await page.keyboard.press("Control+p")
   await expect(input).toBeFocused()
 
@@ -216,12 +216,12 @@ test("Specs: the Jump button opens the palette and a click selects", async ({ pa
 
   await page.goto("/alice/demo/specs")
   await page.locator(".spec-jump", { hasText: "Jump to a spec" }).click()
-  await expect(page.locator(".quickopen:not(.specsearch) .quickopen__input")).toBeVisible()
+  await expect(page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")).toBeVisible()
 
   // Empty query lists every spec; clicking one opens it.
   await expect(page.locator(".quickopen__item")).toHaveCount(2)
   await page.locator(".quickopen__item", { hasText: "CI Pipeline" }).click()
-  await expect(page.locator(".quickopen:not(.specsearch) .quickopen__input")).toBeHidden()
+  await expect(page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")).toBeHidden()
   await expect(page.locator(".spec-view__title")).toHaveText("CI Pipeline")
 })
 
@@ -301,4 +301,56 @@ test("Specs: edit a spec — live preview, save to a branch, PR link", async ({ 
   await page.getByRole("button", { name: "Done" }).click()
   await expect(page.locator(".spec-editor")).toHaveCount(0)
   await expect(page.locator(".spec-view__title")).toHaveText("SSH Transport")
+})
+
+test("Specs: ⌘K command palette lists workflows and runs one", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockSpecs(page, SPECS)
+
+  await page.goto("/alice/demo/specs")
+  await page.keyboard.press("Control+k")
+  await expect(page.locator(".cmdk .quickopen__input")).toBeFocused()
+
+  // The registry exposes the wired commands.
+  await expect(page.locator(".cmdk__item")).toContainText(["New spec", "Jump to a spec", "Search"])
+
+  // Filtering narrows; running "Jump" hands off to the quick-open palette.
+  await page.locator(".cmdk .quickopen__input").fill("jump")
+  await expect(page.locator(".cmdk__item")).toHaveCount(1)
+  await page.keyboard.press("Enter")
+  await expect(page.locator(".cmdk .quickopen__input")).toBeHidden()
+  await expect(page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")).toBeVisible()
+})
+
+test("Specs: ⌘K → New spec prompts for a name and opens a templated draft", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockSpecs(page, SPECS)
+
+  await page.goto("/alice/demo/specs")
+  await page.keyboard.press("Control+k")
+  await page.locator(".cmdk__item", { hasText: "New spec" }).click()
+
+  // The palette switches to the name prompt; the command list is gone.
+  await expect(page.locator(".cmdk__item")).toHaveCount(0)
+  await page.locator(".cmdk .quickopen__input").fill("data retention")
+  await page.keyboard.press("Enter")
+
+  // A templated draft opens in the editor — frontmatter + a titled H1.
+  const editor = page.locator(".spec-editor__input")
+  await expect(editor).toContainText("id: data-retention")
+  await expect(editor).toContainText("# Data Retention")
+  await expect(editor).toContainText("## Behavior")
+  await expect(page.locator(".spec-editor__preview")).toContainText("Data Retention")
+})
+
+test("Specs: empty repo offers New spec via the command palette", async ({ page }) => {
+  await seedToken(page)
+  await mockApi(page)
+  await mockSpecs(page, { ref: "main", specs: [] })
+
+  await page.goto("/alice/demo/specs")
+  await page.getByRole("button", { name: "New spec" }).click()
+  await expect(page.locator(".cmdk__item", { hasText: "New spec" })).toBeVisible()
 })
