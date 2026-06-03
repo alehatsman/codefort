@@ -25,6 +25,7 @@ export {
 export { default as Select } from "@/ui/Select"
 export { default as Sidebar } from "@/ui/Sidebar"
 export { default as SidebarSection } from "@/ui/SidebarSection"
+export { default as Skeleton } from "@/ui/Skeleton"
 export { default as Spinner } from "@/ui/Spinner"
 export { default as Stack, type SpaceStep } from "@/ui/Stack"
 export { default as StatusIcon, type StatusGlyph } from "@/ui/StatusIcon"
