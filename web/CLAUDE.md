@@ -25,6 +25,27 @@ folders; keep them `@/`-absolute so files stay move-proof.
 `pipelines/` owns the shared CI+agent run shell; `agents/` imports a couple of
 helpers from it for now (a marked temporary seam — agents will grow its own).
 
+## Component library: `src/ui/` is the shared vocabulary
+
+`src/ui/` is the in-repo component library — thin, typed wrappers over the BEM
+blocks in `styles.css`, exported from the `@/ui` barrel. Treat it as the
+default vocabulary: build new pages by composing these, not by hand-stitching
+`className` strings.
+
+- **When to add a primitive:** a pattern used by 2+ features (or one you're
+  about to need for a new UI) graduates to `@/ui`. The presentation shell moves
+  into the primitive; the **domain→presentation mapping stays in the feature**
+  (e.g. `StatusIcon` owns the glyph SVGs; `StateIcon`/`CIStatusIcon` map a
+  domain status to a `{glyph, colorClass}` over it). Keep primitives
+  domain-agnostic — pass per-instance styling via a `className`/option prop.
+- **Every primitive gets a `/dev/ui` row.** `DevGalleryPage.tsx` is the living
+  gallery (our Storybook) and the design-token reference; add a section when you
+  add a primitive or variant, and check it against both themes via the top-bar
+  switcher.
+- **Caller-derived state stays out of the primitive.** Route matching, mutation
+  wiring, etc. live at the call site (see `Tab`'s `active` prop); the primitive
+  owns markup + class composition only.
+
 ## Styling: hand-written semantic BEM, no utility framework
 
 - Semantic **BEM** — `block__element--modifier` (`board-col`,

@@ -6,7 +6,7 @@ import OverviewCard from "@/shell/OverviewCard"
 import Avatar from "@/shell/Avatar"
 import BranchTag from "@/features/repo/BranchTag"
 import DiffView from "@/features/pulls/DiffView"
-import { EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
+import { EmptyState, ErrorMessage, RelativeTime, SegmentedControl, Spinner } from "@/ui"
 
 type Mode = "split" | "unified"
 
@@ -88,25 +88,16 @@ export default function CommitPage() {
               {detail.additions > 0 && <span className="diff-file__add"> +{detail.additions}</span>}
               {detail.deletions > 0 && <span className="diff-file__del"> −{detail.deletions}</span>}
             </span>
-            {/* biome-ignore lint/a11y/useSemanticElements: a labeled segmented toggle is a valid ARIA group; no native element fits */}
-            <div className="diff-summary__toggle" role="group" aria-label="Diff layout">
-              <button
-                type="button"
-                className={mode === "split" ? "is-active" : ""}
-                aria-pressed={mode === "split"}
-                onClick={() => setMode("split")}
-              >
-                Split
-              </button>
-              <button
-                type="button"
-                className={mode === "unified" ? "is-active" : ""}
-                aria-pressed={mode === "unified"}
-                onClick={() => setMode("unified")}
-              >
-                Unified
-              </button>
-            </div>
+            <SegmentedControl
+              label="Diff layout"
+              orientation="row"
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: "split", label: "Split" },
+                { value: "unified", label: "Unified" },
+              ]}
+            />
           </div>
 
           {detail.truncated && (

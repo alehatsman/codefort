@@ -73,7 +73,7 @@ export default function App() {
         <Route path="/:owner/:repo/agents/:number" element={<PipelinesPage kind="agent" />} />
         <Route path="/:owner/:repo/settings" element={<RepoSettingsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-        {/* Living gallery of the base UI primitives (components/ui). Dev tool. */}
+        {/* Living gallery of the base UI primitives (src/ui). Dev tool. */}
         <Route path="/dev/ui" element={<DevGalleryPage />} />
         <Route path="*" element={<NotFound detail="This page doesn’t exist." />} />
       </Routes>
