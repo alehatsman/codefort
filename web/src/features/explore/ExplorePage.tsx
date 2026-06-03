@@ -439,9 +439,10 @@ function GraphPackageMap({
         </span>
       </h2>
       <p className="pkg-map__legend muted small">
-        Layered by distance from the entry points — roots (imported by nothing) on top, each layer
-        one import-hop deeper. Each card shows how many internal packages use it (←) and that it
-        uses (→).
+        Layered by distance from the entry points (executable <code>main</code> packages) on top,
+        each layer one import-hop deeper. Packages no entry point reaches (e.g. test-only helpers)
+        are grouped under Standalone. Each card shows how many internal packages use it (←) and that
+        it uses (→).
       </p>
       <div className="pkg-map">
         {tiers.map((tier) => (
@@ -558,8 +559,21 @@ function buildTiers(
     pushTo(usedBy, e.to_package, e.from_package)
   }
 
-  const rank = computeRanks(linked, usedBy)
-  const maxRank = linked.reduce((m, n) => Math.max(m, rank.get(n.package) ?? 0), 0)
+  // Entry points are executable `main` packages (dex's is_main). Rank every
+  // other package by its longest import chain *from* a main, so the layout is
+  // anchored to real entry points — not to whatever happens to have in_degree
+  // 0. A package imported only by test files also has in_degree 0 here (test
+  // imports are excluded from the DAG) yet is no entry point; seeding from
+  // mains keeps those out of the top row.
+  //
+  // Fallback for older dex with no is_main on any node: seed from in_degree==0
+  // roots, reproducing the plain top-down ranking (in a DAG every node is then
+  // reachable, so nothing lands in Standalone).
+  const mains = linked.filter((n) => n.is_main).map((n) => n.package)
+  const sources = new Set(
+    mains.length > 0 ? mains : linked.filter((n) => n.in_degree === 0).map((n) => n.package)
+  )
+  const rank = computeRanks(linked, usedBy, sources)
   const byLabel = (a: PkgRef, b: PkgRef) => a.label.localeCompare(b.label)
 
   const cards: PkgCard[] = linked.map((n) => {
@@ -576,49 +590,70 @@ function buildTiers(
     }
   })
 
+  // Split reachable (ranked from an entry point) from standalone islands —
+  // packages no main imports, transitively (e.g. test-only helpers, separate
+  // tool roots). A rank of -1 means computeRanks found no path from a source.
+  const reachable: PkgCard[] = []
+  const standalone: PkgCard[] = []
+  for (const c of cards) ((rank.get(c.pkg) ?? -1) >= 0 ? reachable : standalone).push(c)
+  const maxRank = reachable.reduce((m, c) => Math.max(m, rank.get(c.pkg) ?? 0), 0)
+  const byInDegree = (a: PkgCard, b: PkgCard) =>
+    b.inDegree - a.inDegree || a.label.localeCompare(b.label)
+
   const byRank = new Map<number, PkgCard[]>()
-  for (const c of cards) {
+  for (const c of reachable) {
     const r = rank.get(c.pkg) ?? 0
     const list = byRank.get(r) ?? []
     list.push(c)
     byRank.set(r, list)
   }
-  const tiers = [...byRank.keys()]
+  const tiers: Tier[] = [...byRank.keys()]
     .sort((a, b) => a - b) // entry points (rank 0) on top, deepest layer last
     .map((r) => ({
       rank: r,
       label: tierLabel(r, maxRank),
-      cards: (byRank.get(r) as PkgCard[]).sort(
-        (a, b) => b.inDegree - a.inDegree || a.label.localeCompare(b.label)
-      ),
+      cards: (byRank.get(r) as PkgCard[]).sort(byInDegree),
     }))
+  // Standalone island(s) pinned to the bottom with a sentinel rank/key.
+  if (standalone.length > 0) {
+    tiers.push({ rank: -1, label: "Standalone", cards: standalone.sort(byInDegree) })
+  }
   return { tiers, linkedCount: linked.length, hiddenCount }
 }
 
-// computeRanks assigns each package its distance from the entry points — the
-// length of the longest import chain from a root (a package nothing else
-// imports, in_degree 0) down to it. Roots are rank 0 (drawn on top); each
-// import hop deeper adds 1. Walking importers (usedBy) rather than imports
-// top-aligns the layout, so every main/entry package lands on the top row
-// regardless of how tall the subtree beneath it happens to be. Go's import
-// graph is acyclic; the visiting set guards against a cycle anyway so a
-// malformed graph can't loop forever.
+// computeRanks assigns each package its distance from the entry points: the
+// length of the longest import chain from a source (a `main` package, or an
+// in_degree==0 root in fallback) down to it. Sources are rank 0 (drawn on
+// top); each import hop deeper adds 1. Walking importers (usedBy) top-aligns
+// the layout, so a source lands on the top row regardless of how tall the
+// subtree beneath it is. A package no source reaches gets -1 (a standalone
+// island — e.g. a test-only helper). Go's import graph is acyclic; the
+// visiting set guards against a cycle anyway so a malformed graph can't loop.
 function computeRanks(
   nodes: IntelPackageGraph["nodes"],
-  usedBy: Map<string, string[]>
+  usedBy: Map<string, string[]>,
+  sources: Set<string>
 ): Map<string, number> {
   const rank = new Map<string, number>()
   const visiting = new Set<string>()
+  // Longest distance from a source to pkg, or -1 if no source reaches it.
   const dfs = (pkg: string): number => {
+    if (sources.has(pkg)) {
+      rank.set(pkg, 0) // sources are rank 0; persist so the partition sees them
+      return 0
+    }
     const memo = rank.get(pkg)
     if (memo !== undefined) return memo
-    if (visiting.has(pkg)) return 0
+    if (visiting.has(pkg)) return -1 // mid-cycle: no source path along this edge
     visiting.add(pkg)
-    let r = 0
-    for (const importer of usedBy.get(pkg) ?? []) r = Math.max(r, 1 + dfs(importer))
+    let best = -1
+    for (const importer of usedBy.get(pkg) ?? []) {
+      const r = dfs(importer)
+      if (r >= 0) best = Math.max(best, r + 1)
+    }
     visiting.delete(pkg)
-    rank.set(pkg, r)
-    return r
+    rank.set(pkg, best)
+    return best
   }
   for (const n of nodes) dfs(n.package)
   return rank
