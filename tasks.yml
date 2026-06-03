@@ -344,6 +344,7 @@ tasks:
             docker rm   moongitd 2>/dev/null || true
             docker run -d --name moongitd \
               --restart unless-stopped \
+              --user "$(id -u):$(id -g)" \
               -p 8080:8080 \
               --add-host host.docker.internal:host-gateway \
               -v "{{ home }}/.local/share/moongit:/data" \
