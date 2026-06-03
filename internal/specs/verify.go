@@ -108,7 +108,10 @@ func Stamp(content []byte, lastVerified string, alignment float64) []byte {
 		return []byte(strings.Join(append(block, lines...), "\n"))
 	}
 
-	fmLines := lines[1:end]
+	// Three-index slice caps fmLines at `end` so upsertYAML's append (the
+	// key-absent path) allocates a fresh backing array instead of overwriting
+	// the closing fence + first body line in the shared `lines` array.
+	fmLines := lines[1:end:end]
 	fmLines = upsertYAML(fmLines, "last_verified", lastVerified)
 	fmLines = upsertYAML(fmLines, "alignment", align)
 
