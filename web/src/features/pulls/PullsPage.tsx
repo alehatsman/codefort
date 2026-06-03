@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react"
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import "./pulls.css"
 import { usePulls } from "@/api/queries"
 import { PR_STATES, type PRState } from "@/api/types"
 import OverviewCard from "@/shell/OverviewCard"
 import PullsFilters from "@/features/pulls/PullsFilters"
-import { Button, EmptyState, ErrorMessage, PageHeader, Spinner } from "@/ui"
+import { Button, EmptyState, ErrorMessage, ListRow, PageHeader, Spinner } from "@/ui"
 
 const STATE_LABEL: Record<PRState, string> = {
   open: "open",
@@ -105,18 +105,20 @@ export default function PullsPage() {
       {data && data.length > 0 && (
         <ul className="issue-list">
           {data.map((pr) => (
-            <li key={pr.id} className="issue-row">
-              <Link to={`/${owner}/${repo}/pulls/${pr.number}`} className="issue-row__link">
+            <ListRow
+              key={pr.id}
+              to={`/${owner}/${repo}/pulls/${pr.number}`}
+              leading={
                 <span className={`pr-state pr-state--${pr.state}`}>{STATE_LABEL[pr.state]}</span>
-                <span className="issue-row__main">
-                  <span className="issue-row__title">{pr.title}</span>
-                  <span className="issue-row__meta">
-                    #{pr.number} {pr.head_ref} → {pr.base_ref} · opened{" "}
-                    {new Date(pr.created_at).toLocaleDateString()} by {pr.author}
-                  </span>
-                </span>
-              </Link>
-            </li>
+              }
+              title={pr.title}
+              meta={
+                <>
+                  #{pr.number} {pr.head_ref} → {pr.base_ref} · opened{" "}
+                  {new Date(pr.created_at).toLocaleDateString()} by {pr.author}
+                </>
+              }
+            />
           ))}
         </ul>
       )}

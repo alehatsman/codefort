@@ -11,6 +11,7 @@ import {
   FilterChip,
   Inline,
   Input,
+  ListRow,
   PageHeader,
   Radio,
   RelativeTime,
@@ -51,6 +52,7 @@ export default function DevGalleryPage() {
       <TabsSection />
       <BadgesSection />
       <StatusPillSection />
+      <ListRowSection />
       <StatusIconSection />
       <SegmentedControlSection />
       <ChipsSection />
@@ -301,6 +303,40 @@ function StatusPillSection() {
         </StatusPill>
       ))}
     </Section>
+  )
+}
+
+// ListRow renders an <li> link in the `.issue-row` grid; wrap in the list <ul>
+// and show a selected row + a plain row, matching the issue/PR list views.
+function ListRowSection() {
+  return (
+    <section className="gallery__section">
+      <h3 className="gallery__heading">ListRow</h3>
+      <ul className="issue-list">
+        <ListRow
+          to="/dev/ui"
+          selected
+          leading={
+            <span className="issue-row__icon">
+              <StatusIcon glyph="dot-ring" label="open" size={16} />
+            </span>
+          }
+          title="Selected row — hjkl highlight"
+          meta="#12 opened today by trooper"
+          side="@you"
+        />
+        <ListRow
+          to="/dev/ui"
+          leading={
+            <span className="issue-row__icon">
+              <StatusIcon glyph="check" label="done" size={16} />
+            </span>
+          }
+          title="Plain row, no side slot"
+          meta="#11 opened yesterday by alice"
+        />
+      </ul>
+    </section>
   )
 }
 

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react"
-import { Link, useSearchParams } from "react-router-dom"
+import { useSearchParams } from "react-router-dom"
 import "./pulls.css"
 import { useAllPulls } from "@/api/queries"
 import { PR_STATES, type PRState } from "@/api/types"
 import NewGlobalPullForm from "@/features/pulls/NewGlobalPullForm"
 import PullsFilters from "@/features/pulls/PullsFilters"
-import { EmptyState, ErrorMessage, PageHeader, Spinner } from "@/ui"
+import { EmptyState, ErrorMessage, ListRow, PageHeader, Spinner } from "@/ui"
 
 const STATE_LABEL: Record<PRState, string> = {
   open: "open",
@@ -88,24 +88,23 @@ export default function GlobalPullsPage() {
       {data && data.length > 0 && (
         <ul className="issue-list">
           {data.map((pr) => (
-            <li key={`${pr.repo.owner}/${pr.repo.name}#${pr.number}`} className="issue-row">
-              <Link
-                to={`/${pr.repo.owner}/${pr.repo.name}/pulls/${pr.number}`}
-                className="issue-row__link"
-              >
+            <ListRow
+              key={`${pr.repo.owner}/${pr.repo.name}#${pr.number}`}
+              to={`/${pr.repo.owner}/${pr.repo.name}/pulls/${pr.number}`}
+              leading={
                 <span className={`pr-state pr-state--${pr.state}`}>{STATE_LABEL[pr.state]}</span>
-                <span className="issue-row__main">
-                  <span className="issue-row__title">{pr.title}</span>
-                  <span className="issue-row__meta">
-                    <span className="issue-row__repo">
-                      {pr.repo.owner}/{pr.repo.name}
-                    </span>{" "}
-                    #{pr.number} {pr.head_ref} → {pr.base_ref} · opened{" "}
-                    {new Date(pr.created_at).toLocaleDateString()} by {pr.author}
-                  </span>
-                </span>
-              </Link>
-            </li>
+              }
+              title={pr.title}
+              meta={
+                <>
+                  <span className="issue-row__repo">
+                    {pr.repo.owner}/{pr.repo.name}
+                  </span>{" "}
+                  #{pr.number} {pr.head_ref} → {pr.base_ref} · opened{" "}
+                  {new Date(pr.created_at).toLocaleDateString()} by {pr.author}
+                </>
+              }
+            />
           ))}
         </ul>
       )}

@@ -1,11 +1,10 @@
-import clsx from "clsx"
 import { useEffect, useState } from "react"
-import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { useAllIssues } from "@/api/queries"
 import { ISSUE_STATES, type IssueState } from "@/api/types"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import StateIcon from "@/features/issues/StateIcon"
-import { EmptyState, ErrorMessage, PageHeader, Spinner } from "@/ui"
+import { EmptyState, ErrorMessage, ListRow, PageHeader, Spinner } from "@/ui"
 import { useListNav } from "@/shell/keyboardNav"
 
 // Fleet-wide Issues view: every repo's issues in one list, newest-updated
@@ -95,31 +94,27 @@ export default function GlobalIssuesPage() {
       {data && data.length > 0 && (
         <ul className="issue-list">
           {data.map((iss, i) => (
-            <li
+            <ListRow
               key={`${iss.repo.owner}/${iss.repo.name}#${iss.number}`}
-              className={clsx("issue-row", { "is-vim-selected": i === index })}
-              data-vim-selected={i === index ? "true" : undefined}
-            >
-              <Link
-                to={`/${iss.repo.owner}/${iss.repo.name}/issues/${iss.number}`}
-                className="issue-row__link"
-              >
+              to={`/${iss.repo.owner}/${iss.repo.name}/issues/${iss.number}`}
+              selected={i === index}
+              leading={
                 <span className="issue-row__icon">
                   <StateIcon state={iss.state} />
                 </span>
-                <span className="issue-row__main">
-                  <span className="issue-row__title">{iss.title}</span>
-                  <span className="issue-row__meta">
-                    <span className="issue-row__repo">
-                      {iss.repo.owner}/{iss.repo.name}
-                    </span>{" "}
-                    #{iss.number} opened {new Date(iss.created_at).toLocaleDateString()} by{" "}
-                    {iss.author}
-                  </span>
-                </span>
-                <span className="issue-row__side">{iss.assignee ? `@${iss.assignee}` : ""}</span>
-              </Link>
-            </li>
+              }
+              title={iss.title}
+              meta={
+                <>
+                  <span className="issue-row__repo">
+                    {iss.repo.owner}/{iss.repo.name}
+                  </span>{" "}
+                  #{iss.number} opened {new Date(iss.created_at).toLocaleDateString()} by{" "}
+                  {iss.author}
+                </>
+              }
+              side={iss.assignee ? `@${iss.assignee}` : ""}
+            />
           ))}
         </ul>
       )}
