@@ -378,6 +378,10 @@
   border-radius: var(--radius);
   background: var(--bg-canvas);
   color: var(--fg-muted);
+  margin-bottom: var(--space-3);
+}
+.branch-commit-row .branch-select {
+  margin-bottom: 0;
 }
 .branch-select select {
   border: none;
