@@ -6,7 +6,7 @@ import { useCompare, useRefs } from "@/api/queries"
 import { useCreatePull } from "@/api/mutations"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
-import { Button, EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { Button, EmptyState, ErrorMessage, PageHeader, Spinner } from "@/ui"
 
 /**
  * Compare two branches: pick base + head, see the ahead/behind + three-dot diff,
@@ -60,11 +60,7 @@ export default function ComparePage() {
     <div className="compare">
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
-      <div className="issues__header">
-        <div className="issues__header-left">
-          <h2>Compare branches</h2>
-        </div>
-      </div>
+      <PageHeader title="Compare branches" />
 
       <div className="compare__pickers">
         <label className="filter-select">

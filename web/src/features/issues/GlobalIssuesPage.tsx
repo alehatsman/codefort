@@ -5,7 +5,7 @@ import { useAllIssues } from "@/api/queries"
 import { ISSUE_STATES, type IssueState } from "@/api/types"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import StateIcon from "@/features/issues/StateIcon"
-import { EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { EmptyState, ErrorMessage, PageHeader, Spinner } from "@/ui"
 import { useListNav } from "@/shell/keyboardNav"
 
 // Fleet-wide Issues view: every repo's issues in one list, newest-updated
@@ -57,12 +57,10 @@ export default function GlobalIssuesPage() {
 
   return (
     <div className="issues">
-      <div className="issues__header">
-        <div className="issues__header-left">
-          <h2>Issues</h2>
-        </div>
-        <NewIssueForm onCreated={(n, o, r) => navigate(`/${o}/${r}/issues/${n}`)} />
-      </div>
+      <PageHeader
+        title="Issues"
+        actions={<NewIssueForm onCreated={(n, o, r) => navigate(`/${o}/${r}/issues/${n}`)} />}
+      />
 
       <div className="filters">
         <input

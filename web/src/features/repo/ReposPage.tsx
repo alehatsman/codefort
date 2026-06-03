@@ -5,7 +5,7 @@ import { useRepos } from "@/api/queries"
 import CIStatusIcon from "@/features/pipelines/CIStatusIcon"
 import NewRepoForm from "@/features/repo/NewRepoForm"
 import StateIcon from "@/features/issues/StateIcon"
-import { Card, EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { Card, EmptyState, ErrorMessage, PageHeader, Spinner } from "@/ui"
 import { useListNav } from "@/shell/keyboardNav"
 
 export default function ReposPage() {
@@ -26,12 +26,10 @@ export default function ReposPage() {
 
   return (
     <div className="repos">
-      <div className="issues__header">
-        <div className="issues__header-left">
-          <h2>Repositories</h2>
-        </div>
-        <NewRepoForm onCreated={(owner, name) => navigate(`/${owner}/${name}`)} />
-      </div>
+      <PageHeader
+        title="Repositories"
+        actions={<NewRepoForm onCreated={(owner, name) => navigate(`/${owner}/${name}`)} />}
+      />
 
       {isLoading && <Spinner />}
       {error && <ErrorMessage error={error} />}

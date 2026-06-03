@@ -8,15 +8,19 @@ import {
   ErrorMessage,
   Field,
   FilterChip,
+  Inline,
   Input,
+  PageHeader,
   RelativeTime,
   SegmentedControl,
   Select,
   Spinner,
+  Stack,
   StatusIcon,
   Tab,
   Tabs,
   Textarea,
+  Toolbar,
 } from "@/ui"
 import type { BadgeState, ButtonVariant, StatusGlyph } from "@/ui"
 
@@ -38,6 +42,7 @@ export default function DevGalleryPage() {
       </header>
 
       <TokensSection />
+      <LayoutSection />
       <ButtonsSection />
       <TabsSection />
       <BadgesSection />
@@ -148,6 +153,51 @@ function TokensSection() {
           </div>
         ))}
       </div>
+    </section>
+  )
+}
+
+const GAP_DEMO = [1, 2, 4, 6] as const
+
+// Layout primitives are containers, so they're shown wrapping placeholder boxes
+// rather than in the standard flex `.gallery__row`.
+function LayoutSection() {
+  return (
+    <section className="gallery__section">
+      <h3 className="gallery__heading">Layout — Stack / Inline / PageHeader / Toolbar</h3>
+
+      <p className="gallery__sublabel">PageHeader — title (+ aside) and actions</p>
+      <PageHeader title="Section title" actions={<Button variant="primary">New thing</Button>}>
+        <Badge state="in_progress">2 open</Badge>
+      </PageHeader>
+
+      <p className="gallery__sublabel">Toolbar — filter/action bar (card surface)</p>
+      <Toolbar label="Demo toolbar" card>
+        <Button size="small">Filter</Button>
+        <Button size="small">Sort</Button>
+        <Badge>3 selected</Badge>
+      </Toolbar>
+
+      <p className="gallery__sublabel">Inline — horizontal, gap steps map to the spacing scale</p>
+      <Stack gap={2}>
+        {GAP_DEMO.map((g) => (
+          <Inline key={g} gap={g}>
+            <span className="gallery__muted" style={{ width: 48 }}>
+              gap {g}
+            </span>
+            <span className="gallery__box" />
+            <span className="gallery__box" />
+            <span className="gallery__box" />
+          </Inline>
+        ))}
+      </Stack>
+
+      <p className="gallery__sublabel">Stack — vertical rhythm (gap 3)</p>
+      <Stack gap={3}>
+        <span className="gallery__box gallery__box--wide" />
+        <span className="gallery__box gallery__box--wide" />
+        <span className="gallery__box gallery__box--wide" />
+      </Stack>
     </section>
   )
 }

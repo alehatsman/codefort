@@ -9,7 +9,7 @@ import OverviewCard from "@/shell/OverviewCard"
 import StateIcon from "@/features/issues/StateIcon"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import { useListNav } from "@/shell/keyboardNav"
-import { EmptyState, ErrorMessage, FilterChip, Spinner } from "@/ui"
+import { EmptyState, ErrorMessage, FilterChip, PageHeader, Spinner } from "@/ui"
 
 export default function IssuesPage() {
   const { owner = "", repo = "" } = useParams()
@@ -110,17 +110,18 @@ export default function IssuesPage() {
     <div className="issues">
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
-      <div className="issues__header">
-        <div className="issues__header-left">
-          <h2>Issues</h2>
-          <IssuesViewSwitch />
-        </div>
-        <NewIssueForm
-          owner={owner}
-          repo={repo}
-          onCreated={(n) => navigate(`/${owner}/${repo}/issues/${n}`)}
-        />
-      </div>
+      <PageHeader
+        title="Issues"
+        actions={
+          <NewIssueForm
+            owner={owner}
+            repo={repo}
+            onCreated={(n) => navigate(`/${owner}/${repo}/issues/${n}`)}
+          />
+        }
+      >
+        <IssuesViewSwitch />
+      </PageHeader>
 
       <div className="filters">
         <input

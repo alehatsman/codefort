@@ -5,7 +5,7 @@ import { usePulls } from "@/api/queries"
 import { PR_STATES, type PRState } from "@/api/types"
 import OverviewCard from "@/shell/OverviewCard"
 import PullsFilters from "@/features/pulls/PullsFilters"
-import { Button, EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { Button, EmptyState, ErrorMessage, PageHeader, Spinner } from "@/ui"
 
 const STATE_LABEL: Record<PRState, string> = {
   open: "open",
@@ -81,14 +81,14 @@ export default function PullsPage() {
     <div className="pulls">
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
-      <div className="issues__header">
-        <div className="issues__header-left">
-          <h2>Pull requests</h2>
-        </div>
-        <Button variant="primary" onClick={() => navigate(`/${owner}/${repo}/compare`)}>
-          + New pr
-        </Button>
-      </div>
+      <PageHeader
+        title="Pull requests"
+        actions={
+          <Button variant="primary" onClick={() => navigate(`/${owner}/${repo}/compare`)}>
+            + New pr
+          </Button>
+        }
+      />
 
       <PullsFilters
         search={search}

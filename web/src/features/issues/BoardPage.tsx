@@ -17,7 +17,7 @@ import BoardColumn from "@/features/issues/BoardColumn"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import OverviewCard from "@/shell/OverviewCard"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
-import { ErrorMessage, Spinner } from "@/ui"
+import { ErrorMessage, PageHeader, Spinner } from "@/ui"
 
 /**
  * Trello-style board view. Columns are the four issue states; cards
@@ -93,13 +93,9 @@ export default function BoardPage() {
     <div>
       <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
 
-      <div className="issues__header">
-        <div className="issues__header-left">
-          <h2>Issues</h2>
-          <IssuesViewSwitch />
-        </div>
-        <NewIssueForm owner={owner} repo={repo} />
-      </div>
+      <PageHeader title="Issues" actions={<NewIssueForm owner={owner} repo={repo} />}>
+        <IssuesViewSwitch />
+      </PageHeader>
 
       <DndContext
         sensors={sensors}

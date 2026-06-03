@@ -31,6 +31,15 @@ test("dev gallery renders every primitive section", async ({ page }) => {
   await expect(page.getByRole("button", { name: "primary", exact: true })).toBeVisible()
 })
 
+test("dev gallery shows the layout primitives", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/dev/ui")
+
+  // PageHeader renders its title as a heading; Toolbar exposes a labeled region.
+  await expect(page.getByRole("heading", { name: "Section title", exact: true })).toBeVisible()
+  await expect(page.getByRole("toolbar", { name: "Demo toolbar" })).toBeVisible()
+})
+
 test("dev gallery Dialog opens and closes", async ({ page }) => {
   await mockApi(page)
   await page.goto("/dev/ui")
