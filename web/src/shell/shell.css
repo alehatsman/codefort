@@ -73,23 +73,4 @@
   color: var(--fg-muted);
   font-style: italic;
 }
-/* Avatar (initial circle) --------------------------------------------- */
-.avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-circle);
-  background: var(--accent);
-  color: white;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-  text-transform: uppercase;
-  flex-shrink: 0;
-}
-.avatar--lg {
-  width: 28px;
-  height: 28px;
-  font-size: var(--text-base);
-}
+/* .avatar moved to styles.css alongside the @/ui Avatar primitive (#280). */

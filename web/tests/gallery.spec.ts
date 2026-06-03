@@ -15,6 +15,7 @@ test("dev gallery renders every primitive section", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "UI primitives" })).toBeVisible()
   for (const section of [
     "Button",
+    "Avatar",
     "Badge",
     "StatusPill — CI statuses (dense)",
     "ListRow",

@@ -9,8 +9,7 @@ import {
   useSetCodeCommentResolved,
 } from "@/api/mutations"
 import type { CodeComment } from "@/api/types"
-import Avatar from "@/shell/Avatar"
-import { Badge, Button, ErrorMessage, Textarea } from "@/ui"
+import { Avatar, Badge, Button, ErrorMessage, Textarea } from "@/ui"
 
 // The markdown renderer pulls in remark/rehype; load it lazily.
 const Markdown = lazy(() => import("@/shell/Markdown"))

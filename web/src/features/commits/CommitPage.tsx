@@ -3,10 +3,9 @@ import "./commits.css"
 import { Link, useParams } from "react-router-dom"
 import { useCommit } from "@/api/queries"
 import OverviewCard from "@/shell/OverviewCard"
-import Avatar from "@/shell/Avatar"
 import BranchTag from "@/features/repo/BranchTag"
 import DiffView from "@/features/pulls/DiffView"
-import { EmptyState, ErrorMessage, RelativeTime, SegmentedControl, Spinner } from "@/ui"
+import { Avatar, EmptyState, ErrorMessage, RelativeTime, SegmentedControl, Spinner } from "@/ui"
 
 type Mode = "split" | "unified"
 

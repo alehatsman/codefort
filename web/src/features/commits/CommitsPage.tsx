@@ -3,9 +3,8 @@ import "./commits.css"
 import { useCommitCIStatus, useInfiniteCommits, useRepo } from "@/api/queries"
 import type { CIRun, Commit } from "@/api/types"
 import OverviewCard from "@/shell/OverviewCard"
-import Avatar from "@/shell/Avatar"
 import CommitCIStatus from "@/features/commits/CommitCIStatus"
-import { EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
+import { Avatar, EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
 
 const PER_PAGE = 30
 

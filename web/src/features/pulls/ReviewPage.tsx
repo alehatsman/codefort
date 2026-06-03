@@ -6,8 +6,7 @@ import { useCodeComments, useWhoami } from "@/api/queries"
 import { useDeleteCodeComment, useSetCodeCommentResolved } from "@/api/mutations"
 import BranchSelector from "@/features/repo/BranchSelector"
 import DraftReviewButton from "@/features/pulls/DraftReviewButton"
-import Avatar from "@/shell/Avatar"
-import { Badge, Button, EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { Avatar, Badge, Button, EmptyState, ErrorMessage, Spinner } from "@/ui"
 import type { CodeComment, CodeCommentState } from "@/api/types"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it lazily
