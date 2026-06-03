@@ -56,7 +56,7 @@ func newTestRunner(t *testing.T, pipeline string, enabled bool, exec stepExecuto
 			CIPollInterval: time.Second,
 		},
 		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		newSession: func(_ context.Context, _, workDir, _ string) (jobSession, error) {
+		newSession: func(_ context.Context, _, workDir, _ string, _ []string) (jobSession, error) {
 			return &hostSession{workDir: workDir, exec: exec}, nil
 		},
 		checkout: func(context.Context, string, string, string) error { return nil },
