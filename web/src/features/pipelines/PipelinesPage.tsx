@@ -1,5 +1,6 @@
 import { useState } from "react"
 import "./pipelines.css"
+import clsx from "clsx"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useCIRun, useCIRuns, useRefs, useRepo } from "@/api/queries"
 import { useCancelCIRun, useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from "@/api/mutations"
@@ -248,7 +249,7 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
   }
 
   return (
-    <section className="pipelines">
+    <section className={clsx("pipelines", { "pipelines--agent-run": isAgent })}>
       <div className="ci-run-head">
         <Link className="ci-run-head__back" to={`/${owner}/${repo}/${base}`}>
           ← {isAgent ? "Agents" : "Pipelines"}
