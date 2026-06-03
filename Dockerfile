@@ -38,7 +38,16 @@ RUN npm run build
 # ── stage 3: runtime ──────────────────────────────────────────────────────
 FROM debian:stable-slim
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates \
+ && apt-get install -y --no-install-recommends git ca-certificates gnupg curl \
+ && install -m 0755 -d /etc/apt/keyrings \
+ && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+ && chmod a+r /etc/apt/keyrings/docker.gpg \
+ && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" \
+      > /etc/apt/sources.list.d/docker.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends docker-ce-cli \
+ && apt-get purge -y curl gnupg \
+ && apt-get autoremove -y \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=go-builder /moongitd /usr/local/bin/moongitd

@@ -82,11 +82,14 @@ jobs:
             docker run -d --name moongitd \
               --restart unless-stopped \
               --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c %g /var/run/docker.sock)" \
               -p 8080:8080 \
               --add-host host.docker.internal:host-gateway \
-              -v "$HOME/.local/share/moongit:/data" \
-              --env-file "$HOME/.config/moongit/moongit-container.env" \
-              --env-file "$HOME/.config/moongit/moongit.secret.env" \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v /home/aleh/.local/share/moongit:/data \
+              -v /home/aleh/.config/moongit:/config:ro \
+              --env-file /config/moongit-container.env \
+              --env-file /config/moongit.secret.env \
               moongit:latest
 
   build-images:
