@@ -151,7 +151,7 @@ test("global nav links the cross-repo aggregate views", async ({ page }) => {
   await expect(page).toHaveURL(/\/issues\/board$/)
   await expect(page.locator(".board-card", { hasText: "alice bug" })).toBeVisible()
   const bobCard = page.locator(".board-card", { hasText: "bob feature" })
-  await expect(bobCard.locator(".board-card__repo")).toHaveText("bob/api")
+  await expect(bobCard.locator(".repo-tag")).toHaveText("bob/api")
   await expect(bobCard.locator("a.board-card__link")).toHaveAttribute("href", "/bob/api/issues/3")
 
   // Pull requests tab.

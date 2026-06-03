@@ -141,7 +141,7 @@ test("global board groups every repo's issues into state columns", async ({ page
 
   // Each card lands in its state column, shows its repo, and links back into it.
   const aliceCard = todo.locator(".board-card", { hasText: "alice todo" })
-  await expect(aliceCard.locator(".board-card__repo")).toHaveText("alice/demo")
+  await expect(aliceCard.locator(".repo-tag")).toHaveText("alice/demo")
   const bobCard = doing.locator(".board-card", { hasText: "bob doing" })
   await expect(bobCard.locator("a.board-card__link")).toHaveAttribute("href", "/bob/api/issues/3")
 })
