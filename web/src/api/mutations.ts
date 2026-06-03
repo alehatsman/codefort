@@ -87,11 +87,16 @@ function invalidateIssueWrites(
   }
 }
 
-export function useCreateIssue(owner: string, repo: string) {
+// useCreateIssue creates an issue in a repo chosen at submit time — owner/repo
+// travel in the mutate variables rather than being bound at hook init, so the
+// same hook serves both the repo-scoped form (target fixed by the route) and
+// the global Issues view (target picked from a dropdown).
+export function useCreateIssue() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: CreateIssueInput) => api.createIssue(owner, repo, input),
-    onSuccess: () => invalidateIssueWrites(qc, owner, repo),
+    mutationFn: ({ owner, repo, ...input }: CreateIssueInput & { owner: string; repo: string }) =>
+      api.createIssue(owner, repo, input),
+    onSuccess: (_created, { owner, repo }) => invalidateIssueWrites(qc, owner, repo),
   })
 }
 

@@ -95,10 +95,11 @@ export function useAgentSettings() {
   })
 }
 
-export function useRepos() {
+export function useRepos(enabled = true) {
   return useQuery({
     queryKey: keys.repos(),
     queryFn: () => api.listRepos(),
+    enabled,
   })
 }
 

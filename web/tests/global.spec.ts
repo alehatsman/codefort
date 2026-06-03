@@ -148,3 +148,25 @@ test("global nav links the cross-repo aggregate views", async ({ page }) => {
     "/bob/api/issues/7"
   )
 })
+
+// The global Issues view can create an issue too: the same modal as the
+// repo-scoped form, plus a Repository picker that targets which repo it lands
+// in. On success we navigate into that repo's new issue.
+test("global Issues page creates an issue in the picked repo", async ({ page }) => {
+  await mockApi(page) // seeds repo alice/demo + the POST issues handler
+  await mockAggregates(page)
+
+  await page.goto("/issues")
+  await page.getByRole("button", { name: "+ New issue" }).click()
+  await expect(page.getByRole("heading", { name: "New issue" })).toBeVisible()
+
+  // The picker defaults to the only seeded repo.
+  await expect(page.getByLabel("Repository")).toHaveValue("alice/demo")
+
+  await page.getByLabel("Title").fill("Cross-repo task")
+  await page.getByRole("button", { name: "Submit new issue" }).click()
+
+  // We land on the picked repo's new issue detail page.
+  await expect(page).toHaveURL("/alice/demo/issues/1")
+  await expect(page.getByRole("heading", { name: /Cross-repo task/ })).toBeVisible()
+})
