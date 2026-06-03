@@ -813,22 +813,101 @@ a.file-tree__commit:hover {
 }
 
 /* Issues list ---------------------------------------------------------- */
-.issues__header {
+/* Layout primitives (@/ui Stack / Inline / PageHeader / Toolbar) — token-driven
+   flex containers; gap steps map to the --space scale. */
+.stack {
   display: flex;
+  flex-direction: column;
+}
+.inline {
+  display: flex;
+  flex-direction: row;
+}
+.stack--gap-0,
+.inline--gap-0 {
+  gap: 0;
+}
+.stack--gap-1,
+.inline--gap-1 {
+  gap: var(--space-1);
+}
+.stack--gap-2,
+.inline--gap-2 {
+  gap: var(--space-2);
+}
+.stack--gap-3,
+.inline--gap-3 {
+  gap: var(--space-3);
+}
+.stack--gap-4,
+.inline--gap-4 {
+  gap: var(--space-4);
+}
+.stack--gap-5,
+.inline--gap-5 {
+  gap: var(--space-5);
+}
+.stack--gap-6,
+.inline--gap-6 {
+  gap: var(--space-6);
+}
+.stack--align-start {
+  align-items: flex-start;
+}
+.stack--align-center {
   align-items: center;
+}
+.stack--align-end {
+  align-items: flex-end;
+}
+.stack--align-stretch {
+  align-items: stretch;
+}
+.inline--align-start {
+  align-items: flex-start;
+}
+.inline--align-center {
+  align-items: center;
+}
+.inline--align-end {
+  align-items: flex-end;
+}
+.inline--align-baseline {
+  align-items: baseline;
+}
+.inline--justify-start {
+  justify-content: flex-start;
+}
+.inline--justify-center {
+  justify-content: center;
+}
+.inline--justify-end {
+  justify-content: flex-end;
+}
+.inline--justify-between {
   justify-content: space-between;
+}
+.inline--wrap {
+  flex-wrap: wrap;
+}
+
+.page-header {
   margin: 0 0 var(--space-4);
-  gap: var(--space-4);
 }
-.issues__header-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
+.page-header__lead {
+  flex-wrap: wrap;
 }
-.issues__header h2 {
+.page-header__title {
   margin: 0;
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
+}
+
+.toolbar--card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
 }
 
 .filters {
@@ -1837,6 +1916,22 @@ h3 {
   height: 16px;
   background: var(--accent);
   border-radius: var(--radius-sm);
+}
+/* Placeholder block for demoing the layout primitives' gap/flow. */
+.gallery__box {
+  width: 40px;
+  height: 24px;
+  background: var(--accent-muted);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+.gallery__box--wide {
+  width: 100%;
+}
+.gallery__sublabel {
+  margin: var(--space-4) 0 var(--space-2);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
 }
 
 /* Buttons (shared design-system primitive — used directly across features) */

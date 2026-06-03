@@ -5,7 +5,7 @@ import { useAllPulls } from "@/api/queries"
 import { PR_STATES, type PRState } from "@/api/types"
 import NewGlobalPullForm from "@/features/pulls/NewGlobalPullForm"
 import PullsFilters from "@/features/pulls/PullsFilters"
-import { EmptyState, ErrorMessage, Spinner } from "@/ui"
+import { EmptyState, ErrorMessage, PageHeader, Spinner } from "@/ui"
 
 const STATE_LABEL: Record<PRState, string> = {
   open: "open",
@@ -70,12 +70,7 @@ export default function GlobalPullsPage() {
 
   return (
     <div className="pulls">
-      <div className="issues__header">
-        <div className="issues__header-left">
-          <h2>Pull requests</h2>
-        </div>
-        <NewGlobalPullForm />
-      </div>
+      <PageHeader title="Pull requests" actions={<NewGlobalPullForm />} />
 
       <PullsFilters
         search={search}

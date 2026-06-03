@@ -9,7 +9,9 @@ export { default as EmptyState } from "@/ui/EmptyState"
 export { default as ErrorMessage } from "@/ui/ErrorMessage"
 export { default as Field } from "@/ui/Field"
 export { default as FilterChip } from "@/ui/FilterChip"
+export { default as Inline } from "@/ui/Inline"
 export { default as Input } from "@/ui/Input"
+export { default as PageHeader } from "@/ui/PageHeader"
 export { default as RelativeTime } from "@/ui/RelativeTime"
 export {
   default as SegmentedControl,
@@ -17,6 +19,8 @@ export {
 } from "@/ui/SegmentedControl"
 export { default as Select } from "@/ui/Select"
 export { default as Spinner } from "@/ui/Spinner"
+export { default as Stack, type SpaceStep } from "@/ui/Stack"
 export { default as StatusIcon, type StatusGlyph } from "@/ui/StatusIcon"
 export { Tab, Tabs } from "@/ui/Tabs"
 export { default as Textarea } from "@/ui/Textarea"
+export { default as Toolbar } from "@/ui/Toolbar"
