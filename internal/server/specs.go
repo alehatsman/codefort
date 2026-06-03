@@ -1,6 +1,9 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"path"
 	"sort"
@@ -8,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/moongit/internal/dex"
 	"github.com/alehatsman/moongit/internal/specs"
 )
 
@@ -198,4 +202,117 @@ func specListItem(specPath string, content []byte) api.SpecListItem {
 		LastVerified: fm.LastVerified,
 		Alignment:    fm.Alignment,
 	}
+}
+
+// specSearchOverFetch is how many dex hits to request before filtering to the
+// specs/ corpus. dex's semantic search takes no path scope (see #213), so we
+// over-fetch and keep the specs/ hits — generous enough that a query with a few
+// spec matches buried among code hits still surfaces them.
+const specSearchOverFetch = 50
+
+// specSearchMaxHits caps the spec hits returned after filtering.
+const specSearchMaxHits = 20
+
+type specSearchRequest struct {
+	Query string `json:"query"`
+}
+
+// handleSearchSpecs runs a dex semantic search scoped to the specs/ corpus: it
+// over-fetches from dex, keeps only specs/ hits, and attributes each to its
+// enclosing spec section (via the parser's line ranges). The spec corpus is the
+// differentiator — no other SDD tool wires semantic search over specs. Mirrors
+// the intel handlers' dex-availability semantics (503 unconfigured, 404
+// un-indexed, 502 transport error).
+func (s *Server) handleSearchSpecs(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.lookupRepoOrFail(w, r); !ok {
+		return
+	}
+	repoDir, ok := s.repoDirOrFail(w, r)
+	if !ok {
+		return
+	}
+	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
+
+	if !s.dex.Enabled() {
+		writeError(w, http.StatusServiceUnavailable, "dex integration not configured")
+		return
+	}
+
+	var req specSearchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	req.Query = strings.TrimSpace(req.Query)
+	if req.Query == "" {
+		writeError(w, http.StatusBadRequest, "query is required")
+		return
+	}
+
+	proj, err := s.dex.ResolveProject(r.Context(), repo)
+	if errors.Is(err, dex.ErrProjectNotFound) {
+		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
+		return
+	}
+	if err != nil {
+		s.logger.Error("dex resolve project", "err", err)
+		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+		return
+	}
+
+	res, err := s.dex.Search(r.Context(), proj.ID, req.Query, specSearchOverFetch)
+	if err != nil {
+		s.logger.Error("dex search", "err", err)
+		writeError(w, http.StatusBadGateway, "dex search failed: "+err.Error())
+		return
+	}
+
+	ref := headRef(r.Context(), repoDir)
+	out := api.SpecSearchResult{Query: req.Query, Hits: []api.SpecSearchHit{}}
+	sections := map[string][]specs.Section{} // spec path -> parsed sections, cached
+	for _, h := range res.Hits {
+		if !strings.HasPrefix(h.Path, specsDir+"/") {
+			continue
+		}
+		if len(out.Hits) >= specSearchMaxHits {
+			break
+		}
+		out.Hits = append(out.Hits, api.SpecSearchHit{
+			Path:    h.Path,
+			Section: s.specSectionAt(r.Context(), repoDir, ref, h.Path, h.StartLine, sections),
+			Line:    h.StartLine,
+			Snippet: h.Content,
+			Score:   h.Score,
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// specSectionAt returns the title of the spec heading enclosing line — the
+// nearest heading at or before it — or "" when the spec can't be read/parsed or
+// nothing precedes the line. Parsed sections are cached per path so a spec with
+// several hits is read once.
+func (s *Server) specSectionAt(
+	ctx context.Context,
+	repoDir, ref, specPath string,
+	line int,
+	cache map[string][]specs.Section,
+) string {
+	secs, ok := cache[specPath]
+	if !ok {
+		// Cache even on failure (nil) so a bad spec isn't re-read per hit.
+		if content, err := gitOutput(ctx, repoDir, "cat-file", "blob", ref+":"+specPath); err == nil {
+			if spec, perr := specs.Parse(specPath, content); perr == nil {
+				secs = spec.Sections
+			}
+		}
+		cache[specPath] = secs
+	}
+	title, best := "", 0
+	for _, sec := range secs {
+		if sec.Line <= line && sec.Line >= best {
+			title, best = sec.Title, sec.Line
+		}
+	}
+	return title
 }
