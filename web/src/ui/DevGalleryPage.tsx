@@ -22,7 +22,7 @@ import type { BadgeState, ButtonVariant } from "@/ui"
  * inspectable in the real app (real theme, real CSS, real Vite). Reachable at
  * /dev/ui. Add a row here whenever you add a primitive or a variant.
  */
-const DevGalleryPage = () => {
+export default function DevGalleryPage() {
   return (
     <div className="gallery">
       <header className="gallery__intro">
@@ -45,7 +45,7 @@ const DevGalleryPage = () => {
   )
 }
 
-const Section = ({ title, children }: { title: string; children: React.ReactNode }) => {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="gallery__section">
       <h3 className="gallery__heading">{title}</h3>
@@ -56,7 +56,7 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
 
 const VARIANTS: ButtonVariant[] = ["default", "primary", "ghost", "danger"]
 
-const ButtonsSection = () => {
+function ButtonsSection() {
   return (
     <Section title="Button">
       {VARIANTS.map((variant) => (
@@ -74,7 +74,7 @@ const ButtonsSection = () => {
 
 const BADGE_STATES: BadgeState[] = ["todo", "in_progress", "done", "closed"]
 
-const BadgesSection = () => {
+function BadgesSection() {
   return (
     <Section title="Badge">
       <Badge>neutral</Badge>
@@ -87,7 +87,7 @@ const BadgesSection = () => {
   )
 }
 
-const ChipsSection = () => {
+function ChipsSection() {
   const [checked, setChecked] = useState<Record<string, boolean>>({ todo: true, done: false })
   return (
     <Section title="FilterChip">
@@ -104,7 +104,7 @@ const ChipsSection = () => {
   )
 }
 
-const CardsSection = () => {
+function CardsSection() {
   return (
     <Section title="Card">
       <Card>
@@ -119,7 +119,7 @@ const CardsSection = () => {
   )
 }
 
-const FeedbackSection = () => {
+function FeedbackSection() {
   return (
     <>
       <Section title="Spinner">
@@ -138,7 +138,7 @@ const FeedbackSection = () => {
   )
 }
 
-const FormSection = () => {
+function FormSection() {
   const [text, setText] = useState("")
   const [body, setBody] = useState("")
   const [choice, setChoice] = useState("one")
@@ -165,7 +165,7 @@ const FormSection = () => {
   )
 }
 
-const RelativeTimeSection = () => {
+function RelativeTimeSection() {
   return (
     <Section title="RelativeTime">
       <RelativeTime iso="2020-01-01T00:00:00Z" />
@@ -174,7 +174,7 @@ const RelativeTimeSection = () => {
   )
 }
 
-const DialogSection = () => {
+function DialogSection() {
   const ref = useRef<HTMLDialogElement>(null)
   const close = () => ref.current?.close()
   return (
@@ -201,5 +201,3 @@ const DialogSection = () => {
     </Section>
   )
 }
-
-export default DevGalleryPage

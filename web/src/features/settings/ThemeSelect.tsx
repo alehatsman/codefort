@@ -2,7 +2,7 @@ import { useState } from "react"
 import "./settings.css"
 import { THEMES, getTheme, setTheme, type ThemeId } from "@/theme"
 
-const ThemeSelect = () => {
+export default function ThemeSelect() {
   const [theme, setThemeState] = useState<ThemeId>(() => getTheme())
 
   function onChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -29,5 +29,3 @@ const ThemeSelect = () => {
     </label>
   )
 }
-
-export default ThemeSelect

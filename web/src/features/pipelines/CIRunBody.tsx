@@ -10,7 +10,7 @@ import { formatDuration } from "@/features/pipelines/runHelpers"
 // CIRunBody renders a CI run's jobs: the dependency DAG and the selected job's
 // live log. It owns the job-selection state (CI-only); the shared run header
 // lives in the parent. An agent run renders AgentRunBody instead.
-const CIRunBody = ({
+export default function CIRunBody({
   owner,
   repo,
   runNumber,
@@ -20,7 +20,7 @@ const CIRunBody = ({
   repo: string
   runNumber: number
   jobs: CIJob[]
-}) => {
+}) {
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
 
   if (jobs.length === 0) {
@@ -53,7 +53,7 @@ const CIRunBody = ({
 // that also serves as the log selector. So the structure (build fans out to
 // test + vet; web is an independent root) is legible at a glance, not flattened
 // into an undifferentiated tab strip.
-const JobDag = ({
+function JobDag({
   jobs,
   active,
   onSelect,
@@ -61,7 +61,7 @@ const JobDag = ({
   jobs: CIJob[]
   active?: string
   onSelect: (name: string) => void
-}) => {
+}) {
   const stages = useMemo(() => jobStages(jobs), [jobs])
   return (
     <nav className="ci-dag" aria-label="Jobs">
@@ -120,7 +120,7 @@ function jobStages(jobs: CIJob[]): CIJob[][] {
   return stages
 }
 
-const JobLog = ({
+function JobLog({
   owner,
   repo,
   runNumber,
@@ -130,7 +130,7 @@ const JobLog = ({
   repo: string
   runNumber: number
   job: CIJob
-}) => {
+}) {
   // A skipped job never produced an event stream; don't open a connection.
   const stream = job.status !== "skipped"
   const { events, done, error } = useJobEventStream(owner, repo, runNumber, job.name, stream)
@@ -182,7 +182,7 @@ const JobLog = ({
 // LogLine renders one log line, interpreting ANSI SGR color escapes into spans.
 // A line with no escapes is a single plain segment, so the common case stays a
 // bare text node.
-const LogLine = ({ text }: { text: string }) => {
+function LogLine({ text }: { text: string }) {
   const segments = parseAnsi(text)
   if (segments.length === 1 && !segments[0].fg && !segments[0].bold && !segments[0].underline) {
     return <>{segments[0].text}</>
@@ -264,5 +264,3 @@ function foldSteps(events: CIEvent[]): StepView[] {
   }
   return order
 }
-
-export default CIRunBody

@@ -9,7 +9,7 @@ import { EmptyState, ErrorMessage, Spinner } from "@/ui"
 // first, filterable by status + keyword (like the global Issues view). Each row
 // links into the owning repo's agent run detail. Replaces the old shared
 // pipelines table for agents with the Agents-owned grid.
-const GlobalAgentsPage = () => {
+export default function GlobalAgentsPage() {
   const { search, setSearch, activeStates, toggleState, query } = useRunFilters()
   const { data, isLoading, error } = useAllRuns("agent", query)
 
@@ -42,5 +42,3 @@ const GlobalAgentsPage = () => {
     </section>
   )
 }
-
-export default GlobalAgentsPage

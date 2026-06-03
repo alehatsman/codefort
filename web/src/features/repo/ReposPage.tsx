@@ -8,7 +8,7 @@ import StateIcon from "@/features/issues/StateIcon"
 import { Card, EmptyState, ErrorMessage, Spinner } from "@/ui"
 import { useListNav } from "@/shell/keyboardNav"
 
-const ReposPage = () => {
+export default function ReposPage() {
   const { data, isLoading, error } = useRepos()
   const navigate = useNavigate()
 
@@ -93,5 +93,3 @@ function gridColumnCount(grid: HTMLDivElement | null): number {
   const tracks = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean)
   return tracks.length || 1
 }
-
-export default ReposPage

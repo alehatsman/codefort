@@ -6,8 +6,6 @@ import type { ComponentPropsWithRef } from "react"
  * the class and forwards native props (incl. `ref`): comment/issue/review
  * compose boxes.
  */
-const Textarea = ({ className, ...rest }: ComponentPropsWithRef<"textarea">) => {
+export default function Textarea({ className, ...rest }: ComponentPropsWithRef<"textarea">) {
   return <textarea className={clsx("textarea", className)} {...rest} />
 }
-
-export default Textarea

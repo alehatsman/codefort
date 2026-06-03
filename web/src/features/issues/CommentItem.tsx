@@ -23,7 +23,7 @@ interface Props {
  * but clear; a custom modal would be more scope than this slice
  * needs.
  */
-const CommentItem = ({ owner, repo, issueNumber, comment, canDelete }: Props) => {
+export default function CommentItem({ owner, repo, issueNumber, comment, canDelete }: Props) {
   const del = useDeleteComment(owner, repo, issueNumber)
 
   function onDelete() {
@@ -65,5 +65,3 @@ const CommentItem = ({ owner, repo, issueNumber, comment, canDelete }: Props) =>
     </li>
   )
 }
-
-export default CommentItem

@@ -18,10 +18,8 @@ interface Props {
  * at ~35 call sites (query/mutation failure states), folding in the `inline`
  * modifier and the `Error → message` coercion.
  */
-const ErrorMessage = ({ error, inline, className }: Props) => {
+export default function ErrorMessage({ error, inline, className }: Props) {
   if (!error) return null
   const message = error instanceof Error ? error.message : String(error)
   return <div className={clsx("error", { inline }, className)}>{message}</div>
 }
-
-export default ErrorMessage

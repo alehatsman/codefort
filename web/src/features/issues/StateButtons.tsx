@@ -15,7 +15,7 @@ interface Props {
  * its own colored background; clicking another state PATCHes. Disabled
  * while the mutation is in flight or for the current value.
  */
-const StateButtons = ({ owner, repo, number, current }: Props) => {
+export default function StateButtons({ owner, repo, number, current }: Props) {
   const mutation = useUpdateIssue(owner, repo, number)
 
   return (
@@ -36,5 +36,3 @@ const StateButtons = ({ owner, repo, number, current }: Props) => {
     </div>
   )
 }
-
-export default StateButtons

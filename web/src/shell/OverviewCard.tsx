@@ -10,7 +10,7 @@ import PathBreadcrumb from "@/features/repo/PathBreadcrumb"
  * didn't summarize) just renders the breadcrumb, so navigation is identical
  * everywhere.
  */
-const OverviewCard = ({
+export default function OverviewCard({
   owner,
   repo,
   path,
@@ -20,12 +20,10 @@ const OverviewCard = ({
   repo: string
   path: string
   summaries: Record<string, string>
-}) => {
+}) {
   return (
     <section className="overview">
       <PathBreadcrumb owner={owner} repo={repo} path={path} summaries={summaries} />
     </section>
   )
 }
-
-export default OverviewCard

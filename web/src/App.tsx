@@ -28,12 +28,12 @@ import DevGalleryPage from "@/ui/DevGalleryPage"
 
 // The old Research and Summaries tabs merged into one Explore tab; keep their
 // URLs working by redirecting to the merged page.
-const ExploreRedirect = () => {
+function ExploreRedirect() {
   const { owner = "", repo = "" } = useParams()
   return <Navigate to={`/${owner}/${repo}/explore`} replace />
 }
 
-const App = () => {
+export default function App() {
   const [hasToken, setHasToken] = useState<boolean>(() => getToken() !== null)
 
   if (!hasToken) {
@@ -78,5 +78,3 @@ const App = () => {
     </Layout>
   )
 }
-
-export default App

@@ -21,7 +21,7 @@ function conflictsFrom(err: unknown): string[] {
   return []
 }
 
-const PullPage = () => {
+export default function PullPage() {
   const { owner = "", repo = "", number = "" } = useParams()
   const n = Number(number)
 
@@ -158,5 +158,3 @@ const PullPage = () => {
     </div>
   )
 }
-
-export default PullPage

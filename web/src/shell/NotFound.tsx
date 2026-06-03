@@ -8,7 +8,7 @@ interface Props {
 
 // Styled fallback for unmatched routes and 404s from the API — used instead of
 // a blank page or a raw backend error string.
-const NotFound = ({ title = "Page not found", detail }: Props) => {
+export default function NotFound({ title = "Page not found", detail }: Props) {
   return (
     <EmptyState>
       <h2>{title}</h2>
@@ -19,5 +19,3 @@ const NotFound = ({ title = "Page not found", detail }: Props) => {
     </EmptyState>
   )
 }
-
-export default NotFound

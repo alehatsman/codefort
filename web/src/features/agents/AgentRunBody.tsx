@@ -18,7 +18,7 @@ const TERMINAL = ["success", "failed", "canceled", "error", "interrupted", "stal
 // AgentRunBody renders an agent run's live transcript plus the follow-up
 // message box. A CI run renders CIRunBody (the job DAG) instead; both hang off
 // the shared run header in the parent.
-const AgentRunBody = ({
+export default function AgentRunBody({
   owner,
   repo,
   runNumber,
@@ -28,7 +28,7 @@ const AgentRunBody = ({
   repo: string
   runNumber: number
   run: CIRunDetail
-}) => {
+}) {
   return (
     <>
       <AgentTranscript owner={owner} repo={repo} runNumber={runNumber} run={run} />
@@ -42,7 +42,7 @@ const AgentRunBody = ({
 // stream-json line); we fold them into readable entries and render in order.
 // The same SSE consumer as CI handles replay + resume, so a terminal run
 // replays its whole transcript and a live one tails it.
-const AgentTranscript = ({
+function AgentTranscript({
   owner,
   repo,
   runNumber,
@@ -52,7 +52,7 @@ const AgentTranscript = ({
   repo: string
   runNumber: number
   run: CIRunDetail
-}) => {
+}) {
   // The server ends the event stream when a turn parks at awaiting_input (so the
   // response is finite and flushes through a buffering proxy/tunnel). When the
   // run resumes for another turn (awaiting_input -> running/finishing), bump the
@@ -316,7 +316,7 @@ function renderEntry(e: AgentEntry) {
 // AgentMessageBox lets a human send follow-up turns to an agent run. It's live
 // while the run isn't terminal: a message sent mid-turn queues behind the
 // current one (the server accepts it; the dispatch loop runs it next).
-const AgentMessageBox = ({
+function AgentMessageBox({
   owner,
   repo,
   runNumber,
@@ -326,7 +326,7 @@ const AgentMessageBox = ({
   repo: string
   runNumber: number
   run: CIRunDetail
-}) => {
+}) {
   const [text, setText] = useState("")
   const send = useCreateAgentTurn(owner, repo, runNumber)
   const finish = useFinishAgentRun(owner, repo, runNumber)
@@ -712,5 +712,3 @@ function compactJSON(v: unknown): string {
     return String(v)
   }
 }
-
-export default AgentRunBody

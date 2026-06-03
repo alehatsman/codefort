@@ -6,7 +6,7 @@ import { Link, useLocation, useParams } from "react-router-dom"
  * issues data. The active view is derived from the URL, not a prop —
  * lets you bookmark either view directly.
  */
-const IssuesViewSwitch = () => {
+export default function IssuesViewSwitch() {
   const { owner = "", repo = "" } = useParams()
   const location = useLocation()
   const isBoard = location.pathname.endsWith("/board")
@@ -41,5 +41,3 @@ const IssuesViewSwitch = () => {
     </div>
   )
 }
-
-export default IssuesViewSwitch

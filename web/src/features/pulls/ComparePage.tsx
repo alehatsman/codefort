@@ -13,7 +13,7 @@ import { Button, EmptyState, ErrorMessage, Spinner } from "@/ui"
  * and open a pull request. base/head live in the URL (?base=&head=) so a
  * comparison is bookmarkable; base defaults to the repo's default branch.
  */
-const ComparePage = () => {
+export default function ComparePage() {
   const { owner = "", repo = "" } = useParams()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -143,5 +143,3 @@ const ComparePage = () => {
     </div>
   )
 }
-
-export default ComparePage

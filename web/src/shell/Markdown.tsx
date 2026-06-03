@@ -24,7 +24,7 @@ interface Props {
  *  - images: relative → authenticated raw fetch (see RawImage)
  *  - code fences: highlighted via the shared lowlight instance
  */
-const Markdown = ({ content, owner, repo, basePath }: Props) => {
+export default function Markdown({ content, owner, repo, basePath }: Props) {
   const components: Components = {
     a({ href, children, ...props }) {
       if (!href) return <a {...props}>{children}</a>
@@ -99,7 +99,7 @@ interface RawImageProps {
  * don't leak. Falls back to the alt text if the fetch fails (missing file,
  * too large, …).
  */
-const RawImage = ({ owner, repo, path, alt }: RawImageProps) => {
+function RawImage({ owner, repo, path, alt }: RawImageProps) {
   const [url, setUrl] = useState<string>()
   const [failed, setFailed] = useState(false)
 
@@ -128,5 +128,3 @@ const RawImage = ({ owner, repo, path, alt }: RawImageProps) => {
   if (!url) return <span className="md-img-loading" role="img" aria-label={alt} />
   return <img src={url} alt={alt} />
 }
-
-export default Markdown

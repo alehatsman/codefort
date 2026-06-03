@@ -13,7 +13,7 @@ interface Props {
  * lets each glyph inherit it. The status string also becomes the icon's
  * accessible label and tooltip.
  */
-const CIStatusIcon = ({ status, size = 16, className = "" }: Props) => {
+export default function CIStatusIcon({ status, size = 16, className = "" }: Props) {
   const cls = `ci-icon ci-icon--${status} ${className}`.trim()
   const svgProps = {
     className: cls,
@@ -91,5 +91,3 @@ const CIStatusIcon = ({ status, size = 16, className = "" }: Props) => {
       )
   }
 }
-
-export default CIStatusIcon

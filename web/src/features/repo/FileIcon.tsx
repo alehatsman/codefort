@@ -8,7 +8,7 @@ interface Props {
  * accent tint via `.file-icon--tree`; files stay muted. Color is driven by
  * CSS so it follows the theme.
  */
-const FileIcon = ({ type, size = 16 }: Props) => {
+export default function FileIcon({ type, size = 16 }: Props) {
   const cls = `file-icon file-icon--${type}`
   const svgProps = {
     className: cls,
@@ -31,5 +31,3 @@ const FileIcon = ({ type, size = 16 }: Props) => {
     </svg>
   )
 }
-
-export default FileIcon

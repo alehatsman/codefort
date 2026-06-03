@@ -13,7 +13,7 @@ interface Props {
  * DraftReviewButton). The `<label>` wraps the control so the caption is its
  * accessible name with no `htmlFor` wiring.
  */
-const Field = ({ label, children }: Props) => {
+export default function Field({ label, children }: Props) {
   return (
     // biome-ignore lint/a11y/noLabelWithoutControl: the control is passed as children and rendered inside the label at runtime; the static check can't see through the children prop
     <label className="field">
@@ -22,5 +22,3 @@ const Field = ({ label, children }: Props) => {
     </label>
   )
 }
-
-export default Field

@@ -1,0 +1,25 @@
+// Enforce `function` declarations for module-level named definitions
+// (components, hooks, utilities). Arrows are allowed only as:
+//   1. inline callbacks (.map/.filter, event handlers, useCallback bodies, ...)
+//   2. functions defined *inside* a component/function body
+// So this flags ONLY a top-level `const X = (...) => ...` (an arrow assigned to a
+// module-scope const). The `within` negations exclude anything nested inside a
+// function (any signature — incl. return type / async), an object/class method,
+// or another arrow — leaving only module-scope declarations.
+language js
+
+`const $name = $params => $body` as $decl where {
+  not $decl <: within or {
+    `function $fn($fa) { $fb }`,
+    `function $fn($fa): $rt { $fb }`,
+    `async function $fn($fa) { $fb }`,
+    `async function $fn($fa): $rt { $fb }`,
+    `$ap => $ab`,
+    `$mn($ma) { $mb }`,
+    `$mn($ma): $mrt { $mb }`
+  },
+  register_diagnostic(
+    span = $decl,
+    message = "Module-level functions must be `function` declarations, not arrow consts (arrows are only for callbacks and in-component helpers)."
+  )
+}

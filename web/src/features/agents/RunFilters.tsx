@@ -3,7 +3,7 @@ import { type CIRunStatus, RUN_STATUSES } from "@/api/types"
 // RunFilters is the search box + status chip row shared by the global and
 // per-repo Agents lists, matching the issues filter chrome (.filters/.chip).
 // State lives in the parent (useRunFilters); this is presentational.
-const RunFilters = ({
+export default function RunFilters({
   search,
   onSearch,
   placeholder,
@@ -15,7 +15,7 @@ const RunFilters = ({
   placeholder: string
   activeStates: CIRunStatus[]
   onToggleState: (s: CIRunStatus) => void
-}) => {
+}) {
   return (
     <div className="filters">
       <input
@@ -42,5 +42,3 @@ const RunFilters = ({
     </div>
   )
 }
-
-export default RunFilters

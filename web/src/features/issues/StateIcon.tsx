@@ -11,7 +11,7 @@ interface Props {
  * via `state-icon--<state>` modifier; `currentColor` lets the icon
  * inherit it.
  */
-const StateIcon = ({ state, size = 16, className = "" }: Props) => {
+export default function StateIcon({ state, size = 16, className = "" }: Props) {
   const cls = `state-icon state-icon--${state} ${className}`.trim()
   const svgProps = {
     className: cls,
@@ -58,5 +58,3 @@ const StateIcon = ({ state, size = 16, className = "" }: Props) => {
       )
   }
 }
-
-export default StateIcon

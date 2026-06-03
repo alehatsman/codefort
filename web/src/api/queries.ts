@@ -349,8 +349,9 @@ export function useIntelSummaries(owner: string, repo: string, enabled: boolean)
 // Poll the list while any run is still live, so a freshly pushed run shows
 // progress without a refresh; stop once everything is terminal. Shared by
 // useCIRuns and useCommitCIStatus, the two readers of this query.
-const ciRunsRefetchInterval = (q: { state: { data?: CIRun[] } }) =>
-  q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false
+function ciRunsRefetchInterval(q: { state: { data?: CIRun[] } }) {
+  return q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false
+}
 
 export function useCIRuns(owner: string, repo: string, kind: "" | "ci" | "agent" = "", query = "") {
   const params = new URLSearchParams(query)

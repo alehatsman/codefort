@@ -13,8 +13,6 @@ interface Props extends HTMLAttributes<HTMLDivElement> {
  * `<Link className="card">` since they need router semantics this div can't
  * carry; this covers the plain `<div className="card">` case (~38 usages).
  */
-const Card = ({ selected, className, ...rest }: Props) => {
+export default function Card({ selected, className, ...rest }: Props) {
   return <div className={clsx("card", { "is-vim-selected": selected }, className)} {...rest} />
 }
-
-export default Card

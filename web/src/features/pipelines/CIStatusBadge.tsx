@@ -6,10 +6,8 @@ import type { CIJobStatus, CIRunStatus } from "@/api/types"
 // status strings are shared between runs and jobs (jobs add "skipped").
 // No conditional here — clsx is used for the shared BEM-modifier convention,
 // not because it removes any artifact (see StateButtons for the real win).
-const CIStatusBadge = ({ status }: { status: CIRunStatus | CIJobStatus }) => {
+export default function CIStatusBadge({ status }: { status: CIRunStatus | CIJobStatus }) {
   return (
     <span className={clsx("ci-badge", `ci-badge--${status}`)}>{status.replace(/_/g, " ")}</span>
   )
 }
-
-export default CIStatusBadge

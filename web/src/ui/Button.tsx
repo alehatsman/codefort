@@ -18,13 +18,13 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
  * Defaults to `type="button"`: a bare <button> inside a <form> submits, which
  * is almost never what these are for. Pass `type="submit"` explicitly.
  */
-const Button = ({
+export default function Button({
   variant = "default",
   size = "md",
   className,
   type = "button",
   ...rest
-}: Props) => {
+}: Props) {
   return (
     <button
       type={type}
@@ -42,5 +42,3 @@ const Button = ({
     />
   )
 }
-
-export default Button

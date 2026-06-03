@@ -26,7 +26,7 @@ interface Props {
  * touched it (when available). Folders route to the tree view, files to the
  * blob view. The backend already sorts entries directories-first.
  */
-const FileTree = ({
+export default function FileTree({
   owner,
   repo,
   entries,
@@ -34,7 +34,7 @@ const FileTree = ({
   commits,
   commitsLoading = false,
   summaries,
-}: Props) => {
+}: Props) {
   const base = `/${owner}/${repo}`
 
   if (entries.length === 0) {
@@ -96,5 +96,3 @@ const FileTree = ({
     </ul>
   )
 }
-
-export default FileTree

@@ -17,7 +17,7 @@ import {
 // agent runs (kind="agent", the Agents tab) in one table, newest-created first.
 // Each row links into the owning repo's per-repo run detail (which carries the
 // job DAG / agent transcript). List-only — the detail routes stay repo-scoped.
-const GlobalRunsPage = ({ kind }: { kind: RunKind }) => {
+export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
   const { data, isLoading, error } = useAllRuns(kind)
   const isAgent = kind === "agent"
   const base = runsBasePath(kind)
@@ -100,5 +100,3 @@ const GlobalRunsPage = ({ kind }: { kind: RunKind }) => {
     </section>
   )
 }
-
-export default GlobalRunsPage
