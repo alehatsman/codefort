@@ -209,13 +209,13 @@ test("Specs: ⌘P quick-open fuzzy-jumps to a spec", async ({ page }) => {
   await expect(page).toHaveURL(/[?&]path=specs%2Fci%2Fpipeline\.md/)
 })
 
-test("Specs: the Jump button opens the palette and a click selects", async ({ page }) => {
+test("Specs: ⌘P quick-open lists every spec and a click selects", async ({ page }) => {
   await seedToken(page)
   await mockApi(page)
   await mockSpecs(page, SPECS)
 
   await page.goto("/alice/demo/specs")
-  await page.locator(".spec-jump", { hasText: "Jump to a spec" }).click()
+  await page.keyboard.press("Control+p")
   await expect(page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")).toBeVisible()
 
   // Empty query lists every spec; clicking one opens it.
@@ -253,16 +253,6 @@ test("Specs: ⌘⇧F semantic search lists hits and deep-links to a section", as
   await expect(page.locator(".spec-view h2", { hasText: "Behavior" })).toBeVisible()
 })
 
-test("Specs: the Search button opens the semantic search palette", async ({ page }) => {
-  await seedToken(page)
-  await mockApi(page)
-  await mockSpecs(page, SPECS)
-  await mockSearch(page, SEARCH)
-
-  await page.goto("/alice/demo/specs")
-  await page.locator(".spec-jump", { hasText: "Search specs" }).click()
-  await expect(page.locator(".specsearch .quickopen__input")).toBeVisible()
-})
 
 test("Specs: edit a spec — live preview, save to a branch, PR link", async ({ page }) => {
   await seedToken(page)

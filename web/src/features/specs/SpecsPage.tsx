@@ -1,5 +1,5 @@
 import "./specs.css"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
 import { useRepo, useSpec, useSpecsList } from "@/api/queries"
 import CommandPalette, { type Command } from "@/features/specs/CommandPalette"
@@ -131,35 +131,6 @@ export default function SpecsPage() {
       ) : specs.length > 0 ? (
         <div className="specs-layout">
           <aside className="specs-sidebar">
-            <div className="spec-actions">
-              <button
-                type="button"
-                className="spec-jump"
-                onClick={() => setCmdkOpen(true)}
-                title="Run a spec command"
-              >
-                <span>Commands…</span>
-                <kbd className="spec-jump__kbd">⌘K</kbd>
-              </button>
-              <button
-                type="button"
-                className="spec-jump"
-                onClick={() => setPaletteOpen(true)}
-                title="Jump to a spec"
-              >
-                <span>Jump to a spec…</span>
-                <kbd className="spec-jump__kbd">⌘P</kbd>
-              </button>
-              <button
-                type="button"
-                className="spec-jump"
-                onClick={() => setSearchOpen(true)}
-                title="Search specs"
-              >
-                <span>Search specs…</span>
-                <kbd className="spec-jump__kbd">⌘⇧F</kbd>
-              </button>
-            </div>
             <StatusRail specs={specs} />
             <SpecTree groups={groups} selectedPath={selectedPath} onSelect={selectSpec} />
           </aside>
@@ -314,21 +285,25 @@ function SpecView({
   const basePath = path.split("/").slice(0, -1).join("/")
   return (
     <article ref={articleRef} className="spec-view">
-      <div className="spec-view__actions">
-        <Button variant="ghost" onClick={() => setEditing(true)}>
-          Edit
-        </Button>
-        <Link className="spec-view__history" to={`/${owner}/${repo}/commits/${path}`}>
-          History
-        </Link>
-      </div>
-      <SpecHeader spec={data} />
+      <SpecHeader
+        spec={data}
+        actions={
+          <div className="spec-view__actions">
+            <Button variant="ghost" onClick={() => setEditing(true)}>
+              Edit
+            </Button>
+            <Link className="spec-view__history" to={`/${owner}/${repo}/commits/${path}`}>
+              History
+            </Link>
+          </div>
+        }
+      />
       <Markdown content={data.body} owner={owner} repo={repo} basePath={basePath} />
     </article>
   )
 }
 
-function SpecHeader({ spec }: { spec: SpecContent }) {
+function SpecHeader({ spec, actions }: { spec: SpecContent; actions?: ReactNode }) {
   const hasMeta = !!(spec.owners?.length || spec.covers?.length || spec.last_verified)
   return (
     <header className="spec-view__head">
@@ -336,6 +311,7 @@ function SpecHeader({ spec }: { spec: SpecContent }) {
         <span className={`spec-dot spec-dot--${statusKey(spec.status)}`} aria-hidden />
         <h1 className="spec-view__title">{spec.title}</h1>
         {spec.status && <span className="spec-view__status muted small">{spec.status}</span>}
+        {actions}
       </div>
       {hasMeta && (
         <div className="spec-view__meta muted small">
