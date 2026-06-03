@@ -24,6 +24,7 @@ import {
   StatusPill,
   Switch,
   Tab,
+  Table,
   Tabs,
   Textarea,
   Toolbar,
@@ -55,6 +56,7 @@ export default function DevGalleryPage() {
       <BadgesSection />
       <StatusPillSection />
       <ListRowSection />
+      <TableSection />
       <StatusIconSection />
       <SegmentedControlSection />
       <ChipsSection />
@@ -348,6 +350,43 @@ function ListRowSection() {
           meta="#11 opened yesterday by alice"
         />
       </ul>
+    </section>
+  )
+}
+
+function TableSection() {
+  return (
+    <section className="gallery__section">
+      <h3 className="gallery__heading">Table</h3>
+      <Table>
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Status</th>
+            <th>When</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>#42</td>
+            <td>
+              <StatusPill dense capitalize className="ci-badge--success">
+                success
+              </StatusPill>
+            </td>
+            <td>2m ago</td>
+          </tr>
+          <tr>
+            <td>#41</td>
+            <td>
+              <StatusPill dense capitalize className="ci-badge--failed">
+                failed
+              </StatusPill>
+            </td>
+            <td>1h ago</td>
+          </tr>
+        </tbody>
+      </Table>
     </section>
   )
 }
