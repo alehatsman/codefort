@@ -19,6 +19,7 @@ import {
   Spinner,
   Stack,
   StatusIcon,
+  StatusPill,
   Switch,
   Tab,
   Tabs,
@@ -49,6 +50,7 @@ export default function DevGalleryPage() {
       <ButtonsSection />
       <TabsSection />
       <BadgesSection />
+      <StatusPillSection />
       <StatusIconSection />
       <SegmentedControlSection />
       <ChipsSection />
@@ -281,6 +283,22 @@ function BadgesSection() {
         <Badge key={state} state={state}>
           {state}
         </Badge>
+      ))}
+    </Section>
+  )
+}
+
+// CIStatusBadge's color vocabulary, shown straight on StatusPill (dense +
+// capitalize) so the gallery stays @/ui-only — no feature import.
+const CI_STATUSES = ["success", "running", "failed", "queued", "skipped", "stalled"] as const
+
+function StatusPillSection() {
+  return (
+    <Section title="StatusPill — CI statuses (dense)">
+      {CI_STATUSES.map((status) => (
+        <StatusPill key={status} dense capitalize className={`ci-badge--${status}`}>
+          {status}
+        </StatusPill>
       ))}
     </Section>
   )
