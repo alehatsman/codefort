@@ -12,7 +12,7 @@ interface Props {
  * identical `<label className="chip"><input type="checkbox" …/>…</label>`
  * markup lived in both IssuesPage and PullsPage; this is that block, once.
  */
-export default function FilterChip({ checked, onChange, children }: Props) {
+const FilterChip = ({ checked, onChange, children }: Props) => {
   return (
     <label className="chip">
       <input type="checkbox" checked={checked} onChange={onChange} />
@@ -20,3 +20,5 @@ export default function FilterChip({ checked, onChange, children }: Props) {
     </label>
   )
 }
+
+export default FilterChip

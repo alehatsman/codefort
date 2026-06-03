@@ -22,7 +22,7 @@ interface Props {
  * Living on every repo route, this is also where h/l tab navigation is wired
  * (`useTabNav`), so the keys work consistently across all tabs.
  */
-export default function RepoTabs({ owner, repo, openIssues }: Props) {
+const RepoTabs = ({ owner, repo, openIssues }: Props) => {
   const location = useLocation()
   useTabNav(owner, repo)
   const base = `/${owner}/${repo}`
@@ -74,3 +74,5 @@ export default function RepoTabs({ owner, repo, openIssues }: Props) {
     </nav>
   )
 }
+
+export default RepoTabs

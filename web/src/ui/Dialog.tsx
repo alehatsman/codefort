@@ -22,7 +22,7 @@ interface Props {
  * their own `ref`, validation, and submit logic. `<dialog>` handles Esc and
  * focus natively.
  */
-export default function Dialog({ ref, title, onClose, onSubmit, footer, children }: Props) {
+const Dialog = ({ ref, title, onClose, onSubmit, footer, children }: Props) => {
   function onBackdropClick(e: React.MouseEvent<HTMLDialogElement>) {
     if (e.target === e.currentTarget) onClose()
   }
@@ -50,3 +50,5 @@ export default function Dialog({ ref, title, onClose, onSubmit, footer, children
     </dialog>
   )
 }
+
+export default Dialog

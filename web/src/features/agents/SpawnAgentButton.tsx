@@ -45,7 +45,7 @@ const PROFILES: { value: CIRunToolProfile; label: string; hint: string }[] = [
  * run view under Pipelines, where the transcript streams live. The base
  * defaults to the repo's HEAD (the server resolves it).
  */
-export default function SpawnAgentButton({ owner, repo, number }: Props) {
+const SpawnAgentButton = ({ owner, repo, number }: Props) => {
   const navigate = useNavigate()
   const spawn = useSpawnAgent(owner, repo, number)
   // The selector defaults to the operator's configured default model (Settings
@@ -129,3 +129,5 @@ export default function SpawnAgentButton({ owner, repo, number }: Props) {
     </>
   )
 }
+
+export default SpawnAgentButton

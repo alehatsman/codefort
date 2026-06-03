@@ -21,7 +21,7 @@ interface Props {
  * assignee is completion attribution, not a live lease, so the claim/release
  * action is hidden — it reads "Completed by" instead.
  */
-export default function AssigneeControl({ owner, repo, number, assignee, state, me }: Props) {
+const AssigneeControl = ({ owner, repo, number, assignee, state, me }: Props) => {
   const claim = useClaimIssue(owner, repo, number)
   const unclaim = useUnclaimIssue(owner, repo, number)
   const inFlight = claim.isPending || unclaim.isPending
@@ -60,3 +60,5 @@ export default function AssigneeControl({ owner, repo, number, assignee, state, 
     </div>
   )
 }
+
+export default AssigneeControl

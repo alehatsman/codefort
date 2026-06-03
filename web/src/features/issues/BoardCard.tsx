@@ -15,7 +15,7 @@ interface Props {
  * after a drop is swallowed by BoardPage's document-level capture listener,
  * which survives the card remounting into its new column.
  */
-export default function BoardCard({ owner, repo, issue }: Props) {
+const BoardCard = ({ owner, repo, issue }: Props) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `issue-${issue.id}`,
     data: { issueNumber: issue.number, currentState: issue.state },
@@ -42,3 +42,5 @@ export default function BoardCard({ owner, repo, issue }: Props) {
     </div>
   )
 }
+
+export default BoardCard

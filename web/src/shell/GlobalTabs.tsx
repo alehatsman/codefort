@@ -8,7 +8,7 @@ import { Link, useLocation } from "react-router-dom"
  * Issues / Pull requests / Pipelines / Agents feeds. The active tab is derived
  * from the current URL.
  */
-export default function GlobalTabs() {
+const GlobalTabs = () => {
   const { pathname } = useLocation()
   const isRepos = pathname === "/"
   const isIssues = pathname.startsWith("/issues")
@@ -36,3 +36,5 @@ export default function GlobalTabs() {
     </nav>
   )
 }
+
+export default GlobalTabs

@@ -22,7 +22,7 @@ const STATUS_LABEL: Record<DiffFile["status"], string> = {
  * column. Per-line syntax highlighting reuses the shared lowlight grammar set
  * (see highlight.tsx) so colours match the blob viewer.
  */
-export default function DiffView({ file, mode }: Props) {
+const DiffView = ({ file, mode }: Props) => {
   // Grammar is picked from the post-image path (or the old path for a delete).
   const lang = useMemo(
     () => langFromPath(file.new_path || file.old_path),
@@ -102,7 +102,7 @@ function pairRows(lines: DiffLine[]): SplitRow[] {
   return rows
 }
 
-function SplitTable({ hunks, lang }: { hunks: DiffHunk[]; lang?: string }) {
+const SplitTable = ({ hunks, lang }: { hunks: DiffHunk[]; lang?: string }) => {
   return (
     <table className="diff-split hljs">
       {/* Fixed layout sizes columns from <col>, not later-row cells: keep the
@@ -122,7 +122,7 @@ function SplitTable({ hunks, lang }: { hunks: DiffHunk[]; lang?: string }) {
   )
 }
 
-function HunkSplit({ hunk, lang }: { hunk: DiffHunk; lang?: string }) {
+const HunkSplit = ({ hunk, lang }: { hunk: DiffHunk; lang?: string }) => {
   const rows = pairRows(hunk.lines)
   return (
     <>
@@ -147,7 +147,7 @@ function HunkSplit({ hunk, lang }: { hunk: DiffHunk; lang?: string }) {
   )
 }
 
-function UnifiedTable({ hunks, lang }: { hunks: DiffHunk[]; lang?: string }) {
+const UnifiedTable = ({ hunks, lang }: { hunks: DiffHunk[]; lang?: string }) => {
   return (
     <table className="diff-unified hljs">
       <colgroup>
@@ -164,7 +164,7 @@ function UnifiedTable({ hunks, lang }: { hunks: DiffHunk[]; lang?: string }) {
   )
 }
 
-function HunkUnified({ hunk, lang }: { hunk: DiffHunk; lang?: string }) {
+const HunkUnified = ({ hunk, lang }: { hunk: DiffHunk; lang?: string }) => {
   return (
     <>
       <tr className="diff-hunk">
@@ -187,3 +187,5 @@ function HunkUnified({ hunk, lang }: { hunk: DiffHunk; lang?: string }) {
     </>
   )
 }
+
+export default DiffView

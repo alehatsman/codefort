@@ -14,7 +14,7 @@ const PER_PAGE = 30
  * (the splat param). GitHub-style: rows grouped by calendar day, newest
  * first, with a "Load more" button that pages through the history.
  */
-export default function CommitsPage() {
+const CommitsPage = () => {
   const { owner = "", repo = "" } = useParams()
   const path = useParams()["*"] ?? ""
 
@@ -76,7 +76,7 @@ export default function CommitsPage() {
   )
 }
 
-function CommitRow({
+const CommitRow = ({
   owner,
   repo,
   commit,
@@ -86,7 +86,7 @@ function CommitRow({
   repo: string
   commit: Commit
   ciRun?: CIRun
-}) {
+}) => {
   const to = `/${owner}/${repo}/commit/${commit.sha}`
   return (
     <li className="commit-row">
@@ -142,3 +142,5 @@ function groupByDay(commits: Commit[]): DayGroup[] {
   }
   return groups
 }
+
+export default CommitsPage

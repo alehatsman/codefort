@@ -11,7 +11,7 @@ import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import { useListNav } from "@/shell/keyboardNav"
 import { EmptyState, ErrorMessage, FilterChip, Spinner } from "@/ui"
 
-export default function IssuesPage() {
+const IssuesPage = () => {
   const { owner = "", repo = "" } = useParams()
   const navigate = useNavigate()
   const [activeStates, setActiveStates] = useState<IssueState[]>(["todo", "in_progress"])
@@ -221,3 +221,5 @@ export default function IssuesPage() {
     </div>
   )
 }
+
+export default IssuesPage

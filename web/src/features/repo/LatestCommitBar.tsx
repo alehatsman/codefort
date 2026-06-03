@@ -21,15 +21,7 @@ interface Props {
  * right. While the commit annotation query is in flight it shows a dim
  * placeholder so the file tree doesn't jump when the data arrives.
  */
-export default function LatestCommitBar({
-  owner,
-  repo,
-  path,
-  latest,
-  ciRun,
-  total,
-  loading,
-}: Props) {
+const LatestCommitBar = ({ owner, repo, path, latest, ciRun, total, loading }: Props) => {
   const commitsHref = `/${owner}/${repo}/commits${path ? `/${path}` : ""}`
 
   return (
@@ -61,3 +53,5 @@ export default function LatestCommitBar({
     </div>
   )
 }
+
+export default LatestCommitBar

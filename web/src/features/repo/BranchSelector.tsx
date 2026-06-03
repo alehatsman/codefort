@@ -12,7 +12,7 @@ interface Props {
  * comments anchored to it. An empty value means the repo's default branch — we
  * never write the default into the URL, keeping default-branch links clean.
  */
-export default function BranchSelector({ owner, repo }: Props) {
+const BranchSelector = ({ owner, repo }: Props) => {
   const refsQ = useRefs(owner, repo)
   const [params, setParams] = useSearchParams()
   const current = params.get("ref") ?? ""
@@ -46,3 +46,5 @@ export default function BranchSelector({ owner, repo }: Props) {
     </label>
   )
 }
+
+export default BranchSelector

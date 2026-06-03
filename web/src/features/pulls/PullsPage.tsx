@@ -17,7 +17,7 @@ const STATE_LABEL: Record<PRState, string> = {
 // "active states" default rather than showing everything.
 const DEFAULT_STATES: readonly PRState[] = ["open"]
 
-export default function PullsPage() {
+const PullsPage = () => {
   const { owner = "", repo = "" } = useParams()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -136,3 +136,5 @@ export default function PullsPage() {
     </div>
   )
 }
+
+export default PullsPage

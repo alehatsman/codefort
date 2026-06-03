@@ -7,7 +7,7 @@ interface Props {
   onSet: () => void
 }
 
-export default function TokenGate({ onSet }: Props) {
+const TokenGate = ({ onSet }: Props) => {
   const [value, setValue] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
@@ -60,3 +60,5 @@ export default function TokenGate({ onSet }: Props) {
     </div>
   )
 }
+
+export default TokenGate

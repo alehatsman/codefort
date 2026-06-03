@@ -18,7 +18,7 @@ interface Props {
  * relative time — used in the blob header. The subject links to the file's
  * commit history.
  */
-export default function CommitMeta({ owner, repo, commit, ciRun, className }: Props) {
+const CommitMeta = ({ owner, repo, commit, ciRun, className }: Props) => {
   return (
     <div className={clsx("commit-meta", className)}>
       <Avatar name={commit.author} />
@@ -38,3 +38,5 @@ export default function CommitMeta({ owner, repo, commit, ciRun, className }: Pr
     </div>
   )
 }
+
+export default CommitMeta

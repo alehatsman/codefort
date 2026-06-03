@@ -16,7 +16,7 @@ type Mode = "split" | "unified"
  * from the commit endpoint (metadata + structured hunks); split is the default
  * layout per the GitHub-style side-by-side request.
  */
-export default function CommitPage() {
+const CommitPage = () => {
   const { owner = "", repo = "", sha = "" } = useParams()
   const commitQ = useCommit(owner, repo, sha)
   const [mode, setMode] = useState<Mode>("split")
@@ -127,3 +127,5 @@ export default function CommitPage() {
     </div>
   )
 }
+
+export default CommitPage

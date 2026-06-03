@@ -20,7 +20,7 @@ import { Button, ErrorMessage, RelativeTime, Spinner } from "@/ui"
 // when an issue with a body is actually shown.
 const Markdown = lazy(() => import("@/shell/Markdown"))
 
-export default function IssuePage() {
+const IssuePage = () => {
   const { owner = "", repo = "", number: numStr = "" } = useParams()
   const num = Number(numStr)
 
@@ -182,3 +182,5 @@ export default function IssuePage() {
     </div>
   )
 }
+
+export default IssuePage

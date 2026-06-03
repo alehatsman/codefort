@@ -27,7 +27,7 @@ function segClass(base: string, hasSummary: boolean) {
  * taken) and is marked with a dotted underline so the affordance is visible.
  * This is the single navigation header shown across repo routes.
  */
-export default function PathBreadcrumb({ owner, repo, path, summaries }: Props) {
+const PathBreadcrumb = ({ owner, repo, path, summaries }: Props) => {
   const base = `/${owner}/${repo}`
   const segments = path === "" ? [] : path.split("/")
   const repoSummary = summaries?.[""]
@@ -83,3 +83,5 @@ export default function PathBreadcrumb({ owner, repo, path, summaries }: Props) 
     </div>
   )
 }
+
+export default PathBreadcrumb

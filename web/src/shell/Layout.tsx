@@ -18,7 +18,7 @@ function repoFromPath(pathname: string): { owner: string; repo: string } | null 
   return { owner: segs[0], repo: segs[1] }
 }
 
-export default function Layout({ children, onSignOut }: Props) {
+const Layout = ({ children, onSignOut }: Props) => {
   const { pathname } = useLocation()
   const ctx = repoFromPath(pathname)
   // Shares the repos-list / repo cache key, so this never fires an extra
@@ -56,3 +56,5 @@ export default function Layout({ children, onSignOut }: Props) {
     </div>
   )
 }
+
+export default Layout

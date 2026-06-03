@@ -11,7 +11,7 @@ interface Props {
  * that does. Lossy by design (a commit can live on several branches), so this
  * is a hint, not the full set.
  */
-export default function BranchTag({ branch, className }: Props) {
+const BranchTag = ({ branch, className }: Props) => {
   return (
     <span className={clsx("branch-tag", className)} title={`on ${branch}`}>
       <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="currentColor">
@@ -21,3 +21,5 @@ export default function BranchTag({ branch, className }: Props) {
     </span>
   )
 }
+
+export default BranchTag

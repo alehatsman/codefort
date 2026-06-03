@@ -33,7 +33,7 @@ import type {
  * tree-commits fetched once per distinct package-parent directory, joined to
  * the dex summaries by path.
  */
-export default function ExplorePage() {
+const ExplorePage = () => {
   const { owner = "", repo = "" } = useParams()
   const repoQ = useRepo(owner, repo)
   const intelQ = useIntel(owner, repo)
@@ -172,7 +172,7 @@ function distinctParents(packages: IntelPackageSummary[]): string[] {
    collapsible <details> card (same pattern as DiffView's file cards): the repo
    name is the always-visible toggle, the prose + stats the body, so a reader
    can close the summary once they've read it. */
-function Hero({
+const Hero = ({
   repo,
   project,
   summary,
@@ -182,7 +182,7 @@ function Hero({
   project: IntelProject
   summary?: string
   loading: boolean
-}) {
+}) => {
   const composed = Math.max(0, project.chunks - project.pending_summaries)
   return (
     <details className="explore-hero" open>
@@ -222,7 +222,7 @@ function Hero({
    "Where work is happening": the packages touched most recently, newest first,
    each annotated with its dex summary. Honest stand-in for "hottest pages" —
    there's no traffic metric, so recency of change is the available signal. */
-function Hotspots({
+const Hotspots = ({
   owner,
   repo,
   packages,
@@ -232,7 +232,7 @@ function Hotspots({
   repo: string
   packages: IntelPackageSummary[]
   lastCommitByPath: Record<string, Commit>
-}) {
+}) => {
   const ranked = useMemo(() => {
     return packages
       .filter((p) => p.path !== "." && p.path !== "" && lastCommitByPath[p.path])
@@ -303,7 +303,7 @@ interface MapProps {
 // PackageMap prefers dex's real package import DAG (graph-driven layering +
 // cross-links). When dex returns no graph — a non-Go or un-graphed repo — it
 // falls back to the path-name grouping so those repos still render a map.
-function PackageMap(props: MapProps) {
+const PackageMap = (props: MapProps) => {
   const { graph } = props
   // Prefer the graph map only when packages have real import edges (a Go-only
   // DAG today). dex emits a node per non-Go dir too (web/src TS modules,
@@ -327,7 +327,14 @@ function PackageMap(props: MapProps) {
   return <FallbackPackageMap {...props} />
 }
 
-function FallbackPackageMap({ owner, repo, packages, lastCommitByPath, loading, error }: MapProps) {
+const FallbackPackageMap = ({
+  owner,
+  repo,
+  packages,
+  lastCommitByPath,
+  loading,
+  error,
+}: MapProps) => {
   const groups = useMemo(() => {
     const byLayer = new Map<string, IntelPackageSummary[]>()
     for (const p of packages) {
@@ -410,7 +417,7 @@ interface MapModel {
   hiddenCount: number // isolated nodes (non-Go / un-graphed) left out
 }
 
-function GraphPackageMap({
+const GraphPackageMap = ({
   owner,
   repo,
   packages,
@@ -418,7 +425,7 @@ function GraphPackageMap({
   lastCommitByPath,
   loading,
   error,
-}: MapProps & { graph: IntelPackageGraph }) {
+}: MapProps & { graph: IntelPackageGraph }) => {
   const { tiers, linkedCount, hiddenCount } = useMemo(
     () => buildTiers(graph, packages, lastCommitByPath),
     [graph, packages, lastCommitByPath]
@@ -459,7 +466,15 @@ function GraphPackageMap({
   )
 }
 
-function GraphPackageCard({ owner, repo, card }: { owner: string; repo: string; card: PkgCard }) {
+const GraphPackageCard = ({
+  owner,
+  repo,
+  card,
+}: {
+  owner: string
+  repo: string
+  card: PkgCard
+}) => {
   return (
     <details className="pkg-card">
       <summary className="pkg-card__summary">
@@ -510,7 +525,7 @@ function GraphPackageCard({ owner, repo, card }: { owner: string; repo: string; 
 // DepLink renders a cross-link to another package's files, or plain text when
 // the import path couldn't be mapped to a repo directory (mixed-language /
 // vendored paths).
-function DepLink({ owner, repo, dep }: { owner: string; repo: string; dep: PkgRef }) {
+const DepLink = ({ owner, repo, dep }: { owner: string; repo: string; dep: PkgRef }) => {
   if (!dep.local) return <span className="pkg-dep pkg-dep--plain">{dep.label}</span>
   return (
     <Link className="pkg-dep" to={`/${owner}/${repo}/tree/${dep.repoRel}`}>
@@ -661,7 +676,7 @@ function pushTo(m: Map<string, string[]>, key: string, val: string) {
   else m.set(key, [val])
 }
 
-function PackageCard({
+const PackageCard = ({
   owner,
   repo,
   pkg,
@@ -671,7 +686,7 @@ function PackageCard({
   repo: string
   pkg: IntelPackageSummary
   commit?: Commit
-}) {
+}) => {
   return (
     <details className="pkg-card">
       <summary className="pkg-card__summary">
@@ -691,7 +706,7 @@ function PackageCard({
    One natural-language box up front (kind defaults to "ask"). The semantic /
    symbol / callers / callees power modes hide behind an Advanced disclosure so
    newcomers aren't met with a mode picker. */
-function AskBox({ owner, repo }: { owner: string; repo: string }) {
+const AskBox = ({ owner, repo }: { owner: string; repo: string }) => {
   const [query, setQuery] = useState("")
   const [kind, setKind] = useState<IntelSearchKind>("ask")
   const [advanced, setAdvanced] = useState(false)
@@ -758,7 +773,7 @@ function AskBox({ owner, repo }: { owner: string; repo: string }) {
   )
 }
 
-function IntelResult({
+const IntelResult = ({
   owner,
   repo,
   result,
@@ -766,7 +781,7 @@ function IntelResult({
   owner: string
   repo: string
   result: IntelSearchResult
-}) {
+}) => {
   // dex's /ask returns extra structure (a synthesized answer, next_action,
   // suggested_reads, annotations). Render that CLI-style. Other kinds keep
   // the flat list.
@@ -777,7 +792,7 @@ function IntelResult({
   return <SearchHits owner={owner} repo={repo} result={result} />
 }
 
-function AskView({
+const AskView = ({
   owner,
   repo,
   result,
@@ -785,7 +800,7 @@ function AskView({
   owner: string
   repo: string
   result: IntelSearchResult
-}) {
+}) => {
   if (result.status !== "ok") {
     return (
       <EmptyState>
@@ -907,7 +922,7 @@ function AskView({
   )
 }
 
-function GraphSection({ graph }: { graph: NonNullable<IntelSearchResult["graph"]> }) {
+const GraphSection = ({ graph }: { graph: NonNullable<IntelSearchResult["graph"]> }) => {
   // Group by kind so the section reads as "Packages: x, y · Functions: a, b".
   const groups = new Map<string, typeof graph.nodes>()
   for (const n of graph.nodes) {
@@ -956,7 +971,7 @@ function shortName(n: { id: string; qualified_name?: string }): string {
   return n.qualified_name || n.id
 }
 
-function SearchHits({
+const SearchHits = ({
   owner,
   repo,
   result,
@@ -964,7 +979,7 @@ function SearchHits({
   owner: string
   repo: string
   result: IntelSearchResult
-}) {
+}) => {
   if (result.status !== "ok") {
     return (
       <EmptyState>
@@ -1052,3 +1067,5 @@ function firstLine(s: string): string {
   const head = i === -1 ? s : s.slice(0, i)
   return head.length > 140 ? `${head.slice(0, 137)}…` : head
 }
+
+export default ExplorePage

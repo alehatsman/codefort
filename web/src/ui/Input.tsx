@@ -6,6 +6,8 @@ import type { ComponentPropsWithRef } from "react"
  * class and forwards every native prop (incl. `ref`), so call sites stop
  * repeating `className="input"`. Pass `className` to extend, not replace.
  */
-export default function Input({ className, ...rest }: ComponentPropsWithRef<"input">) {
+const Input = ({ className, ...rest }: ComponentPropsWithRef<"input">) => {
   return <input className={clsx("input", className)} {...rest} />
 }
+
+export default Input

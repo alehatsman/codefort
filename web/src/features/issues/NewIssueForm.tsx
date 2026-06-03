@@ -18,7 +18,7 @@ interface Props {
  * The dialog resets on close (both via submit success and explicit
  * cancel) so the next open starts fresh.
  */
-export default function NewIssueForm({ owner, repo, onCreated }: Props) {
+const NewIssueForm = ({ owner, repo, onCreated }: Props) => {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const [title, setTitle] = useState("")
@@ -108,3 +108,5 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
     </>
   )
 }
+
+export default NewIssueForm

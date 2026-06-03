@@ -17,14 +17,7 @@ interface Props {
  * re-renders with the new content), then calls onDone to leave edit mode.
  * An empty body clears the description.
  */
-export default function EditIssueForm({
-  owner,
-  repo,
-  number,
-  initialTitle,
-  initialBody,
-  onDone,
-}: Props) {
+const EditIssueForm = ({ owner, repo, number, initialTitle, initialBody, onDone }: Props) => {
   const [title, setTitle] = useState(initialTitle)
   const [body, setBody] = useState(initialBody)
   const mutation = useUpdateIssue(owner, repo, number)
@@ -61,3 +54,5 @@ export default function EditIssueForm({
     </form>
   )
 }
+
+export default EditIssueForm

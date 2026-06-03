@@ -14,7 +14,7 @@ interface Props {
  * to the issues list on success; the mutation invalidates the list/repo
  * counts so they refresh.
  */
-export default function DeleteIssueButton({ owner, repo, number }: Props) {
+const DeleteIssueButton = ({ owner, repo, number }: Props) => {
   const navigate = useNavigate()
   const del = useDeleteIssue(owner, repo, number)
 
@@ -34,3 +34,5 @@ export default function DeleteIssueButton({ owner, repo, number }: Props) {
     </>
   )
 }
+
+export default DeleteIssueButton

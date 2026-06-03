@@ -12,7 +12,7 @@ interface Props {
  * Add-a-comment textarea + submit button. Local state for the
  * draft; server state is the mutation.
  */
-export default function CommentForm({ owner, repo, number }: Props) {
+const CommentForm = ({ owner, repo, number }: Props) => {
   const [body, setBody] = useState("")
   const mutation = useCreateComment(owner, repo, number)
 
@@ -51,3 +51,5 @@ export default function CommentForm({ owner, repo, number }: Props) {
     </form>
   )
 }
+
+export default CommentForm

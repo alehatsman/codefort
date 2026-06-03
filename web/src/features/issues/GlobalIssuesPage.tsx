@@ -11,7 +11,7 @@ import { useListNav } from "@/shell/keyboardNav"
 // first, each row tagged with and linking into its owning repo. Mirrors the
 // per-repo IssuesPage chrome (state chips + search) minus the repo-scoped bits
 // (OverviewCard, assignee/author selects, #number jump).
-export default function GlobalIssuesPage() {
+const GlobalIssuesPage = () => {
   const navigate = useNavigate()
   const [activeStates, setActiveStates] = useState<IssueState[]>(["todo", "in_progress"])
 
@@ -126,3 +126,5 @@ export default function GlobalIssuesPage() {
     </div>
   )
 }
+
+export default GlobalIssuesPage

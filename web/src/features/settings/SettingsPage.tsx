@@ -27,7 +27,7 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: "appearance", label: "Appearance" },
 ]
 
-export default function SettingsPage() {
+const SettingsPage = () => {
   const [section, setSection] = useState<Section>("tokens")
 
   return (
@@ -71,7 +71,7 @@ export default function SettingsPage() {
 
 // AppearanceSection hosts the color-scheme picker. The choice is browser-local
 // (localStorage), so there's nothing to save server-side.
-function AppearanceSection() {
+const AppearanceSection = () => {
   return (
     <section className="settings__section">
       <h2 className="settings__title">Appearance</h2>
@@ -86,7 +86,7 @@ function AppearanceSection() {
 // A section for a feature that's on the roadmap but whose backend isn't built
 // yet. The "Planned." lead signals an intentional, coming feature — not an
 // abandoned stub or a hard non-goal.
-function Placeholder({ title, note }: { title: string; note: string }) {
+const Placeholder = ({ title, note }: { title: string; note: string }) => {
   return (
     <section className="settings__section">
       <h2 className="settings__title">{title}</h2>
@@ -100,7 +100,7 @@ function Placeholder({ title, note }: { title: string; note: string }) {
 // AgentSection sets the global Claude token agent runs authenticate with. The
 // token is write-only: the API reports only whether one is configured, so the
 // field is always blank and submitting replaces it.
-function AgentSection() {
+const AgentSection = () => {
   const settingsQ = useAgentSettings()
   const update = useUpdateAgentSettings()
   const [token, setToken] = useState("")
@@ -294,7 +294,7 @@ function AgentSection() {
   )
 }
 
-function TokensSection() {
+const TokensSection = () => {
   const tokensQ = useTokens()
   const whoami = useWhoami()
   const create = useCreateToken()
@@ -448,7 +448,7 @@ function TokensSection() {
   )
 }
 
-function SSHKeysSection() {
+const SSHKeysSection = () => {
   const keysQ = useSSHKeys()
   const add = useAddSSHKey()
   const del = useDeleteSSHKey()
@@ -557,3 +557,5 @@ function SSHKeysSection() {
     </section>
   )
 }
+
+export default SettingsPage

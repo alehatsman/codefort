@@ -44,7 +44,7 @@ interface Props {
  * render inline under the line they end on, each with author-only Resolve and
  * Delete. A `#L<n>`/`#L<start>-L<end>` URL hash still deep-links + highlights.
  */
-export default function CodeView({
+const CodeView = ({
   content,
   path,
   owner,
@@ -52,7 +52,7 @@ export default function CodeView({
   codeRef = "",
   comments = [],
   currentUser,
-}: Props) {
+}: Props) => {
   const lines = useMemo(() => {
     const body = content.endsWith("\n") ? content.slice(0, -1) : content
     return splitLines(highlight(body, path ? langFromPath(path) : undefined))
@@ -210,7 +210,7 @@ export default function CodeView({
   )
 }
 
-function CodeCommentCard({
+const CodeCommentCard = ({
   owner,
   repo,
   comment,
@@ -220,7 +220,7 @@ function CodeCommentCard({
   repo: string
   comment: CodeComment
   canManage: boolean
-}) {
+}) => {
   const resolve = useSetCodeCommentResolved(owner, repo)
   const del = useDeleteCodeComment(owner, repo)
   const span =
@@ -276,7 +276,7 @@ function CodeCommentCard({
   )
 }
 
-function ComposeForm({
+const ComposeForm = ({
   owner,
   repo,
   codeRef,
@@ -292,7 +292,7 @@ function ComposeForm({
   startLine: number
   endLine: number
   onDone: () => void
-}) {
+}) => {
   const [body, setBody] = useState("")
   const create = useCreateCodeComment(owner, repo)
   const range = endLine > startLine ? `lines ${startLine}–${endLine}` : `line ${startLine}`
@@ -349,3 +349,5 @@ function parseLineRange(hash: string): [number | null, number | null] {
   if (!m) return [null, null]
   return [parseInt(m[1], 10), m[2] ? parseInt(m[2], 10) : null]
 }
+
+export default CodeView

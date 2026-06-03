@@ -21,7 +21,7 @@ interface Props {
  * through the sanitising renderer; other recognised READMEs (.txt, plain
  * README) render verbatim. Binary or oversized blobs are skipped silently.
  */
-export default function ReadmeCard({ owner, repo, dirPath, entry }: Props) {
+const ReadmeCard = ({ owner, repo, dirPath, entry }: Props) => {
   const blobQ = useBlob(owner, repo, entry.path)
   if (!blobQ.data) return null
   const b = blobQ.data
@@ -47,3 +47,5 @@ export default function ReadmeCard({ owner, repo, dirPath, entry }: Props) {
     </div>
   )
 }
+
+export default ReadmeCard

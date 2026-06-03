@@ -13,10 +13,12 @@ interface Props {
  * call sites (commit/issue/run activity lines). Pairs the two lib/timeAgo
  * helpers so call sites stop importing both.
  */
-export default function RelativeTime({ iso, className }: Props) {
+const RelativeTime = ({ iso, className }: Props) => {
   return (
     <span className={className} title={absoluteTime(iso)}>
       {timeAgo(iso)}
     </span>
   )
 }
+
+export default RelativeTime

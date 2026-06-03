@@ -15,7 +15,7 @@ const VALID = /^[A-Za-z0-9._-]+$/
  * and focus trapping with no extra deps. State is local; the mutation
  * owns server state. Resets on close.
  */
-export default function NewRepoForm({ onCreated }: Props) {
+const NewRepoForm = ({ onCreated }: Props) => {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const ownerRef = useRef<HTMLInputElement>(null)
   const whoami = useWhoami()
@@ -110,3 +110,5 @@ export default function NewRepoForm({ onCreated }: Props) {
     </>
   )
 }
+
+export default NewRepoForm

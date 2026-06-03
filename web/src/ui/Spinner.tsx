@@ -9,6 +9,8 @@ interface Props {
  * call sites (route-level query-pending states). Centralizes the copy and the
  * ellipsis character so they can't drift.
  */
-export default function Spinner({ label = "Loading…" }: Props) {
+const Spinner = ({ label = "Loading…" }: Props) => {
   return <div className="loading">{label}</div>
 }
+
+export default Spinner

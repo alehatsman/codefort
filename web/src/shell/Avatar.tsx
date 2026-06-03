@@ -8,7 +8,7 @@ interface Props {
  * a colored background, GitHub-style placeholder until we have real
  * avatar storage.
  */
-export default function Avatar({ name, size = "sm" }: Props) {
+const Avatar = ({ name, size = "sm" }: Props) => {
   const initial = name.trim().charAt(0).toUpperCase() || "?"
   const cls = size === "lg" ? "avatar avatar--lg" : "avatar"
   return (
@@ -17,3 +17,5 @@ export default function Avatar({ name, size = "sm" }: Props) {
     </span>
   )
 }
+
+export default Avatar

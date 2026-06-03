@@ -12,7 +12,7 @@ interface Props {
  * (open-circle / x-circle) since the colors already line up; merged is
  * unique to PRs so it gets its own git-merge glyph in Primer style.
  */
-export default function PRStateIcon({ state, size = 16, className = "" }: Props) {
+const PRStateIcon = ({ state, size = 16, className = "" }: Props) => {
   if (state !== "merged") {
     // open → todo's open circle (green), closed → closed's x-circle (red).
     return (
@@ -34,3 +34,5 @@ export default function PRStateIcon({ state, size = 16, className = "" }: Props)
     </svg>
   )
 }
+
+export default PRStateIcon

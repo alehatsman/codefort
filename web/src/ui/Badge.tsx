@@ -16,6 +16,8 @@ interface Props {
  * themed color modifier (todo / in_progress / done / closed). For CI run/job
  * statuses use CIStatusBadge, which has its own richer status vocabulary.
  */
-export default function Badge({ children, state, className }: Props) {
+const Badge = ({ children, state, className }: Props) => {
   return <span className={clsx("badge", state && `badge--${state}`, className)}>{children}</span>
 }
+
+export default Badge
