@@ -1,6 +1,7 @@
 import { useDraggable } from "@dnd-kit/core"
 import { Link } from "react-router-dom"
 import type { Issue } from "@/api/types"
+import { repoHue } from "@/shell/repoColor"
 import { Avatar } from "@/ui"
 
 interface Props {
@@ -9,15 +10,6 @@ interface Props {
   issue: Issue
   // Show the owning repo on the card — used by the cross-repo (global) board.
   showRepo?: boolean
-}
-
-// Deterministic hue (0–359) from the repo key, so each project keeps a stable
-// tag color across renders and reloads — same repo → same color. Plain string
-// hash (djb2-ish), spread over the wheel.
-function repoHue(key: string): number {
-  let h = 0
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
-  return h % 360
 }
 
 /**

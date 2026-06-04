@@ -20,6 +20,7 @@ import { BoardCardDisplay } from "@/features/issues/BoardCard"
 import StateIcon from "@/features/issues/StateIcon"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import NewIssueForm from "@/features/issues/NewIssueForm"
+import { repoHue } from "@/shell/repoColor"
 import { useRepoFilter } from "@/shell/useRepoFilter"
 import { ErrorMessage, FilterBar, FilterChip, FilterRow, PageHeader, Spinner } from "@/ui"
 
@@ -161,6 +162,10 @@ export default function GlobalBoardPage() {
           <FilterRow label="repo:">
             {availableRepos.map((r) => (
               <FilterChip key={r} checked={activeRepos.includes(r)} onChange={() => toggleRepo(r)}>
+                <span
+                  className="repo-dot"
+                  style={{ "--repo-hue": repoHue(r) } as React.CSSProperties}
+                />
                 {r}
               </FilterChip>
             ))}

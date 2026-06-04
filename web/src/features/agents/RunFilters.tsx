@@ -1,4 +1,5 @@
 import type { CIRunStatus } from "@/api/types"
+import { repoHue } from "@/shell/repoColor"
 import { FilterBar, FilterChip, FilterRow } from "@/ui"
 import type { RunChip } from "./runChips"
 
@@ -53,6 +54,10 @@ export default function RunFilters({
               checked={activeRepos?.includes(r) ?? false}
               onChange={() => onToggleRepo(r)}
             >
+              <span
+                className="repo-dot"
+                style={{ "--repo-hue": repoHue(r) } as React.CSSProperties}
+              />
               {r}
             </FilterChip>
           ))}
