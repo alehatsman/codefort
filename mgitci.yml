@@ -7,7 +7,7 @@
 #
 # DAG:  quality      web        (two independent roots)
 #          \           /
-#         deploy + build-images   (main only — runs in parallel after both gates pass)
+#         build-images            (main only — runs after both gates pass)
 #
 # `quality` runs the full Go gate via the shared go-quality module
 # (`mooncake task ci` → goq/ci; see tasks.yml). For the in-container mooncake to
@@ -21,14 +21,14 @@
 # The CI checkout is now a real working tree with .git (ci_runner.go), which the
 # gate's git-aware scripts (full.sh's `git rev-parse`) require.
 #
-# `deploy` builds moongit:latest (multi-stage Dockerfile) and does a
-# stop/rm/run to swap the running moongitd container. Runs only on main after
-# both gates pass. The deploy step kills the moongitd that's running this very
-# CI pipeline — that run is marked interrupted on startup reconcile; acceptable.
-#
 # `build-images` rebuilds moongit-ci-dev:latest + moongit-agent:latest via the
 # host Docker daemon (docker_socket: true mounts /var/run/docker.sock). Runs in
 # parallel with deploy on main — both need quality + web to pass first.
+#
+# Deploy is intentionally NOT automated via CI. moongitd runs the pipeline —
+# a self-deploy would docker-stop the container mid-run and interrupt the very
+# job that triggered it. Deploy manually: `mooncake task docker-build docker-run`
+# (or tasks.yml docker-build + docker-run targets).
 version: "1"
 on:
   push:
@@ -62,35 +62,6 @@ jobs:
     image: moongit-ci-dev:latest
     steps:
       - run: cd web && npm ci && npm run build
-
-  deploy:
-    image: moongit-ci-dev:latest
-    docker_socket: true
-    needs: [quality, web]
-    steps:
-      - shell:
-          # Build moongit:latest from the CI workspace (the Dockerfile is a
-          # multi-stage build — no pre-built artifacts needed). Then swap the
-          # running moongitd container. This step kills the moongitd that owns
-          # this CI run; the new container's startup reconcile cleans up the
-          # interrupted run.
-          cmd: |
-            set -eu
-            docker build -t moongit:latest /work
-            docker stop moongitd 2>/dev/null || true
-            docker rm   moongitd 2>/dev/null || true
-            docker run -d --name moongitd \
-              --restart unless-stopped \
-              --user "$(id -u):$(id -g)" \
-              --group-add "$(stat -c %g /var/run/docker.sock)" \
-              -p 8080:8080 \
-              --add-host host.docker.internal:host-gateway \
-              -v /var/run/docker.sock:/var/run/docker.sock \
-              -v /home/aleh/.local/share/moongit:/data \
-              -v /home/aleh/.config/moongit:/config:ro \
-              --env-file /config/moongit-container.env \
-              --env-file /config/moongit.secret.env \
-              moongit:latest
 
   build-images:
     image: moongit-ci-dev:latest
