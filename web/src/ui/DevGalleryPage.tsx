@@ -614,10 +614,10 @@ function PaginationSection() {
   const [page, setPage] = useState(2)
   return (
     <Section title="Pagination">
-      <p className="gallery__sublabel">120 items, 25 per page — prev/next with range</p>
-      <Pagination page={page} pageSize={25} total={120} onPageChange={setPage} />
+      <p className="gallery__sublabel">120 items, 15 per page — prev/next with range</p>
+      <Pagination page={page} pageSize={15} total={120} onPageChange={setPage} />
       <p className="gallery__sublabel">Single page (total ≤ pageSize) renders nothing</p>
-      <Pagination page={1} pageSize={25} total={10} onPageChange={() => {}} />
+      <Pagination page={1} pageSize={15} total={10} onPageChange={() => { }} />
     </Section>
   )
 }
