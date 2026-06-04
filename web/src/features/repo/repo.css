@@ -284,25 +284,6 @@
   width: 100%;
   font: var(--text-sm) / 20px var(--font-mono);
 }
-.code-line__num {
-  width: 1%;
-  min-width: 50px;
-  padding: 0 var(--space-4) 0 10px;
-  text-align: right;
-  color: var(--fg-muted);
-  vertical-align: top;
-  user-select: none;
-  white-space: nowrap;
-}
-.code-line__num::before {
-  content: attr(data-line);
-}
-.code-line__text {
-  padding: 0 var(--space-4);
-  white-space: pre;
-  vertical-align: top;
-  width: 100%;
-}
 .code-line:hover .code-line__num,
 .code-line:hover .code-line__text {
   background: var(--code-line-hl);

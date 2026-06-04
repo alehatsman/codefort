@@ -158,7 +158,7 @@ test("review tab groups comments by file, deep-links, and filters by state", asy
   const snippet = page.locator(".review-row__code").first()
   await expect(snippet).toContainText("la2")
   await expect(snippet).toContainText("la3")
-  await expect(snippet.locator(".code-snippet__line.is-focus")).toHaveCount(2)
+  await expect(snippet.locator(".code-line.is-focus")).toHaveCount(2)
 
   // Also checking "resolved" (open stays checked) → state=all, so the resolved
   // one appears too. One is open (Resolve), one is already resolved (Reopen).
@@ -214,11 +214,11 @@ test("review snippet shows ±context lines with the file's own line numbers", as
 
   const snippet = page.locator(".review-row__code").first()
   // ±3 lines around 10–11 → lines 7..14, numbered from the original file.
-  await expect(snippet.locator(".code-snippet__line")).toHaveCount(8)
-  await expect(snippet.locator(".code-snippet__num").first()).toHaveAttribute("data-line", "7")
-  await expect(snippet.locator(".code-snippet__num").last()).toHaveAttribute("data-line", "14")
+  await expect(snippet.locator(".code-line")).toHaveCount(8)
+  await expect(snippet.locator(".code-line__num").first()).toHaveAttribute("data-line", "7")
+  await expect(snippet.locator(".code-line__num").last()).toHaveAttribute("data-line", "14")
   // The annotated lines 10–11 are the tinted focus; context lines are not.
-  await expect(snippet.locator(".code-snippet__line.is-focus")).toHaveCount(2)
+  await expect(snippet.locator(".code-line.is-focus")).toHaveCount(2)
   await expect(snippet).toContainText("line10")
   await expect(snippet).not.toContainText("line6")
   await expect(snippet).not.toContainText("line15")

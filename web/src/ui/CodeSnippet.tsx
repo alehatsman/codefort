@@ -40,12 +40,9 @@ export default function CodeSnippet({ code, path, startLine = 1, focus, classNam
           {lines.map((nodes, i) => {
             const n = startLine + i
             return (
-              <tr
-                key={n}
-                className={clsx("code-snippet__line", { "is-focus": n >= from && n <= to })}
-              >
-                <td className="code-snippet__num" data-line={n} />
-                <td className="code-snippet__text">{nodes.length ? nodes : "\n"}</td>
+              <tr key={n} className={clsx("code-line", { "is-focus": n >= from && n <= to })}>
+                <td className="code-line__num" data-line={n} />
+                <td className="code-line__text">{nodes.length ? nodes : "\n"}</td>
               </tr>
             )
           })}
