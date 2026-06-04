@@ -192,7 +192,7 @@ test("search narrows the list by title/body, and #number jumps to the issue", as
   await expect(page.getByRole("heading", { name: /Something else/ })).toBeVisible()
 })
 
-test("the issue list paginates at 25 per page", async ({ page }) => {
+test("the issue list paginates at 15 per page", async ({ page }) => {
   const now = new Date().toISOString()
   const issues = Array.from({ length: 30 }, (_, i) => ({
     id: i + 1, number: i + 1, title: `Task ${i + 1}`, author: "alice",
@@ -201,12 +201,12 @@ test("the issue list paginates at 25 per page", async ({ page }) => {
   await mockApi(page, { issues })
   await page.goto("/alice/demo/issues")
 
-  // Page 1: first 25 (newest-first → #30..#6), range + pager reflect the total.
-  await expect(page.locator(".issue-row")).toHaveCount(25)
-  await expect(page.locator(".pagination__range")).toHaveText("1–25 of 30")
+  // Page 1: first 15 (newest-first → #30..#6), range + pager reflect the total.
+  await expect(page.locator(".issue-row")).toHaveCount(15)
+  await expect(page.locator(".pagination__range")).toHaveText("1–15 of 30")
 
-  // Next → page 2 with the remaining 5 (offset=25 on the wire).
-  const nextReq = page.waitForRequest((r) => r.url().includes("offset=25"))
+  // Next → page 2 with the remaining 5 (offset=15 on the wire).
+  const nextReq = page.waitForRequest((r) => r.url().includes("offset=15"))
   await page.getByRole("button", { name: "Next" }).click()
   await nextReq
   await expect(page.locator(".issue-row")).toHaveCount(5)
@@ -214,7 +214,7 @@ test("the issue list paginates at 25 per page", async ({ page }) => {
 
   // Prev returns to page 1.
   await page.getByRole("button", { name: "Prev" }).click()
-  await expect(page.locator(".issue-row")).toHaveCount(25)
+  await expect(page.locator(".issue-row")).toHaveCount(15)
 
   // Narrowing the filter resets to page 1 (no stranding on an empty page).
   await page.getByRole("button", { name: "Next" }).click()
