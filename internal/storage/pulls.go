@@ -57,6 +57,29 @@ func GetPull(db *sql.DB, repoID int64, number int) (api.PullRequest, error) {
 	return pr, err
 }
 
+// OpenPRsForBase returns all open pull requests targeting baseRef as their base
+// branch in a repo. Used by the post-receive auto-close path to find PRs whose
+// head may have landed in base via a direct push.
+func OpenPRsForBase(db *sql.DB, repoID int64, baseRef string) ([]api.PullRequest, error) {
+	rows, err := db.Query(
+		`SELECT `+pullColumns+` FROM pull_requests WHERE repo_id = ? AND base_ref = ? AND state = ?`,
+		repoID, baseRef, string(api.PROpen),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []api.PullRequest
+	for rows.Next() {
+		pr, err := scanPull(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, pr)
+	}
+	return out, rows.Err()
+}
+
 // ListPulls returns a repo's PRs, newest number first, optionally filtered to
 // the given states (OR-match; nil/empty means any) and to a case-insensitive
 // keyword matched against title or body (query == "" means any).

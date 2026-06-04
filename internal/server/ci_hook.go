@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
@@ -163,6 +164,14 @@ func (s *Server) handleCIEvents(w http.ResponseWriter, r *http.Request) {
 	// CI-disabled repos still notify subscribers.
 	s.emit("push", repoID, req.Pusher, map[string]any{"ref": req.Ref, "before": req.Old, "after": req.New})
 
+	// Auto-close open PRs whose head branch was merged into base via a direct
+	// push (bypassing the PR merge endpoint). Best-effort: failures are logged
+	// but never block CI enqueue or the push response.
+	if branch, ok := strings.CutPrefix(req.Ref, "refs/heads/"); ok {
+		bareRepo := filepath.Join(s.cfg.ReposDir, owner, name+".git")
+		s.autoCloseMergedPRs(r.Context(), repoID, bareRepo, branch, req.New)
+	}
+
 	enabled, err := storage.RepoCIEnabled(s.db, repoID)
 	if err != nil {
 		s.logger.Error("ci events: enabled check", "err", err)
@@ -228,6 +237,33 @@ func (s *Server) handleCIEvents(w http.ResponseWriter, r *http.Request) {
 // for either sha1 or sha256 widths.
 func isZeroSHA(sha string) bool {
 	return sha == "" || strings.Trim(sha, "0") == ""
+}
+
+// autoCloseMergedPRs scans open pull requests that target baseRef and marks any
+// whose head branch tip is now an ancestor of newBaseSHA as merged. This covers
+// the direct-push path where the PR merge endpoint is bypassed. Best-effort:
+// each PR is attempted independently; a failure on one does not block others.
+func (s *Server) autoCloseMergedPRs(ctx context.Context, repoID int64, bareRepo, baseRef, newBaseSHA string) {
+	prs, err := storage.OpenPRsForBase(s.db, repoID, baseRef)
+	if err != nil {
+		s.logger.Error("auto-close: list open PRs", "base", baseRef, "err", err)
+		return
+	}
+	for _, pr := range prs {
+		headSHA, err := revParse(ctx, bareRepo, "refs/heads/"+pr.HeadRef)
+		if err != nil {
+			// Head branch deleted or not yet pushed — skip.
+			continue
+		}
+		if !isAncestor(ctx, bareRepo, headSHA, newBaseSHA) {
+			continue
+		}
+		if _, err := storage.MarkMerged(s.db, repoID, pr.Number, newBaseSHA, headSHA); err != nil {
+			s.logger.Error("auto-close: mark merged", "pr", pr.Number, "err", err)
+			continue
+		}
+		s.logger.Info("auto-closed PR (head merged via push)", "pr", pr.Number, "head", pr.HeadRef, "base", baseRef)
+	}
 }
 
 // isLoopback reports whether a request's RemoteAddr is a loopback IP.
