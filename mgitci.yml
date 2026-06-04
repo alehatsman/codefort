@@ -37,7 +37,16 @@ on:
     # prefixes here rather than narrowing.
     branches:
       [
-        main
+        main,
+        "feat/*",
+        "fix/*",
+        "chore/*",
+        "docs/*",
+        "refactor/*",
+        "test/*",
+        "build/*",
+        "ci/*",
+        "perf/*",
       ]
 jobs:
   quality:
@@ -53,22 +62,22 @@ jobs:
     steps:
       - run: cd web && npm ci && npm run build
 
-  build-images:
-    image: moongit-ci-dev:latest
-    docker_socket: true
-    needs: [quality, web]
-    steps:
-      - shell:
-          # Clone sibling repos from the moongit server (anonymous HTTP).
-          # --vars overrides the default host paths that tasks.yml defaults to
-          # ("{{ home }}/projects/..."), which don't exist inside the container.
-          cmd: |
-            set -eu
-            git clone --depth=1 http://host.docker.internal:8080/alehatsman/mooncake.git /tmp/mooncake
-            git clone --depth=1 http://host.docker.internal:8080/alehatsman/dex.git /tmp/dex
-            printf '{"mooncake_src":"/tmp/mooncake"}' > /tmp/ci-vars.yml
-            printf '{"mooncake_src":"/tmp/mooncake","dex_src":"/tmp/dex"}' > /tmp/agent-vars.yml
-            mooncake task ci-images --vars /tmp/ci-vars.yml
-            mooncake task agent-image --vars /tmp/agent-vars.yml
-        env:
-          MOONCAKE_MODULE_INSECURE: host.docker.internal:8080
+  # build-images:
+  #   image: moongit-ci-dev:latest
+  #   docker_socket: true
+  #   needs: [quality, web]
+  #   steps:
+  #     - shell:
+  #         # Clone sibling repos from the moongit server (anonymous HTTP).
+  #         # --vars overrides the default host paths that tasks.yml defaults to
+  #         # ("{{ home }}/projects/..."), which don't exist inside the container.
+  #         cmd: |
+  #           set -eu
+  #           git clone --depth=1 http://host.docker.internal:8080/alehatsman/mooncake.git /tmp/mooncake
+  #           git clone --depth=1 http://host.docker.internal:8080/alehatsman/dex.git /tmp/dex
+  #           printf '{"mooncake_src":"/tmp/mooncake"}' > /tmp/ci-vars.yml
+  #           printf '{"mooncake_src":"/tmp/mooncake","dex_src":"/tmp/dex"}' > /tmp/agent-vars.yml
+  #           mooncake task ci-images --vars /tmp/ci-vars.yml
+  #           mooncake task agent-image --vars /tmp/agent-vars.yml
+  #       env:
+  #         MOONCAKE_MODULE_INSECURE: host.docker.internal:8080
