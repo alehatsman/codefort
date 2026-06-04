@@ -16,6 +16,17 @@ type Config struct {
 	DBPath   string
 	ReposDir string
 
+	// HostDataDir is the host-side path that corresponds to DataDir when
+	// moongitd runs inside a Docker container. The CI and agent runners
+	// bind-mount workspace directories into sibling containers via the host
+	// Docker daemon, which resolves bind-mount sources on the HOST filesystem.
+	// When moongitd is containerised, DataDir is the in-container path (e.g.
+	// /data), while the host has the same tree at a different path (e.g.
+	// /home/user/.local/share/moongit). Set MOONGIT_HOST_DATA_DIR to that
+	// host path; leave it empty (or equal to DataDir) for non-containerised
+	// deployments. Set via MOONGIT_HOST_DATA_DIR.
+	HostDataDir string
+
 	// ClaimLease is how long an issue claim stays exclusive before another
 	// agent may steal it. A claim older than this is treated as orphaned
 	// (the owner crashed or lost context). The owner refreshes the lease by
@@ -203,6 +214,7 @@ func Load() (*Config, error) {
 	cfg.DataDir = dataDir
 	cfg.DBPath = envOr("MOONGIT_DB_PATH", filepath.Join(dataDir, "moongit.db"))
 	cfg.ReposDir = envOr("MOONGIT_REPOS_DIR", filepath.Join(dataDir, "repos"))
+	cfg.HostDataDir = envOr("MOONGIT_HOST_DATA_DIR", dataDir)
 	cfg.DexURL = strings.TrimRight(envOr("MOONGIT_DEX_URL", ""), "/")
 	cfg.DexToken = envOr("MOONGIT_DEX_TOKEN", "")
 	cfg.WebDir = envOr("MOONGIT_WEB_DIR", "")

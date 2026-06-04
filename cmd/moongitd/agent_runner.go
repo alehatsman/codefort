@@ -178,7 +178,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	// injected. A failure here — image missing, docker down — fails the run
 	// loudly. NOTE: we do not Close the session on the happy path; the
 	// container must outlive this goroutine for follow-up turns to resume.
-	sess, err := r.newAgentSession(parent, agentContainerName(job.ID), workDir, r.cfg.AgentDefaultImage, env)
+	sess, err := r.newAgentSession(parent, agentContainerName(job.ID), r.hostPath(workDir), r.cfg.AgentDefaultImage, env)
 	if err != nil {
 		r.emit(elog, ci.EventAgentRaw, map[string]any{"line": err.Error()})
 		r.emit(elog, ci.EventRunFailed, map[string]any{"error": err.Error()})
