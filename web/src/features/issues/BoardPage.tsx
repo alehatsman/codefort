@@ -20,7 +20,7 @@ import { BoardCardDisplay } from "@/features/issues/BoardCard"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import OverviewCard from "@/shell/OverviewCard"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
-import { ErrorMessage, PageHeader, Spinner } from "@/ui"
+import { ErrorMessage, FilterBar, PageHeader, Spinner } from "@/ui"
 
 /**
  * Trello-style board view. Columns are the four issue states; cards
@@ -35,9 +35,10 @@ export default function BoardPage() {
   const { owner = "", repo = "" } = useParams()
   const qc = useQueryClient()
 
-  // Fetch everything that hasn't been excluded by limit. No filters from
-  // the page — the board IS the visualization.
+  // Fetch everything that hasn't been excluded by limit.
   const issuesQ = useIssues(owner, repo, "limit=1000")
+
+  const [search, setSearch] = useState("")
 
   // Group issues by state once per data change. Each card carries this repo's
   // owner/repo so BoardColumn stays repo-agnostic (shared with the global board).
@@ -48,11 +49,14 @@ export default function BoardPage() {
       done: [],
       closed: [],
     }
-    issuesQ.data?.forEach((iss) => {
-      map[iss.state].push({ issue: iss, owner, repo })
-    })
+    const q = search.trim().toLowerCase()
+    issuesQ.data
+      ?.filter((iss) => !q || iss.title.toLowerCase().includes(q))
+      .forEach((iss) => {
+        map[iss.state].push({ issue: iss, owner, repo })
+      })
     return map
-  }, [issuesQ.data, owner, repo])
+  }, [issuesQ.data, owner, repo, search])
 
   const [activeItem, setActiveItem] = useState<BoardItem | null>(null)
 
@@ -118,6 +122,13 @@ export default function BoardPage() {
       <PageHeader title="Issues" actions={<NewIssueForm owner={owner} repo={repo} />}>
         <IssuesViewSwitch />
       </PageHeader>
+
+      <FilterBar
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder="Search issues…"
+        searchAriaLabel="Search issues"
+      />
 
       <DndContext
         sensors={sensors}

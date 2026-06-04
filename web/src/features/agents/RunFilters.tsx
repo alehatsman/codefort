@@ -1,4 +1,5 @@
 import type { CIRunStatus } from "@/api/types"
+import CIStatusIcon from "@/features/pipelines/CIStatusIcon"
 import { repoHue } from "@/shell/repoColor"
 import { FilterBar, FilterChip, FilterRow } from "@/ui"
 import type { RunChip } from "./runChips"
@@ -42,6 +43,7 @@ export default function RunFilters({
             checked={activeStates.includes(chip.key)}
             onChange={() => onToggleState(chip.key)}
           >
+            <CIStatusIcon status={chip.key} size={12} />
             {chip.label}
           </FilterChip>
         ))}
