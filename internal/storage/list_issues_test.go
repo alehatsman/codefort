@@ -84,7 +84,7 @@ func TestListIssuesQueryCombinesWithStateFilter(t *testing.T) {
 	mustCreate(t, db, repoID, "deploy script", "") // #1 stays todo
 	mustCreate(t, db, repoID, "deploy docs", "")   // #2 -> done
 	done := api.IssueDone
-	if _, err := UpdateIssue(db, repoID, 2, &done, nil, nil); err != nil {
+	if _, err := UpdateIssue(db, repoID, 2, &done, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateIssue: %v", err)
 	}
 

@@ -346,6 +346,16 @@ var migrations = []string{
 	`
 	ALTER TABLE ci_runs ADD COLUMN spec_path TEXT NOT NULL DEFAULT '';
 	`,
+
+	// 21: parent issue link (#240). A nullable self-referential column — one
+	// issue may have at most one parent, but a parent may have many children.
+	// Scoped to a repo (parent_number is a per-repo issue number). No FK here
+	// because SQLite FK enforcement would require enabling the pragma everywhere
+	// and the soft check in the storage layer is sufficient.
+	`
+	ALTER TABLE issues ADD COLUMN parent_number INTEGER;
+	CREATE INDEX IF NOT EXISTS idx_issues_parent ON issues(repo_id, parent_number);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

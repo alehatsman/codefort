@@ -30,11 +30,30 @@ func CreateIssue(db *sql.DB, repoID int64, req api.CreateIssueRequest) (api.Issu
 		return api.Issue{}, err
 	}
 
+	// Validate parent: must exist in the same repo and not be self-referential
+	// (self-ref can't happen on create since the issue doesn't exist yet, but
+	// check for existence regardless).
+	if req.Parent != nil && *req.Parent > 0 {
+		var exists int
+		if err := tx.QueryRow(
+			`SELECT 1 FROM issues WHERE repo_id = ? AND number = ?`, repoID, *req.Parent,
+		).Scan(&exists); errors.Is(err, sql.ErrNoRows) {
+			return api.Issue{}, ErrInvalidInput
+		} else if err != nil {
+			return api.Issue{}, err
+		}
+	}
+
+	var parentArg any
+	if req.Parent != nil && *req.Parent > 0 {
+		parentArg = *req.Parent
+	}
+
 	row := tx.QueryRow(`
-		INSERT INTO issues(repo_id, number, title, body, author, state)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO issues(repo_id, number, title, body, author, state, parent_number)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		RETURNING `+issueColumns+`
-	`, repoID, next, req.Title, req.Body, req.Author, string(api.IssueTodo))
+	`, repoID, next, req.Title, req.Body, req.Author, string(api.IssueTodo), parentArg)
 
 	iss, err := scanIssue(row)
 	if err != nil {
@@ -92,7 +111,8 @@ var ErrNoUpdateFields = errors.New("no fields to update")
 // and updated_at is bumped. Returns the updated row, ErrNotFound if
 // (repoID, number) doesn't exist, or ErrNoUpdateFields if nothing was given.
 // Validation (state values, non-empty title) is the caller's responsibility.
-func UpdateIssue(db *sql.DB, repoID int64, number int, state *api.IssueState, title, body *string) (api.Issue, error) {
+// parent: nil = no change, 0 = clear, >0 = set to that number (validated).
+func UpdateIssue(db *sql.DB, repoID int64, number int, state *api.IssueState, title, body *string, parent *int) (api.Issue, error) {
 	sets := []string{"updated_at = strftime('%s', 'now')"}
 	args := []any{}
 	if state != nil {
@@ -106,6 +126,28 @@ func UpdateIssue(db *sql.DB, repoID int64, number int, state *api.IssueState, ti
 	if body != nil {
 		sets = append(sets, "body = ?")
 		args = append(args, *body)
+	}
+	if parent != nil {
+		if *parent == 0 {
+			sets = append(sets, "parent_number = NULL")
+		} else {
+			// Validate: parent must exist in same repo and not be self.
+			var exists int
+			err := db.QueryRow(
+				`SELECT 1 FROM issues WHERE repo_id = ? AND number = ?`, repoID, *parent,
+			).Scan(&exists)
+			if errors.Is(err, sql.ErrNoRows) {
+				return api.Issue{}, ErrInvalidInput
+			}
+			if err != nil {
+				return api.Issue{}, err
+			}
+			if *parent == number {
+				return api.Issue{}, ErrInvalidInput
+			}
+			sets = append(sets, "parent_number = ?")
+			args = append(args, *parent)
+		}
 	}
 	// Only the bumped updated_at — caller passed no real fields.
 	if len(sets) == 1 {
@@ -324,7 +366,7 @@ func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error
 
 // issueColumns is the canonical select list, used everywhere so scanIssue
 // stays in sync with INSERT/UPDATE RETURNING and SELECT.
-const issueColumns = "id, number, title, body, author, state, assignee, claimed_at, created_at, updated_at"
+const issueColumns = "id, number, title, body, author, state, assignee, claimed_at, parent_number, created_at, updated_at"
 
 // scanner abstracts *sql.Row and *sql.Rows so scanIssue can serve both.
 type scanner interface {
@@ -335,26 +377,31 @@ func scanIssue(s scanner) (api.Issue, error) {
 	var iss api.Issue
 	var assignee sql.NullString
 	var claimed sql.NullInt64
+	var parent sql.NullInt64
 	var created, updated int64
 	if err := s.Scan(
 		&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State,
-		&assignee, &claimed, &created, &updated,
+		&assignee, &claimed, &parent, &created, &updated,
 	); err != nil {
 		return iss, err
 	}
-	decodeIssue(&iss, assignee, claimed, created, updated)
+	decodeIssue(&iss, assignee, claimed, parent, created, updated)
 	return iss, nil
 }
 
 // decodeIssue fills an Issue's nullable/time fields from the raw column values,
 // shared by scanIssue and the cross-repo aggregate scan so the two never drift.
-func decodeIssue(iss *api.Issue, assignee sql.NullString, claimed sql.NullInt64, created, updated int64) {
+func decodeIssue(iss *api.Issue, assignee sql.NullString, claimed sql.NullInt64, parent sql.NullInt64, created, updated int64) {
 	if assignee.Valid {
 		iss.Assignee = &assignee.String
 	}
 	if claimed.Valid {
 		ts := time.Unix(claimed.Int64, 0).UTC()
 		iss.ClaimedAt = &ts
+	}
+	if parent.Valid {
+		n := int(parent.Int64)
+		iss.ParentNumber = &n
 	}
 	iss.CreatedAt = time.Unix(created, 0).UTC()
 	iss.UpdatedAt = time.Unix(updated, 0).UTC()
@@ -406,7 +453,7 @@ func ListAllIssues(db *sql.DB, filter ListFilter) ([]api.IssueWithRepo, error) {
 	q := strings.Builder{}
 	// Qualify with the issues. prefix: id/created_at also exist on repos/users
 	// under the join, so a bare issueColumns would be ambiguous.
-	q.WriteString(`SELECT issues.id, issues.number, issues.title, issues.body, issues.author, issues.state, issues.assignee, issues.claimed_at, issues.created_at, issues.updated_at, users.name, repos.name
+	q.WriteString(`SELECT issues.id, issues.number, issues.title, issues.body, issues.author, issues.state, issues.assignee, issues.claimed_at, issues.parent_number, issues.created_at, issues.updated_at, users.name, repos.name
 		FROM issues
 		JOIN repos ON repos.id = issues.repo_id
 		JOIN users ON users.id = repos.owner_id
@@ -439,15 +486,16 @@ func ListAllIssues(db *sql.DB, filter ListFilter) ([]api.IssueWithRepo, error) {
 		var iss api.Issue
 		var assignee sql.NullString
 		var claimed sql.NullInt64
+		var parent sql.NullInt64
 		var created, updated int64
 		var owner, name string
 		if err := rows.Scan(
 			&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State,
-			&assignee, &claimed, &created, &updated, &owner, &name,
+			&assignee, &claimed, &parent, &created, &updated, &owner, &name,
 		); err != nil {
 			return nil, err
 		}
-		decodeIssue(&iss, assignee, claimed, created, updated)
+		decodeIssue(&iss, assignee, claimed, parent, created, updated)
 		out = append(out, api.IssueWithRepo{Issue: iss, Repo: api.RepoRef{Owner: owner, Name: name}})
 	}
 	return out, rows.Err()
@@ -480,4 +528,26 @@ func CountAllIssues(db *sql.DB, filter ListFilter) (int, error) {
 	var n int
 	err := db.QueryRow(q.String(), args...).Scan(&n)
 	return n, err
+}
+
+// ListChildren returns all direct children of the given issue (issues whose
+// parent_number == number in the same repo), ordered by number ascending.
+func ListChildren(db *sql.DB, repoID int64, number int) ([]api.ChildIssueSummary, error) {
+	rows, err := db.Query(
+		`SELECT number, title, state FROM issues WHERE repo_id = ? AND parent_number = ? ORDER BY number ASC`,
+		repoID, number,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]api.ChildIssueSummary, 0)
+	for rows.Next() {
+		var c api.ChildIssueSummary
+		if err := rows.Scan(&c.Number, &c.Title, &c.State); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
 }
