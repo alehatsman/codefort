@@ -4,6 +4,7 @@ import Layout from "@/shell/Layout"
 import TokenGate from "@/features/settings/TokenGate"
 import NotFound from "@/shell/NotFound"
 import { getToken } from "@/api/client"
+import IndexPage from "@/features/repo/IndexPage"
 import ReposPage from "@/features/repo/ReposPage"
 import GlobalIssuesPage from "@/features/issues/GlobalIssuesPage"
 import GlobalBoardPage from "@/features/issues/GlobalBoardPage"
@@ -44,7 +45,8 @@ export default function App() {
   return (
     <Layout onSignOut={() => setHasToken(false)}>
       <Routes>
-        <Route path="/" element={<ReposPage />} />
+        <Route path="/" element={<IndexPage />} />
+        <Route path="/repos" element={<ReposPage />} />
         {/* Top-level cross-repo aggregate views (the global nav tabs). Static
             paths, so they rank above the /:owner/:repo dynamic route. */}
         <Route path="/issues" element={<GlobalIssuesPage />} />
