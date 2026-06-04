@@ -4,6 +4,7 @@ import { useAllRuns } from "@/api/queries"
 import AgentRunsTable from "@/features/agents/AgentRunsTable"
 import RunFilters from "@/features/agents/RunFilters"
 import { useRunFilters } from "@/features/agents/useRunFilters"
+import { AGENT_CHIPS } from "@/features/agents/runChips"
 import { useRepoFilter } from "@/shell/useRepoFilter"
 import { EmptyState, ErrorMessage, SkeletonTable } from "@/ui"
 
@@ -11,7 +12,7 @@ import { EmptyState, ErrorMessage, SkeletonTable } from "@/ui"
 // first, filterable by status, keyword, and repo. Each row links into the
 // owning repo's agent run detail.
 export default function GlobalAgentsPage() {
-  const { search, setSearch, activeStates, toggleState, query } = useRunFilters()
+  const { search, setSearch, activeStates, toggleState, query } = useRunFilters(AGENT_CHIPS)
   const { activeRepos, toggleRepo } = useRepoFilter()
   const { data, isLoading, error } = useAllRuns("agent", query)
 
@@ -36,6 +37,7 @@ export default function GlobalAgentsPage() {
       </p>
 
       <RunFilters
+        chips={AGENT_CHIPS}
         search={search}
         onSearch={setSearch}
         placeholder="Search commit, ref, or trigger across all repos…"

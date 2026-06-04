@@ -1,11 +1,13 @@
-import { type CIRunStatus, RUN_STATUSES } from "@/api/types"
+import type { CIRunStatus } from "@/api/types"
 import { FilterBar, FilterChip, FilterRow } from "@/ui"
+import type { RunChip } from "./runChips"
 
 // RunFilters is the search box + status chip row shared by the global and
 // per-repo Agents/Pipelines lists. State lives in the parent (useRunFilters);
 // this is presentational. Pass availableRepos/activeRepos/onToggleRepo to
 // show the optional repo row on fleet-wide views.
 export default function RunFilters({
+  chips,
   search,
   onSearch,
   placeholder,
@@ -15,6 +17,7 @@ export default function RunFilters({
   activeRepos,
   onToggleRepo,
 }: {
+  chips: readonly RunChip[]
   search: string
   onSearch: (v: string) => void
   placeholder: string
@@ -32,9 +35,13 @@ export default function RunFilters({
       searchAriaLabel="Search runs"
     >
       <FilterRow label="status:">
-        {RUN_STATUSES.map((s) => (
-          <FilterChip key={s} checked={activeStates.includes(s)} onChange={() => onToggleState(s)}>
-            {s.replace(/_/g, " ")}
+        {chips.map((chip) => (
+          <FilterChip
+            key={chip.key}
+            checked={activeStates.includes(chip.key)}
+            onChange={() => onToggleState(chip.key)}
+          >
+            {chip.label}
           </FilterChip>
         ))}
       </FilterRow>
