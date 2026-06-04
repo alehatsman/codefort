@@ -321,52 +321,6 @@ tasks:
       - log:
           msg: "built moongit-agent:latest"
 
-  # ---- moongitd Docker image (dev/test only) ----------------------------
-  # moongitd runs as a host systemd service (managed by dotfiles); these
-  # tasks are for building and smoke-testing the Docker image, not for
-  # running production. Deploy is: mooncake task deploy (or `mooncake apply -t moongit`).
-
-  docker-build:
-    desc: Build moongit:latest from the current working tree (multi-stage)
-    steps:
-      - cmd:
-          argv: ["docker", "build", "-t", "moongit:latest", "."]
-      - log:
-          msg: "built moongit:latest"
-
-  docker-run:
-    desc: Run moongit:latest in a throwaway container for local smoke-testing
-    steps:
-      - shell:
-          cmd: |
-            set -eu
-            docker stop moongitd-test 2>/dev/null || true
-            docker rm   moongitd-test 2>/dev/null || true
-            docker run -d --name moongitd-test \
-              --user "$(id -u):$(id -g)" \
-              --group-add "$(stat -c %g /var/run/docker.sock)" \
-              -p 8081:8080 \
-              --add-host host.docker.internal:host-gateway \
-              -v /var/run/docker.sock:/var/run/docker.sock \
-              -v "{{ home }}/.local/share/moongit:/data" \
-              -v "{{ home }}/.config/moongit:/config:ro" \
-              --env-file "/config/moongit-container.env" \
-              --env-file "/config/moongit.secret.env" \
-              moongit:latest
-            echo "moongitd-test container started on :8081 (smoke-test only — production runs as systemd)"
-
-  docker-logs:
-    desc: Tail moongitd-test container logs
-    steps:
-      - shell:
-          cmd: "docker logs -f --tail=100 moongitd-test"
-
-  docker-shell:
-    desc: Open a shell inside the moongitd-test container
-    steps:
-      - shell:
-          cmd: "docker exec -it moongitd-test /bin/bash"
-
   # ---- ops (work against the installed location) ------------------------
   create-repo:
     desc: 'Register and init a repo against the installed data dir. Pass --vars with {owner, name}'
