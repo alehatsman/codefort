@@ -28,9 +28,17 @@ type Pipeline struct {
 	Jobs    map[string]Job `yaml:"jobs"`
 }
 
-// On declares which git events trigger the pipeline. Only push is supported.
+// On declares which git events trigger the pipeline.
 type On struct {
-	Push Push `yaml:"push"`
+	Push     Push            `yaml:"push"`
+	Schedule []ScheduleEntry `yaml:"schedule"`
+}
+
+// ScheduleEntry declares a cron expression that fires the pipeline on a
+// time-based schedule, independent of any push. Standard five-field cron
+// syntax: "min hour dom month dow".
+type ScheduleEntry struct {
+	Cron string `yaml:"cron"`
 }
 
 // Push filters which branches trigger a run. An empty Branches matches all.
@@ -44,7 +52,8 @@ type Push struct {
 // branch filter. Each pattern is matched against the bare branch name as a
 // shell glob via path.Match — so "feat/*" matches "feat/x" but not the nested
 // "feat/x/y" (path.Match's '*' stops at '/') — and a plain name is an exact
-// match.
+// match. Schedule entries are evaluated separately by the cron scheduler, not
+// here.
 func (o On) Matches(ref string) bool {
 	branches := o.Push.Branches
 	if len(branches) == 0 {

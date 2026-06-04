@@ -840,6 +840,86 @@ func scanJob(s scanner) (CIJob, error) {
 	return j, nil
 }
 
+// CronSchedule is a row from cron_schedules: the last time a (repo, expr)
+// pair fired. LastFiredAt is nil when the schedule has never fired.
+type CronSchedule struct {
+	ID          int64
+	RepoID      int64
+	CronExpr    string
+	LastFiredAt *time.Time
+}
+
+// UpsertCronSchedules syncs the cron_schedules table to the given set of
+// expressions for a repo. Expressions not in exprs are deleted; new ones are
+// inserted with NULL last_fired_at; existing ones are left untouched (their
+// last_fired_at is preserved).
+func UpsertCronSchedules(db *sql.DB, repoID int64, exprs []string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Delete rows whose expression is no longer in the pipeline.
+	if len(exprs) == 0 {
+		if _, err := tx.Exec("DELETE FROM cron_schedules WHERE repo_id = ?", repoID); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}
+	placeholders := make([]string, len(exprs))
+	args := make([]any, 0, 1+len(exprs))
+	args = append(args, repoID)
+	for i, e := range exprs {
+		placeholders[i] = "?"
+		args = append(args, e)
+	}
+	del := "DELETE FROM cron_schedules WHERE repo_id = ? AND cron_expr NOT IN (" + strings.Join(placeholders, ",") + ")"
+	if _, err := tx.Exec(del, args...); err != nil {
+		return err
+	}
+
+	// Insert new expressions (ignore conflicts to preserve last_fired_at).
+	for _, e := range exprs {
+		if _, err := tx.Exec(
+			"INSERT OR IGNORE INTO cron_schedules(repo_id, cron_expr) VALUES (?, ?)", repoID, e,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// ListCronSchedules returns all cron_schedules rows for a repo.
+func ListCronSchedules(db *sql.DB, repoID int64) ([]CronSchedule, error) {
+	rows, err := db.Query(
+		"SELECT id, repo_id, cron_expr, last_fired_at FROM cron_schedules WHERE repo_id = ?", repoID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CronSchedule
+	for rows.Next() {
+		var s CronSchedule
+		var lf sql.NullInt64
+		if err := rows.Scan(&s.ID, &s.RepoID, &s.CronExpr, &lf); err != nil {
+			return nil, err
+		}
+		s.LastFiredAt = nullTime(lf)
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// UpdateCronLastFired sets last_fired_at for a cron_schedules row.
+func UpdateCronLastFired(db *sql.DB, id int64, t time.Time) error {
+	_, err := db.Exec(
+		"UPDATE cron_schedules SET last_fired_at = ? WHERE id = ?", t.Unix(), id,
+	)
+	return err
+}
+
 // nullTime converts a nullable unix-seconds column into an optional UTC time.
 func nullTime(n sql.NullInt64) *time.Time {
 	if !n.Valid {

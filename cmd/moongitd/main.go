@@ -147,6 +147,7 @@ func runServe(logger *slog.Logger) error {
 	go runTokenReaper(ctx, db, cfg.AgentTokenTTL, logger)
 	go runCIRetentionReaper(ctx, db, cfg, logger)
 	go runEventRetentionReaper(ctx, db, cfg, logger)
+	go runCronScheduler(ctx, db, cfg, logger)
 
 	// The CI runner can be mid-run when shutdown fires. Cancelling its context
 	// aborts the in-flight steps and it finalizes the run to a terminal status —
