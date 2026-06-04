@@ -56,6 +56,31 @@ func (s RunStatus) Terminal() bool {
 	}
 }
 
+// ActiveCIRunIDsForRef returns the IDs of all non-terminal CI-kind runs for the
+// given repo+ref. Used by the push handler to supersede stale runs when the
+// branch advances: the caller cancels each returned ID before enqueuing the new
+// run, so the runner never picks up work for a commit that's already obsolete.
+func ActiveCIRunIDsForRef(db *sql.DB, repoID int64, ref string) ([]int64, error) {
+	rows, err := db.Query(`
+		SELECT id FROM ci_runs
+		 WHERE repo_id = ? AND ref = ? AND kind = 'ci'
+		   AND status IN ('queued','running')
+	`, repoID, ref)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // CountActiveRuns returns how many of a repo's runs are non-terminal — queued
 // or running, plus the agent-only awaiting_input/finishing — i.e. still owned
 // by the in-process runner. Repo deletion uses it to refuse (409) while work is
