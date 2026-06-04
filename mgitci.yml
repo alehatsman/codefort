@@ -1,3 +1,10 @@
+# smoke: a host-mode (no image) cron job that hits the live prod server
+# every 5 minutes. No container spin-up — mooncake steps run directly on
+# the CI host, which IS the prod server, so 127.0.0.1:8080 is always local.
+# Checks: /healthz (no auth), SPA root, and three API endpoints (Bearer token
+# from MOONGIT_TOKEN in the service env — mint via: mgit token create smoke-ci).
+# A failed assertion fails the step; mooncake aborts on the first failure.
+#
 # moongit CI — moongit's own pipeline (dogfooding the moongitci stack).
 #
 # Schema: version "1", jobs wired into a DAG via `needs`; `run:` is sugar for a
@@ -30,6 +37,8 @@
 # `mooncake task deploy` or `mooncake apply -c ~/dotfiles/main_pc.yml -t moongit`.
 version: "1"
 on:
+  schedule:
+    - cron: "*/5 * * * *"
   push:
     # Conventional-commit branch prefixes the fleet uses. Kept broad on
     # purpose: #199 makes this filter enforced (it was dead code before), so an
@@ -81,3 +90,46 @@ jobs:
   #           mooncake task agent-image --vars /tmp/agent-vars.yml
   #       env:
   #         MOONCAKE_MODULE_INSECURE: host.docker.internal:8080
+
+  # smoke: host-mode (no image), runs on a cron schedule only.
+  # Hits the live prod server at 127.0.0.1:8080 — no container needed.
+  # Requires MOONGIT_TOKEN in the moongitd service env (moongit.secret.env).
+  smoke:
+    steps:
+      - name: "healthz"
+        assert:
+          http:
+            url: "http://127.0.0.1:8080/healthz"
+            status: 200
+            contains: "ok"
+
+      - name: "SPA root"
+        assert:
+          http:
+            url: "http://127.0.0.1:8080/"
+            status: 200
+            contains: "<div id=\"root\""
+
+      - name: "API repos"
+        assert:
+          http:
+            url: "http://127.0.0.1:8080/api/repos"
+            status: 200
+            headers:
+              Authorization: "Bearer {{ env.MOONGIT_TOKEN }}"
+
+      - name: "API issues"
+        assert:
+          http:
+            url: "http://127.0.0.1:8080/api/issues"
+            status: 200
+            headers:
+              Authorization: "Bearer {{ env.MOONGIT_TOKEN }}"
+
+      - name: "API runs"
+        assert:
+          http:
+            url: "http://127.0.0.1:8080/api/runs"
+            status: 200
+            headers:
+              Authorization: "Bearer {{ env.MOONGIT_TOKEN }}"
