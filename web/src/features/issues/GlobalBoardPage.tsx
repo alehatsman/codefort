@@ -17,9 +17,11 @@ import { keys, useAllIssues } from "@/api/queries"
 import { ISSUE_STATES, type IssueState, type IssueWithRepo } from "@/api/types"
 import BoardColumn, { type BoardItem } from "@/features/issues/BoardColumn"
 import { BoardCardDisplay } from "@/features/issues/BoardCard"
+import StateIcon from "@/features/issues/StateIcon"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import NewIssueForm from "@/features/issues/NewIssueForm"
-import { ErrorMessage, PageHeader, Spinner } from "@/ui"
+import { useRepoFilter } from "@/shell/useRepoFilter"
+import { ErrorMessage, FilterBar, FilterChip, FilterRow, PageHeader, Spinner } from "@/ui"
 
 // Same hard cap as the per-repo board — the board is the visualization, not a
 // paginated list; fleet scale here is hundreds, not thousands.
@@ -29,13 +31,32 @@ const ALL_ISSUES_QUERY = "limit=1000"
  * Fleet-wide Trello board: every repo's issues in one set of state columns.
  * Cards carry their owning repo, so dragging a card across columns PATCHes the
  * correct repo's issue. Mirrors BoardPage but cross-repo (no OverviewCard, and
- * cards show owner/repo).
+ * cards show owner/repo). Filterable by keyword, repo, and visible columns.
  */
 export default function GlobalBoardPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
 
   const issuesQ = useAllIssues(ALL_ISSUES_QUERY)
+
+  const [search, setSearch] = useState("")
+  const { activeRepos, toggleRepo } = useRepoFilter()
+  // hiddenStates: columns toggled off. Default empty = all columns visible.
+  const [hiddenStates, setHiddenStates] = useState<Set<IssueState>>(new Set())
+
+  const availableRepos = useMemo(
+    () => [...new Set((issuesQ.data ?? []).map((i) => `${i.repo.owner}/${i.repo.name}`))].sort(),
+    [issuesQ.data]
+  )
+
+  const filtered = useMemo(() => {
+    let items = issuesQ.data ?? []
+    const q = search.trim().toLowerCase()
+    if (q) items = items.filter((i) => i.title.toLowerCase().includes(q))
+    if (activeRepos.length > 0)
+      items = items.filter((i) => activeRepos.includes(`${i.repo.owner}/${i.repo.name}`))
+    return items
+  }, [issuesQ.data, search, activeRepos])
 
   const grouped = useMemo(() => {
     const map: Record<IssueState, BoardItem[]> = {
@@ -44,11 +65,22 @@ export default function GlobalBoardPage() {
       done: [],
       closed: [],
     }
-    issuesQ.data?.forEach((iss) => {
+    filtered.forEach((iss) => {
       map[iss.state].push({ issue: iss, owner: iss.repo.owner, repo: iss.repo.name })
     })
     return map
-  }, [issuesQ.data])
+  }, [filtered])
+
+  const visibleStates = ISSUE_STATES.filter((s) => !hiddenStates.has(s))
+
+  function toggleColumn(state: IssueState) {
+    setHiddenStates((prev) => {
+      const next = new Set(prev)
+      if (next.has(state)) next.delete(state)
+      else next.add(state)
+      return next
+    })
+  }
 
   const [activeItem, setActiveItem] = useState<BoardItem | null>(null)
 
@@ -111,6 +143,31 @@ export default function GlobalBoardPage() {
         <IssuesViewSwitch />
       </PageHeader>
 
+      <FilterBar
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder="Search issues across all repos…"
+        searchAriaLabel="Search issues"
+      >
+        <FilterRow label="columns:">
+          {ISSUE_STATES.map((s) => (
+            <FilterChip key={s} checked={!hiddenStates.has(s)} onChange={() => toggleColumn(s)}>
+              <StateIcon state={s} size={12} />
+              {s}
+            </FilterChip>
+          ))}
+        </FilterRow>
+        {availableRepos.length > 0 && (
+          <FilterRow label="repo:">
+            {availableRepos.map((r) => (
+              <FilterChip key={r} checked={activeRepos.includes(r)} onChange={() => toggleRepo(r)}>
+                {r}
+              </FilterChip>
+            ))}
+          </FilterRow>
+        )}
+      </FilterBar>
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -118,7 +175,7 @@ export default function GlobalBoardPage() {
         onDragEnd={onDragEnd}
       >
         <div className="board">
-          {ISSUE_STATES.map((state) => (
+          {visibleStates.map((state) => (
             <BoardColumn key={state} state={state} items={grouped[state]} showRepo />
           ))}
         </div>
