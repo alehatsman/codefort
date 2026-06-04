@@ -37,16 +37,7 @@ on:
     # prefixes here rather than narrowing.
     branches:
       [
-        main,
-        "feat/*",
-        "fix/*",
-        "chore/*",
-        "docs/*",
-        "refactor/*",
-        "test/*",
-        "build/*",
-        "ci/*",
-        "perf/*",
+        main
       ]
 jobs:
   quality:
