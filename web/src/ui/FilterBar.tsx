@@ -7,7 +7,7 @@ interface FilterBarProps {
   searchPlaceholder?: string
   searchAriaLabel?: string
   onSearchKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void
-  children: ReactNode
+  children?: ReactNode
 }
 
 /**
