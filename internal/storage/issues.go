@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -49,11 +50,16 @@ func CreateIssue(db *sql.DB, repoID int64, req api.CreateIssueRequest) (api.Issu
 		parentArg = *req.Parent
 	}
 
+	labelsJSON, err := json.Marshal(labelsOrEmpty(req.Labels))
+	if err != nil {
+		return api.Issue{}, err
+	}
+
 	row := tx.QueryRow(`
-		INSERT INTO issues(repo_id, number, title, body, author, state, parent_number)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO issues(repo_id, number, title, body, author, state, parent_number, labels)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING `+issueColumns+`
-	`, repoID, next, req.Title, req.Body, req.Author, string(api.IssueTodo), parentArg)
+	`, repoID, next, req.Title, req.Body, req.Author, string(api.IssueTodo), parentArg, string(labelsJSON))
 
 	iss, err := scanIssue(row)
 	if err != nil {
@@ -112,7 +118,8 @@ var ErrNoUpdateFields = errors.New("no fields to update")
 // (repoID, number) doesn't exist, or ErrNoUpdateFields if nothing was given.
 // Validation (state values, non-empty title) is the caller's responsibility.
 // parent: nil = no change, 0 = clear, >0 = set to that number (validated).
-func UpdateIssue(db *sql.DB, repoID int64, number int, state *api.IssueState, title, body *string, parent *int) (api.Issue, error) {
+// labels: nil = no change; non-nil (even empty slice) = replace entire set.
+func UpdateIssue(db *sql.DB, repoID int64, number int, state *api.IssueState, title, body *string, parent *int, labels *[]string) (api.Issue, error) {
 	sets := []string{"updated_at = strftime('%s', 'now')"}
 	args := []any{}
 	if state != nil {
@@ -148,6 +155,14 @@ func UpdateIssue(db *sql.DB, repoID int64, number int, state *api.IssueState, ti
 			sets = append(sets, "parent_number = ?")
 			args = append(args, *parent)
 		}
+	}
+	if labels != nil {
+		b, err := json.Marshal(labelsOrEmpty(*labels))
+		if err != nil {
+			return api.Issue{}, err
+		}
+		sets = append(sets, "labels = ?")
+		args = append(args, string(b))
 	}
 	// Only the bumped updated_at — caller passed no real fields.
 	if len(sets) == 1 {
@@ -305,6 +320,7 @@ type ListFilter struct {
 	Assignee string           // "" = any, "null" = unassigned, otherwise exact
 	Author   string           // "" = any, otherwise exact
 	Query    string           // "" = any; case-insensitive substring of title or body
+	Label    string           // "" = any; issue must have this label (exact, case-sensitive)
 	Sort     api.IssueSort    // "" = default (newest); see api.IssueSort
 	Limit    int              // 0 = default (100), capped at 1000
 	Offset   int              // rows to skip (page * limit); <=0 = none
@@ -366,7 +382,7 @@ func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error
 
 // issueColumns is the canonical select list, used everywhere so scanIssue
 // stays in sync with INSERT/UPDATE RETURNING and SELECT.
-const issueColumns = "id, number, title, body, author, state, assignee, claimed_at, parent_number, created_at, updated_at"
+const issueColumns = "id, number, title, body, author, state, assignee, claimed_at, parent_number, created_at, updated_at, labels"
 
 // scanner abstracts *sql.Row and *sql.Rows so scanIssue can serve both.
 type scanner interface {
@@ -379,19 +395,20 @@ func scanIssue(s scanner) (api.Issue, error) {
 	var claimed sql.NullInt64
 	var parent sql.NullInt64
 	var created, updated int64
+	var labelsJSON string
 	if err := s.Scan(
 		&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State,
-		&assignee, &claimed, &parent, &created, &updated,
+		&assignee, &claimed, &parent, &created, &updated, &labelsJSON,
 	); err != nil {
 		return iss, err
 	}
-	decodeIssue(&iss, assignee, claimed, parent, created, updated)
+	decodeIssue(&iss, assignee, claimed, parent, created, updated, labelsJSON)
 	return iss, nil
 }
 
-// decodeIssue fills an Issue's nullable/time fields from the raw column values,
+// decodeIssue fills an Issue's nullable/time/json fields from the raw column values,
 // shared by scanIssue and the cross-repo aggregate scan so the two never drift.
-func decodeIssue(iss *api.Issue, assignee sql.NullString, claimed sql.NullInt64, parent sql.NullInt64, created, updated int64) {
+func decodeIssue(iss *api.Issue, assignee sql.NullString, claimed sql.NullInt64, parent sql.NullInt64, created, updated int64, labelsJSON string) {
 	if assignee.Valid {
 		iss.Assignee = &assignee.String
 	}
@@ -405,6 +422,21 @@ func decodeIssue(iss *api.Issue, assignee sql.NullString, claimed sql.NullInt64,
 	}
 	iss.CreatedAt = time.Unix(created, 0).UTC()
 	iss.UpdatedAt = time.Unix(updated, 0).UTC()
+	if labelsJSON != "" {
+		_ = json.Unmarshal([]byte(labelsJSON), &iss.Labels)
+	}
+	if iss.Labels == nil {
+		iss.Labels = []string{}
+	}
+}
+
+// labelsOrEmpty returns the slice as-is if non-nil, otherwise an empty slice,
+// so JSON marshaling always produces [] rather than null.
+func labelsOrEmpty(ls []string) []string {
+	if ls == nil {
+		return []string{}
+	}
+	return ls
 }
 
 // appendIssueFilters writes the shared state/assignee/author/query predicates
@@ -441,6 +473,12 @@ func appendIssueFilters(q *strings.Builder, args *[]any, filter ListFilter) {
 		q.WriteString(` AND (title LIKE ? ESCAPE '\' OR body LIKE ? ESCAPE '\')`)
 		*args = append(*args, pat, pat)
 	}
+	if filter.Label != "" {
+		// json_each expands the labels JSON array into rows; the EXISTS check
+		// is true when at least one element equals the requested label exactly.
+		q.WriteString(` AND EXISTS (SELECT 1 FROM json_each(issues.labels) WHERE value = ?)`)
+		*args = append(*args, filter.Label)
+	}
 }
 
 // ListAllIssues returns issues across every repo, newest-updated first, each
@@ -453,7 +491,7 @@ func ListAllIssues(db *sql.DB, filter ListFilter) ([]api.IssueWithRepo, error) {
 	q := strings.Builder{}
 	// Qualify with the issues. prefix: id/created_at also exist on repos/users
 	// under the join, so a bare issueColumns would be ambiguous.
-	q.WriteString(`SELECT issues.id, issues.number, issues.title, issues.body, issues.author, issues.state, issues.assignee, issues.claimed_at, issues.parent_number, issues.created_at, issues.updated_at, users.name, repos.name
+	q.WriteString(`SELECT issues.id, issues.number, issues.title, issues.body, issues.author, issues.state, issues.assignee, issues.claimed_at, issues.parent_number, issues.created_at, issues.updated_at, issues.labels, users.name, repos.name
 		FROM issues
 		JOIN repos ON repos.id = issues.repo_id
 		JOIN users ON users.id = repos.owner_id
@@ -488,14 +526,15 @@ func ListAllIssues(db *sql.DB, filter ListFilter) ([]api.IssueWithRepo, error) {
 		var claimed sql.NullInt64
 		var parent sql.NullInt64
 		var created, updated int64
+		var labelsJSON string
 		var owner, name string
 		if err := rows.Scan(
 			&iss.ID, &iss.Number, &iss.Title, &iss.Body, &iss.Author, &iss.State,
-			&assignee, &claimed, &parent, &created, &updated, &owner, &name,
+			&assignee, &claimed, &parent, &created, &updated, &labelsJSON, &owner, &name,
 		); err != nil {
 			return nil, err
 		}
-		decodeIssue(&iss, assignee, claimed, parent, created, updated)
+		decodeIssue(&iss, assignee, claimed, parent, created, updated, labelsJSON)
 		out = append(out, api.IssueWithRepo{Issue: iss, Repo: api.RepoRef{Owner: owner, Name: name}})
 	}
 	return out, rows.Err()

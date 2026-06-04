@@ -37,6 +37,15 @@ export function BoardCardDisplay({ owner, repo, issue, showRepo = false }: Props
           </span>
         )}
         <div className="board-card__title">{issue.title}</div>
+        {issue.labels.length > 0 && (
+          <div className="issue-labels">
+            {issue.labels.map((l) => (
+              <span key={l} className="issue-label">
+                {l}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="board-card__meta">
           <span className="muted">#{issue.number}</span>
           {issue.assignee && (
@@ -86,6 +95,15 @@ export default function BoardCard({ owner, repo, issue, showRepo = false }: Prop
           </span>
         )}
         <div className="board-card__title">{issue.title}</div>
+        {issue.labels.length > 0 && (
+          <div className="issue-labels">
+            {issue.labels.map((l) => (
+              <span key={l} className="issue-label">
+                {l}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="board-card__meta">
           <span className="muted">#{issue.number}</span>
           {issue.assignee && (

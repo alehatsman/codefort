@@ -348,3 +348,21 @@
 .issue-children__num {
   flex-shrink: 0;
 }
+
+/* Labels ------------------------------------------------------------------ */
+.issue-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.issue-label {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  line-height: 1.5;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+}

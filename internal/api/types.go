@@ -59,10 +59,11 @@ type Issue struct {
 	Body         string              `json:"body,omitempty"`
 	Author       string              `json:"author"`
 	State        IssueState          `json:"state"`
-	Assignee     *string             `json:"assignee"`              // nil = unassigned. Explicit null in JSON.
-	ClaimedAt    *time.Time          `json:"claimed_at"`            // when Assignee took the issue; nil when unassigned
+	Assignee     *string             `json:"assignee"`                // nil = unassigned. Explicit null in JSON.
+	ClaimedAt    *time.Time          `json:"claimed_at"`              // when Assignee took the issue; nil when unassigned
 	ParentNumber *int                `json:"parent_number,omitempty"` // nil = no parent
-	Children     []ChildIssueSummary `json:"children,omitempty"`    // populated only on single-issue GET
+	Children     []ChildIssueSummary `json:"children,omitempty"`      // populated only on single-issue GET
+	Labels       []string            `json:"labels"`                  // free-form tags; always [] when empty
 	CreatedAt    time.Time           `json:"created_at"`
 	UpdatedAt    time.Time           `json:"updated_at"`
 }
@@ -76,10 +77,11 @@ type ChildIssueSummary struct {
 }
 
 type CreateIssueRequest struct {
-	Title  string `json:"title"`
-	Body   string `json:"body,omitempty"`
-	Author string `json:"-"` // populated server-side from token
-	Parent *int   `json:"parent,omitempty"` // optional parent issue number
+	Title  string   `json:"title"`
+	Body   string   `json:"body,omitempty"`
+	Author string   `json:"-"`              // populated server-side from token
+	Parent *int     `json:"parent,omitempty"` // optional parent issue number
+	Labels []string `json:"labels,omitempty"` // initial labels; nil/empty = no labels
 }
 
 // UpdateIssueRequest is a partial update: every field is optional, and only
@@ -92,6 +94,7 @@ type UpdateIssueRequest struct {
 	Title  *string     `json:"title,omitempty"`
 	Body   *string     `json:"body,omitempty"`
 	Parent *int        `json:"parent,omitempty"`
+	Labels *[]string   `json:"labels,omitempty"` // nil = no change; non-nil (even []) = replace
 }
 
 // ClaimRequest atomically takes ownership of an issue. The server stamps

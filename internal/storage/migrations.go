@@ -371,6 +371,12 @@ var migrations = []string{
 	    UNIQUE (repo_id, cron_expr)
 	);
 	`,
+
+	// 23: issue labels (#340). Free-form string tags scoped to a repo, stored
+	// as a JSON array so the column carries 0-N labels without a join table.
+	// json_each() provides filtered lookups. DEFAULT '[]' ensures existing rows
+	// are already valid JSON and no NULL handling is needed.
+	`ALTER TABLE issues ADD COLUMN labels TEXT NOT NULL DEFAULT '[]';`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

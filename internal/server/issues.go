@@ -149,7 +149,7 @@ func (s *Server) handleUpdateIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	iss, err := storage.UpdateIssue(s.db, repoID, num, req.State, req.Title, req.Body, req.Parent)
+	iss, err := storage.UpdateIssue(s.db, repoID, num, req.State, req.Title, req.Body, req.Parent, req.Labels)
 	if errors.Is(err, storage.ErrInvalidInput) {
 		writeError(w, http.StatusBadRequest, "parent issue not found in this repo or is self-referential")
 		return
@@ -321,6 +321,9 @@ func parseListFilter(q map[string][]string) (storage.ListFilter, error) {
 	}
 	if v := q["q"]; len(v) > 0 {
 		f.Query = strings.TrimSpace(v[0])
+	}
+	if v := q["label"]; len(v) > 0 {
+		f.Label = strings.TrimSpace(v[0])
 	}
 	if v := q["sort"]; len(v) > 0 && v[0] != "" {
 		s := api.IssueSort(v[0])

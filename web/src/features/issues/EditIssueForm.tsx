@@ -8,14 +8,15 @@ interface Props {
   number: number
   initialTitle: string
   initialBody: string
+  initialLabels: string[]
   onDone: () => void
 }
 
 /**
- * Inline editor for an issue's title + body, seeded from the current values.
- * PATCHes both on save (the mutation invalidates the issue so the page
+ * Inline editor for an issue's title + body + labels, seeded from the current
+ * values. PATCHes on save (the mutation invalidates the issue so the page
  * re-renders with the new content), then calls onDone to leave edit mode.
- * An empty body clears the description.
+ * An empty body clears the description; an empty labels string clears all labels.
  */
 export default function EditIssueForm({
   owner,
@@ -23,17 +24,23 @@ export default function EditIssueForm({
   number,
   initialTitle,
   initialBody,
+  initialLabels,
   onDone,
 }: Props) {
   const [title, setTitle] = useState(initialTitle)
   const [body, setBody] = useState(initialBody)
+  const [labelsStr, setLabelsStr] = useState(initialLabels.join(", "))
   const mutation = useUpdateIssue(owner, repo, number)
 
   function submit(e: React.SyntheticEvent) {
     e.preventDefault()
     const trimmed = title.trim()
     if (!trimmed || mutation.isPending) return
-    mutation.mutate({ title: trimmed, body }, { onSuccess: onDone })
+    const labels = labelsStr
+      .split(",")
+      .map((l) => l.trim())
+      .filter(Boolean)
+    mutation.mutate({ title: trimmed, body, labels }, { onSuccess: onDone })
   }
 
   return (
@@ -47,6 +54,13 @@ export default function EditIssueForm({
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={8}
+        />
+      </Field>
+      <Field label="Labels">
+        <Input
+          placeholder="bug, ui, backend (comma-separated)"
+          value={labelsStr}
+          onChange={(e) => setLabelsStr(e.target.value)}
         />
       </Field>
       <ErrorMessage error={mutation.error} />

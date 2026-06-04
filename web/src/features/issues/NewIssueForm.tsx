@@ -31,6 +31,7 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
   const titleRef = useRef<HTMLInputElement>(null)
   const [title, setTitle] = useState("")
   const [body, setBody] = useState("")
+  const [labelsStr, setLabelsStr] = useState("")
   // "owner/name" of the picked repo; only used when the caller didn't pin one.
   const [target, setTarget] = useState("")
   const mutation = useCreateIssue()
@@ -47,6 +48,7 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
     const reset = () => {
       setTitle("")
       setBody("")
+      setLabelsStr("")
       mutation.reset()
     }
     dialog.addEventListener("close", reset)
@@ -80,8 +82,18 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
     const trimmed = title.trim()
     const dest = resolveTarget()
     if (!trimmed || !dest || mutation.isPending) return
+    const labels = labelsStr
+      .split(",")
+      .map((l) => l.trim())
+      .filter(Boolean)
     mutation.mutate(
-      { owner: dest.owner, repo: dest.repo, title: trimmed, body: body.trim() || undefined },
+      {
+        owner: dest.owner,
+        repo: dest.repo,
+        title: trimmed,
+        body: body.trim() || undefined,
+        labels: labels.length > 0 ? labels : undefined,
+      },
       {
         onSuccess: (created) => {
           close()
@@ -157,6 +169,17 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={8}
+            />
+          )}
+        </FormField>
+        <FormField label="Labels">
+          {({ controlId, describedBy }) => (
+            <Input
+              id={controlId}
+              aria-describedby={describedBy}
+              placeholder="bug, ui, backend (comma-separated, optional)"
+              value={labelsStr}
+              onChange={(e) => setLabelsStr(e.target.value)}
             />
           )}
         </FormField>

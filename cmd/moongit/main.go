@@ -133,6 +133,7 @@ func runIssueCreate(args []string) error {
 	fs := flag.NewFlagSet("issue create", flag.ContinueOnError)
 	title := fs.String("title", "", "issue title (required)")
 	body := fs.String("body", "", "issue body")
+	labelsFlag := fs.String("labels", "", "comma-separated labels to set (e.g. bug,ui)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -145,9 +146,15 @@ func runIssueCreate(args []string) error {
 		return err
 	}
 
-	payload, err := json.Marshal(api.CreateIssueRequest{
-		Title: *title, Body: *body,
-	})
+	req := api.CreateIssueRequest{Title: *title, Body: *body}
+	if *labelsFlag != "" {
+		for _, l := range strings.Split(*labelsFlag, ",") {
+			if l = strings.TrimSpace(l); l != "" {
+				req.Labels = append(req.Labels, l)
+			}
+		}
+	}
+	payload, err := json.Marshal(req)
 	if err != nil {
 		return err
 	}
@@ -175,6 +182,7 @@ func runIssueList(args []string) error {
 	state := fs.String("state", "", "filter by state(s), comma-separated (todo,in_progress,done,closed)")
 	assignee := fs.String("assignee", "", "filter by assignee; 'null' for unassigned")
 	limit := fs.Int("limit", 0, "max results (default 100, max 1000)")
+	label := fs.String("label", "", "filter: issue must have this label")
 	var query string
 	fs.StringVar(&query, "query", "", "filter by keyword in title or body")
 	fs.StringVar(&query, "q", "", "shorthand for --query")
@@ -195,6 +203,9 @@ func runIssueList(args []string) error {
 	}
 	if query != "" {
 		q.Set("q", query)
+	}
+	if *label != "" {
+		q.Set("label", *label)
 	}
 	if *limit > 0 {
 		q.Set("limit", strconv.Itoa(*limit))
@@ -263,6 +274,9 @@ func runIssueShow(args []string) error {
 		fmt.Printf("assignee: (unassigned)\n")
 	}
 	fmt.Printf("created:  %s\n", iss.CreatedAt.Local().Format(time.RFC3339))
+	if len(iss.Labels) > 0 {
+		fmt.Printf("labels:   %s\n", strings.Join(iss.Labels, ", "))
+	}
 	if iss.Body != "" {
 		fmt.Printf("\n%s\n", iss.Body)
 	}
@@ -327,7 +341,7 @@ func runIssueSetState(args []string) error {
 // clobbers the body and vice versa.
 func runIssueEdit(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: moongit issue edit <number> [--title <t>] [--body <b>] [--state <s>]")
+		return errors.New("usage: moongit issue edit <number> [--title <t>] [--body <b>] [--state <s>] [--labels <a,b>]")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -338,6 +352,7 @@ func runIssueEdit(args []string) error {
 	title := fs.String("title", "", "new title")
 	body := fs.String("body", "", "new body")
 	stateFlag := fs.String("state", "", "new state (todo|in_progress|done|closed)")
+	labelsFlag := fs.String("labels", "", "replace labels (comma-separated; empty string clears all)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -362,8 +377,17 @@ func runIssueEdit(args []string) error {
 		}
 		req.State = &state
 	}
-	if req.Title == nil && req.Body == nil && req.State == nil {
-		return errors.New("nothing to edit: pass at least one of --title, --body, --state")
+	if seen["labels"] {
+		var ls []string
+		for _, l := range strings.Split(*labelsFlag, ",") {
+			if l = strings.TrimSpace(l); l != "" {
+				ls = append(ls, l)
+			}
+		}
+		req.Labels = &ls
+	}
+	if req.Title == nil && req.Body == nil && req.State == nil && req.Labels == nil {
+		return errors.New("nothing to edit: pass at least one of --title, --body, --state, --labels")
 	}
 
 	target, err := discoverTarget()

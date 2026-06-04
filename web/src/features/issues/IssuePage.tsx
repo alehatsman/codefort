@@ -88,9 +88,7 @@ export default function IssuePage() {
       {iss.parent_number != null && (
         <div className="issue-parent-link">
           Part of{" "}
-          <Link to={`/${owner}/${repo}/issues/${iss.parent_number}`}>
-            #{iss.parent_number}
-          </Link>
+          <Link to={`/${owner}/${repo}/issues/${iss.parent_number}`}>#{iss.parent_number}</Link>
         </div>
       )}
 
@@ -100,6 +98,17 @@ export default function IssuePage() {
             <SidebarSection label="State">
               <StateButtons owner={owner} repo={repo} number={iss.number} current={iss.state} />
             </SidebarSection>
+            {iss.labels.length > 0 && (
+              <SidebarSection label="Labels">
+                <div className="issue-labels">
+                  {iss.labels.map((l) => (
+                    <span key={l} className="issue-label">
+                      {l}
+                    </span>
+                  ))}
+                </div>
+              </SidebarSection>
+            )}
             <SidebarSection label="Assignee">
               <AssigneeControl
                 owner={owner}
@@ -126,6 +135,7 @@ export default function IssuePage() {
             number={iss.number}
             initialTitle={iss.title}
             initialBody={iss.body ?? ""}
+            initialLabels={iss.labels}
             onDone={() => setEditing(false)}
           />
         ) : (
@@ -224,10 +234,7 @@ function ChildIssueList({
         {children.map((c) => (
           <li key={c.number} className="issue-children__row">
             <StateIcon state={c.state} size={14} />
-            <Link
-              to={`/${owner}/${repo}/issues/${c.number}`}
-              className="issue-children__title"
-            >
+            <Link to={`/${owner}/${repo}/issues/${c.number}`} className="issue-children__title">
               {c.title}
             </Link>
             <span className="issue-children__num muted small">#{c.number}</span>

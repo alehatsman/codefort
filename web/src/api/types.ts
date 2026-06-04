@@ -48,6 +48,7 @@ export interface Issue {
   assignee: string | null
   parent_number?: number
   children?: ChildIssueSummary[]
+  labels: string[]
   created_at: string
   updated_at: string
 }
@@ -90,6 +91,7 @@ export interface CreateRepoInput {
 export interface CreateIssueInput {
   title: string
   body?: string
+  labels?: string[]
 }
 
 export interface CreateCommentInput {
@@ -106,6 +108,7 @@ export interface UpdateIssueInput {
   state?: IssueState
   title?: string
   body?: string
+  labels?: string[] // non-nil = replace entire set; omit = no change
 }
 
 export interface Whoami {

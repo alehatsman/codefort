@@ -34,6 +34,7 @@ export default function IssuesPage() {
   const committedQuery = searchParams.get("q") ?? ""
   const assignee = searchParams.get("assignee") ?? ""
   const author = searchParams.get("author") ?? ""
+  const label = searchParams.get("label") ?? ""
   const sort = searchParams.get("sort") ?? "newest"
   const [search, setSearch] = useState(committedQuery)
 
@@ -75,6 +76,7 @@ export default function IssuesPage() {
   if (activeStates.length > 0) filterQuery.set("state", activeStates.join(","))
   if (assignee) filterQuery.set("assignee", assignee)
   if (author) filterQuery.set("author", author)
+  if (label) filterQuery.set("label", label)
   if (committedQuery) filterQuery.set("q", committedQuery)
   if (sort !== "newest") filterQuery.set("sort", sort)
   const filterKey = filterQuery.toString()
@@ -112,6 +114,13 @@ export default function IssuesPage() {
     if (assignee && assignee !== "null") set.add(assignee)
     return [...set].sort()
   }, [issues, assignee])
+
+  const labelOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const iss of issues) for (const l of iss.labels) set.add(l)
+    if (label) set.add(label)
+    return [...set].sort()
+  }, [issues, label])
 
   // j/k select an issue row and Enter opens it. (h/l tab nav lives in RepoTabs.)
   const { index } = useListNav({
@@ -212,6 +221,23 @@ export default function IssuesPage() {
               <option value="recently-updated">recently updated</option>
             </select>
           </label>
+          {labelOptions.length > 0 && (
+            <label className="filter-select">
+              <span className="filter-label">label:</span>
+              <select
+                value={label}
+                onChange={(e) => setParam("label", e.target.value)}
+                aria-label="Filter by label"
+              >
+                <option value="">any</option>
+                {labelOptions.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </FilterRow>
       </FilterBar>
 
@@ -238,6 +264,15 @@ export default function IssuesPage() {
                   <>
                     #{iss.number} opened {new Date(iss.created_at).toLocaleDateString()} by{" "}
                     {iss.author}
+                    {iss.labels.length > 0 && (
+                      <span className="issue-labels">
+                        {iss.labels.map((l) => (
+                          <span key={l} className="issue-label">
+                            {l}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                   </>
                 }
                 side={iss.assignee ? `@${iss.assignee}` : ""}
