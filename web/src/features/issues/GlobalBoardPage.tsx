@@ -1,19 +1,22 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import "./issues.css"
 import { useNavigate } from "react-router-dom"
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   closestCenter,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core"
 import { useQueryClient } from "@tanstack/react-query"
 import { api } from "@/api/client"
 import { keys, useAllIssues } from "@/api/queries"
 import { ISSUE_STATES, type IssueState, type IssueWithRepo } from "@/api/types"
 import BoardColumn, { type BoardItem } from "@/features/issues/BoardColumn"
+import { BoardCardDisplay } from "@/features/issues/BoardCard"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import { ErrorMessage, PageHeader, Spinner } from "@/ui"
@@ -47,6 +50,8 @@ export default function GlobalBoardPage() {
     return map
   }, [issuesQ.data])
 
+  const [activeItem, setActiveItem] = useState<BoardItem | null>(null)
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   // Swallow the synthetic post-drop click so a drag doesn't navigate. See
@@ -64,7 +69,23 @@ export default function GlobalBoardPage() {
     return () => document.removeEventListener("click", swallowPostDragClick, true)
   }, [])
 
+  function onDragStart(event: DragStartEvent) {
+    justDraggedRef.current = true
+    const { issueNumber, owner: o, repo: r } = event.active.data.current ?? {}
+    if (!issueNumber || !o || !r) return
+    for (const items of Object.values(grouped)) {
+      const found = items.find(
+        (item) => item.issue.number === issueNumber && item.owner === o && item.repo === r
+      )
+      if (found) {
+        setActiveItem(found)
+        return
+      }
+    }
+  }
+
   function onDragEnd(event: DragEndEvent) {
+    setActiveItem(null)
     const { active, over } = event
     if (!over) return
     const targetState = over.data.current?.state as IssueState | undefined
@@ -93,9 +114,7 @@ export default function GlobalBoardPage() {
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragStart={() => {
-          justDraggedRef.current = true
-        }}
+        onDragStart={onDragStart}
         onDragEnd={onDragEnd}
       >
         <div className="board">
@@ -103,6 +122,16 @@ export default function GlobalBoardPage() {
             <BoardColumn key={state} state={state} items={grouped[state]} showRepo />
           ))}
         </div>
+        <DragOverlay>
+          {activeItem && (
+            <BoardCardDisplay
+              owner={activeItem.owner}
+              repo={activeItem.repo}
+              issue={activeItem.issue}
+              showRepo
+            />
+          )}
+        </DragOverlay>
       </DndContext>
     </div>
   )
