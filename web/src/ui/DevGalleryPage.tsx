@@ -7,6 +7,7 @@ import {
   Checkbox,
   CodeSnippet,
   Comment,
+  DetailLayout,
   Dialog,
   EmptyState,
   ErrorMessage,
@@ -73,6 +74,7 @@ export default function DevGalleryPage() {
       <ListRowSection />
       <TableSection />
       <SidebarSectionDemo />
+      <DetailLayoutSection />
       <CommentSection />
       <TooltipSection />
       <MenuSection />
@@ -441,6 +443,36 @@ function SidebarSectionDemo() {
   )
 }
 
+function DetailLayoutSection() {
+  return (
+    <Section title="DetailLayout">
+      <p className="gallery__sublabel">with sidebar</p>
+      <DetailLayout
+        sidebar={
+          <>
+            <SidebarSection label="Meta">First sidebar section</SidebarSection>
+            <SidebarSection label="Actions">Second sidebar section</SidebarSection>
+          </>
+        }
+      >
+        <div className="body">
+          <div className="body__head">Main content column</div>
+          <div className="body__content">
+            Body text fills the available width; the sidebar rail is 280px on the right.
+          </div>
+        </div>
+      </DetailLayout>
+      <p className="gallery__sublabel">without sidebar (single column)</p>
+      <DetailLayout>
+        <div className="body">
+          <div className="body__head">Main content — no sidebar</div>
+          <div className="body__content">Collapses to a single column when sidebar is omitted.</div>
+        </div>
+      </DetailLayout>
+    </Section>
+  )
+}
+
 // Comment renders an <li>; wrap in a <ul> and show a plain + a resolved one.
 function CommentSection() {
   return (
@@ -617,7 +649,7 @@ function PaginationSection() {
       <p className="gallery__sublabel">120 items, 15 per page — prev/next with range</p>
       <Pagination page={page} pageSize={15} total={120} onPageChange={setPage} />
       <p className="gallery__sublabel">Single page (total ≤ pageSize) renders nothing</p>
-      <Pagination page={1} pageSize={15} total={10} onPageChange={() => { }} />
+      <Pagination page={1} pageSize={15} total={10} onPageChange={() => {}} />
     </Section>
   )
 }

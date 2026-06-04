@@ -1514,6 +1514,20 @@ a.file-tree__commit:hover {
   padding: var(--space-4);
 }
 
+/* DetailLayout -------------------------------------------------------- */
+.detail-layout__body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: var(--space-5);
+  align-items: start;
+}
+.detail-layout__body--nosidebar {
+  display: block;
+}
+.detail-layout__main {
+  min-width: 0;
+}
+
 /* Sidebar ------------------------------------------------------------- */
 .sidebar {
   display: flex;

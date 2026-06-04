@@ -17,9 +17,9 @@ import {
   Avatar,
   Badge,
   Button,
+  DetailLayout,
   ErrorMessage,
   RelativeTime,
-  Sidebar,
   SidebarSection,
   SkeletonText,
   Spinner,
@@ -84,106 +84,106 @@ export default function IssuePage() {
         <span>opened this on {new Date(iss.created_at).toLocaleDateString()}</span>
       </div>
 
-      <div className="issue-detail">
-        <div className="issue-main">
-          {editing ? (
-            <EditIssueForm
-              owner={owner}
-              repo={repo}
-              number={iss.number}
-              initialTitle={iss.title}
-              initialBody={iss.body ?? ""}
-              onDone={() => setEditing(false)}
-            />
-          ) : (
-            iss.body && (
-              <div className="body">
-                <div className="body__head">
-                  <Avatar name={iss.author} /> {iss.author} •{" "}
-                  {new Date(iss.created_at).toLocaleString()}
-                </div>
-                <div className="body__content">
-                  <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
-                    <Markdown content={iss.body} owner={owner} repo={repo} basePath="" />
-                  </Suspense>
-                </div>
+      <DetailLayout
+        sidebar={
+          <>
+            <SidebarSection label="State">
+              <StateButtons owner={owner} repo={repo} number={iss.number} current={iss.state} />
+            </SidebarSection>
+            <SidebarSection label="Assignee">
+              <AssigneeControl
+                owner={owner}
+                repo={repo}
+                number={iss.number}
+                assignee={iss.assignee}
+                state={iss.state}
+                me={me.data?.name}
+              />
+            </SidebarSection>
+            <SidebarSection label="Agent">
+              <SpawnAgentButton owner={owner} repo={repo} number={iss.number} />
+            </SidebarSection>
+            <SidebarSection label="Danger zone">
+              <DeleteIssueButton owner={owner} repo={repo} number={iss.number} />
+            </SidebarSection>
+          </>
+        }
+      >
+        {editing ? (
+          <EditIssueForm
+            owner={owner}
+            repo={repo}
+            number={iss.number}
+            initialTitle={iss.title}
+            initialBody={iss.body ?? ""}
+            onDone={() => setEditing(false)}
+          />
+        ) : (
+          iss.body && (
+            <div className="body">
+              <div className="body__head">
+                <Avatar name={iss.author} /> {iss.author} •{" "}
+                {new Date(iss.created_at).toLocaleString()}
               </div>
-            )
-          )}
+              <div className="body__content">
+                <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
+                  <Markdown content={iss.body} owner={owner} repo={repo} basePath="" />
+                </Suspense>
+              </div>
+            </div>
+          )
+        )}
 
-          {commentsQ.isLoading && <Spinner label="Loading comments…" />}
-          {commentsQ.data && commentsQ.data.length > 0 && (
-            <ul className="comments">
-              {commentsQ.data.map((c) => (
-                <CommentItem
-                  key={c.id}
-                  owner={owner}
-                  repo={repo}
-                  issueNumber={iss.number}
-                  comment={c}
-                  canDelete={me.data?.name === c.author}
-                />
-              ))}
-            </ul>
-          )}
+        {commentsQ.isLoading && <Spinner label="Loading comments…" />}
+        {commentsQ.data && commentsQ.data.length > 0 && (
+          <ul className="comments">
+            {commentsQ.data.map((c) => (
+              <CommentItem
+                key={c.id}
+                owner={owner}
+                repo={repo}
+                issueNumber={iss.number}
+                comment={c}
+                canDelete={me.data?.name === c.author}
+              />
+            ))}
+          </ul>
+        )}
 
-          {commitsQ.data && commitsQ.data.length > 0 && (
-            <section className="issue-commits">
-              <h3 className="issue-commits__label">
-                Commits <span className="issue-commits__count">{commitsQ.data.length}</span>
-              </h3>
-              <ul className="commit-list">
-                {commitsQ.data.map((c) => {
-                  const to = `/${owner}/${repo}/commit/${c.sha}`
-                  return (
-                    <li key={c.sha} className="commit-row">
-                      <Avatar name={c.author} />
-                      <div className="commit-row__main">
-                        <Link to={to} className="commit-row__subject" title={c.subject}>
-                          {c.subject}
-                        </Link>
-                        <div className="commit-row__meta muted small">
-                          <span className="commit-row__author">{c.author}</span>
-                          {" committed "}
-                          <RelativeTime iso={c.date} />
-                        </div>
-                      </div>
-                      {c.branch && <BranchTag branch={c.branch} />}
-                      <Link to={to} className="commit-row__sha" title={`View commit ${c.sha}`}>
-                        {c.short_sha}
+        {commitsQ.data && commitsQ.data.length > 0 && (
+          <section className="issue-commits">
+            <h3 className="issue-commits__label">
+              Commits <span className="issue-commits__count">{commitsQ.data.length}</span>
+            </h3>
+            <ul className="commit-list">
+              {commitsQ.data.map((c) => {
+                const to = `/${owner}/${repo}/commit/${c.sha}`
+                return (
+                  <li key={c.sha} className="commit-row">
+                    <Avatar name={c.author} />
+                    <div className="commit-row__main">
+                      <Link to={to} className="commit-row__subject" title={c.subject}>
+                        {c.subject}
                       </Link>
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
-          )}
+                      <div className="commit-row__meta muted small">
+                        <span className="commit-row__author">{c.author}</span>
+                        {" committed "}
+                        <RelativeTime iso={c.date} />
+                      </div>
+                    </div>
+                    {c.branch && <BranchTag branch={c.branch} />}
+                    <Link to={to} className="commit-row__sha" title={`View commit ${c.sha}`}>
+                      {c.short_sha}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
 
-          <CommentForm owner={owner} repo={repo} number={iss.number} />
-        </div>
-
-        <Sidebar>
-          <SidebarSection label="State">
-            <StateButtons owner={owner} repo={repo} number={iss.number} current={iss.state} />
-          </SidebarSection>
-          <SidebarSection label="Assignee">
-            <AssigneeControl
-              owner={owner}
-              repo={repo}
-              number={iss.number}
-              assignee={iss.assignee}
-              state={iss.state}
-              me={me.data?.name}
-            />
-          </SidebarSection>
-          <SidebarSection label="Agent">
-            <SpawnAgentButton owner={owner} repo={repo} number={iss.number} />
-          </SidebarSection>
-          <SidebarSection label="Danger zone">
-            <DeleteIssueButton owner={owner} repo={repo} number={iss.number} />
-          </SidebarSection>
-        </Sidebar>
-      </div>
+        <CommentForm owner={owner} repo={repo} number={iss.number} />
+      </DetailLayout>
     </div>
   )
 }

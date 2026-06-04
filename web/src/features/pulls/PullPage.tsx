@@ -7,7 +7,15 @@ import { usePull } from "@/api/queries"
 import type { MergeConflictResponse } from "@/api/types"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
-import { Button, Checkbox, EmptyState, ErrorMessage, SkeletonText, useToast } from "@/ui"
+import {
+  Button,
+  Checkbox,
+  DetailLayout,
+  EmptyState,
+  ErrorMessage,
+  SkeletonText,
+  useToast,
+} from "@/ui"
 
 const Markdown = lazy(() => import("@/shell/Markdown"))
 
@@ -49,7 +57,7 @@ export default function PullPage() {
       ) : !pr ? (
         <EmptyState>Pull request not found.</EmptyState>
       ) : (
-        <>
+        <DetailLayout>
           <header className="pull-head">
             <h2 className="pull-head__title">
               {pr.title} <span className="pull-head__number">#{pr.number}</span>
@@ -159,7 +167,7 @@ export default function PullPage() {
           )}
 
           <CompareView compare={pr.compare} />
-        </>
+        </DetailLayout>
       )}
     </div>
   )
