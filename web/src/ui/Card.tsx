@@ -1,5 +1,5 @@
 import clsx from "clsx"
-import type { HTMLAttributes } from "react"
+import { forwardRef, type HTMLAttributes } from "react"
 
 interface Props extends HTMLAttributes<HTMLDivElement> {
   /** Toggles the `.is-vim-selected` highlight used by keyboard nav lists. */
@@ -12,7 +12,19 @@ interface Props extends HTMLAttributes<HTMLDivElement> {
  * markup. Link-style cards (a whole card that navigates) stay as
  * `<Link className="card">` since they need router semantics this div can't
  * carry; this covers the plain `<div className="card">` case (~38 usages).
+ *
+ * forwardRef so drag-and-drop libraries (dnd-kit) can attach their node refs.
  */
-export default function Card({ selected, className, ...rest }: Props) {
-  return <div className={clsx("card", { "is-vim-selected": selected }, className)} {...rest} />
-}
+const Card = forwardRef<HTMLDivElement, Props>(function Card(
+  { selected, className, ...rest },
+  ref
+) {
+  return (
+    <div
+      ref={ref}
+      className={clsx("card", { "is-vim-selected": selected }, className)}
+      {...rest}
+    />
+  )
+})
+export default Card

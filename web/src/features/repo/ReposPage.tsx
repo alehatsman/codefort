@@ -1,34 +1,75 @@
-import { useRef } from "react"
+import { useMemo, useRef } from "react"
 import "./repo.css"
 import { Link, useNavigate } from "react-router-dom"
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { useRepos } from "@/api/queries"
 import CIStatusIcon from "@/features/pipelines/CIStatusIcon"
 import NewRepoForm from "@/features/repo/NewRepoForm"
-import { Card, EmptyState, ErrorMessage, PageHeader, SkeletonText } from "@/ui"
+import { applyOrder, useRepoOrder } from "@/features/repo/useRepoOrder"
+import { Button, Card, EmptyState, ErrorMessage, PageHeader, SkeletonText } from "@/ui"
 import type { Repo } from "@/api/types"
 import { useListNav } from "@/shell/keyboardNav"
 
 export default function ReposPage() {
   const { data, isLoading, error } = useRepos()
   const navigate = useNavigate()
+  const { order, reorder, resetOrder, isCustom } = useRepoOrder()
 
-  // hjkl roves the repo grid (j/k a row, h/l a cell); Enter opens the repo.
-  // Columns are read live from the rendered grid so nav follows reflow.
+  const sorted = useMemo(() => applyOrder(data ?? [], order), [data, order])
+  const ids = sorted.map((r) => `${r.owner}/${r.name}`)
+
   const gridRef = useRef<HTMLDivElement>(null)
   const { index } = useListNav({
-    count: data?.length ?? 0,
+    count: sorted.length,
     getColumns: () => gridColumnCount(gridRef.current),
     onActivate: (i) => {
-      const r = data?.[i]
+      const r = sorted[i]
       if (r) navigate(`/${r.owner}/${r.name}`)
     },
   })
+
+  // 8px activation distance so a quick click on a link inside the card still
+  // navigates instead of starting a drag.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+
+  function onDragEnd({ active, over }: DragEndEvent) {
+    if (!over || active.id === over.id) return
+    const oldIndex = ids.indexOf(active.id as string)
+    const newIndex = ids.indexOf(over.id as string)
+    if (oldIndex === -1 || newIndex === -1) return
+    const next = arrayMove(ids, oldIndex, newIndex)
+    reorder(next)
+  }
 
   return (
     <div className="repos">
       <PageHeader
         title="Repositories"
-        actions={<NewRepoForm onCreated={(owner, name) => navigate(`/${owner}/${name}`)} />}
+        actions={
+          <>
+            {isCustom && (
+              <Button size="small" onClick={resetOrder} title="Restore creation order">
+                Reset order
+              </Button>
+            )}
+            <NewRepoForm onCreated={(owner, name) => navigate(`/${owner}/${name}`)} />
+          </>
+        }
       />
 
       {isLoading && (
@@ -48,35 +89,70 @@ export default function ReposPage() {
       )}
 
       {data && data.length > 0 && (
-        <div className="card-grid" ref={gridRef}>
-          {data.map((r, i) => (
-            <Card
-              key={r.id}
-              selected={i === index}
-              data-vim-selected={i === index ? "true" : undefined}
-            >
-              <div className="card__title">
-                <Link to={`/${r.owner}/${r.name}`}>
-                  <span className="muted">{r.owner}/</span>
-                  {r.name}
-                </Link>
-                <span className="card__created muted">
-                  {new Date(r.created_at).toLocaleDateString()}
-                </span>
-              </div>
-              <RepoMetrics repo={r} />
-            </Card>
-          ))}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={ids} strategy={rectSortingStrategy}>
+            <div className="card-grid" ref={gridRef}>
+              {sorted.map((r, i) => (
+                <SortableRepoCard
+                  key={`${r.owner}/${r.name}`}
+                  repo={r}
+                  selected={i === index}
+                />
+              ))}
+            </div>
+          </SortableContext>
+          <DragOverlay>
+            {/* DragOverlay renders the floating ghost; content is handled by the
+                sortable item's transform so we don't need a separate ghost card */}
+            {null}
+          </DragOverlay>
+        </DndContext>
       )}
     </div>
   )
 }
 
-// RepoMetrics renders the five at-a-glance metrics in fixed order —
-// CI · Issues · PRs · Reviews · Agents — as a labeled tile grid. Each tile
-// deep-links to the repo's matching sub-page; a zero count is dimmed so the
-// repos with live activity stand out at a glance.
+function SortableRepoCard({ repo, selected }: { repo: Repo; selected: boolean }) {
+  const id = `${repo.owner}/${repo.name}`
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : undefined,
+    cursor: isDragging ? "grabbing" : undefined,
+  }
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      selected={selected}
+      data-vim-selected={selected ? "true" : undefined}
+      {...attributes}
+      {...listeners}
+    >
+      <div className="card__title">
+        <Link
+          to={`/${repo.owner}/${repo.name}`}
+          // Prevent the link from hijacking the drag gesture. The PointerSensor's
+          // activation distance means a plain click still follows the link.
+          draggable={false}
+        >
+          <span className="muted">{repo.owner}/</span>
+          {repo.name}
+        </Link>
+        <span className="card__created muted">
+          {new Date(repo.created_at).toLocaleDateString()}
+        </span>
+      </div>
+      <RepoMetrics repo={repo} />
+    </Card>
+  )
+}
+
 function RepoMetrics({ repo: r }: { repo: Repo }) {
   const base = `/${r.owner}/${r.name}`
   const ciTo = r.ci_status ? `${base}/pipelines/${r.ci_number}` : `${base}/pipelines`
@@ -107,9 +183,6 @@ function MetricTile({ to, value, label }: { to: string; value: number; label: st
   )
 }
 
-// Count the columns the CSS grid currently renders. getComputedStyle resolves
-// the auto-fill template to explicit pixel tracks ("312px 312px 312px"), so
-// the track count is the live column count at this viewport width.
 function gridColumnCount(grid: HTMLDivElement | null): number {
   if (!grid) return 1
   const tracks = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean)
