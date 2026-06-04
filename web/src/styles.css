@@ -1161,7 +1161,7 @@ a.file-tree__commit:hover {
 }
 .issue-row__link {
   display: grid;
-  grid-template-columns: 20px 1fr auto;
+  grid-template-columns: auto 1fr auto;
   gap: var(--space-3);
   align-items: start;
   padding: 10px var(--space-4);
