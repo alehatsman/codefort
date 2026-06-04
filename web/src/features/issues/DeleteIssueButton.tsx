@@ -1,6 +1,7 @@
+import { useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { useDeleteIssue } from "@/api/mutations"
-import { Button, ErrorMessage } from "@/ui"
+import { Button, ConfirmDialog } from "@/ui"
 
 interface Props {
   owner: string
@@ -8,29 +9,40 @@ interface Props {
   number: number
 }
 
-/**
- * Destructive control that hard-deletes an issue and its comments. Guards
- * with window.confirm (matching CommentItem's posture), then navigates back
- * to the issues list on success; the mutation invalidates the list/repo
- * counts so they refresh.
- */
 export default function DeleteIssueButton({ owner, repo, number }: Props) {
   const navigate = useNavigate()
   const del = useDeleteIssue(owner, repo, number)
+  const dialogRef = useRef<HTMLDialogElement>(null)
 
-  function onDelete() {
-    if (!confirm(`Delete issue #${number} and all its comments? This cannot be undone.`)) return
+  function onConfirm() {
     del.mutate(undefined, {
-      onSuccess: () => navigate(`/${owner}/${repo}/issues`),
+      onSuccess: () => {
+        dialogRef.current?.close()
+        navigate(`/${owner}/${repo}/issues`)
+      },
     })
   }
 
   return (
     <>
-      <Button variant="danger" disabled={del.isPending} onClick={onDelete}>
-        {del.isPending ? "Deleting…" : "Delete issue"}
+      <Button
+        variant="danger"
+        disabled={del.isPending}
+        onClick={() => dialogRef.current?.showModal()}
+      >
+        Delete issue
       </Button>
-      {del.error && <ErrorMessage error={del.error} inline />}
+      <ConfirmDialog
+        ref={dialogRef}
+        title={`Delete issue #${number}?`}
+        confirmLabel="Delete issue"
+        onConfirm={onConfirm}
+        onClose={() => dialogRef.current?.close()}
+        isPending={del.isPending}
+        error={del.error}
+      >
+        This permanently deletes the issue and all its comments. This cannot be undone.
+      </ConfirmDialog>
     </>
   )
 }

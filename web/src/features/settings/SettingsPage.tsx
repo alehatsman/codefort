@@ -1,6 +1,6 @@
 import clsx from "clsx"
 import "./settings.css"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useAgentSettings, useRepos, useSSHKeys, useTokens, useWhoami } from "@/api/queries"
 import {
   useAddSSHKey,
@@ -15,6 +15,7 @@ import ThemeSelect from "@/features/settings/ThemeSelect"
 import {
   Badge,
   Button,
+  ConfirmDialog,
   EmptyState,
   ErrorMessage,
   FormField,
@@ -434,6 +435,8 @@ function TokensSection() {
   const whoami = useWhoami()
   const create = useCreateToken()
   const revoke = useRevokeToken()
+  const revokeDialogRef = useRef<HTMLDialogElement>(null)
+  const [revokeTarget, setRevokeTarget] = useState<Token | null>(null)
 
   const [name, setName] = useState("")
   // The plaintext is only ever returned once, at creation; hold it here so
@@ -460,11 +463,18 @@ function TokensSection() {
 
   function onRevoke(t: Token) {
     if (t.revoked_at) return
-    const self = t.name === whoami.data?.name ? " This is the token you're signed in with." : ""
-    if (!window.confirm(`Revoke token "${t.name}"? It will stop working immediately.${self}`)) {
-      return
-    }
-    revoke.mutate(t.id)
+    setRevokeTarget(t)
+    revokeDialogRef.current?.showModal()
+  }
+
+  function confirmRevoke() {
+    if (!revokeTarget) return
+    revoke.mutate(revokeTarget.id, {
+      onSuccess: () => {
+        revokeDialogRef.current?.close()
+        setRevokeTarget(null)
+      },
+    })
   }
 
   async function copySecret() {
@@ -527,7 +537,19 @@ function TokensSection() {
 
       {tokensQ.isLoading && <Spinner />}
       <ErrorMessage error={tokensQ.error} />
-      <ErrorMessage error={revoke.error} inline />
+      <ConfirmDialog
+        ref={revokeDialogRef}
+        title={`Revoke token "${revokeTarget?.name}"?`}
+        confirmLabel="Revoke token"
+        onConfirm={confirmRevoke}
+        onClose={() => revokeDialogRef.current?.close()}
+        isPending={revoke.isPending}
+        error={revoke.error}
+      >
+        {revokeTarget?.name === whoami.data?.name
+          ? "This is the token you're signed in with. It will stop working immediately."
+          : "This token will stop working immediately."}
+      </ConfirmDialog>
 
       {tokensQ.data && tokensQ.data.length === 0 && (
         <EmptyState>No tokens yet. Create one above.</EmptyState>
@@ -587,6 +609,8 @@ function SSHKeysSection() {
   const keysQ = useSSHKeys()
   const add = useAddSSHKey()
   const del = useDeleteSSHKey()
+  const deleteDialogRef = useRef<HTMLDialogElement>(null)
+  const [deleteTarget, setDeleteTarget] = useState<SSHKey | null>(null)
 
   const [publicKey, setPublicKey] = useState("")
   const [comment, setComment] = useState("")
@@ -608,11 +632,18 @@ function SSHKeysSection() {
   }
 
   function onDelete(k: SSHKey) {
-    const label = k.comment || k.fingerprint
-    if (!window.confirm(`Remove SSH key "${label}"? Pushes signed by it will stop working.`)) {
-      return
-    }
-    del.mutate(k.id)
+    setDeleteTarget(k)
+    deleteDialogRef.current?.showModal()
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return
+    del.mutate(deleteTarget.id, {
+      onSuccess: () => {
+        deleteDialogRef.current?.close()
+        setDeleteTarget(null)
+      },
+    })
   }
 
   return (
@@ -644,9 +675,20 @@ function SSHKeysSection() {
       </form>
       <ErrorMessage error={add.error} inline />
 
+      <ConfirmDialog
+        ref={deleteDialogRef}
+        title={`Remove SSH key "${deleteTarget?.comment || deleteTarget?.fingerprint}"?`}
+        confirmLabel="Remove key"
+        onConfirm={confirmDelete}
+        onClose={() => deleteDialogRef.current?.close()}
+        isPending={del.isPending}
+        error={del.error}
+      >
+        Pushes signed by this key will stop working immediately.
+      </ConfirmDialog>
+
       {keysQ.isLoading && <Spinner />}
       <ErrorMessage error={keysQ.error} />
-      <ErrorMessage error={del.error} inline />
 
       {keysQ.data && keysQ.data.length === 0 && (
         <EmptyState>No SSH keys yet. Add one above.</EmptyState>
