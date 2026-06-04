@@ -38,7 +38,7 @@ RUN apt-get update \
  && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" \
       > /etc/apt/sources.list.d/docker.list \
  && apt-get update \
- && apt-get install -y --no-install-recommends docker-ce-cli gcc \
+ && apt-get install -y --no-install-recommends docker-ce-cli gcc libc6-dev \
  && curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
       | tar -C /usr/local -xz \
  && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz" \
@@ -53,13 +53,14 @@ ENV PATH=/usr/local/go/bin:$PATH \
 
 # Install the static-analysis toolchain onto PATH, then wipe the build-time
 # caches so runtime jobs (moongitd uid) own the cache dirs they recreate.
-RUN GOBIN=/usr/local/bin go install \
+# CGO_ENABLED=0: these tools are pure Go; no C deps needed at install time.
+RUN CGO_ENABLED=0 GOBIN=/usr/local/bin go install \
       "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}" \
- && GOBIN=/usr/local/bin go install \
+ && CGO_ENABLED=0 GOBIN=/usr/local/bin go install \
       "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" \
- && GOBIN=/usr/local/bin go install \
+ && CGO_ENABLED=0 GOBIN=/usr/local/bin go install \
       "github.com/fzipp/gocyclo/cmd/gocyclo@${GOCYCLO_VERSION}" \
- && GOBIN=/usr/local/bin go install \
+ && CGO_ENABLED=0 GOBIN=/usr/local/bin go install \
       "github.com/mibk/dupl@${DUPL_VERSION}" \
  && go clean -cache -modcache \
  && rm -rf /tmp/go /tmp/.cache
