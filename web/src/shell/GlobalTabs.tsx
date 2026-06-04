@@ -10,7 +10,7 @@ import { Tab, Tabs } from "@/ui"
  */
 export default function GlobalTabs() {
   const { pathname } = useLocation()
-  const isRepos = pathname === "/"
+  const isRepos = pathname === "/repos"
   const isIssues = pathname.startsWith("/issues")
   const isPulls = pathname.startsWith("/pulls")
   const isPipelines = pathname.startsWith("/pipelines")
@@ -18,7 +18,7 @@ export default function GlobalTabs() {
 
   return (
     <Tabs label="Global navigation">
-      <Tab to="/" active={isRepos}>
+      <Tab to="/repos" active={isRepos}>
         Repos
       </Tab>
       <Tab to="/issues/board" active={isIssues}>

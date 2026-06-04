@@ -14,18 +14,14 @@ import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@d
 import { CSS } from "@dnd-kit/utilities"
 import { useRepos } from "@/api/queries"
 import CIStatusIcon from "@/features/pipelines/CIStatusIcon"
-import ActivityFeed from "@/features/repo/ActivityFeed"
-import FleetCounters from "@/features/repo/FleetCounters"
 import NewRepoForm from "@/features/repo/NewRepoForm"
 import { applyOrder, useRepoOrder } from "@/features/repo/useRepoOrder"
-import { useFleetEvents } from "@/features/repo/useFleetEvents"
 import { Button, Card, EmptyState, ErrorMessage, PageHeader, SkeletonText } from "@/ui"
 import type { Repo } from "@/api/types"
 import { useListNav } from "@/shell/keyboardNav"
 
 export default function ReposPage() {
   const { data, isLoading, error } = useRepos()
-  const events = useFleetEvents()
   const navigate = useNavigate()
   const { order, reorder, resetOrder, isCustom } = useRepoOrder()
 
@@ -70,11 +66,6 @@ export default function ReposPage() {
           </>
         }
       />
-
-      <FleetCounters />
-
-      <h3 className="repos__feed-title muted small">Recent activity</h3>
-      <ActivityFeed events={events} />
 
       {isLoading && (
         <div className="card-grid" aria-hidden="true">
