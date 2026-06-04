@@ -53,10 +53,17 @@ func translateClaudeLine(line []byte) (eventType string, data map[string]any, re
 // failed. They're surfaced as a "stalled" turn (neutral), distinct from a hard
 // failure. Mirrors mooncake/internal/agent.StopReason (moongit doesn't import
 // it); kept as literals like the "failed"/"success" checks elsewhere here.
+//
+// "canceled" and "aborted" are clean operator stops (ctx cancel / stdin abort
+// control message — mooncake #101/#103): the loop stopped before completing,
+// but no step failed. Without this entry both would fall through to "success",
+// misreporting a stopped run as successful.
 var softStopReasons = map[string]bool{
 	"max_iterations": true,
 	"no_progress":    true,
 	"no_change":      true,
+	"canceled":       true,
+	"aborted":        true,
 }
 
 // turnStatus maps a finished turn onto a CI-style status string for the
