@@ -32,6 +32,12 @@ export interface UpdateRepoInput {
   ci_enabled?: boolean
 }
 
+export interface ChildIssueSummary {
+  number: number
+  title: string
+  state: IssueState
+}
+
 export interface Issue {
   id: number
   number: number
@@ -40,6 +46,8 @@ export interface Issue {
   author: string
   state: IssueState
   assignee: string | null
+  parent_number?: number
+  children?: ChildIssueSummary[]
   created_at: string
   updated_at: string
 }

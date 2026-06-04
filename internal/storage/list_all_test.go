@@ -52,7 +52,7 @@ func TestListAllIssuesStateFilter(t *testing.T) {
 	}
 	// Close bob's issue, then filter to closed — only it should come back.
 	closed := api.IssueClosed
-	if _, err := UpdateIssue(db, bob, 1, &closed, nil, nil); err != nil {
+	if _, err := UpdateIssue(db, bob, 1, &closed, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateIssue: %v", err)
 	}
 

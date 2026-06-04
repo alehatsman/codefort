@@ -53,32 +53,45 @@ func (s IssueSort) Valid() bool {
 var AllIssueSorts = []IssueSort{IssueSortNewest, IssueSortOldest, IssueSortRecentlyUpdated}
 
 type Issue struct {
-	ID        int64      `json:"id"`
-	Number    int        `json:"number"`
-	Title     string     `json:"title"`
-	Body      string     `json:"body,omitempty"`
-	Author    string     `json:"author"`
-	State     IssueState `json:"state"`
-	Assignee  *string    `json:"assignee"`   // nil = unassigned. Explicit null in JSON.
-	ClaimedAt *time.Time `json:"claimed_at"` // when Assignee took the issue; nil when unassigned
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	ID           int64               `json:"id"`
+	Number       int                 `json:"number"`
+	Title        string              `json:"title"`
+	Body         string              `json:"body,omitempty"`
+	Author       string              `json:"author"`
+	State        IssueState          `json:"state"`
+	Assignee     *string             `json:"assignee"`              // nil = unassigned. Explicit null in JSON.
+	ClaimedAt    *time.Time          `json:"claimed_at"`            // when Assignee took the issue; nil when unassigned
+	ParentNumber *int                `json:"parent_number,omitempty"` // nil = no parent
+	Children     []ChildIssueSummary `json:"children,omitempty"`    // populated only on single-issue GET
+	CreatedAt    time.Time           `json:"created_at"`
+	UpdatedAt    time.Time           `json:"updated_at"`
+}
+
+// ChildIssueSummary is a lightweight view of a child issue, embedded in the
+// parent's GET response to avoid a second round-trip.
+type ChildIssueSummary struct {
+	Number int        `json:"number"`
+	Title  string     `json:"title"`
+	State  IssueState `json:"state"`
 }
 
 type CreateIssueRequest struct {
 	Title  string `json:"title"`
 	Body   string `json:"body,omitempty"`
 	Author string `json:"-"` // populated server-side from token
+	Parent *int   `json:"parent,omitempty"` // optional parent issue number
 }
 
 // UpdateIssueRequest is a partial update: every field is optional, and only
 // the ones present (non-nil) are changed. An all-nil request is a no-op the
 // server rejects. State-only requests stay wire-compatible with older clients
 // that sent {"state": "..."}.
+// Parent: nil = no change, 0 = clear parent, >0 = set parent to that number.
 type UpdateIssueRequest struct {
-	State *IssueState `json:"state,omitempty"`
-	Title *string     `json:"title,omitempty"`
-	Body  *string     `json:"body,omitempty"`
+	State  *IssueState `json:"state,omitempty"`
+	Title  *string     `json:"title,omitempty"`
+	Body   *string     `json:"body,omitempty"`
+	Parent *int        `json:"parent,omitempty"`
 }
 
 // ClaimRequest atomically takes ownership of an issue. The server stamps

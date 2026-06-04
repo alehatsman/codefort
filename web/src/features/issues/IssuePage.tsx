@@ -24,6 +24,7 @@ import {
   SkeletonText,
   Spinner,
 } from "@/ui"
+import type { ChildIssueSummary } from "@/api/types"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it only
 // when an issue with a body is actually shown.
@@ -84,6 +85,15 @@ export default function IssuePage() {
         <span>opened this on {new Date(iss.created_at).toLocaleDateString()}</span>
       </div>
 
+      {iss.parent_number != null && (
+        <div className="issue-parent-link">
+          Part of{" "}
+          <Link to={`/${owner}/${repo}/issues/${iss.parent_number}`}>
+            #{iss.parent_number}
+          </Link>
+        </div>
+      )}
+
       <DetailLayout
         sidebar={
           <>
@@ -132,6 +142,10 @@ export default function IssuePage() {
               </div>
             </div>
           )
+        )}
+
+        {iss.children && iss.children.length > 0 && (
+          <ChildIssueList owner={owner} repo={repo} children={iss.children} />
         )}
 
         {commentsQ.isLoading && <Spinner label="Loading comments…" />}
@@ -185,5 +199,41 @@ export default function IssuePage() {
         <CommentForm owner={owner} repo={repo} number={iss.number} />
       </DetailLayout>
     </div>
+  )
+}
+
+function ChildIssueList({
+  owner,
+  repo,
+  children,
+}: {
+  owner: string
+  repo: string
+  children: ChildIssueSummary[]
+}) {
+  const done = children.filter((c) => c.state === "done" || c.state === "closed").length
+  return (
+    <section className="issue-children">
+      <h3 className="issue-children__label">
+        Sub-issues
+        <span className="issue-children__progress">
+          {done}/{children.length}
+        </span>
+      </h3>
+      <ul className="issue-children__list">
+        {children.map((c) => (
+          <li key={c.number} className="issue-children__row">
+            <StateIcon state={c.state} size={14} />
+            <Link
+              to={`/${owner}/${repo}/issues/${c.number}`}
+              className="issue-children__title"
+            >
+              {c.title}
+            </Link>
+            <span className="issue-children__num muted small">#{c.number}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

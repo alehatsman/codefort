@@ -31,7 +31,16 @@ func (s *Server) handleCreateIssue(w http.ResponseWriter, r *http.Request) {
 	// author is ignored.
 	req.Author = identityFromContext(r)
 
+	if req.Parent != nil && *req.Parent < 0 {
+		writeError(w, http.StatusBadRequest, "parent must be a positive issue number")
+		return
+	}
+
 	iss, err := storage.CreateIssue(s.db, repoID, req)
+	if errors.Is(err, storage.ErrInvalidInput) {
+		writeError(w, http.StatusBadRequest, "parent issue not found in this repo")
+		return
+	}
 	if err != nil {
 		s.logger.Error("create issue", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -91,6 +100,15 @@ func (s *Server) handleGetIssue(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	children, err := storage.ListChildren(s.rdb, repoID, num)
+	if err != nil {
+		s.logger.Error("list children", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if len(children) > 0 {
+		iss.Children = children
+	}
 	writeJSON(w, http.StatusOK, iss)
 }
 
@@ -126,7 +144,16 @@ func (s *Server) handleUpdateIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	iss, err := storage.UpdateIssue(s.db, repoID, num, req.State, req.Title, req.Body)
+	if req.Parent != nil && *req.Parent < 0 {
+		writeError(w, http.StatusBadRequest, "parent must be a positive issue number or 0 to clear")
+		return
+	}
+
+	iss, err := storage.UpdateIssue(s.db, repoID, num, req.State, req.Title, req.Body, req.Parent)
+	if errors.Is(err, storage.ErrInvalidInput) {
+		writeError(w, http.StatusBadRequest, "parent issue not found in this repo or is self-referential")
+		return
+	}
 	if errors.Is(err, storage.ErrNoUpdateFields) {
 		writeError(w, http.StatusBadRequest, "no fields to update (provide state, title, and/or body)")
 		return
