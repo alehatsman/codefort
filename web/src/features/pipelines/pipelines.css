@@ -84,6 +84,43 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Pipelines list — fill-viewport layout for the runs table.
+   Used on GlobalRunsPage directly (.pipelines--list) and on the per-repo list
+   via the .repo--list-view flex parent (see PipelinesPage). */
+.pipelines--list {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--topbar-h) - 2 * var(--space-5));
+}
+/* Per-repo pipelines list: the .repo wrapper becomes a bounded flex column so
+   the .pipelines section inside can take the remaining height after the
+   .overview breadcrumb without needing a hard-coded pixel offset. */
+.repo--list-view {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--topbar-h) - 2 * var(--space-5));
+}
+.repo--list-view > .pipelines {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Scrollable table container that takes whatever flex space is left after the
+   section head, lead paragraph, and filter bar. The thead sticks to the top of
+   the scroll area so columns stay visible while the body scrolls. */
+.pipelines__table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.pipelines__table-wrap .table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 1;
+}
+
 /* Run detail */
 /* An agent run view fills the viewport below the chrome so the transcript
    scroll region grows to fit instead of sitting at a static max-height. The

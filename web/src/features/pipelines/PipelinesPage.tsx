@@ -1,7 +1,8 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import "./pipelines.css"
 import clsx from "clsx"
 import { Link, useNavigate, useParams } from "react-router-dom"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import { useCIRun, useCIRuns, useRefs, useRepo } from "@/api/queries"
 import { useCancelCIRun, useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from "@/api/mutations"
 import { absoluteTime, timeAgo } from "@/shell/timeAgo"
@@ -53,10 +54,11 @@ export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
   // *detail* view fills the viewport (.pipelines--agent-run is sized to
   // 100dvh - topbar - padding) and carries its own back-nav header, so a card
   // above it would push the full-height section past the viewport (#322).
+  const isList = runNumber === null || !Number.isFinite(runNumber)
   return (
-    <div className="repo">
-      {runNumber !== null && Number.isFinite(runNumber) ? (
-        <RunDetail owner={r.owner} repo={r.name} runNumber={runNumber} />
+    <div className={clsx("repo", isList && "repo--list-view")}>
+      {!isList ? (
+        <RunDetail owner={r.owner} repo={r.name} runNumber={runNumber as number} />
       ) : (
         <>
           <OverviewCard owner={r.owner} repo={r.name} path="" summaries={{}} />
@@ -98,6 +100,21 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
 
   const isAgent = kind === "agent"
   const base = runsBasePath(kind)
+  const runs = runsQ.data ?? []
+  const colSpan = isAgent ? 6 : 7
+
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const virtualizer = useVirtualizer({
+    count: runs.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 40,
+    overscan: 8,
+  })
+  const virtualItems = virtualizer.getVirtualItems()
+  const totalSize = virtualizer.getTotalSize()
+  const paddingTop = virtualItems.length > 0 ? (virtualItems[0]?.start ?? 0) : 0
+  const paddingBottom =
+    virtualItems.length > 0 ? totalSize - (virtualItems[virtualItems.length - 1]?.end ?? 0) : 0
 
   return (
     <section className="pipelines">
@@ -136,7 +153,7 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
       <p className="muted small pipelines__lead">
         {isAgent ? (
           <>
-            Agent runs are spawned from an issue (the “Spawn agent” button); each works the issue in
+            Agent runs are spawned from an issue (the "Spawn agent" button); each works the issue in
             an isolated container.
           </>
         ) : (
@@ -159,10 +176,10 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
         />
       )}
       <ErrorMessage error={runsQ.error} />
-      {runsQ.data && runsQ.data.length === 0 && (
+      {runsQ.data && runs.length === 0 && (
         <EmptyState>
           {isAgent ? (
-            <>No agent runs yet. Open an issue and click “Spawn agent” to start one.</>
+            <>No agent runs yet. Open an issue and click "Spawn agent" to start one.</>
           ) : (
             <>
               No runs yet. Push a commit with an <code>mgitci.yml</code> to trigger the first one.
@@ -171,54 +188,69 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
         </EmptyState>
       )}
 
-      {runsQ.data && runsQ.data.length > 0 && (
-        <Table className="ci-runs">
-          <thead>
-            <tr>
-              <th>Run</th>
-              <th>Status</th>
-              <th>Commit</th>
-              <th>Ref</th>
-              <th>Trigger</th>
-              <th>Duration</th>
-              <th>When</th>
-            </tr>
-          </thead>
-          <tbody>
-            {runsQ.data.map((run) => (
-              <tr key={run.number}>
-                <td>
-                  <Link className="ci-runs__num" to={`/${owner}/${repo}/${base}/${run.number}`}>
-                    #{run.number}
-                  </Link>
-                  {isAgent && (
-                    <span className="ci-runs__model muted small">
-                      {executionModelLabel(run.execution_model)}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  <CIStatusBadge status={run.status} />
-                </td>
-                <td className="ci-runs__commit">
-                  <span className="ci-runs__msg" title={run.commit_msg || undefined}>
-                    {run.commit_msg || "(no commit message)"}
-                  </span>
-                  <span className="ci-runs__sha muted small" title={run.commit_sha}>
-                    {shortSHA(run.commit_sha)}
-                    {run.commit_author ? ` · ${run.commit_author}` : ""}
-                  </span>
-                </td>
-                <td className="muted">{shortRef(run.ref)}</td>
-                <td className="muted">{run.trigger || "—"}</td>
-                <td className="muted">{runDuration(run)}</td>
-                <td className="muted" title={absoluteTime(run.created_at)}>
-                  {timeAgo(run.created_at)}
-                </td>
+      {runsQ.data && runs.length > 0 && (
+        <div ref={scrollRef} className="pipelines__table-wrap">
+          <Table className="ci-runs">
+            <thead>
+              <tr>
+                <th>Run</th>
+                <th>Status</th>
+                <th>Commit</th>
+                {!isAgent && <th>Ref</th>}
+                <th>Trigger</th>
+                <th>Duration</th>
+                <th>When</th>
               </tr>
-            ))}
-          </tbody>
-        </Table>
+            </thead>
+            <tbody>
+              {paddingTop > 0 && (
+                <tr>
+                  <td colSpan={colSpan} style={{ height: paddingTop, padding: 0, border: 0 }} />
+                </tr>
+              )}
+              {virtualItems.map((vrow) => {
+                const run = runs[vrow.index]
+                return (
+                  <tr key={run.number}>
+                    <td>
+                      <Link className="ci-runs__num" to={`/${owner}/${repo}/${base}/${run.number}`}>
+                        #{run.number}
+                      </Link>
+                      {isAgent && (
+                        <span className="ci-runs__model muted small">
+                          {executionModelLabel(run.execution_model)}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <CIStatusBadge status={run.status} />
+                    </td>
+                    <td className="ci-runs__commit">
+                      <span className="ci-runs__msg" title={run.commit_msg || undefined}>
+                        {run.commit_msg || "(no commit message)"}
+                      </span>
+                      <span className="ci-runs__sha muted small" title={run.commit_sha}>
+                        {shortSHA(run.commit_sha)}
+                        {run.commit_author ? ` · ${run.commit_author}` : ""}
+                      </span>
+                    </td>
+                    {!isAgent && <td className="muted">{shortRef(run.ref)}</td>}
+                    <td className="muted">{run.trigger || "—"}</td>
+                    <td className="muted">{runDuration(run)}</td>
+                    <td className="muted" title={absoluteTime(run.created_at)}>
+                      {timeAgo(run.created_at)}
+                    </td>
+                  </tr>
+                )
+              })}
+              {paddingBottom > 0 && (
+                <tr>
+                  <td colSpan={colSpan} style={{ height: paddingBottom, padding: 0, border: 0 }} />
+                </tr>
+              )}
+            </tbody>
+          </Table>
+        </div>
       )}
     </section>
   )
