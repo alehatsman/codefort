@@ -328,15 +328,24 @@ func TestMergeAlreadyMerged(t *testing.T) {
 	}
 }
 
-func TestMergeNothingToMerge(t *testing.T) {
+func TestMergeHeadAlreadyInBase(t *testing.T) {
 	s, _ := newMergeTestServer(t)
-	// head=main into base=ahead: ahead already contains main, so there is
-	// nothing to bring in.
-	openPull(t, s, "ahead", "main", "nothing")
+	// head=main into base=ahead: ahead already contains main (head is an
+	// ancestor of base). The endpoint now marks the PR merged and returns 200
+	// instead of 409 so that callers that merged via direct push don't hit an
+	// error when they also invoke the PR merge endpoint.
+	openPull(t, s, "ahead", "main", "already-in-base")
 	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
 		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", nil)
-	if rr.Code != http.StatusConflict {
-		t.Errorf("status = %d, want 409 (nothing to merge)", rr.Code)
+	if rr.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200 (head already in base → mark merged)", rr.Code)
+	}
+	res := mergeResult(t, rr.Result())
+	if res.PullRequest.State != api.PRMerged {
+		t.Errorf("pr state = %s, want merged", res.PullRequest.State)
+	}
+	if !res.FastForward {
+		t.Error("want FastForward=true for head-already-in-base path")
 	}
 }
 

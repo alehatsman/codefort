@@ -90,10 +90,23 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Nothing to merge if head is already contained in base (head is an ancestor
-	// of base, which also covers base == head).
+	// Head is already contained in base: the head was merged via a direct push
+	// (bypassing this endpoint). Mark the PR merged and return success so the
+	// caller doesn't have to treat this as an error. We use headTip as the
+	// frozen pre-merge base approximation; the pre-push base is unknowable here,
+	// so the frozen diff will be empty — same caveat as autoCloseMergedPRs.
 	if isAncestor(r.Context(), repoDir, headTip, baseTip) {
-		writeError(w, http.StatusConflict, "nothing to merge: head is already in base")
+		updated, err := storage.MarkMerged(s.db, repoID, num, headTip, headTip)
+		if err != nil {
+			s.logger.Error("mark pull merged (head already in base)", "repo", repoDir, "pr", num, "err", err)
+			writeError(w, http.StatusInternalServerError, "failed to update PR state")
+			return
+		}
+		writeJSON(w, http.StatusOK, api.MergeResult{
+			PullRequest: updated,
+			MergeCommit: baseTip,
+			FastForward: true,
+		})
 		return
 	}
 

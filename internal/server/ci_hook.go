@@ -169,7 +169,7 @@ func (s *Server) handleCIEvents(w http.ResponseWriter, r *http.Request) {
 	// but never block CI enqueue or the push response.
 	if branch, ok := strings.CutPrefix(req.Ref, "refs/heads/"); ok {
 		bareRepo := filepath.Join(s.cfg.ReposDir, owner, name+".git")
-		s.autoCloseMergedPRs(r.Context(), repoID, bareRepo, branch, req.New)
+		s.autoCloseMergedPRs(r.Context(), repoID, bareRepo, branch, req.Old, req.New)
 	}
 
 	enabled, err := storage.RepoCIEnabled(s.db, repoID)
@@ -241,9 +241,12 @@ func isZeroSHA(sha string) bool {
 
 // autoCloseMergedPRs scans open pull requests that target baseRef and marks any
 // whose head branch tip is now an ancestor of newBaseSHA as merged. This covers
-// the direct-push path where the PR merge endpoint is bypassed. Best-effort:
-// each PR is attempted independently; a failure on one does not block others.
-func (s *Server) autoCloseMergedPRs(ctx context.Context, repoID int64, bareRepo, baseRef, newBaseSHA string) {
+// the direct-push path where the PR merge endpoint is bypassed. oldBaseSHA is
+// the pre-push base tip; it is frozen alongside headSHA so the detail endpoint
+// can reproduce the pre-merge diff (computeCompare(oldBaseSHA, headSHA)).
+// Best-effort: each PR is attempted independently; a failure on one does not
+// block others.
+func (s *Server) autoCloseMergedPRs(ctx context.Context, repoID int64, bareRepo, baseRef, oldBaseSHA, newBaseSHA string) {
 	prs, err := storage.OpenPRsForBase(s.db, repoID, baseRef)
 	if err != nil {
 		s.logger.Error("auto-close: list open PRs", "base", baseRef, "err", err)
@@ -258,7 +261,7 @@ func (s *Server) autoCloseMergedPRs(ctx context.Context, repoID int64, bareRepo,
 		if !isAncestor(ctx, bareRepo, headSHA, newBaseSHA) {
 			continue
 		}
-		if _, err := storage.MarkMerged(s.db, repoID, pr.Number, newBaseSHA, headSHA); err != nil {
+		if _, err := storage.MarkMerged(s.db, repoID, pr.Number, oldBaseSHA, headSHA); err != nil {
 			s.logger.Error("auto-close: mark merged", "pr", pr.Number, "err", err)
 			continue
 		}
