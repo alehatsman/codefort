@@ -356,6 +356,21 @@ var migrations = []string{
 	ALTER TABLE issues ADD COLUMN parent_number INTEGER;
 	CREATE INDEX IF NOT EXISTS idx_issues_parent ON issues(repo_id, parent_number);
 	`,
+
+	// 22: cron schedule state (#344). Tracks the last fire time for every
+	// (repo, cron_expr) pair so the scheduler can determine the next due time
+	// without scanning ci_runs. Rows are upserted on each scheduler tick from
+	// the repo's pipeline; stale rows (expr removed from the pipeline) are
+	// deleted at the same time. last_fired_at is NULL until the first fire.
+	`
+	CREATE TABLE IF NOT EXISTS cron_schedules (
+	    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+	    repo_id       INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+	    cron_expr     TEXT NOT NULL,
+	    last_fired_at INTEGER,
+	    UNIQUE (repo_id, cron_expr)
+	);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —
