@@ -7,6 +7,8 @@ import {
   Checkbox,
   CodeSnippet,
   Comment,
+  DataList,
+  DataState,
   Dialog,
   EmptyState,
   ErrorMessage,
@@ -85,6 +87,7 @@ export default function DevGalleryPage() {
       <FilterBarSection />
       <CardsSection />
       <FeedbackSection />
+      <DataSection />
       <SkeletonSection />
       <FormSection />
       <FormFieldSection />
@@ -663,6 +666,67 @@ function CardsSection() {
         <p className="gallery__muted">The keyboard-nav highlight (is-vim-selected).</p>
       </Card>
     </Section>
+  )
+}
+
+type GalleryItem = { id: number; label: string }
+const GALLERY_ITEMS: GalleryItem[] = [
+  { id: 1, label: "First item" },
+  { id: 2, label: "Second item" },
+  { id: 3, label: "Third item" },
+]
+
+function DataSection() {
+  return (
+    <>
+      <Section title="DataState — loading">
+        <DataState
+          data={undefined}
+          isLoading={true}
+          error={null}
+          skeleton={<SkeletonList rows={3} />}
+          empty="Nothing here."
+        >
+          {() => null}
+        </DataState>
+      </Section>
+      <Section title="DataState — error">
+        <DataState
+          data={undefined}
+          isLoading={false}
+          error={new Error("Failed to load items.")}
+          skeleton={<SkeletonList rows={3} />}
+          empty="Nothing here."
+        >
+          {() => null}
+        </DataState>
+      </Section>
+      <Section title="DataState — empty">
+        <DataState
+          data={[]}
+          isLoading={false}
+          error={null}
+          skeleton={<SkeletonList rows={3} />}
+          empty="No items match this filter."
+        >
+          {() => null}
+        </DataState>
+      </Section>
+      <Section title="DataList — data">
+        <DataList
+          data={GALLERY_ITEMS}
+          isLoading={false}
+          error={null}
+          empty="No items."
+        >
+          {(items) =>
+            items.map((item) => (
+              <ListRow key={item.id} to="#" title={item.label} meta={`id=${item.id}`} />
+            ))
+          }
+        </DataList>
+      </Section>
+    </>
   )
 }
 
