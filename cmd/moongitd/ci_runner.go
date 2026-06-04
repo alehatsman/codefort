@@ -600,7 +600,7 @@ func (r *ciRunner) runJob(ctx context.Context, owner, repo string, runNum int, j
 	if job.DockerSocket {
 		extraVols = append(extraVols, "/var/run/docker.sock:/var/run/docker.sock")
 	}
-	sess, err := r.newSession(ctx, containerName(jobID, jobName), workDir, image, extraVols)
+	sess, err := r.newSession(ctx, containerName(jobID, jobName), r.hostPath(workDir), image, extraVols)
 	if err != nil {
 		// A shutdown mid-open cancels the session's context — interrupted, not a
 		// failure to provision the environment.
@@ -1084,6 +1084,24 @@ func sanitizeContainerName(s string) string {
 		}
 	}
 	return b.String()
+}
+
+// hostPath translates a container-side path under DataDir to the corresponding
+// host-side path under HostDataDir. When moongitd runs inside Docker, DataDir
+// is the in-container mount point (e.g. /data) but sibling CI/agent containers
+// are launched by the host Docker daemon, which resolves bind-mount sources on
+// the HOST filesystem. HostDataDir holds the host-side path (e.g.
+// /home/user/.local/share/moongit); the substitution makes the workspace
+// visible inside sibling containers. No-op when the two dirs are identical
+// (non-containerised deployments).
+func (r *ciRunner) hostPath(containerPath string) string {
+	if r.cfg.HostDataDir == r.cfg.DataDir {
+		return containerPath
+	}
+	if strings.HasPrefix(containerPath, r.cfg.DataDir) {
+		return r.cfg.HostDataDir + containerPath[len(r.cfg.DataDir):]
+	}
+	return containerPath
 }
 
 // runMooncakeStep executes one translated step via `mooncake step '<YAML>'` in
