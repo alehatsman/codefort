@@ -183,13 +183,29 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  /* Virtual-scroll viewport: column scrolls independently, board stays stable. */
+  max-height: 70dvh;
+  overflow-y: auto;
 }
 .board-col__empty {
   padding: var(--space-4) var(--space-2);
   text-align: center;
   font-size: var(--text-sm);
 }
-/* "Show N more / Show less" toggle for the collapsed done column. */
+/* Virtualizer inner container — relative so absolute vrows stack correctly. */
+.board-col__virtual {
+  position: relative;
+  width: 100%;
+}
+/* One virtualised row; transform is set inline by useVirtualizer. */
+.board-col__vrow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding-bottom: var(--space-2);
+}
+/* "Show N more / Show less" toggle for collapsed columns. */
 .board-col__more {
   appearance: none;
   border: 1px dashed var(--border);

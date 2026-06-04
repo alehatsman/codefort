@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useDroppable } from "@dnd-kit/core"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import clsx from "clsx"
 import type { Issue, IssueState } from "@/api/types"
 import BoardCard from "@/features/issues/BoardCard"
@@ -21,17 +22,19 @@ interface Props {
   showRepo?: boolean
 }
 
-// The done column can pile up; keep it scannable by showing only the most
-// recent N and collapsing the rest behind a toggle.
-const DONE_VISIBLE = 15
+// All columns collapse past this threshold behind a "Show N more" toggle.
+const COL_VISIBLE = 30
 
 /**
  * Drop target for one state. The header shows state name + count; the body
- * lists draggable cards. Visual highlight when something is hovering over it.
+ * lists draggable cards with virtual scroll. Visual highlight when something
+ * is hovering over it.
  *
- * The `done` column sorts by recency (updated_at desc — the move-to-done time)
- * and collapses everything past the first {@link DONE_VISIBLE} behind a
- * "Show N more" toggle, so a long backlog of finished work stays tidy.
+ * All columns collapse items past {@link COL_VISIBLE} behind a "Show N more"
+ * toggle. The `done` column additionally sorts by recency (updated_at desc)
+ * so recently-closed work surfaces first. Within the visible window the body
+ * is a fixed-height virtualised scroll area — only rendered cards near the
+ * viewport are in the DOM, keeping large columns lightweight.
  */
 export default function BoardColumn({ state, items, showRepo = false }: Props) {
   const { setNodeRef, isOver } = useDroppable({
@@ -39,14 +42,24 @@ export default function BoardColumn({ state, items, showRepo = false }: Props) {
     data: { state },
   })
   const [expanded, setExpanded] = useState(false)
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   const isDone = state === "done"
   const ordered = isDone
     ? [...items].sort((a, b) => +new Date(b.issue.updated_at) - +new Date(a.issue.updated_at))
     : items
-  const collapsible = isDone && ordered.length > DONE_VISIBLE
-  const visible = collapsible && !expanded ? ordered.slice(0, DONE_VISIBLE) : ordered
+  const collapsible = ordered.length > COL_VISIBLE
+  const visible = collapsible && !expanded ? ordered.slice(0, COL_VISIBLE) : ordered
   const hiddenCount = ordered.length - visible.length
+
+  // Estimate each card height: title (~40px) + meta row (~24px) + gap (8px) + border/padding (~16px).
+  const CARD_EST = 88
+  const rowVirtualizer = useVirtualizer({
+    count: visible.length,
+    getScrollElement: () => bodyRef.current,
+    estimateSize: () => CARD_EST,
+    overscan: 5,
+  })
 
   return (
     <div
@@ -59,11 +72,26 @@ export default function BoardColumn({ state, items, showRepo = false }: Props) {
         <span className="board-col__name">{state.replace("_", " ")}</span>
         <span className="board-col__count">{items.length}</span>
       </div>
-      <div className="board-col__body">
+      <div ref={bodyRef} className="board-col__body">
         {items.length === 0 && <div className="board-col__empty muted">No issues</div>}
-        {visible.map(({ issue, owner, repo }) => (
-          <BoardCard key={issue.id} owner={owner} repo={repo} issue={issue} showRepo={showRepo} />
-        ))}
+        {items.length > 0 && (
+          <div className="board-col__virtual" style={{ height: rowVirtualizer.getTotalSize() }}>
+            {rowVirtualizer.getVirtualItems().map((vItem) => {
+              const { issue, owner, repo } = visible[vItem.index]
+              return (
+                <div
+                  key={vItem.key}
+                  className="board-col__vrow"
+                  style={{ transform: `translateY(${vItem.start}px)` }}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={vItem.index}
+                >
+                  <BoardCard owner={owner} repo={repo} issue={issue} showRepo={showRepo} />
+                </div>
+              )
+            })}
+          </div>
+        )}
         {collapsible && (
           <button type="button" className="board-col__more" onClick={() => setExpanded((v) => !v)}>
             {expanded ? "Show less" : `Show ${hiddenCount} more`}
