@@ -8,18 +8,23 @@ interface Props {
   searchPlaceholder?: string
   activeStates: PRState[]
   onToggleState: (state: PRState) => void
+  availableRepos?: string[]
+  activeRepos?: string[]
+  onToggleRepo?: (repo: string) => void
 }
 
-/**
- * PR list filter bar — keyword search + state chips — shared by PullsPage and
- * GlobalPullsPage. State is owned by the caller; this is purely presentational.
- */
+// PR list filter bar — keyword search + state chips — shared by PullsPage and
+// GlobalPullsPage. Pass availableRepos/activeRepos/onToggleRepo to show the
+// repo row on fleet-wide views. State is owned by the caller.
 export default function PullsFilters({
   search,
   onSearchChange,
   searchPlaceholder = "Search title or body…",
   activeStates,
   onToggleState,
+  availableRepos,
+  activeRepos,
+  onToggleRepo,
 }: Props) {
   return (
     <FilterBar
@@ -36,6 +41,19 @@ export default function PullsFilters({
           </FilterChip>
         ))}
       </FilterRow>
+      {availableRepos && availableRepos.length > 0 && onToggleRepo && (
+        <FilterRow label="repo:">
+          {availableRepos.map((r) => (
+            <FilterChip
+              key={r}
+              checked={activeRepos?.includes(r) ?? false}
+              onChange={() => onToggleRepo(r)}
+            >
+              {r}
+            </FilterChip>
+          ))}
+        </FilterRow>
+      )}
     </FilterBar>
   )
 }

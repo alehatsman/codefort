@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import "./pulls.css"
 import { useAllPulls } from "@/api/queries"
 import { PR_STATES, type PRState } from "@/api/types"
 import NewGlobalPullForm from "@/features/pulls/NewGlobalPullForm"
 import PullsFilters from "@/features/pulls/PullsFilters"
+import { useRepoFilter } from "@/shell/useRepoFilter"
 import { EmptyState, ErrorMessage, ListRow, PageHeader, Spinner } from "@/ui"
 
 const STATE_LABEL: Record<PRState, string> = {
@@ -17,10 +18,11 @@ const STATE_LABEL: Record<PRState, string> = {
 const DEFAULT_STATES: readonly PRState[] = ["open"]
 
 // Fleet-wide Pull requests view: every repo's PRs in one list, newest-updated
-// first, each row tagged with and linking into its owning repo. Mirrors the
-// per-repo PullsPage state chips minus the repo-scoped chrome.
+// first, each row tagged with and linking into its owning repo. Filterable by
+// state, keyword, and repo.
 export default function GlobalPullsPage() {
   const [params, setParams] = useSearchParams()
+  const { activeRepos, toggleRepo } = useRepoFilter()
 
   const raw = params.get("state")
   const activeStates: PRState[] =
@@ -54,6 +56,17 @@ export default function GlobalPullsPage() {
 
   const { data, isLoading, error } = useAllPulls(activeStates.join(","), committedQuery)
 
+  const availableRepos = useMemo(
+    () => [...new Set((data ?? []).map((p) => `${p.repo.owner}/${p.repo.name}`))].sort(),
+    [data]
+  )
+
+  const pulls = useMemo(() => {
+    if (!data) return []
+    if (activeRepos.length === 0) return data
+    return data.filter((p) => activeRepos.includes(`${p.repo.owner}/${p.repo.name}`))
+  }, [data, activeRepos])
+
   function toggleState(s: PRState) {
     const next = activeStates.includes(s)
       ? activeStates.filter((x) => x !== s)
@@ -78,16 +91,19 @@ export default function GlobalPullsPage() {
         searchPlaceholder="Search title or body across all repos…"
         activeStates={activeStates}
         onToggleState={toggleState}
+        availableRepos={availableRepos}
+        activeRepos={activeRepos}
+        onToggleRepo={toggleRepo}
       />
 
       {isLoading && <Spinner />}
       <ErrorMessage error={error} />
 
-      {data && data.length === 0 && <EmptyState>No pull requests match this filter.</EmptyState>}
+      {data && pulls.length === 0 && <EmptyState>No pull requests match this filter.</EmptyState>}
 
-      {data && data.length > 0 && (
+      {data && pulls.length > 0 && (
         <ul className="issue-list">
-          {data.map((pr) => (
+          {pulls.map((pr) => (
             <ListRow
               key={`${pr.repo.owner}/${pr.repo.name}#${pr.number}`}
               to={`/${pr.repo.owner}/${pr.repo.name}/pulls/${pr.number}`}

@@ -1,9 +1,13 @@
+import { useMemo } from "react"
 import { Link } from "react-router-dom"
 import "./pipelines.css"
 import { useAllRuns } from "@/api/queries"
+import RunFilters from "@/features/agents/RunFilters"
+import { useRunFilters } from "@/features/agents/useRunFilters"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
 import { EmptyState, ErrorMessage, SkeletonTable, Table } from "@/ui"
 import { absoluteTime, timeAgo } from "@/shell/timeAgo"
+import { useRepoFilter } from "@/shell/useRepoFilter"
 import {
   type RunKind,
   executionModelLabel,
@@ -15,12 +19,30 @@ import {
 
 // Fleet-wide runs view: every repo's CI runs (kind="ci", the Pipelines tab) or
 // agent runs (kind="agent", the Agents tab) in one table, newest-created first.
-// Each row links into the owning repo's per-repo run detail (which carries the
-// job DAG / agent transcript). List-only — the detail routes stay repo-scoped.
+// Each row links into the owning repo's per-repo run detail. Filterable by
+// keyword, status, and repo.
 export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
-  const { data, isLoading, error } = useAllRuns(kind)
+  const { search, setSearch, activeStates, toggleState, query } = useRunFilters()
+  const { activeRepos, toggleRepo } = useRepoFilter()
+  const { data, isLoading, error } = useAllRuns(kind, query)
   const isAgent = kind === "agent"
   const base = runsBasePath(kind)
+
+  const availableRepos = useMemo(
+    () =>
+      [...new Set((data ?? []).map((r) => `${r.repo.owner}/${r.repo.name}`))].sort(),
+    [data]
+  )
+
+  const rows = useMemo(() => {
+    if (!data) return []
+    if (activeRepos.length === 0) return data
+    return data.filter((r) => activeRepos.includes(`${r.repo.owner}/${r.repo.name}`))
+  }, [data, activeRepos])
+
+  const placeholder = isAgent
+    ? "Search commit, ref, or trigger across all repos…"
+    : "Search commit, ref, or trigger across all repos…"
 
   return (
     <section className="pipelines">
@@ -33,6 +55,17 @@ export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
           : "Every pipeline run across all repos. Open one to see its job graph."}
       </p>
 
+      <RunFilters
+        search={search}
+        onSearch={setSearch}
+        placeholder={placeholder}
+        activeStates={activeStates}
+        onToggleState={toggleState}
+        availableRepos={availableRepos}
+        activeRepos={activeRepos}
+        onToggleRepo={toggleRepo}
+      />
+
       {isLoading && (
         <SkeletonTable
           className="ci-runs"
@@ -40,11 +73,11 @@ export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
         />
       )}
       {error && <ErrorMessage error={error} />}
-      {data && data.length === 0 && (
-        <EmptyState>{isAgent ? "No agent runs yet." : "No pipeline runs yet."}</EmptyState>
+      {data && rows.length === 0 && (
+        <EmptyState>{isAgent ? "No agent runs match these filters." : "No pipeline runs match these filters."}</EmptyState>
       )}
 
-      {data && data.length > 0 && (
+      {data && rows.length > 0 && (
         <Table className="ci-runs">
           <thead>
             <tr>
@@ -59,7 +92,7 @@ export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
             </tr>
           </thead>
           <tbody>
-            {data.map((run) => {
+            {rows.map((run) => {
               const repoPath = `/${run.repo.owner}/${run.repo.name}`
               return (
                 <tr key={`${run.repo.owner}/${run.repo.name}#${run.number}`}>

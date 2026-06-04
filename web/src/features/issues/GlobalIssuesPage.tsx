@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import "./issues.css"
 import { useAllIssuesPage } from "@/api/queries"
@@ -6,6 +6,7 @@ import { ISSUE_STATES, type IssueState } from "@/api/types"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import StateIcon from "@/features/issues/StateIcon"
+import { useRepoFilter } from "@/shell/useRepoFilter"
 import {
   EmptyState,
   ErrorMessage,
@@ -22,12 +23,12 @@ import { useListNav } from "@/shell/keyboardNav"
 const PAGE_SIZE = 25
 
 // Fleet-wide Issues view: every repo's issues in one list, newest-updated
-// first, each row tagged with and linking into its owning repo. Mirrors the
-// per-repo IssuesPage chrome (state chips + search) minus the repo-scoped bits
-// (OverviewCard, assignee/author selects, #number jump).
+// first, each row tagged with and linking into its owning repo. Filterable by
+// state, keyword, and repo (repo filter is client-side on the loaded page).
 export default function GlobalIssuesPage() {
   const navigate = useNavigate()
   const [activeStates, setActiveStates] = useState<IssueState[]>(["todo", "in_progress"])
+  const { activeRepos, toggleRepo } = useRepoFilter()
 
   const [searchParams, setSearchParams] = useSearchParams()
   const committedQuery = searchParams.get("q") ?? ""
@@ -51,9 +52,11 @@ export default function GlobalIssuesPage() {
   }, [search, committedQuery, setSearchParams])
 
   // Filter signature (no pagination); page resets to 1 when it changes.
+  // Include repo filter in filterKey so page resets when repos are toggled.
   const filterQuery = new URLSearchParams()
   if (activeStates.length > 0) filterQuery.set("state", activeStates.join(","))
   if (committedQuery) filterQuery.set("q", committedQuery)
+  if (activeRepos.length > 0) filterQuery.set("_repo", activeRepos.join(","))
   const filterKey = filterQuery.toString()
 
   // Reset to page 1 when the filter changes (adjust-state-during-render).
@@ -64,13 +67,25 @@ export default function GlobalIssuesPage() {
     setPage(1)
   }
 
-  const query = new URLSearchParams(filterKey)
+  const query = new URLSearchParams()
+  if (activeStates.length > 0) query.set("state", activeStates.join(","))
+  if (committedQuery) query.set("q", committedQuery)
   query.set("limit", String(PAGE_SIZE))
   if (page > 1) query.set("offset", String((page - 1) * PAGE_SIZE))
 
   const { data, isLoading, error } = useAllIssuesPage(query.toString())
-  const issues = data?.items ?? []
+  const allIssues = data?.items ?? []
   const total = data?.total ?? 0
+
+  const availableRepos = useMemo(
+    () => [...new Set(allIssues.map((i) => `${i.repo.owner}/${i.repo.name}`))].sort(),
+    [allIssues]
+  )
+
+  const issues = useMemo(() => {
+    if (activeRepos.length === 0) return allIssues
+    return allIssues.filter((i) => activeRepos.includes(`${i.repo.owner}/${i.repo.name}`))
+  }, [allIssues, activeRepos])
 
   const { index } = useListNav({
     count: issues.length,
@@ -107,6 +122,15 @@ export default function GlobalIssuesPage() {
             </FilterChip>
           ))}
         </FilterRow>
+        {availableRepos.length > 0 && (
+          <FilterRow label="repo:">
+            {availableRepos.map((r) => (
+              <FilterChip key={r} checked={activeRepos.includes(r)} onChange={() => toggleRepo(r)}>
+                {r}
+              </FilterChip>
+            ))}
+          </FilterRow>
+        )}
       </FilterBar>
 
       {isLoading && <SkeletonList />}
