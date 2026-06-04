@@ -96,38 +96,33 @@ jobs:
   # Requires MOONGIT_TOKEN in the moongitd service env (moongit.secret.env).
   smoke:
     steps:
-      - name: "healthz"
-        assert:
+      - assert:
           http:
             url: "http://127.0.0.1:8080/healthz"
             status: 200
             contains: "ok"
 
-      - name: "SPA root"
-        assert:
+      - assert:
           http:
             url: "http://127.0.0.1:8080/"
             status: 200
             contains: "<div id=\"root\""
 
-      - name: "API repos"
-        assert:
+      - assert:
           http:
             url: "http://127.0.0.1:8080/api/repos"
             status: 200
             headers:
               Authorization: "Bearer {{ env.MOONGIT_TOKEN }}"
 
-      - name: "API issues"
-        assert:
+      - assert:
           http:
             url: "http://127.0.0.1:8080/api/issues"
             status: 200
             headers:
               Authorization: "Bearer {{ env.MOONGIT_TOKEN }}"
 
-      - name: "API runs"
-        assert:
+      - assert:
           http:
             url: "http://127.0.0.1:8080/api/runs"
             status: 200
