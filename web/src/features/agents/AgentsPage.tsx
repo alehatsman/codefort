@@ -4,6 +4,7 @@ import { useCIRuns } from "@/api/queries"
 import AgentRunsTable from "@/features/agents/AgentRunsTable"
 import RunFilters from "@/features/agents/RunFilters"
 import { useRunFilters } from "@/features/agents/useRunFilters"
+import { AGENT_CHIPS } from "@/features/agents/runChips"
 import OverviewCard from "@/shell/OverviewCard"
 import { EmptyState, ErrorMessage, Spinner } from "@/ui"
 
@@ -13,7 +14,7 @@ import { EmptyState, ErrorMessage, Spinner } from "@/ui"
 // run shell (PipelinesPage), reached via the grid's #number links.
 export default function AgentsPage() {
   const { owner = "", repo = "" } = useParams()
-  const { search, setSearch, activeStates, toggleState, query } = useRunFilters()
+  const { search, setSearch, activeStates, toggleState, query } = useRunFilters(AGENT_CHIPS)
   const { data, isLoading, error } = useCIRuns(owner, repo, "agent", query)
 
   return (
@@ -29,6 +30,7 @@ export default function AgentsPage() {
         </p>
 
         <RunFilters
+          chips={AGENT_CHIPS}
           search={search}
           onSearch={setSearch}
           placeholder="Search commit, ref, or trigger…"

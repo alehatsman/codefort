@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import type { CIRunStatus } from "@/api/types"
+import type { RunChip } from "./runChips"
 
-// useRunFilters owns the Agents views' fulltext + status filter state, mirroring
-// the issues pages: the committed search term lives in the URL ?q (debounced
-// 250ms so typing doesn't spam the API), while the status chips are local
-// component state. It returns `query` — the ?state=&q= string to hand to
+// useRunFilters owns the Agents/Pipelines fulltext + status filter state,
+// mirroring the issues pages: the committed search term lives in the URL ?q
+// (debounced 250ms so typing doesn't spam the API), while the status chips are
+// local component state. It returns `query` — the ?state=&q= string to hand to
 // useAllRuns / useCIRuns (kind is added by the caller).
-export function useRunFilters() {
+//
+// Pass the chip definitions from AGENT_CHIPS or CI_RUN_CHIPS so the hook can
+// expand each chip key to the backend statuses it covers when building ?state=.
+export function useRunFilters(chips: readonly RunChip[]) {
   const [activeStates, setActiveStates] = useState<CIRunStatus[]>([])
 
   const [searchParams, setSearchParams] = useSearchParams()
@@ -35,8 +39,12 @@ export function useRunFilters() {
     setActiveStates((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]))
   }
 
+  // Expand each active chip key to the backend statuses it covers, deduped.
+  const chipMap = new Map(chips.map((c) => [c.key, c.statuses]))
+  const expanded = [...new Set(activeStates.flatMap((s) => chipMap.get(s) ?? [s]))]
+
   const params = new URLSearchParams()
-  if (activeStates.length > 0) params.set("state", activeStates.join(","))
+  if (expanded.length > 0) params.set("state", expanded.join(","))
   if (committedQuery) params.set("q", committedQuery)
 
   return { search, setSearch, activeStates, toggleState, query: params.toString() }

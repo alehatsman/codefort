@@ -4,6 +4,7 @@ import "./pipelines.css"
 import { useAllRuns } from "@/api/queries"
 import RunFilters from "@/features/agents/RunFilters"
 import { useRunFilters } from "@/features/agents/useRunFilters"
+import { AGENT_CHIPS, CI_RUN_CHIPS } from "@/features/agents/runChips"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
 import { EmptyState, ErrorMessage, SkeletonTable, Table } from "@/ui"
 import { absoluteTime, timeAgo } from "@/shell/timeAgo"
@@ -22,15 +23,15 @@ import {
 // Each row links into the owning repo's per-repo run detail. Filterable by
 // keyword, status, and repo.
 export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
-  const { search, setSearch, activeStates, toggleState, query } = useRunFilters()
+  const isAgent = kind === "agent"
+  const chips = isAgent ? AGENT_CHIPS : CI_RUN_CHIPS
+  const { search, setSearch, activeStates, toggleState, query } = useRunFilters(chips)
   const { activeRepos, toggleRepo } = useRepoFilter()
   const { data, isLoading, error } = useAllRuns(kind, query)
-  const isAgent = kind === "agent"
   const base = runsBasePath(kind)
 
   const availableRepos = useMemo(
-    () =>
-      [...new Set((data ?? []).map((r) => `${r.repo.owner}/${r.repo.name}`))].sort(),
+    () => [...new Set((data ?? []).map((r) => `${r.repo.owner}/${r.repo.name}`))].sort(),
     [data]
   )
 
@@ -56,6 +57,7 @@ export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
       </p>
 
       <RunFilters
+        chips={chips}
         search={search}
         onSearch={setSearch}
         placeholder={placeholder}
@@ -74,7 +76,9 @@ export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
       )}
       {error && <ErrorMessage error={error} />}
       {data && rows.length === 0 && (
-        <EmptyState>{isAgent ? "No agent runs match these filters." : "No pipeline runs match these filters."}</EmptyState>
+        <EmptyState>
+          {isAgent ? "No agent runs match these filters." : "No pipeline runs match these filters."}
+        </EmptyState>
       )}
 
       {data && rows.length > 0 && (
