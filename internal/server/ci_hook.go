@@ -192,6 +192,20 @@ func (s *Server) handleCIEvents(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Supersede any active CI runs for this ref: a new commit makes them
+	// pointless. Best-effort — a query failure or nil canceler doesn't block
+	// the new enqueue.
+	if s.agentCanceler != nil {
+		if stale, qerr := storage.ActiveCIRunIDsForRef(s.db, repoID, req.Ref); qerr != nil {
+			s.logger.Error("ci events: supersede query", "err", qerr)
+		} else {
+			for _, id := range stale {
+				s.agentCanceler.CancelCIRun(id)
+				s.logger.Info("ci run superseded", "run_id", id, "ref", req.Ref, "new_sha", req.New)
+			}
+		}
+	}
+
 	msg, author := gitCommitMeta(bareRepo, req.New)
 	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
 		CommitSHA: req.New, CommitMsg: msg, CommitAuthor: author,
