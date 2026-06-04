@@ -7,6 +7,7 @@ import {
   Checkbox,
   CodeSnippet,
   Comment,
+  ConfirmDialog,
   Dialog,
   EmptyState,
   ErrorMessage,
@@ -91,6 +92,7 @@ export default function DevGalleryPage() {
       <FormControlsSection />
       <RelativeTimeSection />
       <DialogSection />
+      <ConfirmDialogSection />
     </div>
   )
 }
@@ -617,7 +619,7 @@ function PaginationSection() {
       <p className="gallery__sublabel">120 items, 15 per page — prev/next with range</p>
       <Pagination page={page} pageSize={15} total={120} onPageChange={setPage} />
       <p className="gallery__sublabel">Single page (total ≤ pageSize) renders nothing</p>
-      <Pagination page={1} pageSize={15} total={10} onPageChange={() => { }} />
+      <Pagination page={1} pageSize={15} total={10} onPageChange={() => {}} />
     </Section>
   )
 }
@@ -801,6 +803,26 @@ function RelativeTimeSection() {
     <Section title="RelativeTime">
       <RelativeTime iso="2020-01-01T00:00:00Z" />
       <RelativeTime className="muted small" iso="2026-05-30T12:00:00Z" />
+    </Section>
+  )
+}
+
+function ConfirmDialogSection() {
+  const ref = useRef<HTMLDialogElement>(null)
+  return (
+    <Section title="ConfirmDialog">
+      <Button variant="danger" onClick={() => ref.current?.showModal()}>
+        Delete something
+      </Button>
+      <ConfirmDialog
+        ref={ref}
+        title="Delete this thing?"
+        confirmLabel="Delete"
+        onConfirm={() => ref.current?.close()}
+        onClose={() => ref.current?.close()}
+      >
+        This permanently removes the item. This cannot be undone.
+      </ConfirmDialog>
     </Section>
   )
 }
