@@ -91,6 +91,27 @@ type intelSearchRequest struct {
 	Kind  string `json:"kind"` // "semantic" (default) | "symbol"
 }
 
+// resolveDexProject calls ResolveProject and writes the appropriate HTTP error
+// if the project is not found or the name is ambiguous (multiple projects share
+// the same basename). Returns the project and true on success.
+func (s *Server) resolveDexProject(w http.ResponseWriter, r *http.Request, repo string) (dex.ProjectStatus, bool) {
+	proj, err := s.dex.ResolveProject(r.Context(), repo)
+	if errors.Is(err, dex.ErrProjectNotFound) {
+		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
+		return dex.ProjectStatus{}, false
+	}
+	if errors.Is(err, dex.ErrAmbiguousProject) {
+		writeError(w, http.StatusConflict, "ambiguous repo name: multiple dex projects share this basename")
+		return dex.ProjectStatus{}, false
+	}
+	if err != nil {
+		s.logger.Error("dex resolve project", "err", err)
+		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+		return dex.ProjectStatus{}, false
+	}
+	return proj, true
+}
+
 // handleIntelOverview returns the at-a-glance repo + package summaries
 // dex composed at index time. Used by the Intel tab to render an overview
 // before the user has typed a query.
@@ -103,14 +124,8 @@ func (s *Server) handleIntelOverview(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "dex integration not configured")
 		return
 	}
-	proj, err := s.dex.ResolveProject(r.Context(), repo)
-	if errors.Is(err, dex.ErrProjectNotFound) {
-		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
-		return
-	}
-	if err != nil {
-		s.logger.Error("dex resolve project", "err", err)
-		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+	proj, ok2 := s.resolveDexProject(w, r, repo)
+	if !ok2 {
 		return
 	}
 	ov, err := s.dex.Overview(r.Context(), proj.ID)
@@ -136,14 +151,8 @@ func (s *Server) handleIntelPackageGraph(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusServiceUnavailable, "dex integration not configured")
 		return
 	}
-	proj, err := s.dex.ResolveProject(r.Context(), repo)
-	if errors.Is(err, dex.ErrProjectNotFound) {
-		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
-		return
-	}
-	if err != nil {
-		s.logger.Error("dex resolve project", "err", err)
-		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+	proj, ok2 := s.resolveDexProject(w, r, repo)
+	if !ok2 {
 		return
 	}
 	pg, err := s.dex.PackageGraph(r.Context(), proj.ID)
@@ -182,14 +191,8 @@ func (s *Server) handleIntelFileSummary(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusServiceUnavailable, "dex integration not configured")
 		return
 	}
-	proj, err := s.dex.ResolveProject(r.Context(), repo)
-	if errors.Is(err, dex.ErrProjectNotFound) {
-		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
-		return
-	}
-	if err != nil {
-		s.logger.Error("dex resolve project", "err", err)
-		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+	proj, ok2 := s.resolveDexProject(w, r, repo)
+	if !ok2 {
 		return
 	}
 	summary, err := s.dex.FileSummary(r.Context(), proj.ID, path)
@@ -224,14 +227,8 @@ func (s *Server) handleIntelSummaries(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "dex integration not configured")
 		return
 	}
-	proj, err := s.dex.ResolveProject(r.Context(), repo)
-	if errors.Is(err, dex.ErrProjectNotFound) {
-		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
-		return
-	}
-	if err != nil {
-		s.logger.Error("dex resolve project", "err", err)
-		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+	proj, ok2 := s.resolveDexProject(w, r, repo)
+	if !ok2 {
 		return
 	}
 
@@ -291,19 +288,14 @@ func (s *Server) handleIntelSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	proj, err := s.dex.ResolveProject(r.Context(), repo)
-	if errors.Is(err, dex.ErrProjectNotFound) {
-		writeError(w, http.StatusNotFound, "repo is not indexed by dex")
-		return
-	}
-	if err != nil {
-		s.logger.Error("dex resolve project", "err", err)
-		writeError(w, http.StatusBadGateway, "dex unreachable: "+err.Error())
+	proj, ok2 := s.resolveDexProject(w, r, repo)
+	if !ok2 {
 		return
 	}
 
 	const maxHits = 20
 	var res *dex.SearchResult
+	var err error
 	switch req.Kind {
 	case "symbol":
 		res, err = s.dex.FindSymbol(r.Context(), proj.ID, req.Query, maxHits)

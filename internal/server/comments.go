@@ -45,6 +45,10 @@ func (s *Server) handleCreateComment(w http.ResponseWriter, r *http.Request) {
 	req.Author = identityFromContext(r)
 
 	c, err := storage.CreateComment(s.db, issueID, req)
+	if errors.Is(err, storage.ErrInvalidInput) {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if err != nil {
 		s.logger.Error("create comment", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")

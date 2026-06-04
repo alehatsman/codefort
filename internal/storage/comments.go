@@ -11,6 +11,9 @@ import (
 // CreateComment appends a comment to an issue. issueID is the row id,
 // not the per-repo number.
 func CreateComment(db *sql.DB, issueID int64, req api.CreateCommentRequest) (api.Comment, error) {
+	if req.Author == "" || req.Body == "" {
+		return api.Comment{}, ErrInvalidInput
+	}
 	row := db.QueryRow(`
 		INSERT INTO issue_comments(issue_id, author, body)
 		VALUES (?, ?, ?)
@@ -92,6 +95,6 @@ func scanComment(s scanner) (api.Comment, error) {
 		}
 		return c, err
 	}
-	c.CreatedAt = time.Unix(created, 0).UTC()
+	c.CreatedAt = time.Unix(created, 0).UTC() // created_at stored as Unix seconds
 	return c, nil
 }
