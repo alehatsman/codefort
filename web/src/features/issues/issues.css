@@ -246,33 +246,10 @@
 .board-card__link:hover {
   text-decoration: none;
 }
-/* Per-project repo tag on cross-repo board cards. Color is driven by a
-   --repo-hue set inline (a stable hash of owner/repo), so each project keeps
-   the same hue; light/dark/monokai each pick legible lightness off that hue. */
-.repo-tag {
-  display: inline-block;
-  max-width: 100%;
+/* Spacing between the repo tag and card title — board-card-specific. The
+   .repo-tag block itself lives in styles.css (shared across all global views). */
+.board-card .repo-tag {
   margin-bottom: 6px;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-medium);
-  line-height: 1.6;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background: hsl(var(--repo-hue, 212) 65% 90%);
-  color: hsl(var(--repo-hue, 212) 50% 28%);
-}
-@media (prefers-color-scheme: dark) {
-  .repo-tag {
-    background: hsl(var(--repo-hue, 212) 40% 24%);
-    color: hsl(var(--repo-hue, 212) 70% 80%);
-  }
-}
-[data-theme="monokai"] .repo-tag {
-  background: hsl(var(--repo-hue, 212) 30% 26%);
-  color: hsl(var(--repo-hue, 212) 65% 80%);
 }
 .board-card__title {
   font-weight: var(--weight-medium);

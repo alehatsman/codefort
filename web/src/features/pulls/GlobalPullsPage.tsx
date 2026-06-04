@@ -5,6 +5,7 @@ import { useAllPulls } from "@/api/queries"
 import { PR_STATES, type PRState } from "@/api/types"
 import NewGlobalPullForm from "@/features/pulls/NewGlobalPullForm"
 import PullsFilters from "@/features/pulls/PullsFilters"
+import { repoHue } from "@/shell/repoColor"
 import { useRepoFilter } from "@/shell/useRepoFilter"
 import { EmptyState, ErrorMessage, ListRow, PageHeader, Spinner } from "@/ui"
 
@@ -113,7 +114,14 @@ export default function GlobalPullsPage() {
               title={pr.title}
               meta={
                 <>
-                  <span className="issue-row__repo">
+                  <span
+                    className="repo-tag"
+                    style={
+                      {
+                        "--repo-hue": repoHue(`${pr.repo.owner}/${pr.repo.name}`),
+                      } as React.CSSProperties
+                    }
+                  >
                     {pr.repo.owner}/{pr.repo.name}
                   </span>{" "}
                   #{pr.number} {pr.head_ref} → {pr.base_ref} · opened{" "}

@@ -6,6 +6,7 @@ import { ISSUE_STATES, type IssueState } from "@/api/types"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import StateIcon from "@/features/issues/StateIcon"
+import { repoHue } from "@/shell/repoColor"
 import { useRepoFilter } from "@/shell/useRepoFilter"
 import {
   EmptyState,
@@ -126,6 +127,10 @@ export default function GlobalIssuesPage() {
           <FilterRow label="repo:">
             {availableRepos.map((r) => (
               <FilterChip key={r} checked={activeRepos.includes(r)} onChange={() => toggleRepo(r)}>
+                <span
+                  className="repo-dot"
+                  style={{ "--repo-hue": repoHue(r) } as React.CSSProperties}
+                />
                 {r}
               </FilterChip>
             ))}
@@ -154,7 +159,14 @@ export default function GlobalIssuesPage() {
                 title={iss.title}
                 meta={
                   <>
-                    <span className="issue-row__repo">
+                    <span
+                      className="repo-tag"
+                      style={
+                        {
+                          "--repo-hue": repoHue(`${iss.repo.owner}/${iss.repo.name}`),
+                        } as React.CSSProperties
+                      }
+                    >
                       {iss.repo.owner}/{iss.repo.name}
                     </span>{" "}
                     #{iss.number} opened {new Date(iss.created_at).toLocaleDateString()} by{" "}

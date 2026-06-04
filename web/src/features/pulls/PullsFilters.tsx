@@ -1,5 +1,6 @@
 import { PR_STATES, type PRState } from "@/api/types"
 import PRStateIcon from "@/features/pulls/PRStateIcon"
+import { repoHue } from "@/shell/repoColor"
 import { FilterBar, FilterChip, FilterRow } from "@/ui"
 
 interface Props {
@@ -49,6 +50,10 @@ export default function PullsFilters({
               checked={activeRepos?.includes(r) ?? false}
               onChange={() => onToggleRepo(r)}
             >
+              <span
+                className="repo-dot"
+                style={{ "--repo-hue": repoHue(r) } as React.CSSProperties}
+              />
               {r}
             </FilterChip>
           ))}

@@ -1099,6 +1099,53 @@ a.file-tree__commit:hover {
 .chip input {
   margin: 0;
 }
+/* Colored repo swatch inside a filter chip — hue driven by --repo-hue. */
+.repo-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: hsl(var(--repo-hue, 212) 60% 50%);
+}
+@media (prefers-color-scheme: dark) {
+  .repo-dot {
+    background: hsl(var(--repo-hue, 212) 55% 65%);
+  }
+}
+[data-theme="monokai"] .repo-dot {
+  background: hsl(var(--repo-hue, 212) 50% 60%);
+}
+/* Per-project colored pill used on board cards, list rows, and table cells.
+   Color driven by --repo-hue (deterministic hash of owner/repo string).
+   Board cards add their own margin-bottom via .board-card .repo-tag. */
+.repo-tag {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  line-height: 1.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: hsl(var(--repo-hue, 212) 65% 90%);
+  color: hsl(var(--repo-hue, 212) 50% 28%);
+  text-decoration: none;
+}
+.repo-tag:hover {
+  text-decoration: none;
+}
+@media (prefers-color-scheme: dark) {
+  .repo-tag {
+    background: hsl(var(--repo-hue, 212) 40% 24%);
+    color: hsl(var(--repo-hue, 212) 70% 80%);
+  }
+}
+[data-theme="monokai"] .repo-tag {
+  background: hsl(var(--repo-hue, 212) 30% 26%);
+  color: hsl(var(--repo-hue, 212) 65% 80%);
+}
 .filter-select {
   display: inline-flex;
   align-items: center;
