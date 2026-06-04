@@ -1972,7 +1972,7 @@ h3 {
 
 /* Breadcrumb header section shared by every repo route (see OverviewCard). */
 .overview {
-  margin: var(--space-4) 0 var(--space-5);
+  margin: var(--space-1) 0 var(--space-2);
 }
 
 /* Vim keyboard navigation ---------------------------------------------- */
