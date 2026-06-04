@@ -28,7 +28,7 @@ export default function GlobalAgentsPage() {
   }, [data, activeRepos])
 
   return (
-    <section className="pipelines">
+    <section className="pipelines pipelines--agents-list">
       <div className="pipelines__head">
         <h2 className="pipelines__title">Agents</h2>
       </div>

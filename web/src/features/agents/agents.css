@@ -24,6 +24,31 @@
   display: block;
 }
 
+/* Fill-height shell for the global agents list page — mirrors .pipelines--agent-run.
+   Bounds the section to available viewport space; .agent-runs-scroll takes the
+   slack so the table scrolls there, not the page. */
+.pipelines--agents-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: calc(100dvh - var(--topbar-h) - 2 * var(--space-5));
+}
+/* Virtualised scroll region for the agent runs table. flex:1 fills remaining
+   space inside .pipelines--agents-list; in non-fill contexts (per-repo AgentsPage)
+   it just grows to content since no height constraint is set on the parent. */
+.agent-runs-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* Sticky column header inside the virtualised scroll region. */
+.agent-runs thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-canvas);
+}
+
 /* Spawn-agent: model picker sits inline with the spawn button (#110). */
 .spawn-agent {
   display: flex;
