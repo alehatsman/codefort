@@ -641,7 +641,8 @@ a.file-tree__commit:hover {
   width: 100%;
   font: var(--text-sm) / 20px var(--font-mono);
 }
-.code-snippet__num {
+/* Shared code line table cells — used by both CodeSnippet and CodeView. */
+.code-line__num {
   width: 1%;
   min-width: 50px;
   padding: 0 var(--space-4) 0 10px;
@@ -651,22 +652,21 @@ a.file-tree__commit:hover {
   user-select: none;
   white-space: nowrap;
 }
-.code-snippet__num::before {
+.code-line__num::before {
   content: attr(data-line);
 }
-.code-snippet__text {
+.code-line__text {
   padding: 0 var(--space-4);
   white-space: pre;
   vertical-align: top;
   width: 100%;
 }
-/* The lines this region focuses on (e.g. a review comment's range): a muted
-   tint + gutter bar so the annotated lines stand out from their context. */
-.code-snippet__line.is-focus .code-snippet__num,
-.code-snippet__line.is-focus .code-snippet__text {
+/* Focus range (e.g. a review comment's annotated lines): muted tint + gutter bar. */
+.code-line.is-focus .code-line__num,
+.code-line.is-focus .code-line__text {
   background: color-mix(in srgb, var(--state-in_progress) 16%, transparent);
 }
-.code-snippet__line.is-focus .code-snippet__num {
+.code-line.is-focus .code-line__num {
   box-shadow: inset 2px 0 0 var(--state-in_progress);
 }
 
