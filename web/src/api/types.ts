@@ -604,6 +604,18 @@ export interface CIRunDetail extends CIRun {
   turns?: AgentTurn[]
 }
 
+// FleetEvent mirrors the api.Event wire type from GET /api/events (SSE fleet
+// feed). Seq is monotonic across the server's lifetime; repo is "owner/name"
+// (absent for global events); time is unix millis.
+export interface FleetEvent {
+  seq: number
+  type: string
+  time: number
+  repo?: string
+  actor?: string
+  data?: Record<string, unknown>
+}
+
 // CIEvent mirrors internal/ci.Event — one entry in a job's append-only event
 // stream. Seq is monotonic within a job; data shape varies by type (see the
 // CI_EVENT_* constants).
