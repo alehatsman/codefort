@@ -43,7 +43,7 @@ func TestCreateIssueWithInvalidParent(t *testing.T) {
 
 func TestUpdateIssueSetParent(t *testing.T) {
 	db, repoID, parent, child := seedTwoIssues(t)
-	iss, err := UpdateIssue(db, repoID, child, nil, nil, nil, &parent)
+	iss, err := UpdateIssue(db, repoID, child, nil, nil, nil, &parent, nil)
 	if err != nil {
 		t.Fatalf("UpdateIssue set parent: %v", err)
 	}
@@ -54,11 +54,11 @@ func TestUpdateIssueSetParent(t *testing.T) {
 
 func TestUpdateIssueClearParent(t *testing.T) {
 	db, repoID, parent, child := seedTwoIssues(t)
-	if _, err := UpdateIssue(db, repoID, child, nil, nil, nil, &parent); err != nil {
+	if _, err := UpdateIssue(db, repoID, child, nil, nil, nil, &parent, nil); err != nil {
 		t.Fatalf("set parent: %v", err)
 	}
 	zero := 0
-	iss, err := UpdateIssue(db, repoID, child, nil, nil, nil, &zero)
+	iss, err := UpdateIssue(db, repoID, child, nil, nil, nil, &zero, nil)
 	if err != nil {
 		t.Fatalf("clear parent: %v", err)
 	}
@@ -69,14 +69,14 @@ func TestUpdateIssueClearParent(t *testing.T) {
 
 func TestUpdateIssueSelfParentRejected(t *testing.T) {
 	db, repoID, num, _ := seedTwoIssues(t)
-	if _, err := UpdateIssue(db, repoID, num, nil, nil, nil, &num); err != ErrInvalidInput {
+	if _, err := UpdateIssue(db, repoID, num, nil, nil, nil, &num, nil); err != ErrInvalidInput {
 		t.Fatalf("err = %v, want ErrInvalidInput for self-parent", err)
 	}
 }
 
 func TestListChildren(t *testing.T) {
 	db, repoID, parent, child := seedTwoIssues(t)
-	if _, err := UpdateIssue(db, repoID, child, nil, nil, nil, &parent); err != nil {
+	if _, err := UpdateIssue(db, repoID, child, nil, nil, nil, &parent, nil); err != nil {
 		t.Fatalf("set parent: %v", err)
 	}
 	children, err := ListChildren(db, repoID, parent)
