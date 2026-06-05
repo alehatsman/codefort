@@ -11,12 +11,12 @@ func TestUpdateIssueTitleOnlyLeavesBody(t *testing.T) {
 	db, repoID, num := seedIssue(t)
 	// Give the issue a body so we can prove a title-only edit preserves it.
 	body := "original body"
-	if _, err := UpdateIssue(db, repoID, num, nil, nil, &body, nil); err != nil {
+	if _, err := UpdateIssue(db, repoID, num, nil, nil, &body, nil, nil); err != nil {
 		t.Fatalf("seed body: %v", err)
 	}
 
 	title := "new title"
-	iss, err := UpdateIssue(db, repoID, num, nil, &title, nil, nil)
+	iss, err := UpdateIssue(db, repoID, num, nil, &title, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("UpdateIssue title: %v", err)
 	}
@@ -31,12 +31,12 @@ func TestUpdateIssueTitleOnlyLeavesBody(t *testing.T) {
 func TestUpdateIssueBodyOnlyLeavesTitleAndState(t *testing.T) {
 	db, repoID, num := seedIssue(t)
 	done := api.IssueDone
-	if _, err := UpdateIssue(db, repoID, num, &done, nil, nil, nil); err != nil {
+	if _, err := UpdateIssue(db, repoID, num, &done, nil, nil, nil, nil); err != nil {
 		t.Fatalf("seed state: %v", err)
 	}
 
 	body := "just body"
-	iss, err := UpdateIssue(db, repoID, num, nil, nil, &body, nil)
+	iss, err := UpdateIssue(db, repoID, num, nil, nil, &body, nil, nil)
 	if err != nil {
 		t.Fatalf("UpdateIssue body: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestUpdateIssueBodyOnlyLeavesTitleAndState(t *testing.T) {
 
 func TestUpdateIssueNoFieldsRejected(t *testing.T) {
 	db, repoID, num := seedIssue(t)
-	if _, err := UpdateIssue(db, repoID, num, nil, nil, nil, nil); !errors.Is(err, ErrNoUpdateFields) {
+	if _, err := UpdateIssue(db, repoID, num, nil, nil, nil, nil, nil); !errors.Is(err, ErrNoUpdateFields) {
 		t.Fatalf("err = %v, want ErrNoUpdateFields", err)
 	}
 }
@@ -61,7 +61,7 @@ func TestUpdateIssueNoFieldsRejected(t *testing.T) {
 func TestUpdateIssueNotFound(t *testing.T) {
 	db, repoID, _ := seedIssue(t)
 	title := "x"
-	if _, err := UpdateIssue(db, repoID, 9999, nil, &title, nil, nil); !errors.Is(err, ErrNotFound) {
+	if _, err := UpdateIssue(db, repoID, 9999, nil, &title, nil, nil, nil); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
 }
