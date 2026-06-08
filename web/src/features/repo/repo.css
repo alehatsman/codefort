@@ -56,7 +56,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
-  max-height: 280px;
+  max-height: 1000px;
   overflow-y: auto;
 }
 .activity-feed--empty {
