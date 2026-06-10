@@ -333,6 +333,15 @@ type ListFilter struct {
 	Sort     api.IssueSort    // "" = default (newest); see api.IssueSort
 	Limit    int              // 0 = default (100), capped at 1000
 	Offset   int              // rows to skip (page * limit); <=0 = none
+
+	// Ready and Blocked are computed views over the dependency graph, mutually
+	// exclusive. Ready: todo, unclaimed, not an epic (no children), every
+	// depends-on target done/closed — the actionable pick list. Blocked: a todo
+	// leaf with at least one unmet depends-on target. Both imply state=todo, so
+	// callers set them instead of States. Per-repo only — ListIssues honors
+	// them; the cross-repo aggregate ignores them.
+	Ready   bool
+	Blocked bool
 }
 
 // likeEscape neutralizes the LIKE wildcards (% and _) and the escape char
@@ -347,6 +356,7 @@ func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error
 	q.WriteString(`SELECT ` + issueColumns + ` FROM issues WHERE repo_id = ?`)
 	args := []any{repoID}
 	appendIssueFilters(&q, &args, filter)
+	appendReadyBlockedFilters(&q, filter)
 
 	limit := filter.Limit
 	if limit <= 0 {
@@ -487,6 +497,45 @@ func appendIssueFilters(q *strings.Builder, args *[]any, filter ListFilter) {
 		// is true when at least one element equals the requested label exactly.
 		q.WriteString(` AND EXISTS (SELECT 1 FROM json_each(issues.labels) WHERE value = ?)`)
 		*args = append(*args, filter.Label)
+	}
+}
+
+// hasUnmetDep is a correlated EXISTS over the dependency graph: true when the
+// outer issues row has at least one depends-on target that is not yet
+// done/closed. Used (negated for ready, plain for blocked) by the computed
+// views. References only the issues table name, so it composes with the
+// per-repo ListIssues query. Carries no bind args — fully self-contained.
+const hasUnmetDep = `EXISTS (
+		SELECT 1 FROM issue_dependencies d
+		  JOIN issues t ON t.repo_id = d.repo_id AND t.number = d.depends_on_number
+		 WHERE d.repo_id = issues.repo_id AND d.issue_number = issues.number
+		   AND t.state NOT IN ('done','closed')
+	)`
+
+// isEpic is a correlated EXISTS that's true when the outer issues row has at
+// least one child (another issue whose parent_number points back at it). Epics
+// are maps, not work, so both computed views exclude them.
+const isEpic = `EXISTS (
+		SELECT 1 FROM issues c WHERE c.repo_id = issues.repo_id AND c.parent_number = issues.number
+	)`
+
+// appendReadyBlockedFilters writes the computed-view predicates for the Ready
+// and Blocked filters onto an in-progress per-repo issue query. The two are
+// mutually exclusive; both pin state=todo and exclude epics. Ready additionally
+// requires the issue to be unclaimed with every dependency met; Blocked
+// requires at least one unmet dependency. No-op when neither flag is set. All
+// predicates are constant SQL (no bind args), so the caller's args slice is
+// untouched.
+func appendReadyBlockedFilters(q *strings.Builder, filter ListFilter) {
+	switch {
+	case filter.Ready:
+		q.WriteString(" AND state = 'todo' AND assignee IS NULL")
+		q.WriteString(" AND NOT " + isEpic)
+		q.WriteString(" AND NOT " + hasUnmetDep)
+	case filter.Blocked:
+		q.WriteString(" AND state = 'todo'")
+		q.WriteString(" AND NOT " + isEpic)
+		q.WriteString(" AND " + hasUnmetDep)
 	}
 }
 

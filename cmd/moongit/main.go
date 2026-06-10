@@ -62,7 +62,7 @@ func printUsage(w io.Writer) {
 
 USAGE:
     moongit issue create  --title <t> [--body <b>] [--parent <n>]
-    moongit issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--limit n]
+    moongit issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--limit n] [--ready|--blocked]
     moongit issue show    <number>
     moongit issue edit    <number> [--title <t>] [--body <b>] [--state <s>] [--parent <n>|0]
                                    [--depends-on <m,...>] [--remove-depends-on <m,...>]
@@ -191,11 +191,16 @@ func runIssueList(args []string) error {
 	assignee := fs.String("assignee", "", "filter by assignee; 'null' for unassigned")
 	limit := fs.Int("limit", 0, "max results (default 100, max 1000)")
 	label := fs.String("label", "", "filter: issue must have this label")
+	ready := fs.Bool("ready", false, "only actionable leaves: todo, unclaimed, not an epic, all dependencies done")
+	blocked := fs.Bool("blocked", false, "only todo leaves with at least one unmet dependency")
 	var query string
 	fs.StringVar(&query, "query", "", "filter by keyword in title or body")
 	fs.StringVar(&query, "q", "", "shorthand for --query")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *ready && *blocked {
+		return errors.New("--ready and --blocked are mutually exclusive")
 	}
 	target, err := discoverTarget()
 	if err != nil {
@@ -214,6 +219,12 @@ func runIssueList(args []string) error {
 	}
 	if *label != "" {
 		q.Set("label", *label)
+	}
+	if *ready {
+		q.Set("ready", "1")
+	}
+	if *blocked {
+		q.Set("blocked", "1")
 	}
 	if *limit > 0 {
 		q.Set("limit", strconv.Itoa(*limit))

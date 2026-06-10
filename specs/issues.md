@@ -76,6 +76,22 @@ Issues form a graph through two typed, directed edges, so a fleet can answer
 - WHEN an issue is deleted, its depends-on edges are cleared in both directions
   so no dangling edge survives.
 
+### Computed backlog views
+
+The dependency graph powers two derived, live-computed list filters — no manual
+`ready`/`blocked` label to keep in sync.
+
+- WHEN a client lists a repo's issues with the **ready** filter, the result is
+  the actionable pick list: issues that are `todo`, unclaimed, not an epic (have
+  no children), and whose every depends-on target is in a done/closed state.
+- WHEN a client lists with the **blocked** filter, the result is the inverse for
+  visibility: `todo` leaves (non-epics) with at least one depends-on target not
+  yet done/closed.
+- IF a request asks for both ready and blocked at once, it is rejected — the two
+  views are mutually exclusive.
+- WHERE ready/blocked are requested, they apply to a single repo's backlog; the
+  cross-repo aggregate feed ignores them.
+
 ## Non-goals
 
 - **Agent runs spawned from an issue.** Turning an issue into a containerized
@@ -103,4 +119,5 @@ Issues form a graph through two typed, directed edges, so a fleet can answer
 - [x] Comments with token-stamped author; author-only delete
 - [x] Parent edge (epic membership): at most one, validated, clearable
 - [x] depends-on edges: add/remove, self + cycle rejection, edges in single-issue GET, cleared on delete
+- [x] Computed `ready` / `blocked` backlog views over the dependency graph; mutually exclusive
 - [ ] Verified against the code by the verify workflow (flip to `living`)

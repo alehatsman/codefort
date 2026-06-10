@@ -464,7 +464,27 @@ func parseListFilter(q map[string][]string) (storage.ListFilter, error) {
 		}
 		f.Offset = n
 	}
+	f.Ready = queryBool(q, "ready")
+	f.Blocked = queryBool(q, "blocked")
+	if f.Ready && f.Blocked {
+		return f, errors.New("ready and blocked are mutually exclusive")
+	}
 	return f, nil
+}
+
+// queryBool reports whether a query param is present and truthy. A bare flag
+// (?ready) counts as true; explicit "false"/"0" turn it off.
+func queryBool(q map[string][]string, key string) bool {
+	v, ok := q[key]
+	if !ok || len(v) == 0 {
+		return false
+	}
+	switch strings.ToLower(v[0]) {
+	case "", "1", "true", "yes":
+		return true
+	default:
+		return false
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
