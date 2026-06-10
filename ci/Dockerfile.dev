@@ -49,7 +49,8 @@ ENV PATH=/usr/local/go/bin:$PATH \
     HOME=/tmp \
     GOCACHE=/tmp/.cache/go-build \
     GOPATH=/tmp/go \
-    GOTOOLCHAIN=local
+    GOTOOLCHAIN=local \
+    GOPROXY=https://proxy.golang.org,https://goproxy.io,direct
 
 # Install the static-analysis toolchain onto PATH, then wipe the build-time
 # caches so runtime jobs (moongitd uid) own the cache dirs they recreate.
