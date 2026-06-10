@@ -35,6 +35,10 @@ type Server struct {
 	// which a DB-only signal can't do. nil in tests that don't exercise cancel
 	// (and on the read pool path) — the handler then 503s.
 	agentCanceler AgentCanceler
+
+	// limiter is the per-IP rate limiter. nil when rate limiting is disabled
+	// (MOONGIT_RATE_LIMIT=0 or unset).
+	limiter *ipLimiter
 }
 
 // AgentCanceler force-stops a running run by id, returning true if the run was
@@ -59,6 +63,10 @@ func New(cfg *config.Config, db, rdb *sql.DB, logger *slog.Logger) *Server {
 		}
 		secret = gen
 	}
+	var lim *ipLimiter
+	if cfg.RateLimit > 0 {
+		lim = newIPLimiter(cfg.RateLimit, int(cfg.RateLimit*3))
+	}
 	return &Server{
 		cfg:      cfg,
 		db:       db,
@@ -67,6 +75,7 @@ func New(cfg *config.Config, db, rdb *sql.DB, logger *slog.Logger) *Server {
 		dex:      dex.New(cfg.DexURL, cfg.DexToken),
 		ciSecret: secret,
 		ciURL:    loopbackURL(cfg.Addr),
+		limiter:  lim,
 	}
 }
 
@@ -76,7 +85,9 @@ func New(cfg *config.Config, db, rdb *sql.DB, logger *slog.Logger) *Server {
 // top-level prefix dispatcher keeps them apart, and also cleanly scopes
 // auth to the API mux.
 func (s *Server) Handler() http.Handler {
-	apiAuth := s.withAuth(s.apiHandler())
+	apiAuth := s.withRateLimit(s.withAuth(s.apiHandler()))
+	// Public API (register/login) — no bearer auth required, but still rate-limited.
+	pubAPI := s.withRateLimit(s.publicAPIHandler())
 	// Basic auth (when configured) gates the human/git-facing surfaces;
 	// /api keeps its Bearer-token auth and /healthz stays open.
 	gitMux := s.withBasicAuth(s.gitHandler())
@@ -92,6 +103,9 @@ func (s *Server) Handler() http.Handler {
 		case r.URL.Path == "/internal/ci/events":
 			// Loopback-only, CI-secret-gated; off the Bearer /api surface.
 			s.handleCIEvents(w, r)
+		case strings.HasPrefix(r.URL.Path, "/api/auth/"):
+			// Public auth endpoints (register, login) — no Bearer token needed.
+			pubAPI.ServeHTTP(w, r)
 		case strings.HasPrefix(r.URL.Path, "/api/"):
 			apiAuth.ServeHTTP(w, r)
 		case isGitRequest(r):
@@ -110,10 +124,21 @@ func (s *Server) Handler() http.Handler {
 	return s.withLogging(root)
 }
 
+// publicAPIHandler holds endpoints that don't require a bearer token.
+// These are routed before withAuth in Handler().
+func (s *Server) publicAPIHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/auth/register", s.handleRegister)
+	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
+	return mux
+}
+
 func (s *Server) apiHandler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/whoami", s.handleWhoami)
+
+	mux.HandleFunc("GET /api/users/{username}", s.handleGetUser)
 
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 
@@ -135,6 +160,10 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}", s.handleGetRepo)
 	mux.HandleFunc("DELETE /api/repos/{owner}/{repo}", s.handleDeleteRepo)
 	mux.HandleFunc("PATCH /api/repos/{owner}/{repo}", s.handleUpdateRepo)
+
+	mux.HandleFunc("GET /api/repos/{owner}/{repo}/members", s.handleListMembers)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/members", s.handleAddMember)
+	mux.HandleFunc("DELETE /api/repos/{owner}/{repo}/members/{username}", s.handleRemoveMember)
 
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/refs", s.handleListRefs)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/tree", s.handleTree)

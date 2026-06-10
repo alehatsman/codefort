@@ -7,6 +7,7 @@ import {
   useCreateToken,
   useDeleteRepo,
   useDeleteSSHKey,
+  useRegister,
   useRevokeToken,
   useUpdateAgentSettings,
 } from "@/api/mutations"
@@ -61,13 +62,7 @@ export default function SettingsPage() {
       <div className="settings__content">
         {section === "tokens" && <TokensSection />}
         {section === "agent" && <AgentSection />}
-        {section === "users" && (
-          <Placeholder
-            title="Users"
-            note="Per-user accounts and management are planned. Identity is the API
-              token's name today; this section fills in once that backend lands."
-          />
-        )}
+        {section === "users" && <UsersSection />}
         {section === "ssh" && <SSHKeysSection />}
         {section === "branches" && (
           <Placeholder
@@ -212,6 +207,85 @@ function AppearanceSection() {
         Color scheme for the UI chrome and code view. Saved to this browser.
       </p>
       <ThemeSelect />
+    </section>
+  )
+}
+
+// UsersSection lets an admin create new user accounts (username + password).
+// The created account can then sign in via the gate's "Sign in" tab.
+function UsersSection() {
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [lastCreated, setLastCreated] = useState<string | null>(null)
+  const register = useRegister()
+
+  const trimmedU = username.trim()
+  const trimmedP = password.trim()
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!trimmedU || !trimmedP || register.isPending) return
+    register.mutate(
+      { username: trimmedU, password: trimmedP },
+      {
+        onSuccess: (res) => {
+          setLastCreated(res.token.name)
+          setUsername("")
+          setPassword("")
+          register.reset()
+        },
+      }
+    )
+  }
+
+  return (
+    <section className="settings__section">
+      <h2 className="settings__title">Users</h2>
+      <p className="muted settings__lead">
+        Create new user accounts. Each account can sign in via the login gate using their username
+        and password, and receives an API token automatically.
+      </p>
+      {lastCreated && (
+        <div className="token-reveal">
+          <div className="token-reveal__head">
+            <strong>Created account "{lastCreated}"</strong>
+            <button
+              type="button"
+              className="modal__close"
+              onClick={() => setLastCreated(null)}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+          <p className="muted">The account can now sign in via the login gate.</p>
+        </div>
+      )}
+      <form className="settings__create settings__create--stacked" onSubmit={submit}>
+        <Input
+          placeholder="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          autoComplete="off"
+          maxLength={100}
+        />
+        <Input
+          type="password"
+          placeholder="initial password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
+          maxLength={200}
+        />
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={!trimmedU || !trimmedP || register.isPending}
+        >
+          {register.isPending ? "Creating…" : "Create user"}
+        </Button>
+      </form>
+      <ErrorMessage error={register.error} inline />
     </section>
   )
 }

@@ -18,16 +18,17 @@ import (
 	"github.com/alehatsman/moongit/internal/storage"
 )
 
-func (s *Server) handleListRepos(w http.ResponseWriter, _ *http.Request) {
-	rows, err := storage.ListRepos(s.rdb)
+func (s *Server) handleListRepos(w http.ResponseWriter, r *http.Request) {
+	caller := identityFromContext(r)
+	rows, err := storage.ListReposForCaller(s.rdb, caller)
 	if err != nil {
 		s.logger.Error("list repos", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	out := make([]api.Repo, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, toAPIRepo(r))
+	for _, row := range rows {
+		out = append(out, toAPIRepo(row))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -77,10 +78,18 @@ func (s *Server) handleCreateRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, _, err := CreateRepo(s.db, s.cfg.ReposDir, owner, name); err != nil {
+	repoID, _, err := CreateRepo(s.db, s.cfg.ReposDir, owner, name)
+	if err != nil {
 		s.logger.Error("create repo", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
+	}
+
+	if vis := strings.TrimSpace(req.Visibility); vis == "private" {
+		if err := storage.SetRepoVisibility(s.db, repoID, "private"); err != nil {
+			s.logger.Error("set repo visibility", "err", err)
+			// Non-fatal — repo is created; just log and proceed.
+		}
 	}
 
 	row, err := storage.GetRepoSummary(s.db, owner, name)
@@ -138,6 +147,10 @@ func CreateRepo(db *sql.DB, reposDir, owner, name string) (int64, string, error)
 }
 
 func toAPIRepo(r storage.RepoSummary) api.Repo {
+	vis := r.Visibility
+	if vis == "" {
+		vis = "public"
+	}
 	return api.Repo{
 		ID:           r.ID,
 		Owner:        r.Owner,
@@ -151,12 +164,12 @@ func toAPIRepo(r storage.RepoSummary) api.Repo {
 		OpenPulls:    r.OpenPulls,
 		OpenReviews:  r.OpenReviews,
 		ActiveAgents: r.ActiveAgents,
+		Visibility:   vis,
 	}
 }
 
-// handleUpdateRepo applies a partial update to a repo's settings. Currently the
-// only mutable field is ci_enabled (the per-repo CI opt-in). Returns the
-// updated repo summary.
+// handleUpdateRepo applies a partial update to a repo's settings.
+// Mutable fields: ci_enabled, visibility. Returns the updated repo summary.
 func (s *Server) handleUpdateRepo(w http.ResponseWriter, r *http.Request) {
 	owner := r.PathValue("owner")
 	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
@@ -166,8 +179,8 @@ func (s *Server) handleUpdateRepo(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
-	if req.CIEnabled == nil {
-		writeError(w, http.StatusBadRequest, "no fields to update (provide ci_enabled)")
+	if req.CIEnabled == nil && req.Visibility == nil {
+		writeError(w, http.StatusBadRequest, "no fields to update (provide ci_enabled or visibility)")
 		return
 	}
 
@@ -182,10 +195,23 @@ func (s *Server) handleUpdateRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := storage.SetRepoCIEnabled(s.db, repoID, *req.CIEnabled); err != nil {
-		s.logger.Error("update repo ci_enabled", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
+	if req.CIEnabled != nil {
+		if err := storage.SetRepoCIEnabled(s.db, repoID, *req.CIEnabled); err != nil {
+			s.logger.Error("update repo ci_enabled", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+	}
+	if req.Visibility != nil {
+		if err := storage.SetRepoVisibility(s.db, repoID, *req.Visibility); err != nil {
+			if errors.Is(err, storage.ErrInvalidInput) {
+				writeError(w, http.StatusBadRequest, "visibility must be 'public' or 'private'")
+				return
+			}
+			s.logger.Error("update repo visibility", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
 	}
 
 	row, err := storage.GetRepoSummary(s.db, owner, repo)

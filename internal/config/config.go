@@ -196,6 +196,10 @@ type Config struct {
 	// stable across restarts. Set via MOONGIT_SSH_HOST_KEY (default
 	// "$MOONGIT_DATA_DIR/ssh_host_ed25519_key"). Only used when SSHAddr is set.
 	SSHHostKey string
+
+	// RateLimit is the per-IP request rate limit in requests per second.
+	// 0 disables rate limiting (default). Set via MOONGIT_RATE_LIMIT.
+	RateLimit float64
 }
 
 // Load reads MOONGIT_* environment variables and resolves the data directory
@@ -222,6 +226,12 @@ func Load() (*Config, error) {
 	cfg.BasicPass = envOr("MOONGIT_BASIC_PASS", "")
 	cfg.SSHAddr = envOr("MOONGIT_SSH_ADDR", "")
 	cfg.SSHHostKey = envOr("MOONGIT_SSH_HOST_KEY", filepath.Join(dataDir, "ssh_host_ed25519_key"))
+
+	rateLimit, err := strconv.ParseFloat(envOr("MOONGIT_RATE_LIMIT", "0"), 64)
+	if err != nil {
+		return nil, fmt.Errorf("MOONGIT_RATE_LIMIT: %w", err)
+	}
+	cfg.RateLimit = rateLimit
 
 	lease, err := time.ParseDuration(envOr("MOONGIT_CLAIM_LEASE", "60m"))
 	if err != nil {

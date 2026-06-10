@@ -1,7 +1,7 @@
 import { useRef, useState } from "react"
 import { useCreateRepo } from "@/api/mutations"
 import { useWhoami } from "@/api/queries"
-import { Button, Dialog, ErrorMessage, FormField, Input } from "@/ui"
+import { Button, Dialog, ErrorMessage, FormField, Input, Select } from "@/ui"
 
 interface Props {
   onCreated?: (owner: string, name: string) => void
@@ -21,11 +21,13 @@ export default function NewRepoForm({ onCreated }: Props) {
   const whoami = useWhoami()
   const [owner, setOwner] = useState("")
   const [name, setName] = useState("")
+  const [visibility, setVisibility] = useState<"public" | "private">("public")
   const mutation = useCreateRepo()
 
   function reset() {
     setOwner("")
     setName("")
+    setVisibility("public")
     mutation.reset()
   }
 
@@ -49,7 +51,7 @@ export default function NewRepoForm({ onCreated }: Props) {
     e.preventDefault()
     if (!valid || mutation.isPending) return
     mutation.mutate(
-      { owner: trimmedOwner, name: trimmedName },
+      { owner: trimmedOwner, name: trimmedName, visibility },
       {
         onSuccess: (repo) => {
           close()
@@ -115,6 +117,18 @@ export default function NewRepoForm({ onCreated }: Props) {
               onChange={(e) => setName(e.target.value)}
               required
             />
+          )}
+        </FormField>
+        <FormField label="Visibility">
+          {({ controlId }) => (
+            <Select
+              id={controlId}
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value as "public" | "private")}
+            >
+              <option value="public">Public — anyone can read</option>
+              <option value="private">Private — only collaborators</option>
+            </Select>
           )}
         </FormField>
         <ErrorMessage error={mutation.error} />

@@ -61,6 +61,7 @@ export const keys = {
   pulls: (owner: string, repo: string, state = "", query = "") =>
     ["pulls", owner, repo, state, query] as const,
   pull: (owner: string, repo: string, n: number) => ["pull", owner, repo, n] as const,
+  repoMembers: (owner: string, repo: string) => ["repoMembers", owner, repo] as const,
 }
 
 // A run is "live" until it reaches a terminal state. Lists and detail views
@@ -482,5 +483,13 @@ export function useCIRun(owner: string, repo: string, n: number) {
     // Poll run + job statuses while the run is live (the SSE stream carries the
     // log lines; this keeps the run/job status badges current).
     refetchInterval: (q) => (q.state.data && isLiveStatus(q.state.data.status) ? 2000 : false),
+  })
+}
+
+export function useRepoMembers(owner: string, repo: string) {
+  return useQuery({
+    queryKey: keys.repoMembers(owner, repo),
+    queryFn: () => api.listRepoMembers(owner, repo),
+    enabled: !!owner && !!repo,
   })
 }

@@ -377,6 +377,37 @@ var migrations = []string{
 	// json_each() provides filtered lookups. DEFAULT '[]' ensures existing rows
 	// are already valid JSON and no NULL handling is needed.
 	`ALTER TABLE issues ADD COLUMN labels TEXT NOT NULL DEFAULT '[]';`,
+
+	// 24: multi-user auth (#363) + repo visibility (#362).
+	// password_hash is nullable: admin-provisioned users (EnsureUser) have none
+	// and can only authenticate via their bearer token. Users created through
+	// registration carry a bcrypt hash.
+	// visibility is either 'public' or 'private'; existing repos default to 'public'.
+	`
+	ALTER TABLE users ADD COLUMN password_hash TEXT;
+	ALTER TABLE repos ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public';
+	`,
+
+	// 25: token-user link (#363). user_id ties a bearer token back to the user
+	// account that owns it. Nullable so agent tokens (created without a user
+	// context) and legacy admin tokens keep working unchanged.
+	`ALTER TABLE tokens ADD COLUMN user_id INTEGER REFERENCES users(id);`,
+
+	// 26: repo membership (#364). Stores collaborators: owner row is NOT
+	// automatically inserted here — ownership is derived from repos.owner_id.
+	// Role is one of 'read' or 'write'. Unique per (repo, user) pair.
+	`
+	CREATE TABLE IF NOT EXISTS repo_members (
+	    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	    repo_id    INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+	    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	    role       TEXT NOT NULL DEFAULT 'write',
+	    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+	    UNIQUE (repo_id, user_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_repo_members_repo ON repo_members(repo_id);
+	CREATE INDEX IF NOT EXISTS idx_repo_members_user ON repo_members(user_id);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —
