@@ -233,3 +233,84 @@
   color: var(--fg-default);
   font-size: var(--text-sm);
 }
+
+/* Inline diff comment affordances */
+.diff-add-comment {
+  display: none;
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-canvas);
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.diff-code {
+  position: relative;
+}
+
+.diff-row:hover .diff-add-comment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diff-add-comment:hover {
+  background: var(--color-accent, #0969da);
+  color: #fff;
+  border-color: var(--color-accent, #0969da);
+}
+
+.diff-comment-row .diff-comment-cell {
+  padding: 0;
+  background: var(--bg-subtle, var(--bg-canvas));
+}
+
+.diff-inline-comment {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+.diff-inline-comment.is-resolved {
+  opacity: 0.6;
+}
+
+.diff-inline-comment__author {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.diff-inline-comment__body {
+  flex: 1;
+}
+
+.diff-comment-form {
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.diff-comment-form__input {
+  width: 100%;
+  resize: vertical;
+  font-size: var(--text-sm);
+}
+
+.diff-comment-form__actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}

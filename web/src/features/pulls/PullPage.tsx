@@ -2,19 +2,12 @@ import { lazy, Suspense } from "react"
 import "./pulls.css"
 import { useParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
-import { useMergePull, useUpdatePull } from "@/api/mutations"
+import { useCreateCodeComment, useMergePull, useUpdatePull } from "@/api/mutations"
 import { usePull } from "@/api/queries"
 import type { MergeConflictResponse } from "@/api/types"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
-import {
-  Button,
-  DetailLayout,
-  EmptyState,
-  ErrorMessage,
-  SkeletonText,
-  useToast,
-} from "@/ui"
+import { Button, DetailLayout, EmptyState, ErrorMessage, SkeletonText, useToast } from "@/ui"
 
 const Markdown = lazy(() => import("@/shell/Markdown"))
 
@@ -41,14 +34,25 @@ export default function PullPage() {
   const pullQ = usePull(owner, repo, n)
   const mergePull = useMergePull(owner, repo, n)
   const updatePull = useUpdatePull(owner, repo, n)
+  const createComment = useCreateCodeComment(owner, repo)
   const toast = useToast()
   const pr = pullQ.data
   const conflicts = conflictsFrom(mergePull.error)
   const notFastForwardable = isNotFastForwardable(mergePull.error)
-  const openComments = (pr?.comments ?? []).filter((c) => !c.resolved)
 
   // Mergeable only when open with commits to bring in (ahead > 0).
   const mergeable = pr?.state === "open" && pr.compare.ahead > 0
+
+  async function handleAddComment(path: string, line: number, body: string) {
+    if (!pr) return
+    await createComment.mutateAsync({
+      ref: pr.head_ref,
+      path,
+      start_line: line,
+      end_line: line,
+      body,
+    })
+  }
 
   return (
     <div className="pull-page">
@@ -108,7 +112,8 @@ export default function PullPage() {
                       mergePull.mutate(
                         { method: "merge" },
                         {
-                          onSuccess: () => toast(`Pull request #${n} merged`, { variant: "success" }),
+                          onSuccess: () =>
+                            toast(`Pull request #${n} merged`, { variant: "success" }),
                         }
                       )
                     }
@@ -158,29 +163,11 @@ export default function PullPage() {
             </div>
           )}
 
-          {openComments.length > 0 && (
-            <div className="review-list">
-              <h3>Review comments ({openComments.length})</h3>
-              {openComments.map((c) => {
-                const lines =
-                  c.end_line > c.start_line ? `L${c.start_line}-L${c.end_line}` : `L${c.start_line}`
-                return (
-                  <div key={c.id} className="review-row">
-                    <div className="review-row__head">
-                      <span className="review-row__lines">
-                        {c.path}:{lines}
-                      </span>
-                      <span className="muted small">@{c.author}</span>
-                    </div>
-                    <div className="review-row__body">{c.body}</div>
-                    {c.snippet && <pre className="review-row__snippet">{c.snippet}</pre>}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          <CompareView compare={pr.compare} />
+          <CompareView
+            compare={pr.compare}
+            comments={pr.comments}
+            onAddComment={handleAddComment}
+          />
         </DetailLayout>
       )}
     </div>

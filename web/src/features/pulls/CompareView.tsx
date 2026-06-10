@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { Compare } from "@/api/types"
+import type { CodeComment, Compare } from "@/api/types"
 import DiffView from "@/features/pulls/DiffView"
 import { EmptyState, SegmentedControl } from "@/ui"
 
@@ -7,6 +7,8 @@ type Mode = "split" | "unified"
 
 interface Props {
   compare: Compare
+  comments?: CodeComment[]
+  onAddComment?: (path: string, line: number, body: string) => Promise<void>
 }
 
 /**
@@ -14,9 +16,20 @@ interface Props {
  * head introduces, a "N files changed" summary with a Split/Unified toggle, and
  * a DiffView per changed file. Shared by the standalone Compare screen and the
  * PR detail screen, which both render the three-dot diff identically.
+ *
+ * When comments + onAddComment are supplied (PR detail only), each DiffView
+ * renders inline comment threads and a "+" affordance on changed lines.
  */
-export default function CompareView({ compare }: Props) {
+export default function CompareView({ compare, comments, onAddComment }: Props) {
   const [mode, setMode] = useState<Mode>("split")
+
+  // Partition comments by file path so each DiffView only receives its own.
+  const commentsByFile = new Map<string, CodeComment[]>()
+  for (const c of comments ?? []) {
+    const arr = commentsByFile.get(c.path) ?? []
+    arr.push(c)
+    commentsByFile.set(c.path, arr)
+  }
 
   return (
     <div className="compare-view">
@@ -64,7 +77,18 @@ export default function CompareView({ compare }: Props) {
       {compare.files.length === 0 ? (
         <EmptyState>No file changes between these branches.</EmptyState>
       ) : (
-        compare.files.map((f) => <DiffView key={f.new_path || f.old_path} file={f} mode={mode} />)
+        compare.files.map((f) => {
+          const filePath = f.new_path || f.old_path
+          return (
+            <DiffView
+              key={filePath}
+              file={f}
+              mode={mode}
+              comments={commentsByFile.get(filePath)}
+              onAddComment={onAddComment}
+            />
+          )
+        })
       )}
     </div>
   )
