@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react"
+import { lazy, Suspense } from "react"
 import "./pulls.css"
 import { useParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
@@ -9,7 +9,6 @@ import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
 import {
   Button,
-  Checkbox,
   DetailLayout,
   EmptyState,
   ErrorMessage,
@@ -29,6 +28,12 @@ function conflictsFrom(err: unknown): string[] {
   return []
 }
 
+// isNotFastForwardable detects the 409 returned when ff-only fails but there
+// are no content conflicts — the branches have diverged.
+function isNotFastForwardable(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 409 && conflictsFrom(err).length === 0
+}
+
 export default function PullPage() {
   const { owner = "", repo = "", number = "" } = useParams()
   const n = Number(number)
@@ -37,10 +42,9 @@ export default function PullPage() {
   const mergePull = useMergePull(owner, repo, n)
   const updatePull = useUpdatePull(owner, repo, n)
   const toast = useToast()
-  const [ffOnly, setFFOnly] = useState(false)
-
   const pr = pullQ.data
   const conflicts = conflictsFrom(mergePull.error)
+  const notFastForwardable = isNotFastForwardable(mergePull.error)
   const openComments = (pr?.comments ?? []).filter((c) => !c.resolved)
 
   // Mergeable only when open with commits to bring in (ahead > 0).
@@ -88,25 +92,30 @@ export default function PullPage() {
                   disabled={!mergeable || mergePull.isPending}
                   onClick={() =>
                     mergePull.mutate(
-                      { method: ffOnly ? "ff-only" : "merge" },
+                      { method: "ff-only" },
                       {
                         onSuccess: () => toast(`Pull request #${n} merged`, { variant: "success" }),
                       }
                     )
                   }
                 >
-                  {mergePull.isPending
-                    ? "Merging…"
-                    : ffOnly
-                      ? "Fast-forward merge"
-                      : "Merge pull request"}
+                  {mergePull.isPending ? "Merging…" : "Merge"}
                 </Button>
-                <Checkbox
-                  className="pull-merge__opt"
-                  label="fast-forward only"
-                  checked={ffOnly}
-                  onChange={(e) => setFFOnly(e.target.checked)}
-                />
+                {notFastForwardable && (
+                  <Button
+                    disabled={mergePull.isPending}
+                    onClick={() =>
+                      mergePull.mutate(
+                        { method: "merge" },
+                        {
+                          onSuccess: () => toast(`Pull request #${n} merged`, { variant: "success" }),
+                        }
+                      )
+                    }
+                  >
+                    Merge with commit
+                  </Button>
+                )}
                 <Button
                   variant="danger"
                   disabled={updatePull.isPending}
@@ -126,6 +135,11 @@ export default function PullPage() {
                       <li key={p}>{p}</li>
                     ))}
                   </ul>
+                </div>
+              ) : notFastForwardable ? (
+                <div className="pull-merge__warn">
+                  Branches have diverged — fast-forward not possible. Use "Merge with commit" to
+                  create a merge commit, or rebase the head branch onto base and push.
                 </div>
               ) : (
                 mergePull.error && <ErrorMessage error={mergePull.error} inline />

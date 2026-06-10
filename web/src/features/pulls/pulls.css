@@ -223,3 +223,13 @@
   margin: var(--space-1) 0 0;
   padding-left: var(--space-5);
 }
+
+.pull-merge__warn {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-warning, #f0ad4e) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f0ad4e) 40%, transparent);
+  color: var(--fg-default);
+  font-size: var(--text-sm);
+}
