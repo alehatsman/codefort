@@ -28,7 +28,7 @@ test("repo card shows the five metrics in order with deep-links", async ({ page 
       },
     ],
   })
-  await page.goto("/")
+  await page.goto("/repos")
 
   const metrics = page.locator(".repo-metrics").first()
   // Labels appear in the required order.
@@ -78,7 +78,7 @@ test("repo card with no activity links CI to the pipelines index", async ({ page
       },
     ],
   })
-  await page.goto("/")
+  await page.goto("/repos")
 
   const metrics = page.locator(".repo-metrics").first()
   await expect(metrics.locator("a.repo-metric").nth(0)).toHaveAttribute(

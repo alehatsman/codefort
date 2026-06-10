@@ -67,21 +67,27 @@ test("duplicate token name surfaces a 409 error", async ({ page }) => {
 
 test("revoke a token marks it revoked", async ({ page }) => {
   await mockApi(page)
-  // Stub the confirm() dialog so revoke proceeds.
-  page.on("dialog", (d) => d.accept())
   await page.goto("/settings")
 
   await page.getByRole("button", { name: "Revoke" }).first().click()
+  // Revoke now opens a confirmation modal; confirm it.
+  await page.getByRole("button", { name: "Revoke token" }).click()
   await expect(page.getByText("revoked")).toBeVisible()
 })
 
-test("remaining sections are clearly marked planned, not built", async ({ page }) => {
+test("Users section shows account creation form", async ({ page }) => {
   await mockApi(page)
   await page.goto("/settings")
 
   await page.getByRole("button", { name: "Users" }).click()
-  await expect(page.getByText("Planned", { exact: false })).toBeVisible()
-  await expect(page.getByText("Per-user accounts and management are planned", { exact: false })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Users" })).toBeVisible()
+  await expect(page.getByPlaceholder("username")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Create user" })).toBeVisible()
+})
+
+test("Branch rules section is marked planned", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/settings")
 
   await page.getByRole("button", { name: "Branch rules" }).click()
   await expect(page.getByText("Planned", { exact: false })).toBeVisible()
@@ -128,13 +134,14 @@ test("remove an SSH key clears it from the list", async ({ page }) => {
       },
     ],
   })
-  page.on("dialog", (d) => d.accept())
   await page.goto("/settings")
 
   await page.getByRole("button", { name: "SSH keys" }).click()
   await expect(page.getByRole("cell", { name: "workstation", exact: true })).toBeVisible()
 
   await page.getByRole("button", { name: "Remove" }).first().click()
+  // Remove now opens a confirmation modal; confirm it.
+  await page.getByRole("button", { name: "Remove key" }).click()
   await expect(page.getByText("No SSH keys yet.", { exact: false })).toBeVisible()
 })
 

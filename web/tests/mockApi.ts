@@ -12,6 +12,7 @@ export interface Issue {
   author: string
   state: IssueState
   assignee: string | null
+  labels?: string[]
   created_at: string
   updated_at: string
 }
@@ -669,7 +670,10 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       const filtered = applyIssueFilters(state.issues, q)
       const offset = q.offset && q.offset > 0 ? q.offset : 0
       const limit = q.limit && q.limit > 0 ? q.limit : filtered.length
-      const pageItems = filtered.slice(offset, offset + limit)
+      const pageItems = filtered.slice(offset, offset + limit).map((i) => ({
+        ...i,
+        labels: i.labels ?? [],
+      }))
       return route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -689,6 +693,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
         author: state.identity,
         state: "todo",
         assignee: null,
+        labels: [],
         created_at: nowIso(),
         updated_at: nowIso(),
       }
@@ -707,10 +712,10 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const iss = state.issues.find((i) => i.number === n)
     if (!iss) return json(route, 404, { error: "issue not found" })
 
-    if (req.method() === "GET") return json(route, 200, iss)
+    if (req.method() === "GET") return json(route, 200, { ...iss, labels: iss.labels ?? [] })
     if (req.method() === "PATCH") {
       // Partial update: only the provided fields change (mirrors the server).
-      const body = req.postDataJSON() as { state?: IssueState; title?: string; body?: string }
+      const body = req.postDataJSON() as { state?: IssueState; title?: string; body?: string; labels?: string[] }
       if (body.state !== undefined) iss.state = body.state
       if (body.title !== undefined) iss.title = body.title
       if (body.body !== undefined) iss.body = body.body

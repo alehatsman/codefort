@@ -40,7 +40,7 @@ test("valid token passes the gate, persists, and enters the app", async ({ page 
   await page.getByPlaceholder("mgt_...").fill("mgt_valid_qa_token")
   await page.getByRole("button", { name: "Continue" }).click()
 
-  await expect(page.getByRole("heading", { name: "Repositories" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible()
 
   const stored = await page.evaluate(() => localStorage.getItem("moongit_token"))
   expect(stored).toBe("mgt_valid_qa_token")

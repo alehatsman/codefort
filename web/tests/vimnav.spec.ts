@@ -15,12 +15,13 @@ test("repos grid: hjkl moves spatially (j/k a row, h/l a cell), Enter opens", as
       owner: "alice",
       name: `r${n + 1}`,
       created_at: now,
+      ci_enabled: false,
       open_issues: 0,
       total_issues: 0,
     })),
   })
   await page.setViewportSize({ width: 1000, height: 900 })
-  await page.goto("/")
+  await page.goto("/repos")
   await expect(page.locator(".card")).toHaveCount(9)
 
   // Read the live column count rather than hard-coding the grid math.
