@@ -177,6 +177,45 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
+// User is the public profile of a registered account.
+type User struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// RegisterRequest creates a new user account.
+type RegisterRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// LoginRequest authenticates a user with username + password.
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// AuthResponse is returned by /api/auth/register and /api/auth/login.
+// Secret is the plaintext bearer token — display once, never stored.
+type AuthResponse struct {
+	Token  Token  `json:"token"`
+	Secret string `json:"secret"`
+}
+
+// RepoMember is a collaborator on a repository.
+type RepoMember struct {
+	Username string    `json:"username"`
+	Role     string    `json:"role"`
+	JoinedAt time.Time `json:"joined_at"`
+}
+
+// AddMemberRequest adds a collaborator to a repo.
+type AddMemberRequest struct {
+	Username string `json:"username"`
+	Role     string `json:"role"`
+}
+
 // Repo is the public view of a registered repository for UI/CLI clients.
 type Repo struct {
 	ID          int64     `json:"id"`
@@ -194,22 +233,25 @@ type Repo struct {
 	// OpenPulls / OpenReviews / ActiveAgents are at-a-glance counts for the repos
 	// list metric grid: open PRs, unresolved code-review comments, and agent runs
 	// in a non-terminal state. Always emitted (a zero is a real "none", not absent).
-	OpenPulls    int `json:"open_pulls"`
-	OpenReviews  int `json:"open_reviews"`
-	ActiveAgents int `json:"active_agents"`
+	OpenPulls    int    `json:"open_pulls"`
+	OpenReviews  int    `json:"open_reviews"`
+	ActiveAgents int    `json:"active_agents"`
+	Visibility   string `json:"visibility"`
 }
 
 // UpdateRepoRequest is a partial update of a repo's settings. Only non-nil
 // fields are changed; an all-nil request is rejected.
 type UpdateRepoRequest struct {
-	CIEnabled *bool `json:"ci_enabled,omitempty"`
+	CIEnabled  *bool   `json:"ci_enabled,omitempty"`
+	Visibility *string `json:"visibility,omitempty"`
 }
 
 // CreateRepoRequest provisions a new repository: a bare git repo on disk
 // plus its database registration.
 type CreateRepoRequest struct {
-	Owner string `json:"owner"`
-	Name  string `json:"name"`
+	Owner      string `json:"owner"`
+	Name       string `json:"name"`
+	Visibility string `json:"visibility,omitempty"`
 }
 
 // TreeEntry is one item in a repository directory listing.

@@ -16,7 +16,7 @@ import { useRepos } from "@/api/queries"
 import CIStatusIcon from "@/features/pipelines/CIStatusIcon"
 import NewRepoForm from "@/features/repo/NewRepoForm"
 import { applyOrder, useRepoOrder } from "@/features/repo/useRepoOrder"
-import { Button, Card, EmptyState, ErrorMessage, PageHeader, SkeletonText } from "@/ui"
+import { Badge, Button, Card, EmptyState, ErrorMessage, PageHeader, SkeletonText } from "@/ui"
 import type { Repo } from "@/api/types"
 import { useListNav } from "@/shell/keyboardNav"
 
@@ -136,6 +136,7 @@ function SortableRepoCard({ repo, selected }: { repo: Repo; selected: boolean })
           {repo.name}
         </Link>
         <span className="card__created muted">
+          {repo.visibility === "private" && <Badge>private</Badge>}
           {new Date(repo.created_at).toLocaleDateString()}
         </span>
       </div>

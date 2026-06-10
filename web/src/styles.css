@@ -279,6 +279,32 @@ pre {
   gap: var(--space-3);
   margin-top: var(--space-4);
 }
+.gate__tabs {
+  display: flex;
+  gap: 0;
+  margin-top: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.gate__tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  margin-bottom: -1px;
+  transition: color 0.1s;
+}
+.gate__tab:hover {
+  color: var(--fg);
+}
+.gate__tab.is-active {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
 
 /* App shell ------------------------------------------------------------- */
 .app {

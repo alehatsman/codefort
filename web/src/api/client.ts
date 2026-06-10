@@ -55,6 +55,12 @@ import type {
   UpdateIssueInput,
   UpdateRepoInput,
   Whoami,
+  RegisterInput,
+  LoginInput,
+  AuthResponse,
+  User,
+  RepoMember,
+  AddMemberInput,
 } from "@/api/types"
 
 const TOKEN_KEY = "moongit_token"
@@ -137,6 +143,39 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
       }
     } catch {
       // raw stays as message; body stays undefined
+    }
+    throw new ApiError(resp.status, message, body)
+  }
+  if (!raw) return undefined as T
+  return JSON.parse(raw) as T
+}
+
+// requestPublic is like request() but never attaches a Bearer token — used for
+// register and login endpoints that must be reachable before a token exists.
+async function requestPublic<T>(path: string, opts: RequestOpts = {}): Promise<T> {
+  const headers = new Headers()
+  headers.set("Accept", "application/json")
+  if (opts.body !== undefined) {
+    headers.set("Content-Type", "application/json")
+  }
+
+  const resp = await fetch(path, {
+    method: opts.method ?? "GET",
+    headers,
+    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+  })
+
+  const raw = await resp.text()
+  if (!resp.ok) {
+    let message = raw || resp.statusText
+    let body: unknown
+    try {
+      body = JSON.parse(raw)
+      if (body && typeof (body as { error?: unknown }).error === "string") {
+        message = (body as { error: string }).error
+      }
+    } catch {
+      // raw stays as message
     }
     throw new ApiError(resp.status, message, body)
   }
@@ -477,4 +516,21 @@ export const api = {
   getAgentSettings: () => request<AgentSettings>("/api/settings/agent"),
   updateAgentSettings: (body: UpdateAgentSettingsInput) =>
     request<AgentSettings>("/api/settings/agent", { method: "PUT", body }),
+
+  // Auth — public endpoints (no bearer token required).
+  register: (body: RegisterInput) =>
+    requestPublic<AuthResponse>("/api/auth/register", { method: "POST", body }),
+  login: (body: LoginInput) =>
+    requestPublic<AuthResponse>("/api/auth/login", { method: "POST", body }),
+
+  // User profile.
+  getUser: (username: string) => request<User>(`/api/users/${username}`),
+
+  // Repo members (collaborator access control).
+  listRepoMembers: (owner: string, repo: string) =>
+    request<RepoMember[]>(`/api/repos/${owner}/${repo}/members`),
+  addRepoMember: (owner: string, repo: string, body: AddMemberInput) =>
+    request<void>(`/api/repos/${owner}/${repo}/members`, { method: "POST", body }),
+  removeRepoMember: (owner: string, repo: string, username: string) =>
+    request<void>(`/api/repos/${owner}/${repo}/members/${username}`, { method: "DELETE" }),
 }

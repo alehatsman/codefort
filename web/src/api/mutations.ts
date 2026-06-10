@@ -17,6 +17,9 @@ import type {
   UpdateIssueInput,
   UpdatePullRequestInput,
   UpdateRepoInput,
+  RegisterInput,
+  LoginInput,
+  AddMemberInput,
 } from "@/api/types"
 
 export function useCreateRepo() {
@@ -358,5 +361,50 @@ export function useSetCIEnabled(owner: string, repo: string) {
       qc.invalidateQueries({ queryKey: keys.repo(owner, repo) })
       qc.invalidateQueries({ queryKey: keys.repos() })
     },
+  })
+}
+
+// useSetRepoVisibility toggles a repo between public and private.
+export function useSetRepoVisibility(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (visibility: "public" | "private") =>
+      api.updateRepo(owner, repo, { visibility } as UpdateRepoInput),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.repo(owner, repo) })
+      qc.invalidateQueries({ queryKey: keys.repos() })
+    },
+  })
+}
+
+// useRegister creates a new user account and returns an AuthResponse.
+export function useRegister() {
+  return useMutation({
+    mutationFn: (input: RegisterInput) => api.register(input),
+  })
+}
+
+// useLogin authenticates a user and returns an AuthResponse.
+export function useLogin() {
+  return useMutation({
+    mutationFn: (input: LoginInput) => api.login(input),
+  })
+}
+
+// useAddRepoMember grants a collaborator access to a repo.
+export function useAddRepoMember(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: AddMemberInput) => api.addRepoMember(owner, repo, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.repoMembers(owner, repo) }),
+  })
+}
+
+// useRemoveRepoMember revokes a collaborator's access.
+export function useRemoveRepoMember(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (username: string) => api.removeRepoMember(owner, repo, username),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.repoMembers(owner, repo) }),
   })
 }

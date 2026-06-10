@@ -26,10 +26,44 @@ export interface Repo {
   open_pulls: number
   open_reviews: number
   active_agents: number
+  visibility: "public" | "private"
 }
 
 export interface UpdateRepoInput {
   ci_enabled?: boolean
+  visibility?: "public" | "private"
+}
+
+export interface User {
+  id: number
+  name: string
+  created_at: string
+}
+
+export interface RegisterInput {
+  username: string
+  password: string
+}
+
+export interface LoginInput {
+  username: string
+  password: string
+}
+
+export interface AuthResponse {
+  token: Token
+  secret: string
+}
+
+export interface RepoMember {
+  username: string
+  role: "read" | "write"
+  joined_at: string
+}
+
+export interface AddMemberInput {
+  username: string
+  role?: "read" | "write"
 }
 
 export interface ChildIssueSummary {
@@ -86,6 +120,7 @@ export interface CIRunWithRepo extends CIRun {
 export interface CreateRepoInput {
   owner: string
   name: string
+  visibility?: "public" | "private"
 }
 
 export interface CreateIssueInput {
