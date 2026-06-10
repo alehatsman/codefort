@@ -68,6 +68,21 @@ func (s *Server) handleListIssues(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	// The epics view carries a live child-completion rollup per umbrella, so the
+	// list renders progress without an N+1 fetch.
+	if filter.Epics && len(issues) > 0 {
+		progress, err := storage.ChildProgress(s.rdb, repoID)
+		if err != nil {
+			s.logger.Error("epic progress", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		for i := range issues {
+			if p, ok := progress[issues[i].Number]; ok {
+				issues[i].Progress = &p
+			}
+		}
+	}
 	total, err := storage.CountIssues(s.rdb, repoID, filter)
 	if err != nil {
 		s.logger.Error("count issues", "err", err)
@@ -108,6 +123,7 @@ func (s *Server) handleGetIssue(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(children) > 0 {
 		iss.Children = children
+		iss.Progress = progressFromChildren(children)
 	}
 	dependsOn, err := storage.ListDependencies(s.rdb, repoID, num)
 	if err != nil {
@@ -220,6 +236,7 @@ func (s *Server) writeIssueWithEdges(w http.ResponseWriter, repoID int64, num in
 	}
 	if children, err := storage.ListChildren(s.rdb, repoID, num); err == nil && len(children) > 0 {
 		iss.Children = children
+		iss.Progress = progressFromChildren(children)
 	}
 	if deps, err := storage.ListDependencies(s.rdb, repoID, num); err == nil && len(deps) > 0 {
 		iss.DependsOn = deps
@@ -228,6 +245,18 @@ func (s *Server) writeIssueWithEdges(w http.ResponseWriter, repoID int64, num in
 		iss.Blocks = blocks
 	}
 	writeJSON(w, http.StatusOK, iss)
+}
+
+// progressFromChildren computes an epic's completion rollup from its already
+// fetched child summaries, so the single-issue view needs no extra query.
+func progressFromChildren(children []api.ChildIssueSummary) *api.EpicProgress {
+	p := api.EpicProgress{Total: len(children)}
+	for _, c := range children {
+		if c.State == api.IssueDone || c.State == api.IssueClosed {
+			p.Done++
+		}
+	}
+	return &p
 }
 
 func (s *Server) handleUpdateIssue(w http.ResponseWriter, r *http.Request) {
@@ -466,8 +495,14 @@ func parseListFilter(q map[string][]string) (storage.ListFilter, error) {
 	}
 	f.Ready = queryBool(q, "ready")
 	f.Blocked = queryBool(q, "blocked")
+	f.Epics = queryBool(q, "epics")
 	if f.Ready && f.Blocked {
 		return f, errors.New("ready and blocked are mutually exclusive")
+	}
+	// epics selects umbrellas; ready/blocked exclude umbrellas — combining them
+	// is always empty and signals confusion, so reject it.
+	if f.Epics && (f.Ready || f.Blocked) {
+		return f, errors.New("epics cannot be combined with ready or blocked")
 	}
 	return f, nil
 }

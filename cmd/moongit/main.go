@@ -62,7 +62,7 @@ func printUsage(w io.Writer) {
 
 USAGE:
     moongit issue create  --title <t> [--body <b>] [--parent <n>]
-    moongit issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--limit n] [--ready|--blocked]
+    moongit issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--limit n] [--ready|--blocked|--epics]
     moongit issue show    <number>
     moongit issue edit    <number> [--title <t>] [--body <b>] [--state <s>] [--parent <n>|0]
                                    [--depends-on <m,...>] [--remove-depends-on <m,...>]
@@ -193,6 +193,7 @@ func runIssueList(args []string) error {
 	label := fs.String("label", "", "filter: issue must have this label")
 	ready := fs.Bool("ready", false, "only actionable leaves: todo, unclaimed, not an epic, all dependencies done")
 	blocked := fs.Bool("blocked", false, "only todo leaves with at least one unmet dependency")
+	epics := fs.Bool("epics", false, "only epics (issues with children), each with a done/total rollup")
 	var query string
 	fs.StringVar(&query, "query", "", "filter by keyword in title or body")
 	fs.StringVar(&query, "q", "", "shorthand for --query")
@@ -201,6 +202,9 @@ func runIssueList(args []string) error {
 	}
 	if *ready && *blocked {
 		return errors.New("--ready and --blocked are mutually exclusive")
+	}
+	if *epics && (*ready || *blocked) {
+		return errors.New("--epics cannot be combined with --ready or --blocked")
 	}
 	target, err := discoverTarget()
 	if err != nil {
@@ -225,6 +229,9 @@ func runIssueList(args []string) error {
 	}
 	if *blocked {
 		q.Set("blocked", "1")
+	}
+	if *epics {
+		q.Set("epics", "1")
 	}
 	if *limit > 0 {
 		q.Set("limit", strconv.Itoa(*limit))
@@ -254,8 +261,12 @@ func runIssueList(args []string) error {
 		if iss.Assignee != nil {
 			assignee = *iss.Assignee
 		}
-		fmt.Printf("#%-4d  [%-11s]  @%-20s  %s  — %s\n",
-			iss.Number, iss.State, assignee, iss.Title, iss.Author)
+		progress := ""
+		if iss.Progress != nil {
+			progress = fmt.Sprintf("  (%d/%d done)", iss.Progress.Done, iss.Progress.Total)
+		}
+		fmt.Printf("#%-4d  [%-11s]  @%-20s  %s  — %s%s\n",
+			iss.Number, iss.State, assignee, iss.Title, iss.Author, progress)
 	}
 	return nil
 }
@@ -305,7 +316,11 @@ func runIssueShow(args []string) error {
 
 	// Edges: epic children + dependency graph. Each line is one issue ref.
 	if len(iss.Children) > 0 {
-		fmt.Printf("\nChildren (%d):\n", len(iss.Children))
+		rollup := ""
+		if iss.Progress != nil {
+			rollup = fmt.Sprintf(" — %d/%d done", iss.Progress.Done, iss.Progress.Total)
+		}
+		fmt.Printf("\nChildren (%d)%s:\n", len(iss.Children), rollup)
 		for _, c := range iss.Children {
 			fmt.Printf("  #%-4d  [%-11s]  %s\n", c.Number, c.State, c.Title)
 		}

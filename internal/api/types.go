@@ -65,9 +65,18 @@ type Issue struct {
 	Children     []ChildIssueSummary `json:"children,omitempty"`      // populated only on single-issue GET
 	DependsOn    []IssueRef          `json:"depends_on,omitempty"`    // issues blocking this one; populated only on single-issue GET
 	Blocks       []IssueRef          `json:"blocks,omitempty"`        // issues this one blocks; populated only on single-issue GET
+	Progress     *EpicProgress       `json:"progress,omitempty"`      // child rollup; set only for issues that have children (epics)
 	Labels       []string            `json:"labels"`                  // free-form tags; always [] when empty
 	CreatedAt    time.Time           `json:"created_at"`
 	UpdatedAt    time.Time           `json:"updated_at"`
+}
+
+// EpicProgress is the child-completion rollup for an epic: how many of its
+// direct children are in a done/closed state out of the total. Computed live
+// from parent edges + child states, so it never drifts from a prose checklist.
+type EpicProgress struct {
+	Total int `json:"total"`
+	Done  int `json:"done"`
 }
 
 // ChildIssueSummary is a lightweight view of a child issue, embedded in the
@@ -96,7 +105,7 @@ type AddDependencyRequest struct {
 type CreateIssueRequest struct {
 	Title  string   `json:"title"`
 	Body   string   `json:"body,omitempty"`
-	Author string   `json:"-"`              // populated server-side from token
+	Author string   `json:"-"`                // populated server-side from token
 	Parent *int     `json:"parent,omitempty"` // optional parent issue number
 	Labels []string `json:"labels,omitempty"` // initial labels; nil/empty = no labels
 }

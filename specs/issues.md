@@ -92,6 +92,20 @@ The dependency graph powers two derived, live-computed list filters — no manua
 - WHERE ready/blocked are requested, they apply to a single repo's backlog; the
   cross-repo aggregate feed ignores them.
 
+### Native epic rollup
+
+Epic↔child structure is first-class in the views, so a drifting prose checklist
+is never needed.
+
+- WHEN a single issue with children is fetched, the response carries a live
+  child-completion rollup (how many children are done/closed out of the total),
+  computed from parent edges + child states.
+- WHEN a client lists with the **epics** filter, the result is only umbrella
+  issues (those with at least one child), each carrying its rollup; combining
+  epics with ready or blocked is rejected (those views exclude umbrellas).
+- WHERE a rollup is reported, it reflects the current child states with no manual
+  edit to the epic — marking a child done updates the parent's rollup directly.
+
 ## Non-goals
 
 - **Agent runs spawned from an issue.** Turning an issue into a containerized
@@ -120,4 +134,5 @@ The dependency graph powers two derived, live-computed list filters — no manua
 - [x] Parent edge (epic membership): at most one, validated, clearable
 - [x] depends-on edges: add/remove, self + cycle rejection, edges in single-issue GET, cleared on delete
 - [x] Computed `ready` / `blocked` backlog views over the dependency graph; mutually exclusive
+- [x] Native epic rollup: child-completion progress on single GET + `epics` list view
 - [ ] Verified against the code by the verify workflow (flip to `living`)

@@ -342,6 +342,11 @@ type ListFilter struct {
 	// them; the cross-repo aggregate ignores them.
 	Ready   bool
 	Blocked bool
+
+	// Epics restricts the result to umbrella issues — those that have at least
+	// one child. The umbrella/map view; composes with state/assignee/etc. The
+	// caller populates each result's Progress rollup separately. Per-repo only.
+	Epics bool
 }
 
 // likeEscape neutralizes the LIKE wildcards (% and _) and the escape char
@@ -537,6 +542,41 @@ func appendReadyBlockedFilters(q *strings.Builder, filter ListFilter) {
 		q.WriteString(" AND NOT " + isEpic)
 		q.WriteString(" AND " + hasUnmetDep)
 	}
+	// Epics composes with ready/blocked-independent filters (state, assignee,
+	// label, ...). It would be contradictory alongside ready/blocked (those
+	// exclude epics), but the caller guards against that combination.
+	if filter.Epics {
+		q.WriteString(" AND " + isEpic)
+	}
+}
+
+// ChildProgress returns the child-completion rollup for every epic in a repo,
+// keyed by the epic's issue number: how many direct children are done/closed
+// out of the total. One grouped query covers the whole repo, so populating a
+// list of epics costs a single round-trip rather than one per epic. Issues with
+// no children are absent from the map.
+func ChildProgress(db *sql.DB, repoID int64) (map[int]api.EpicProgress, error) {
+	rows, err := db.Query(`
+		SELECT parent_number,
+		       COUNT(*),
+		       SUM(CASE WHEN state IN ('done','closed') THEN 1 ELSE 0 END)
+		  FROM issues
+		 WHERE repo_id = ? AND parent_number IS NOT NULL
+		 GROUP BY parent_number
+	`, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int]api.EpicProgress{}
+	for rows.Next() {
+		var parent, total, done int
+		if err := rows.Scan(&parent, &total, &done); err != nil {
+			return nil, err
+		}
+		out[parent] = api.EpicProgress{Total: total, Done: done}
+	}
+	return out, rows.Err()
 }
 
 // ListAllIssues returns issues across every repo, newest-updated first, each
@@ -599,13 +639,16 @@ func ListAllIssues(db *sql.DB, filter ListFilter) ([]api.IssueWithRepo, error) {
 }
 
 // CountIssues returns how many issues in a repo match the filter's
-// state/assignee/author/query predicates. Limit/Offset/Sort are ignored —
-// it's the total for pagination, not a page. Mirrors ListIssues' WHERE.
+// state/assignee/author/query predicates plus the computed-view predicates
+// (ready/blocked/epics). Limit/Offset/Sort are ignored — it's the total for
+// pagination, not a page. Mirrors ListIssues' WHERE so X-Total-Count agrees
+// with the page even under the graph filters.
 func CountIssues(db *sql.DB, repoID int64, filter ListFilter) (int, error) {
 	q := strings.Builder{}
 	q.WriteString(`SELECT COUNT(*) FROM issues WHERE repo_id = ?`)
 	args := []any{repoID}
 	appendIssueFilters(&q, &args, filter)
+	appendReadyBlockedFilters(&q, filter)
 	var n int
 	err := db.QueryRow(q.String(), args...).Scan(&n)
 	return n, err
