@@ -387,9 +387,51 @@ func listBranches(ctx context.Context, repoDir string) ([]string, error) {
 	return branches, nil
 }
 
-// handleListRefs returns the repo's local branches and which one is the
-// default, backing the web branch selector. An unborn repo yields an empty
-// branch list with the configured default branch name.
+// listTags returns the repo's tags, newest first (by version sort), each with
+// its dereferenced commit SHA, tagger date, and the first line of the tag
+// message (annotated tags only).
+func listTags(ctx context.Context, repoDir string) ([]api.Tag, error) {
+	// %(objecttype) is "tag" for annotated, "commit" for lightweight.
+	// *objectname dereferences tag objects to their target commit.
+	// %(creatordate:iso-strict) works for both commit and tag objects.
+	raw, err := gitOutput(ctx, repoDir, "for-each-ref",
+		"--format=%(refname:short)%00%(*objectname)%(objectname)%00%(creatordate:iso-strict)%00%(subject)",
+		"--sort=-version:refname",
+		"refs/tags")
+	if err != nil {
+		return nil, err
+	}
+	tags := make([]api.Tag, 0)
+	for line := range strings.SplitSeq(strings.TrimSpace(string(raw)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "\x00", 4)
+		if len(parts) < 4 {
+			continue
+		}
+		name, sha, date, msg := parts[0], parts[1], parts[2], parts[3]
+		if sha == "" {
+			sha = parts[1] // lightweight: objectname itself is the commit SHA
+		}
+		// sha field is "*objectname + objectname"; take the first non-empty 40-char prefix.
+		sha = strings.TrimSpace(sha)
+		if len(sha) > 40 {
+			sha = sha[:40]
+		}
+		tags = append(tags, api.Tag{
+			Name:      name,
+			SHA:       sha,
+			CreatedAt: date,
+			Message:   strings.TrimSpace(msg),
+		})
+	}
+	return tags, nil
+}
+
+// handleListRefs returns the repo's local branches, tags, and which branch is
+// the default, backing the web branch selector and Tags tab.
 func (s *Server) handleListRefs(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.lookupRepoOrFail(w, r); !ok {
 		return
@@ -404,7 +446,17 @@ func (s *Server) handleListRefs(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, api.RefList{Default: headRef(r.Context(), repoDir), Branches: branches})
+	tags, err := listTags(r.Context(), repoDir)
+	if err != nil {
+		s.logger.Error("list tags", "repo", repoDir, "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, api.RefList{
+		Default:  headRef(r.Context(), repoDir),
+		Branches: branches,
+		Tags:     tags,
+	})
 }
 
 // hasCommits reports whether HEAD resolves to a commit (false for a freshly

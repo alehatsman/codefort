@@ -157,11 +157,20 @@ type UpdateCodeCommentRequest struct {
 	Resolved *bool `json:"resolved,omitempty"`
 }
 
+// Tag is a lightweight or annotated git tag with its resolved commit SHA.
+type Tag struct {
+	Name      string `json:"name"`
+	SHA       string `json:"sha"`
+	CreatedAt string `json:"created_at,omitempty"`
+	Message   string `json:"message,omitempty"`
+}
+
 // RefList is the branch listing for a repo: every local branch plus the name
 // of the default one, so a client can preselect it.
 type RefList struct {
 	Default  string   `json:"default"`
 	Branches []string `json:"branches"`
+	Tags     []Tag    `json:"tags"`
 }
 
 type ErrorResponse struct {

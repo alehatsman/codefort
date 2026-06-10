@@ -26,6 +26,7 @@ import SpecsPage from "@/features/specs/SpecsPage"
 import ReviewPage from "@/features/pulls/ReviewPage"
 import PipelinesPage from "@/features/pipelines/PipelinesPage"
 import SettingsPage from "@/features/settings/SettingsPage"
+import TagsPage from "@/features/repo/TagsPage"
 import DevGalleryPage from "@/ui/DevGalleryPage"
 
 // The old Research and Summaries tabs merged into one Explore tab; keep their
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/:owner/:repo/compare" element={<ComparePage />} />
         <Route path="/:owner/:repo/pulls" element={<PullsPage />} />
         <Route path="/:owner/:repo/pulls/:number" element={<PullPage />} />
+        <Route path="/:owner/:repo/tags" element={<TagsPage />} />
         <Route path="/:owner/:repo/explore" element={<ExplorePage />} />
         <Route path="/:owner/:repo/specs" element={<SpecsPage />} />
         <Route path="/:owner/:repo/research" element={<ExploreRedirect />} />

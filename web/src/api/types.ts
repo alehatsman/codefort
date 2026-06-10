@@ -245,10 +245,18 @@ export interface TreeCommits {
   entries: Record<string, Commit>
 }
 
+export interface RepoTag {
+  name: string
+  sha: string
+  created_at?: string
+  message?: string
+}
+
 // RefList is a repo's local branches plus the name of the default one.
 export interface RefList {
   default: string
   branches: string[]
+  tags: RepoTag[]
 }
 
 // --- Code review comments ---
