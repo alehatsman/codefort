@@ -26,6 +26,7 @@ async function mockAggregates(page: import("@playwright/test").Page) {
           author: "alice",
           state: "todo",
           assignee: null,
+          labels: [],
           created_at: nowIso(),
           updated_at: nowIso(),
           repo: { owner: "alice", name: "demo" },
@@ -37,6 +38,7 @@ async function mockAggregates(page: import("@playwright/test").Page) {
           author: "bob",
           state: "in_progress",
           assignee: "bob",
+          labels: [],
           created_at: nowIso(),
           updated_at: nowIso(),
           repo: { owner: "bob", name: "api" },
@@ -141,7 +143,7 @@ test("global nav links the cross-repo aggregate views", async ({ page }) => {
   await mockApi(page)
   await mockAggregates(page)
 
-  await page.goto("/")
+  await page.goto("/repos")
   const nav = page.locator("nav.tabs", { hasText: "Repos" })
   await expect(nav.getByRole("link", { name: "Repos" })).toHaveClass(/is-active/)
 
@@ -157,9 +159,9 @@ test("global nav links the cross-repo aggregate views", async ({ page }) => {
   // Pull requests tab.
   await page.locator("nav.tabs").getByRole("link", { name: "Pull requests" }).click()
   await expect(page).toHaveURL(/\/pulls$/)
-  const prRow = page.locator(".issue-row", { hasText: "alice pr" })
-  await expect(prRow.locator(".issue-row__repo")).toHaveText("alice/demo")
-  await expect(prRow.getByRole("link")).toHaveAttribute("href", "/alice/demo/pulls/5")
+  const prRow = page.locator(".issue-list li", { hasText: "alice pr" })
+  await expect(prRow.locator(".repo-tag")).toHaveText("alice/demo")
+  await expect(prRow.getByRole("link", { name: "alice pr" })).toHaveAttribute("href", "/alice/demo/pulls/5")
 
   // Pipelines tab: CI runs across repos, run link into the owning repo.
   await page.locator("nav.tabs").getByRole("link", { name: "Pipelines" }).click()

@@ -185,7 +185,8 @@ test("dev gallery FilterChip toggles its checkbox", async ({ page }) => {
   await mockApi(page)
   await page.goto("/dev/ui")
 
-  const todo = page.getByRole("checkbox", { name: "todo" })
+  // Two FilterChip sections in the gallery both have a "todo" chip; use first().
+  const todo = page.getByRole("checkbox", { name: "todo" }).first()
   await expect(todo).toBeChecked() // seeded checked in the gallery
   await todo.click()
   await expect(todo).not.toBeChecked()

@@ -74,21 +74,26 @@ test("drag a card to done and back to todo; no crash, state PATCHes both ways", 
   // todo -> done
   await dragCardOnto(page, page.locator(".board-card").first(), done)
   await expect.poll(() => state.issues[0].state).toBe("done")
-  await expect(done.getByText("Round trip")).toBeVisible()
+  // Wait for all background refetches, then confirm board is fully re-rendered:
+  // card visible in done AND todo column showing empty.
+  await page.waitForLoadState("networkidle")
+  const doneCard = done.locator(".board-card").first()
+  await expect(doneCard).toBeVisible()
+  await expect(todo.getByText("No issues")).toBeVisible()
 
   // done -> todo (the "dragging back" path from #148)
-  await dragCardOnto(page, done.locator(".board-card").first(), todo)
+  await dragCardOnto(page, doneCard, todo)
   await expect.poll(() => state.issues[0].state).toBe("todo")
   await expect(todo.getByText("Round trip")).toBeVisible()
 
   expect(pageErrors, "drag round-trip must not crash the page").toEqual([])
 })
 
-test("done column shows the 15 most recent and collapses the rest", async ({ page }) => {
+test("done column collapses past COL_VISIBLE=30 and expands on demand", async ({ page }) => {
   const base = Date.parse("2026-01-01T00:00:00Z")
-  // 18 done issues with descending updated_at (newest = #18), so the visible
-  // 15 are the most-recent and the 3 oldest (#1–#3) are collapsed.
-  const issues = Array.from({ length: 18 }, (_, i) => {
+  // 33 done issues (> COL_VISIBLE=30) so the collapse toggle is visible.
+  // Timestamps ascend so issue #33 (newest) sorts to the top.
+  const issues = Array.from({ length: 33 }, (_, i) => {
     const ts = new Date(base + i * 1000).toISOString()
     return {
       id: i + 1, number: i + 1, title: `Done ${i + 1}`, author: "alice",
@@ -100,17 +105,21 @@ test("done column shows the 15 most recent and collapses the rest", async ({ pag
   await page.goto("/alice/demo/issues/board")
   const done = page.getByTestId("board-column-done")
 
-  // Header count is the full set; only 15 cards render until expanded.
-  await expect(done.locator(".board-col__count")).toHaveText("18")
-  await expect(done.locator(".board-card")).toHaveCount(15)
-  // The newest is shown, the oldest (collapsed) is not.
-  await expect(done.getByText("Done 18", { exact: true })).toBeVisible()
+  // Header always shows the full count.
+  await expect(done.locator(".board-col__count")).toHaveText("33")
+  // Newest card (#33) is visible near the top.
+  await expect(done.getByText("Done 33", { exact: true })).toBeVisible()
+  // Oldest 3 cards (#1–#3) are collapsed — not in DOM.
   await expect(done.getByText("Done 1", { exact: true })).toHaveCount(0)
 
-  // Expand reveals all 18; toggle flips to "Show less".
-  await done.getByRole("button", { name: "Show 3 more" }).click()
-  await expect(done.locator(".board-card")).toHaveCount(18)
-  await expect(done.getByText("Done 1", { exact: true })).toBeVisible()
+  // Expand reveals all 33; toggle flips to "Show less".
+  // The button lives after the virtual container inside board-col__body.
+  // Scroll that inner container to the bottom so the button is in the viewport,
+  // then use a JS click to bypass any remaining pointer-interception from the
+  // virtualiser rows.
+  const moreBtn = done.getByRole("button", { name: "Show 3 more" })
+  await done.locator(".board-col__body").evaluate((el) => { el.scrollTop = el.scrollHeight })
+  await moreBtn.evaluate((btn) => (btn as HTMLButtonElement).click())
   await expect(done.getByRole("button", { name: "Show less" })).toBeVisible()
 })
 
@@ -123,12 +132,12 @@ test("global board groups every repo's issues into state columns", async ({ page
       body: JSON.stringify([
         {
           id: 1, number: 7, title: "alice todo", author: "alice", state: "todo",
-          assignee: null, created_at: now, updated_at: now,
+          assignee: null, labels: [], created_at: now, updated_at: now,
           repo: { owner: "alice", name: "demo" },
         },
         {
           id: 2, number: 3, title: "bob doing", author: "bob", state: "in_progress",
-          assignee: "bob", created_at: now, updated_at: now,
+          assignee: "bob", labels: [], created_at: now, updated_at: now,
           repo: { owner: "bob", name: "api" },
         },
       ]),

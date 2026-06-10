@@ -156,7 +156,7 @@ test("fulltext search filters the Agents grid and is reflected in the URL", asyn
 
   // "parser" matches only run #1's commit subject (searched server-side over
   // commit subject/author + ref + trigger).
-  await page.getByRole("searchbox", { name: "Search agent runs" }).fill("parser")
+  await page.getByRole("searchbox", { name: "Search runs" }).fill("parser")
   await expect(page).toHaveURL(/[?&]q=parser/)
   await expect(rows).toHaveCount(1)
   await expect(rows.first().getByRole("link", { name: "issue #12" })).toBeVisible()
