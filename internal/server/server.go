@@ -181,6 +181,8 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("DELETE /api/repos/{owner}/{repo}/issues/{number}", s.handleDeleteIssue)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/claim", s.handleClaimIssue)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/unclaim", s.handleUnclaimIssue)
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/dependencies", s.handleAddDependency)
+	mux.HandleFunc("DELETE /api/repos/{owner}/{repo}/issues/{number}/dependencies/{target}", s.handleRemoveDependency)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues/{number}/commits", s.handleIssueCommits)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/issues/{number}/agent", s.handleSpawnAgent)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/issues/{number}/comments", s.handleListComments)

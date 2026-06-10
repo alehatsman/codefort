@@ -63,6 +63,8 @@ type Issue struct {
 	ClaimedAt    *time.Time          `json:"claimed_at"`              // when Assignee took the issue; nil when unassigned
 	ParentNumber *int                `json:"parent_number,omitempty"` // nil = no parent
 	Children     []ChildIssueSummary `json:"children,omitempty"`      // populated only on single-issue GET
+	DependsOn    []IssueRef          `json:"depends_on,omitempty"`    // issues blocking this one; populated only on single-issue GET
+	Blocks       []IssueRef          `json:"blocks,omitempty"`        // issues this one blocks; populated only on single-issue GET
 	Labels       []string            `json:"labels"`                  // free-form tags; always [] when empty
 	CreatedAt    time.Time           `json:"created_at"`
 	UpdatedAt    time.Time           `json:"updated_at"`
@@ -74,6 +76,21 @@ type ChildIssueSummary struct {
 	Number int        `json:"number"`
 	Title  string     `json:"title"`
 	State  IssueState `json:"state"`
+}
+
+// IssueRef is a lightweight reference to the issue at the other end of a
+// dependency edge (number + title + current state), embedded in an issue's GET
+// response so an edge can be rendered without a second round-trip.
+type IssueRef struct {
+	Number int        `json:"number"`
+	Title  string     `json:"title"`
+	State  IssueState `json:"state"`
+}
+
+// AddDependencyRequest records a depends-on edge: the issue named in the path
+// depends on DependsOn (is blocked until DependsOn reaches a done/closed state).
+type AddDependencyRequest struct {
+	DependsOn int `json:"depends_on"`
 }
 
 type CreateIssueRequest struct {

@@ -6,6 +6,7 @@ covers:
   - "internal/server/issues.go"
   - "internal/server/comments.go"
   - "internal/storage/issues.go"
+  - "internal/storage/dependencies.go"
 ---
 # Issues & Claim-First Coordination
 
@@ -54,6 +55,27 @@ token may write); the claim is the social contract that keeps it orderly.
   or claim issues — the claim, not per-issue ownership of the data, is what
   serializes work.
 
+### Typed edges between issues
+
+Issues form a graph through two typed, directed edges, so a fleet can answer
+"what's next" from structure instead of hand-maintained prose.
+
+- WHERE an issue carries a **parent**, it is a child of that epic; an issue has
+  at most one parent (a per-repo issue number), and setting it to a missing or
+  self issue is rejected. Setting the parent to zero clears it.
+- WHEN a client adds a **depends-on** edge from issue A to issue B, A is recorded
+  as blocked until B is done; both must exist in the repo, a self-edge is
+  rejected, and an edge that would close a cycle is refused (the dependency graph
+  is kept acyclic so the derived "ready" view is well-defined).
+- WHEN a client removes a depends-on edge, the edge is dropped; removing an edge
+  that does not exist is an idempotent success, as is adding one that already
+  exists.
+- WHEN a single issue is fetched, the response carries its edge sets — children,
+  the issues it is blocked by (depends-on targets), and the issues it blocks —
+  each as a lightweight number/title/state reference.
+- WHEN an issue is deleted, its depends-on edges are cleared in both directions
+  so no dangling edge survives.
+
 ## Non-goals
 
 - **Agent runs spawned from an issue.** Turning an issue into a containerized
@@ -79,4 +101,6 @@ token may write); the claim is the social contract that keeps it orderly.
 - [x] Lease expiry + re-claim heartbeat renewal
 - [x] Owner-only unclaim; already-unclaimed is a no-op
 - [x] Comments with token-stamped author; author-only delete
+- [x] Parent edge (epic membership): at most one, validated, clearable
+- [x] depends-on edges: add/remove, self + cycle rejection, edges in single-issue GET, cleared on delete
 - [ ] Verified against the code by the verify workflow (flip to `living`)

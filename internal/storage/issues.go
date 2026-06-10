@@ -103,6 +103,15 @@ func DeleteIssue(db *sql.DB, repoID int64, number int) error {
 	if _, err := tx.Exec(`DELETE FROM issue_comments WHERE issue_id = ?`, id); err != nil {
 		return err
 	}
+	// Clear depends-on edges touching this issue in either direction. There is
+	// no FK on the per-repo issue numbers, so this can't ride a cascade — do it
+	// explicitly so a deleted issue never leaves a dangling edge.
+	if _, err := tx.Exec(
+		`DELETE FROM issue_dependencies WHERE repo_id = ? AND (issue_number = ? OR depends_on_number = ?)`,
+		repoID, number, number,
+	); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM issues WHERE id = ?`, id); err != nil {
 		return err
 	}

@@ -109,6 +109,124 @@ func (s *Server) handleGetIssue(w http.ResponseWriter, r *http.Request) {
 	if len(children) > 0 {
 		iss.Children = children
 	}
+	dependsOn, err := storage.ListDependencies(s.rdb, repoID, num)
+	if err != nil {
+		s.logger.Error("list dependencies", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if len(dependsOn) > 0 {
+		iss.DependsOn = dependsOn
+	}
+	blocks, err := storage.ListDependents(s.rdb, repoID, num)
+	if err != nil {
+		s.logger.Error("list dependents", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if len(blocks) > 0 {
+		iss.Blocks = blocks
+	}
+	writeJSON(w, http.StatusOK, iss)
+}
+
+// handleAddDependency records a depends-on edge: the path issue depends on the
+// issue named in the request body. Rejects self-edges (400) and edges that
+// would close a cycle (409). Both issues must exist in the repo (400 otherwise).
+func (s *Server) handleAddDependency(w http.ResponseWriter, r *http.Request) {
+	num, err := strconv.Atoi(r.PathValue("number"))
+	if err != nil || num <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid issue number")
+		return
+	}
+
+	var req api.AddDependencyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if req.DependsOn <= 0 {
+		writeError(w, http.StatusBadRequest, "depends_on must be a positive issue number")
+		return
+	}
+
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	err = storage.AddDependency(s.db, repoID, num, req.DependsOn)
+	switch {
+	case errors.Is(err, storage.ErrSelfDependency):
+		writeError(w, http.StatusBadRequest, "an issue cannot depend on itself")
+		return
+	case errors.Is(err, storage.ErrDependencyCycle):
+		writeError(w, http.StatusConflict, "dependency would create a cycle")
+		return
+	case errors.Is(err, storage.ErrInvalidInput):
+		writeError(w, http.StatusBadRequest, "issue not found in this repo")
+		return
+	case err != nil:
+		s.logger.Error("add dependency", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	s.emit("issue.updated", repoID, identityFromContext(r), map[string]any{"number": num, "depends_on": req.DependsOn})
+	s.writeIssueWithEdges(w, repoID, num)
+}
+
+// handleRemoveDependency deletes a depends-on edge. Removing a non-existent
+// edge is an idempotent success.
+func (s *Server) handleRemoveDependency(w http.ResponseWriter, r *http.Request) {
+	num, err := strconv.Atoi(r.PathValue("number"))
+	if err != nil || num <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid issue number")
+		return
+	}
+	target, err := strconv.Atoi(r.PathValue("target"))
+	if err != nil || target <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid dependency target")
+		return
+	}
+
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+
+	if err := storage.RemoveDependency(s.db, repoID, num, target); err != nil {
+		s.logger.Error("remove dependency", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	s.emit("issue.updated", repoID, identityFromContext(r), map[string]any{"number": num, "removed_depends_on": target})
+	s.writeIssueWithEdges(w, repoID, num)
+}
+
+// writeIssueWithEdges fetches an issue and its edge sets (children, blocked-by,
+// blocks) and writes it as the response. Shared by the dependency mutation
+// handlers so an edge change returns the same shape as GET. A missing issue is
+// reported as 404.
+func (s *Server) writeIssueWithEdges(w http.ResponseWriter, repoID int64, num int) {
+	iss, err := storage.GetIssue(s.rdb, repoID, num)
+	if errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "issue not found")
+		return
+	}
+	if err != nil {
+		s.logger.Error("get issue", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if children, err := storage.ListChildren(s.rdb, repoID, num); err == nil && len(children) > 0 {
+		iss.Children = children
+	}
+	if deps, err := storage.ListDependencies(s.rdb, repoID, num); err == nil && len(deps) > 0 {
+		iss.DependsOn = deps
+	}
+	if blocks, err := storage.ListDependents(s.rdb, repoID, num); err == nil && len(blocks) > 0 {
+		iss.Blocks = blocks
+	}
 	writeJSON(w, http.StatusOK, iss)
 }
 

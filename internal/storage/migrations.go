@@ -408,6 +408,30 @@ var migrations = []string{
 	CREATE INDEX IF NOT EXISTS idx_repo_members_repo ON repo_members(repo_id);
 	CREATE INDEX IF NOT EXISTS idx_repo_members_user ON repo_members(user_id);
 	`,
+
+	// 27: typed depends-on edges between issues (#383). A row (issue_number,
+	// depends_on_number) means issue_number is blocked until depends_on_number
+	// is done — a directed dependency edge, scoped to a repo (both are per-repo
+	// issue numbers). Distinct from parent_number (epic membership): an issue
+	// may depend on many issues and block many, so this is a join table rather
+	// than a column. No FK on the issue numbers (same reason parent_number has
+	// none — per-repo numbers, not row ids); the storage layer validates
+	// existence, self-edges, and cycles. The DAG invariant the --ready/next
+	// derivations assume is enforced on insert. Deleting an issue clears its
+	// edges in both directions (handled in DeleteIssue, not a cascade, since
+	// there's no FK).
+	`
+	CREATE TABLE IF NOT EXISTS issue_dependencies (
+	    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+	    repo_id           INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+	    issue_number      INTEGER NOT NULL,
+	    depends_on_number INTEGER NOT NULL,
+	    created_at        INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+	    UNIQUE (repo_id, issue_number, depends_on_number)
+	);
+	CREATE INDEX IF NOT EXISTS idx_issue_deps_issue  ON issue_dependencies(repo_id, issue_number);
+	CREATE INDEX IF NOT EXISTS idx_issue_deps_target ON issue_dependencies(repo_id, depends_on_number);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

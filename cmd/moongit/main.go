@@ -61,10 +61,11 @@ func printUsage(w io.Writer) {
 	fmt.Fprint(w, `moongit — client for the moongit server
 
 USAGE:
-    moongit issue create  --title <t> [--body <b>]
+    moongit issue create  --title <t> [--body <b>] [--parent <n>]
     moongit issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--limit n]
     moongit issue show    <number>
-    moongit issue edit    <number> [--title <t>] [--body <b>] [--state <s>]
+    moongit issue edit    <number> [--title <t>] [--body <b>] [--state <s>] [--parent <n>|0]
+                                   [--depends-on <m,...>] [--remove-depends-on <m,...>]
     moongit issue set-state <number> <todo|in_progress|done|closed>
     moongit issue claim   <number> [--state s]
     moongit issue unclaim <number>
@@ -134,11 +135,15 @@ func runIssueCreate(args []string) error {
 	title := fs.String("title", "", "issue title (required)")
 	body := fs.String("body", "", "issue body")
 	labelsFlag := fs.String("labels", "", "comma-separated labels to set (e.g. bug,ui)")
+	parent := fs.Int("parent", 0, "parent epic issue number (omit for none)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if strings.TrimSpace(*title) == "" {
 		return errors.New("--title is required")
+	}
+	if *parent < 0 {
+		return errors.New("--parent must be a positive issue number")
 	}
 
 	target, err := discoverTarget()
@@ -147,6 +152,9 @@ func runIssueCreate(args []string) error {
 	}
 
 	req := api.CreateIssueRequest{Title: *title, Body: *body}
+	if *parent > 0 {
+		req.Parent = parent
+	}
 	if *labelsFlag != "" {
 		for _, l := range strings.Split(*labelsFlag, ",") {
 			if l = strings.TrimSpace(l); l != "" {
@@ -277,8 +285,31 @@ func runIssueShow(args []string) error {
 	if len(iss.Labels) > 0 {
 		fmt.Printf("labels:   %s\n", strings.Join(iss.Labels, ", "))
 	}
+	if iss.ParentNumber != nil {
+		fmt.Printf("parent:   #%d\n", *iss.ParentNumber)
+	}
 	if iss.Body != "" {
 		fmt.Printf("\n%s\n", iss.Body)
+	}
+
+	// Edges: epic children + dependency graph. Each line is one issue ref.
+	if len(iss.Children) > 0 {
+		fmt.Printf("\nChildren (%d):\n", len(iss.Children))
+		for _, c := range iss.Children {
+			fmt.Printf("  #%-4d  [%-11s]  %s\n", c.Number, c.State, c.Title)
+		}
+	}
+	if len(iss.DependsOn) > 0 {
+		fmt.Printf("\nBlocked by (%d):\n", len(iss.DependsOn))
+		for _, d := range iss.DependsOn {
+			fmt.Printf("  #%-4d  [%-11s]  %s\n", d.Number, d.State, d.Title)
+		}
+	}
+	if len(iss.Blocks) > 0 {
+		fmt.Printf("\nBlocks (%d):\n", len(iss.Blocks))
+		for _, d := range iss.Blocks {
+			fmt.Printf("  #%-4d  [%-11s]  %s\n", d.Number, d.State, d.Title)
+		}
 	}
 
 	// Comments timeline.
@@ -341,7 +372,7 @@ func runIssueSetState(args []string) error {
 // clobbers the body and vice versa.
 func runIssueEdit(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: moongit issue edit <number> [--title <t>] [--body <b>] [--state <s>] [--labels <a,b>]")
+		return errors.New("usage: moongit issue edit <number> [--title <t>] [--body <b>] [--state <s>] [--labels <a,b>] [--parent <n>|0] [--depends-on <m,...>] [--remove-depends-on <m,...>]")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -353,6 +384,9 @@ func runIssueEdit(args []string) error {
 	body := fs.String("body", "", "new body")
 	stateFlag := fs.String("state", "", "new state (todo|in_progress|done|closed)")
 	labelsFlag := fs.String("labels", "", "replace labels (comma-separated; empty string clears all)")
+	parent := fs.Int("parent", 0, "set parent epic to this number; 0 clears the parent")
+	dependsOn := fs.String("depends-on", "", "add depends-on edges to these issue numbers (comma-separated)")
+	removeDependsOn := fs.String("remove-depends-on", "", "remove depends-on edges to these issue numbers (comma-separated)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -386,20 +420,75 @@ func runIssueEdit(args []string) error {
 		}
 		req.Labels = &ls
 	}
-	if req.Title == nil && req.Body == nil && req.State == nil && req.Labels == nil {
-		return errors.New("nothing to edit: pass at least one of --title, --body, --state, --labels")
+	if seen["parent"] {
+		if *parent < 0 {
+			return errors.New("--parent must be a positive issue number, or 0 to clear")
+		}
+		req.Parent = parent // 0 = clear (server contract)
+	}
+
+	addEdges, err := parseIssueNums(*dependsOn)
+	if err != nil {
+		return fmt.Errorf("--depends-on: %w", err)
+	}
+	removeEdges, err := parseIssueNums(*removeDependsOn)
+	if err != nil {
+		return fmt.Errorf("--remove-depends-on: %w", err)
+	}
+
+	hasPatch := req.Title != nil || req.Body != nil || req.State != nil || req.Labels != nil || req.Parent != nil
+	if !hasPatch && len(addEdges) == 0 && len(removeEdges) == 0 {
+		return errors.New("nothing to edit: pass at least one of --title, --body, --state, --labels, --parent, --depends-on, --remove-depends-on")
 	}
 
 	target, err := discoverTarget()
 	if err != nil {
 		return err
 	}
-	payload, err := json.Marshal(req)
-	if err != nil {
-		return err
+
+	// Field edits go through PATCH; edge changes are subresource calls.
+	if hasPatch {
+		payload, err := json.Marshal(req)
+		if err != nil {
+			return err
+		}
+		endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d", target.server, target.owner, target.repo, num)
+		resp, raw, err := httpDo(http.MethodPatch, endpoint, bytes.NewReader(payload), "application/json")
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+		}
 	}
+	for _, m := range removeEdges {
+		endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d/dependencies/%d", target.server, target.owner, target.repo, num, m)
+		resp, raw, err := httpDo(http.MethodDelete, endpoint, nil, "")
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("remove depends-on %d: server returned %d: %s", m, resp.StatusCode, decodeError(raw))
+		}
+	}
+	for _, m := range addEdges {
+		payload, err := json.Marshal(api.AddDependencyRequest{DependsOn: m})
+		if err != nil {
+			return err
+		}
+		endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d/dependencies", target.server, target.owner, target.repo, num)
+		resp, raw, err := httpDo(http.MethodPost, endpoint, bytes.NewReader(payload), "application/json")
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("add depends-on %d: server returned %d: %s", m, resp.StatusCode, decodeError(raw))
+		}
+	}
+
+	// Re-fetch so the printed line reflects the final state after every change.
 	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d", target.server, target.owner, target.repo, num)
-	resp, raw, err := httpDo(http.MethodPatch, endpoint, bytes.NewReader(payload), "application/json")
+	resp, raw, err := httpDo(http.MethodGet, endpoint, nil, "")
 	if err != nil {
 		return err
 	}
@@ -412,6 +501,26 @@ func runIssueEdit(args []string) error {
 	}
 	fmt.Printf("#%d  %s  [%s]\n", iss.Number, iss.Title, iss.State)
 	return nil
+}
+
+// parseIssueNums parses a comma-separated list of positive issue numbers.
+// An empty string yields no numbers (the flag was not used). Each element must
+// be a positive integer; duplicates are preserved (the caller's loops are
+// idempotent server-side).
+func parseIssueNums(s string) ([]int, error) {
+	var out []int
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		n, err := strconv.Atoi(part)
+		if err != nil || n <= 0 {
+			return nil, fmt.Errorf("invalid issue number %q", part)
+		}
+		out = append(out, n)
+	}
+	return out, nil
 }
 
 func runIssueClaim(args []string) error {
