@@ -103,7 +103,7 @@ export default function PullPage() {
                     )
                   }
                 >
-                  {mergePull.isPending ? "Merging…" : "Merge"}
+                  {mergePull.isPending ? "Merging…" : "Merge pull request"}
                 </Button>
                 {notFastForwardable && (
                   <Button

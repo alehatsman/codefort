@@ -155,7 +155,7 @@ export default function IssuePage() {
         )}
 
         {iss.children && iss.children.length > 0 && (
-          <ChildIssueList owner={owner} repo={repo} children={iss.children} />
+          <ChildIssueList owner={owner} repo={repo} items={iss.children} />
         )}
 
         {commentsQ.isLoading && <Spinner label="Loading comments…" />}
@@ -215,23 +215,23 @@ export default function IssuePage() {
 function ChildIssueList({
   owner,
   repo,
-  children,
+  items,
 }: {
   owner: string
   repo: string
-  children: ChildIssueSummary[]
+  items: ChildIssueSummary[]
 }) {
-  const done = children.filter((c) => c.state === "done" || c.state === "closed").length
+  const done = items.filter((c) => c.state === "done" || c.state === "closed").length
   return (
     <section className="issue-children">
       <h3 className="issue-children__label">
         Sub-issues
         <span className="issue-children__progress">
-          {done}/{children.length}
+          {done}/{items.length}
         </span>
       </h3>
       <ul className="issue-children__list">
-        {children.map((c) => (
+        {items.map((c) => (
           <li key={c.number} className="issue-children__row">
             <StateIcon state={c.state} size={14} />
             <Link to={`/${owner}/${repo}/issues/${c.number}`} className="issue-children__title">
