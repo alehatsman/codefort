@@ -77,6 +77,7 @@ export default function RepoTabs({ owner, repo }: Props) {
     location.pathname.startsWith(`${base}/research`) ||
     location.pathname.startsWith(`${base}/summaries`)
   const isSpecs = location.pathname.startsWith(`${base}/specs`)
+  const isTags = location.pathname.startsWith(`${base}/tags`)
   const isPipelines = location.pathname.startsWith(`${base}/pipelines`)
   const isAgents = location.pathname.startsWith(`${base}/agents`)
 
@@ -93,6 +94,9 @@ export default function RepoTabs({ owner, repo }: Props) {
       </Tab>
       <Tab to={`${base}/pulls`} active={isPulls}>
         Pull requests
+      </Tab>
+      <Tab to={`${base}/tags`} active={isTags}>
+        Tags
       </Tab>
       <Tab to={`${base}/review`} active={isReview} count={pill(openReview)}>
         Review
