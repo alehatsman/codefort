@@ -156,43 +156,36 @@ func (m *mcpServer) newServer() *sdk.Server {
 
 	// ── issues ──────────────────────────────────────────────────────────────
 	addTool(m, srv, &sdk.Tool{
-		Name: "issue_list",
-		Description: "List issues in the repo. Returns a slim summary (no body) for token efficiency. " +
-			"Filter by state (comma-separated: todo,in_progress,done,closed), assignee ('null' for " +
-			"unassigned), label (exact), or keyword in title/body. Computed views: ready=true " +
-			"(unclaimed todo leaves with all deps met), blocked=true (todo leaves with unmet deps), " +
-			"epics=true (issues that have children). Survey this before claiming work.",
+		Name:        "issue_list",
+		Description: "List issues (slim — no body). Filter: state, assignee (null=unassigned), label, query. Views: ready, blocked, epics.",
 	}, m.issueList)
 	addTool(m, srv, &sdk.Tool{
 		Name:        "issue_show",
-		Description: "Show one issue (title, state, author, assignee, body) plus its comment timeline.",
+		Description: "Show an issue with its comments.",
 	}, m.issueShow)
 	addTool(m, srv, &sdk.Tool{
 		Name:        "issue_create",
-		Description: "Create a new issue. The author is stamped from the token identity. Returns the new issue.",
+		Description: "Create an issue.",
 	}, m.issueCreate)
 	addTool(m, srv, &sdk.Tool{
 		Name:        "issue_comment",
-		Description: "Post a comment on an issue — use this to report progress at real checkpoints.",
+		Description: "Post a comment on an issue.",
 	}, m.issueComment)
 	addTool(m, srv, &sdk.Tool{
-		Name: "issue_claim",
-		Description: "Atomically claim (assign yourself) an issue, optionally transitioning its state " +
-			"(e.g. in_progress). Fails if the issue is already claimed by someone else. Claim before coding.",
+		Name:        "issue_claim",
+		Description: "Claim an issue. Optional state transition. Fails if already claimed by another.",
 	}, m.issueClaim)
 	addTool(m, srv, &sdk.Tool{
 		Name:        "issue_unclaim",
-		Description: "Release your claim on an issue so someone else can pick it up.",
+		Description: "Release your claim on an issue.",
 	}, m.issueUnclaim)
 	addTool(m, srv, &sdk.Tool{
 		Name:        "issue_set_state",
-		Description: "Set an issue's state to one of: todo, in_progress, done, closed.",
+		Description: "Set issue state: todo|in_progress|done|closed.",
 	}, m.issueSetState)
 	addTool(m, srv, &sdk.Tool{
-		Name: "issue_update",
-		Description: "Partially update an issue's title, body, labels, or parent. " +
-			"Only provided fields change; omit fields to leave them unchanged. " +
-			"To clear parent set parent=0; to clear labels provide an empty labels array.",
+		Name:        "issue_update",
+		Description: "Partial update: title, body, labels, parent. parent=0 clears; empty labels array clears labels.",
 	}, m.issueUpdate)
 
 	// ── PRs ──────────────────────────────────────────────────────────────────
@@ -202,29 +195,25 @@ func (m *mcpServer) newServer() *sdk.Server {
 	}, m.prList)
 	addTool(m, srv, &sdk.Tool{
 		Name:        "pr_show",
-		Description: "Show one PR (head/base refs, state, author, body) plus its head-vs-base diff and code-review comments.",
+		Description: "Show a PR with diff and review comments.",
 	}, m.prShow)
 	addTool(m, srv, &sdk.Tool{
 		Name:        "pr_create",
-		Description: "Open a new pull request from head into base. Author is stamped from the token identity.",
+		Description: "Open a PR from head into base.",
 	}, m.prCreate)
 	addTool(m, srv, &sdk.Tool{
 		Name:        "pr_merge",
-		Description: "Merge a PR. Method: 'ff-only' (fast-forward, fails if diverged — use this) or 'merge' (always a merge commit). Returns the resulting base-ref tip.",
+		Description: "Merge a PR. method: ff-only (preferred) or merge.",
 	}, m.prMerge)
 
 	// ── reviews (code comments anchored to a file's line range on a branch) ──
 	addTool(m, srv, &sdk.Tool{
-		Name: "review_list",
-		Description: "List code-review comments anchored to file line-ranges on a branch. Scope by " +
-			"ref (branch; defaults to the repo default), by path, and by state (open|resolved|all). " +
-			"Each comment carries its file, line range, author, body, and the source snippet.",
+		Name:        "review_list",
+		Description: "List code-review comments. Filter by ref, path, state (open|resolved|all).",
 	}, m.reviewList)
 	addTool(m, srv, &sdk.Tool{
-		Name: "review_create",
-		Description: "Post a code-review comment anchored to PATH's line range (1-based, inclusive) on a " +
-			"branch REF. This is how a review agent records findings — no shell needed. The author and " +
-			"the ref's commit SHA are stamped server-side.",
+		Name:        "review_create",
+		Description: "Post a code-review comment on a file line-range (1-based, inclusive) on a branch.",
 	}, m.reviewCreate)
 	addTool(m, srv, &sdk.Tool{
 		Name:        "review_resolve",
@@ -238,31 +227,25 @@ func (m *mcpServer) newServer() *sdk.Server {
 	// ── pipelines (CI runs) ──────────────────────────────────────────────────
 	addTool(m, srv, &sdk.Tool{
 		Name: "pipeline_trigger",
-		Description: "Trigger a CI run for a ref (branch, tag, or commit SHA) without a push. Returns the " +
-			"queued run.",
+		Description: "Trigger a CI run for a ref (branch, tag, SHA).",
 	}, m.pipelineTrigger)
 	addTool(m, srv, &sdk.Tool{
 		Name: "pipeline_list",
-		Description: "List recent runs. Optionally cap with limit and filter by kind ('ci' or 'agent'). " +
-			"Returns each run's number, kind, ref, status, and timestamps.",
+		Description: "List runs. Filter by kind (ci|agent).",
 	}, m.pipelineList)
 	addTool(m, srv, &sdk.Tool{
 		Name:        "pipeline_get",
-		Description: "Get one run by number, including its jobs (and, for an agent run, its follow-up turns).",
+		Description: "Get one run with jobs and (for agent runs) follow-up turns.",
 	}, m.pipelineGet)
 
 	// ── agents ───────────────────────────────────────────────────────────────
 	addTool(m, srv, &sdk.Tool{
 		Name: "agent_spawn",
-		Description: "Spawn an agent run to work an issue in a container. Optionally pin the base ref " +
-			"(defaults to repo HEAD), pick the execution model (claude-edit|mooncake-agent; empty uses the " +
-			"server default), allow shell for the mooncake-agent model, and set the tool profile " +
-			"(full|review; review spawns a read-only review agent). Returns the queued run.",
+		Description: "Spawn an agent on an issue. Options: ref, model (claude-edit|mooncake-agent), allow_shell, tool_profile (full|review).",
 	}, m.agentSpawn)
 	addTool(m, srv, &sdk.Tool{
 		Name: "agent_turn",
-		Description: "Queue a follow-up message on an agent run that's awaiting input (or running — it " +
-			"queues behind the current turn). Addressed by run number.",
+		Description: "Queue a follow-up message on an agent run.",
 	}, m.agentTurn)
 
 	return srv
@@ -286,14 +269,14 @@ const (
 // ─── issues ──────────────────────────────────────────────────────────────────
 
 type issueListInput struct {
-	State    string `json:"state,omitempty" jsonschema:"comma-separated states to filter by (todo,in_progress,done,closed)"`
-	Assignee string `json:"assignee,omitempty" jsonschema:"filter by assignee; 'null' for unassigned"`
-	Label    string `json:"label,omitempty" jsonschema:"filter to issues that carry this exact label"`
-	Query    string `json:"query,omitempty" jsonschema:"keyword to match in title or body"`
-	Limit    int    `json:"limit,omitempty" jsonschema:"max results (default 100, max 1000)"`
-	Ready    bool   `json:"ready,omitempty" jsonschema:"only unclaimed todo leaves with all deps met"`
-	Blocked  bool   `json:"blocked,omitempty" jsonschema:"only todo leaves with at least one unmet dep"`
-	Epics    bool   `json:"epics,omitempty" jsonschema:"only issues that have children (umbrellas)"`
+	State    string `json:"state,omitempty" jsonschema:"todo,in_progress,done,closed"`
+	Assignee string `json:"assignee,omitempty" jsonschema:"null for unassigned"`
+	Label    string `json:"label,omitempty" jsonschema:"exact label match"`
+	Query    string `json:"query,omitempty" jsonschema:"keyword in title or body"`
+	Limit    int    `json:"limit,omitempty" jsonschema:"max results"`
+	Ready    bool   `json:"ready,omitempty" jsonschema:"unclaimed todos with deps met"`
+	Blocked  bool   `json:"blocked,omitempty" jsonschema:"todos with unmet deps"`
+	Epics    bool   `json:"epics,omitempty" jsonschema:"issues with children"`
 }
 
 // issueSummary is the slim per-item view returned by issue_list — no body or
@@ -394,9 +377,9 @@ func (m *mcpServer) issueShow(_ context.Context, _ *sdk.CallToolRequest, in issu
 }
 
 type issueCreateInput struct {
-	Title  string   `json:"title" jsonschema:"issue title (required)"`
-	Body   string   `json:"body,omitempty" jsonschema:"issue body (markdown)"`
-	Parent int      `json:"parent,omitempty" jsonschema:"parent issue number (makes this a child issue)"`
+	Title  string   `json:"title" jsonschema:"issue title"`
+	Body   string   `json:"body,omitempty" jsonschema:"markdown body"`
+	Parent int      `json:"parent,omitempty" jsonschema:"parent issue number"`
 	Labels []string `json:"labels,omitempty" jsonschema:"initial labels"`
 }
 
@@ -423,7 +406,7 @@ func (m *mcpServer) issueCreate(_ context.Context, _ *sdk.CallToolRequest, in is
 
 type issueCommentInput struct {
 	Number int    `json:"number" jsonschema:"the issue number"`
-	Body   string `json:"body" jsonschema:"comment text (required)"`
+	Body   string `json:"body" jsonschema:"comment text"`
 }
 
 type commentOutput struct {
@@ -449,7 +432,7 @@ func (m *mcpServer) issueComment(_ context.Context, _ *sdk.CallToolRequest, in i
 
 type issueClaimInput struct {
 	Number int    `json:"number" jsonschema:"the issue number"`
-	State  string `json:"state,omitempty" jsonschema:"optional state transition on claim (e.g. in_progress)"`
+	State  string `json:"state,omitempty" jsonschema:"e.g. in_progress"`
 }
 
 func (m *mcpServer) issueClaim(_ context.Context, _ *sdk.CallToolRequest, in issueClaimInput) (*sdk.CallToolResult, issueOutput, error) {
@@ -489,7 +472,7 @@ func (m *mcpServer) issueUnclaim(_ context.Context, _ *sdk.CallToolRequest, in i
 
 type issueSetStateInput struct {
 	Number int    `json:"number" jsonschema:"the issue number"`
-	State  string `json:"state" jsonschema:"new state: todo | in_progress | done | closed"`
+	State  string `json:"state" jsonschema:"todo|in_progress|done|closed"`
 }
 
 func (m *mcpServer) issueSetState(_ context.Context, _ *sdk.CallToolRequest, in issueSetStateInput) (*sdk.CallToolResult, issueOutput, error) {
@@ -509,11 +492,11 @@ func (m *mcpServer) issueSetState(_ context.Context, _ *sdk.CallToolRequest, in 
 }
 
 type issueUpdateInput struct {
-	Number int      `json:"number" jsonschema:"the issue number (required)"`
-	Title  *string  `json:"title,omitempty" jsonschema:"new title (omit to leave unchanged)"`
-	Body   *string  `json:"body,omitempty" jsonschema:"new body in markdown (omit to leave unchanged)"`
-	Labels []string `json:"labels,omitempty" jsonschema:"replace label set; empty array clears all labels; omit to leave unchanged"`
-	Parent *int     `json:"parent,omitempty" jsonschema:"parent issue number; 0 = clear parent; omit = no change"`
+	Number int      `json:"number" jsonschema:"issue number"`
+	Title  *string  `json:"title,omitempty" jsonschema:"new title"`
+	Body   *string  `json:"body,omitempty" jsonschema:"new body (markdown)"`
+	Labels []string `json:"labels,omitempty" jsonschema:"empty array clears; omit=no change"`
+	Parent *int     `json:"parent,omitempty" jsonschema:"0 clears parent; omit=no change"`
 }
 
 func (m *mcpServer) issueUpdate(_ context.Context, _ *sdk.CallToolRequest, in issueUpdateInput) (*sdk.CallToolResult, issueOutput, error) {
@@ -549,7 +532,7 @@ func (m *mcpServer) issueUpdate(_ context.Context, _ *sdk.CallToolRequest, in is
 // ─── PRs ─────────────────────────────────────────────────────────────────────
 
 type prListInput struct {
-	State string `json:"state,omitempty" jsonschema:"filter by state: open | merged | closed (default open)"`
+	State string `json:"state,omitempty" jsonschema:"open|merged|closed"`
 	Limit int    `json:"limit,omitempty" jsonschema:"max results"`
 }
 
@@ -600,9 +583,9 @@ func (m *mcpServer) prShow(_ context.Context, _ *sdk.CallToolRequest, in prShowI
 }
 
 type prCreateInput struct {
-	Title string `json:"title" jsonschema:"PR title (required)"`
-	Head  string `json:"head" jsonschema:"head branch to merge from (required)"`
-	Base  string `json:"base" jsonschema:"base branch to merge into (required)"`
+	Title string `json:"title" jsonschema:"PR title"`
+	Head  string `json:"head" jsonschema:"head branch"`
+	Base  string `json:"base" jsonschema:"base branch"`
 	Body  string `json:"body,omitempty" jsonschema:"PR description"`
 }
 
@@ -626,7 +609,7 @@ func (m *mcpServer) prCreate(_ context.Context, _ *sdk.CallToolRequest, in prCre
 
 type prMergeInput struct {
 	Number int    `json:"number" jsonschema:"the PR number"`
-	Method string `json:"method,omitempty" jsonschema:"merge method: ff-only (fast-forward, preferred) or merge (merge commit)"`
+	Method string `json:"method,omitempty" jsonschema:"ff-only|merge"`
 }
 
 type prMergeOutput struct {
@@ -654,9 +637,9 @@ func (m *mcpServer) prMerge(_ context.Context, _ *sdk.CallToolRequest, in prMerg
 // ─── reviews ─────────────────────────────────────────────────────────────────
 
 type reviewListInput struct {
-	Ref   string `json:"ref,omitempty" jsonschema:"branch to review (defaults to the repo's default branch)"`
-	Path  string `json:"path,omitempty" jsonschema:"scope to a single file path"`
-	State string `json:"state,omitempty" jsonschema:"open | resolved | all (default open)"`
+	Ref   string `json:"ref,omitempty" jsonschema:"branch (default: repo default)"`
+	Path  string `json:"path,omitempty" jsonschema:"file path filter"`
+	State string `json:"state,omitempty" jsonschema:"open|resolved|all"`
 }
 
 type reviewListOutput struct {
@@ -691,11 +674,11 @@ func (m *mcpServer) reviewList(_ context.Context, _ *sdk.CallToolRequest, in rev
 }
 
 type reviewCreateInput struct {
-	Path      string `json:"path" jsonschema:"file path to anchor the comment to (required)"`
-	StartLine int    `json:"start_line" jsonschema:"first line of the range, 1-based (required)"`
-	EndLine   int    `json:"end_line,omitempty" jsonschema:"last line of the range, 1-based inclusive (defaults to start_line)"`
-	Body      string `json:"body" jsonschema:"comment text (required)"`
-	Ref       string `json:"ref,omitempty" jsonschema:"branch to anchor on (defaults to the repo's default branch)"`
+	Path      string `json:"path" jsonschema:"file path"`
+	StartLine int    `json:"start_line" jsonschema:"1-based"`
+	EndLine   int    `json:"end_line,omitempty" jsonschema:"defaults to start_line"`
+	Body      string `json:"body" jsonschema:"comment text"`
+	Ref       string `json:"ref,omitempty" jsonschema:"defaults to repo default"`
 }
 
 type codeCommentOutput struct {
@@ -754,7 +737,7 @@ func (m *mcpServer) reviewSetResolved(resolved bool) sdk.ToolHandlerFor[reviewID
 // ─── pipelines ───────────────────────────────────────────────────────────────
 
 type pipelineTriggerInput struct {
-	Ref string `json:"ref" jsonschema:"branch, tag, or commit SHA to run (required)"`
+	Ref string `json:"ref" jsonschema:"branch, tag, or SHA"`
 }
 
 type runOutput struct {
@@ -777,7 +760,7 @@ func (m *mcpServer) pipelineTrigger(_ context.Context, _ *sdk.CallToolRequest, i
 
 type pipelineListInput struct {
 	Limit int    `json:"limit,omitempty" jsonschema:"max runs to return"`
-	Kind  string `json:"kind,omitempty" jsonschema:"filter by kind: 'ci' or 'agent'"`
+	Kind  string `json:"kind,omitempty" jsonschema:"ci|agent"`
 }
 
 type runListOutput struct {
@@ -829,11 +812,11 @@ func (m *mcpServer) pipelineGet(_ context.Context, _ *sdk.CallToolRequest, in pi
 // ─── agents ──────────────────────────────────────────────────────────────────
 
 type agentSpawnInput struct {
-	IssueNumber int    `json:"issue_number" jsonschema:"the issue the agent should work (required)"`
-	Ref         string `json:"ref,omitempty" jsonschema:"base ref to check out (defaults to repo HEAD)"`
-	Model       string `json:"model,omitempty" jsonschema:"execution model: claude-edit | mooncake-agent (empty uses the server default)"`
-	AllowShell  bool   `json:"allow_shell,omitempty" jsonschema:"for mooncake-agent, allow the plan to run shell/cmd actions"`
-	ToolProfile string `json:"tool_profile,omitempty" jsonschema:"mgit MCP toolset scope: full | review (empty defaults to full); review spawns a read-only review agent"`
+	IssueNumber int    `json:"issue_number" jsonschema:"issue number"`
+	Ref         string `json:"ref,omitempty" jsonschema:"defaults to repo HEAD"`
+	Model       string `json:"model,omitempty" jsonschema:"claude-edit|mooncake-agent"`
+	AllowShell  bool   `json:"allow_shell,omitempty" jsonschema:"mooncake-agent only"`
+	ToolProfile string `json:"tool_profile,omitempty" jsonschema:"full|review"`
 }
 
 func (m *mcpServer) agentSpawn(_ context.Context, _ *sdk.CallToolRequest, in agentSpawnInput) (*sdk.CallToolResult, runOutput, error) {
@@ -849,8 +832,8 @@ func (m *mcpServer) agentSpawn(_ context.Context, _ *sdk.CallToolRequest, in age
 }
 
 type agentTurnInput struct {
-	RunNumber int    `json:"run_number" jsonschema:"the agent run number to message (required)"`
-	Text      string `json:"text" jsonschema:"the follow-up message to the agent (required)"`
+	RunNumber int    `json:"run_number" jsonschema:"run number"`
+	Text      string `json:"text" jsonschema:"message text"`
 }
 
 type turnOutput struct {
