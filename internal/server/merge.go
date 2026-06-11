@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alehatsman/moongit/internal/api"
 	"github.com/alehatsman/moongit/internal/storage"
@@ -102,6 +103,9 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "failed to update PR state")
 			return
 		}
+		// Head reached base via a direct push that may not have hit the mirror;
+		// push the current base out so an external mirror stays in lockstep.
+		s.mirrorMergedBranch(repoDir, pr.BaseRef)
 		writeJSON(w, http.StatusOK, api.MergeResult{
 			PullRequest: updated,
 			MergeCommit: baseTip,
@@ -140,11 +144,70 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "merged refs but failed to update PR state")
 		return
 	}
+	// The merge moved the base ref directly in the bare repo (no git push), so
+	// push it out to the mirror remote, if configured, to keep an external
+	// mirror in sync. Best-effort and async — the merge already succeeded.
+	s.mirrorMergedBranch(repoDir, pr.BaseRef)
 	writeJSON(w, http.StatusOK, api.MergeResult{
 		PullRequest: updated,
 		MergeCommit: newTip,
 		FastForward: ff,
 	})
+}
+
+// mirrorMergedBranch best-effort pushes branch to the repo's "mirror" remote,
+// if one is configured. Server-side merges move refs with update-ref rather than
+// receive-pack, so without this an external mirror (e.g. GitHub) silently drifts
+// from the canonical server. Fire-and-forget with its own timeout: the server is
+// the source of truth and the mirror is eventual, so a mirror failure must never
+// fail or delay the merge. A no-op when the repo has no "mirror" remote, leaving
+// repos that haven't opted in untouched.
+//
+// The push is plain (never --force): if the mirror diverged (someone pushed
+// straight to it), the non-fast-forward push is rejected and logged rather than
+// clobbering external commits — reconcile by hand, the same fix a divergence
+// always needs.
+func (s *Server) mirrorMergedBranch(repoDir, branch string) {
+	if !hasMirrorRemote(repoDir) {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		if err := pushMirror(ctx, repoDir, branch); err != nil {
+			s.logger.Warn("mirror push failed", "repo", repoDir, "branch", branch, "err", err)
+			return
+		}
+		s.logger.Info("mirrored merged branch", "repo", repoDir, "branch", branch)
+	}()
+}
+
+// hasMirrorRemote reports whether the bare repo has a remote named "mirror" —
+// the opt-in signal for mirroring. Config lives in the repo's git config (set
+// with `git -C <repo> remote add mirror <url>`), so there's no moongit-side
+// schema or secret to manage. Any error (git missing, not a repo) reads as "no
+// mirror", so mirroring stays silent rather than noisy on a misconfigured repo.
+func hasMirrorRemote(repoDir string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := gitOutput(ctx, repoDir, "remote")
+	if err != nil {
+		return false
+	}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		if strings.TrimSpace(line) == "mirror" {
+			return true
+		}
+	}
+	return false
+}
+
+// pushMirror pushes branch to the "mirror" remote, base→base. Separated from the
+// async wrapper so it's directly testable against real bare repos.
+func pushMirror(ctx context.Context, repoDir, branch string) error {
+	refspec := "refs/heads/" + branch + ":refs/heads/" + branch
+	_, err := gitOutput(ctx, repoDir, "push", "mirror", refspec)
+	return err
 }
 
 // errNotFastForward / errBaseMoved are sentinels doMerge returns so the handler

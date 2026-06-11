@@ -54,6 +54,12 @@ conflict rules, not from access gates.
   resulting base tip — the same gate and run lifecycle as a pushed commit — and
   emits a merge event to the fleet feed, so a merge is built, tested, and visible
   like any other change to the branch.
+- WHERE the bare repo has a git remote named `mirror`, a successful merge also
+  pushes the updated base branch to it, so an external mirror (e.g. GitHub) tracks
+  the canonical server without a manual sync. The push is best-effort and
+  asynchronous — the server is the source of truth and a mirror failure never
+  fails or delays the merge — and plain (never forced), so a diverged mirror is
+  reported rather than clobbered. A repo with no `mirror` remote is unaffected.
 - WHEN a PR's head is not fast-forwardable onto base, a client can have the server
   rebase head onto base inside the bare repo (worktree-free), reporting conflicts
   the same way a merge does, so a linear history is produced without a local
@@ -96,5 +102,6 @@ conflict rules, not from access gates.
 - [x] Review comments anchored to a line range, with source snippets
 - [x] Author-only resolve/unresolve and delete; open/resolved/all listing
 - [ ] CI run + merge event enqueued on a server-side merge (#256)
+- [x] Merged base branch mirror-pushed to a configured `mirror` remote (best-effort, non-forced)
 - [ ] Server-side rebase of head onto base, worktree-free (#257)
 - [ ] Verified against the code by the verify workflow (flip to `living`)
