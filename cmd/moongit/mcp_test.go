@@ -222,6 +222,7 @@ func TestMCPProfileFilter(t *testing.T) {
 		"issue_list", "issue_show", "issue_comment",
 		"review_list", "review_create", "review_resolve", "review_reopen",
 		"pipeline_list", "pipeline_get",
+		"pr_list", "pr_show",
 	}
 	for _, w := range wantReview {
 		if !review[w] {
@@ -240,12 +241,12 @@ func TestMCPProfileFilter(t *testing.T) {
 		}
 	}
 
-	// "full" and the empty default expose everything (16 tools).
-	if got := len(listTools(t, profileFull)); got != 16 {
-		t.Errorf("full profile advertised %d tools, want 16", got)
+	// "full" and the empty default expose everything (21 tools).
+	if got := len(listTools(t, profileFull)); got != 21 {
+		t.Errorf("full profile advertised %d tools, want 21", got)
 	}
-	if got := len(listTools(t, "")); got != 16 {
-		t.Errorf("empty (default) profile advertised %d tools, want 16", got)
+	if got := len(listTools(t, "")); got != 21 {
+		t.Errorf("empty (default) profile advertised %d tools, want 21", got)
 	}
 }
 
@@ -281,7 +282,9 @@ func TestMCPRoundTrip(t *testing.T) {
 	}
 	want := []string{
 		"issue_list", "issue_show", "issue_create", "issue_comment", "issue_claim",
-		"issue_unclaim", "issue_set_state", "review_list", "review_create",
+		"issue_unclaim", "issue_set_state", "issue_update",
+		"pr_list", "pr_show", "pr_create", "pr_merge",
+		"review_list", "review_create",
 		"review_resolve", "review_reopen", "pipeline_trigger", "pipeline_list",
 		"pipeline_get", "agent_spawn", "agent_turn",
 	}

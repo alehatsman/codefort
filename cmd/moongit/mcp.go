@@ -75,6 +75,8 @@ var reviewProfileTools = map[string]bool{
 	"review_reopen":  true,
 	"pipeline_list":  true,
 	"pipeline_get":   true,
+	"pr_list":        true,
+	"pr_show":        true,
 }
 
 func validProfile(p string) bool { return p == profileFull || p == profileReview }
@@ -155,9 +157,11 @@ func (m *mcpServer) newServer() *sdk.Server {
 	// ── issues ──────────────────────────────────────────────────────────────
 	addTool(m, srv, &sdk.Tool{
 		Name: "issue_list",
-		Description: "List issues in the repo. Filter by state(s) (comma-separated: " +
-			"todo,in_progress,done,closed), by assignee ('null' for unassigned), or by a " +
-			"keyword in title/body. Survey this before claiming work.",
+		Description: "List issues in the repo. Returns a slim summary (no body) for token efficiency. " +
+			"Filter by state (comma-separated: todo,in_progress,done,closed), assignee ('null' for " +
+			"unassigned), label (exact), or keyword in title/body. Computed views: ready=true " +
+			"(unclaimed todo leaves with all deps met), blocked=true (todo leaves with unmet deps), " +
+			"epics=true (issues that have children). Survey this before claiming work.",
 	}, m.issueList)
 	addTool(m, srv, &sdk.Tool{
 		Name:        "issue_show",
@@ -184,6 +188,30 @@ func (m *mcpServer) newServer() *sdk.Server {
 		Name:        "issue_set_state",
 		Description: "Set an issue's state to one of: todo, in_progress, done, closed.",
 	}, m.issueSetState)
+	addTool(m, srv, &sdk.Tool{
+		Name: "issue_update",
+		Description: "Partially update an issue's title, body, labels, or parent. " +
+			"Only provided fields change; omit fields to leave them unchanged. " +
+			"To clear parent set parent=0; to clear labels provide an empty labels array.",
+	}, m.issueUpdate)
+
+	// ── PRs ──────────────────────────────────────────────────────────────────
+	addTool(m, srv, &sdk.Tool{
+		Name:        "pr_list",
+		Description: "List pull requests. Filter by state (open|merged|closed; default open).",
+	}, m.prList)
+	addTool(m, srv, &sdk.Tool{
+		Name:        "pr_show",
+		Description: "Show one PR (head/base refs, state, author, body) plus its head-vs-base diff and code-review comments.",
+	}, m.prShow)
+	addTool(m, srv, &sdk.Tool{
+		Name:        "pr_create",
+		Description: "Open a new pull request from head into base. Author is stamped from the token identity.",
+	}, m.prCreate)
+	addTool(m, srv, &sdk.Tool{
+		Name:        "pr_merge",
+		Description: "Merge a PR. Method: 'ff-only' (fast-forward, fails if diverged — use this) or 'merge' (always a merge commit). Returns the resulting base-ref tip.",
+	}, m.prMerge)
 
 	// ── reviews (code comments anchored to a file's line range on a branch) ──
 	addTool(m, srv, &sdk.Tool{
@@ -260,14 +288,30 @@ const (
 type issueListInput struct {
 	State    string `json:"state,omitempty" jsonschema:"comma-separated states to filter by (todo,in_progress,done,closed)"`
 	Assignee string `json:"assignee,omitempty" jsonschema:"filter by assignee; 'null' for unassigned"`
+	Label    string `json:"label,omitempty" jsonschema:"filter to issues that carry this exact label"`
 	Query    string `json:"query,omitempty" jsonschema:"keyword to match in title or body"`
 	Limit    int    `json:"limit,omitempty" jsonschema:"max results (default 100, max 1000)"`
+	Ready    bool   `json:"ready,omitempty" jsonschema:"only unclaimed todo leaves with all deps met"`
+	Blocked  bool   `json:"blocked,omitempty" jsonschema:"only todo leaves with at least one unmet dep"`
+	Epics    bool   `json:"epics,omitempty" jsonschema:"only issues that have children (umbrellas)"`
+}
+
+// issueSummary is the slim per-item view returned by issue_list — no body or
+// timestamps, so a full survey fits in a fraction of the tokens a full Issue list would.
+type issueSummary struct {
+	Number       int               `json:"number"`
+	Title        string            `json:"title"`
+	State        api.IssueState    `json:"state"`
+	Assignee     *string           `json:"assignee"`
+	Labels       []string          `json:"labels"`
+	ParentNumber *int              `json:"parent_number,omitempty"`
+	Progress     *api.EpicProgress `json:"progress,omitempty"`
 }
 
 type issueListOutput struct {
-	Status string      `json:"status"`
-	Error  string      `json:"error,omitempty"`
-	Issues []api.Issue `json:"issues,omitempty"`
+	Status string         `json:"status"`
+	Error  string         `json:"error,omitempty"`
+	Issues []issueSummary `json:"issues,omitempty"`
 }
 
 func (m *mcpServer) issueList(_ context.Context, _ *sdk.CallToolRequest, in issueListInput) (*sdk.CallToolResult, issueListOutput, error) {
@@ -278,11 +322,23 @@ func (m *mcpServer) issueList(_ context.Context, _ *sdk.CallToolRequest, in issu
 	if in.Assignee != "" {
 		q.Set("assignee", in.Assignee)
 	}
+	if in.Label != "" {
+		q.Set("label", in.Label)
+	}
 	if in.Query != "" {
 		q.Set("q", in.Query)
 	}
 	if in.Limit > 0 {
 		q.Set("limit", strconv.Itoa(in.Limit))
+	}
+	if in.Ready {
+		q.Set("ready", "true")
+	}
+	if in.Blocked {
+		q.Set("blocked", "true")
+	}
+	if in.Epics {
+		q.Set("epics", "true")
 	}
 	path := "/issues"
 	if len(q) > 0 {
@@ -292,7 +348,23 @@ func (m *mcpServer) issueList(_ context.Context, _ *sdk.CallToolRequest, in issu
 	if err := m.call(http.MethodGet, path, nil, http.StatusOK, &issues); err != nil {
 		return nil, issueListOutput{Status: statusError, Error: err.Error()}, nil
 	}
-	return nil, issueListOutput{Status: statusOK, Issues: issues}, nil
+	summaries := make([]issueSummary, len(issues))
+	for i, iss := range issues {
+		labels := iss.Labels
+		if labels == nil {
+			labels = []string{}
+		}
+		summaries[i] = issueSummary{
+			Number:       iss.Number,
+			Title:        iss.Title,
+			State:        iss.State,
+			Assignee:     iss.Assignee,
+			Labels:       labels,
+			ParentNumber: iss.ParentNumber,
+			Progress:     iss.Progress,
+		}
+	}
+	return nil, issueListOutput{Status: statusOK, Issues: summaries}, nil
 }
 
 type issueShowInput struct {
@@ -322,8 +394,10 @@ func (m *mcpServer) issueShow(_ context.Context, _ *sdk.CallToolRequest, in issu
 }
 
 type issueCreateInput struct {
-	Title string `json:"title" jsonschema:"issue title (required)"`
-	Body  string `json:"body,omitempty" jsonschema:"issue body (markdown)"`
+	Title  string   `json:"title" jsonschema:"issue title (required)"`
+	Body   string   `json:"body,omitempty" jsonschema:"issue body (markdown)"`
+	Parent int      `json:"parent,omitempty" jsonschema:"parent issue number (makes this a child issue)"`
+	Labels []string `json:"labels,omitempty" jsonschema:"initial labels"`
 }
 
 type issueOutput struct {
@@ -337,7 +411,10 @@ func (m *mcpServer) issueCreate(_ context.Context, _ *sdk.CallToolRequest, in is
 		return nil, issueOutput{Status: statusError, Error: "title is required"}, nil
 	}
 	var iss api.Issue
-	req := api.CreateIssueRequest{Title: in.Title, Body: in.Body}
+	req := api.CreateIssueRequest{Title: in.Title, Body: in.Body, Labels: in.Labels}
+	if in.Parent > 0 {
+		req.Parent = &in.Parent
+	}
 	if err := m.call(http.MethodPost, "/issues", req, http.StatusCreated, &iss); err != nil {
 		return nil, issueOutput{Status: statusError, Error: err.Error()}, nil
 	}
@@ -429,6 +506,149 @@ func (m *mcpServer) issueSetState(_ context.Context, _ *sdk.CallToolRequest, in 
 		return nil, issueOutput{Status: statusError, Error: err.Error()}, nil
 	}
 	return nil, issueOutput{Status: statusOK, Issue: &iss}, nil
+}
+
+type issueUpdateInput struct {
+	Number int      `json:"number" jsonschema:"the issue number (required)"`
+	Title  *string  `json:"title,omitempty" jsonschema:"new title (omit to leave unchanged)"`
+	Body   *string  `json:"body,omitempty" jsonschema:"new body in markdown (omit to leave unchanged)"`
+	Labels []string `json:"labels,omitempty" jsonschema:"replace label set; empty array clears all labels; omit to leave unchanged"`
+	Parent *int     `json:"parent,omitempty" jsonschema:"parent issue number; 0 = clear parent; omit = no change"`
+}
+
+func (m *mcpServer) issueUpdate(_ context.Context, _ *sdk.CallToolRequest, in issueUpdateInput) (*sdk.CallToolResult, issueOutput, error) {
+	if in.Number <= 0 {
+		return nil, issueOutput{Status: statusError, Error: "number must be a positive issue number"}, nil
+	}
+	req := api.UpdateIssueRequest{}
+	if in.Title != nil {
+		if *in.Title == "" {
+			return nil, issueOutput{Status: statusError, Error: "title cannot be empty"}, nil
+		}
+		req.Title = in.Title
+	}
+	if in.Body != nil {
+		req.Body = in.Body
+	}
+	if in.Labels != nil {
+		req.Labels = &in.Labels
+	}
+	if in.Parent != nil {
+		req.Parent = in.Parent
+	}
+	if req.Title == nil && req.Body == nil && req.Labels == nil && req.Parent == nil {
+		return nil, issueOutput{Status: statusError, Error: "at least one field (title, body, labels, parent) must be provided"}, nil
+	}
+	var iss api.Issue
+	if err := m.call(http.MethodPatch, fmt.Sprintf("/issues/%d", in.Number), req, http.StatusOK, &iss); err != nil {
+		return nil, issueOutput{Status: statusError, Error: err.Error()}, nil
+	}
+	return nil, issueOutput{Status: statusOK, Issue: &iss}, nil
+}
+
+// ─── PRs ─────────────────────────────────────────────────────────────────────
+
+type prListInput struct {
+	State string `json:"state,omitempty" jsonschema:"filter by state: open | merged | closed (default open)"`
+	Limit int    `json:"limit,omitempty" jsonschema:"max results"`
+}
+
+type prListOutput struct {
+	Status string             `json:"status"`
+	Error  string             `json:"error,omitempty"`
+	PRs    []api.PullRequest  `json:"prs,omitempty"`
+}
+
+func (m *mcpServer) prList(_ context.Context, _ *sdk.CallToolRequest, in prListInput) (*sdk.CallToolResult, prListOutput, error) {
+	q := url.Values{}
+	if in.State != "" {
+		q.Set("state", in.State)
+	}
+	if in.Limit > 0 {
+		q.Set("limit", strconv.Itoa(in.Limit))
+	}
+	path := "/pulls"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	var prs []api.PullRequest
+	if err := m.call(http.MethodGet, path, nil, http.StatusOK, &prs); err != nil {
+		return nil, prListOutput{Status: statusError, Error: err.Error()}, nil
+	}
+	return nil, prListOutput{Status: statusOK, PRs: prs}, nil
+}
+
+type prShowInput struct {
+	Number int `json:"number" jsonschema:"the PR number"`
+}
+
+type prDetailOutput struct {
+	Status string                 `json:"status"`
+	Error  string                 `json:"error,omitempty"`
+	PR     *api.PullRequestDetail `json:"pr,omitempty"`
+}
+
+func (m *mcpServer) prShow(_ context.Context, _ *sdk.CallToolRequest, in prShowInput) (*sdk.CallToolResult, prDetailOutput, error) {
+	if in.Number <= 0 {
+		return nil, prDetailOutput{Status: statusError, Error: "number must be a positive PR number"}, nil
+	}
+	var pr api.PullRequestDetail
+	if err := m.call(http.MethodGet, fmt.Sprintf("/pulls/%d", in.Number), nil, http.StatusOK, &pr); err != nil {
+		return nil, prDetailOutput{Status: statusError, Error: err.Error()}, nil
+	}
+	return nil, prDetailOutput{Status: statusOK, PR: &pr}, nil
+}
+
+type prCreateInput struct {
+	Title string `json:"title" jsonschema:"PR title (required)"`
+	Head  string `json:"head" jsonschema:"head branch to merge from (required)"`
+	Base  string `json:"base" jsonschema:"base branch to merge into (required)"`
+	Body  string `json:"body,omitempty" jsonschema:"PR description"`
+}
+
+type prOutput struct {
+	Status string            `json:"status"`
+	Error  string            `json:"error,omitempty"`
+	PR     *api.PullRequest  `json:"pr,omitempty"`
+}
+
+func (m *mcpServer) prCreate(_ context.Context, _ *sdk.CallToolRequest, in prCreateInput) (*sdk.CallToolResult, prOutput, error) {
+	if in.Title == "" || in.Head == "" || in.Base == "" {
+		return nil, prOutput{Status: statusError, Error: "title, head, and base are required"}, nil
+	}
+	var pr api.PullRequest
+	req := api.CreatePullRequest{Title: in.Title, Head: in.Head, Base: in.Base, Body: in.Body}
+	if err := m.call(http.MethodPost, "/pulls", req, http.StatusCreated, &pr); err != nil {
+		return nil, prOutput{Status: statusError, Error: err.Error()}, nil
+	}
+	return nil, prOutput{Status: statusOK, PR: &pr}, nil
+}
+
+type prMergeInput struct {
+	Number int    `json:"number" jsonschema:"the PR number"`
+	Method string `json:"method,omitempty" jsonschema:"merge method: ff-only (fast-forward, preferred) or merge (merge commit)"`
+}
+
+type prMergeOutput struct {
+	Status string            `json:"status"`
+	Error  string            `json:"error,omitempty"`
+	Result *api.MergeResult  `json:"result,omitempty"`
+}
+
+func (m *mcpServer) prMerge(_ context.Context, _ *sdk.CallToolRequest, in prMergeInput) (*sdk.CallToolResult, prMergeOutput, error) {
+	if in.Number <= 0 {
+		return nil, prMergeOutput{Status: statusError, Error: "number must be a positive PR number"}, nil
+	}
+	method := api.MergeMethod(in.Method)
+	if in.Method != "" && !method.Valid() {
+		return nil, prMergeOutput{Status: statusError, Error: fmt.Sprintf("invalid method %q (want merge or ff-only)", in.Method)}, nil
+	}
+	var result api.MergeResult
+	req := api.MergeRequest{Method: method}
+	if err := m.call(http.MethodPost, fmt.Sprintf("/pulls/%d/merge", in.Number), req, http.StatusOK, &result); err != nil {
+		return nil, prMergeOutput{Status: statusError, Error: err.Error()}, nil
+	}
+	return nil, prMergeOutput{Status: statusOK, Result: &result}, nil
 }
 
 // ─── reviews ─────────────────────────────────────────────────────────────────
