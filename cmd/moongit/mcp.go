@@ -311,9 +311,11 @@ func (m *mcpServer) issueList(_ context.Context, _ *sdk.CallToolRequest, in issu
 	if in.Query != "" {
 		q.Set("q", in.Query)
 	}
-	if in.Limit > 0 {
-		q.Set("limit", strconv.Itoa(in.Limit))
+	limit := in.Limit
+	if limit == 0 {
+		limit = 20
 	}
+	q.Set("limit", strconv.Itoa(limit))
 	if in.Ready {
 		q.Set("ready", "true")
 	}
@@ -354,11 +356,94 @@ type issueShowInput struct {
 	Number int `json:"number" jsonschema:"the issue number"`
 }
 
+// mcpIssue strips internal fields (ID, timestamps) that add noise without aiding reasoning.
+type mcpIssue struct {
+	Number       int                     `json:"number"`
+	Title        string                  `json:"title"`
+	Body         string                  `json:"body,omitempty"`
+	Author       string                  `json:"author"`
+	State        api.IssueState          `json:"state"`
+	Assignee     *string                 `json:"assignee"`
+	ParentNumber *int                    `json:"parent_number,omitempty"`
+	Children     []api.ChildIssueSummary `json:"children,omitempty"`
+	DependsOn    []api.IssueRef          `json:"depends_on,omitempty"`
+	Blocks       []api.IssueRef          `json:"blocks,omitempty"`
+	Progress     *api.EpicProgress       `json:"progress,omitempty"`
+	Labels       []string                `json:"labels"`
+}
+
+func toMCPIssue(iss *api.Issue) *mcpIssue {
+	if iss == nil {
+		return nil
+	}
+	labels := iss.Labels
+	if labels == nil {
+		labels = []string{}
+	}
+	return &mcpIssue{
+		Number:       iss.Number,
+		Title:        iss.Title,
+		Body:         iss.Body,
+		Author:       iss.Author,
+		State:        iss.State,
+		Assignee:     iss.Assignee,
+		ParentNumber: iss.ParentNumber,
+		Children:     iss.Children,
+		DependsOn:    iss.DependsOn,
+		Blocks:       iss.Blocks,
+		Progress:     iss.Progress,
+		Labels:       labels,
+	}
+}
+
+// mcpComment strips ID, IssueID, and CreatedAt.
+type mcpComment struct {
+	Author string `json:"author"`
+	Body   string `json:"body"`
+}
+
+// mcpCIRun strips timestamps and internal fields (MooncakeAllowShell, CommitAuthor).
+type mcpCIRun struct {
+	Number         int    `json:"number"`
+	Kind           string `json:"kind"`
+	IssueNumber    *int   `json:"issue_number,omitempty"`
+	ExecutionModel string `json:"execution_model,omitempty"`
+	ToolProfile    string `json:"tool_profile,omitempty"`
+	CommitSHA      string `json:"commit_sha"`
+	CommitMsg      string `json:"commit_msg,omitempty"`
+	Ref            string `json:"ref"`
+	Event          string `json:"event"`
+	Trigger        string `json:"trigger,omitempty"`
+	Status         string `json:"status"`
+}
+
+func toMCPCIRun(r *api.CIRun) mcpCIRun {
+	return mcpCIRun{
+		Number:         r.Number,
+		Kind:           r.Kind,
+		IssueNumber:    r.IssueNumber,
+		ExecutionModel: r.ExecutionModel,
+		ToolProfile:    r.ToolProfile,
+		CommitSHA:      r.CommitSHA,
+		CommitMsg:      r.CommitMsg,
+		Ref:            r.Ref,
+		Event:          r.Event,
+		Trigger:        r.Trigger,
+		Status:         r.Status,
+	}
+}
+
+type mcpCIRunDetail struct {
+	mcpCIRun
+	Jobs  []api.CIJob     `json:"jobs"`
+	Turns []api.AgentTurn `json:"turns,omitempty"`
+}
+
 type issueShowOutput struct {
-	Status   string        `json:"status"`
-	Error    string        `json:"error,omitempty"`
-	Issue    *api.Issue    `json:"issue,omitempty"`
-	Comments []api.Comment `json:"comments,omitempty"`
+	Status   string       `json:"status"`
+	Error    string       `json:"error,omitempty"`
+	Issue    *mcpIssue    `json:"issue,omitempty"`
+	Comments []mcpComment `json:"comments,omitempty"`
 }
 
 func (m *mcpServer) issueShow(_ context.Context, _ *sdk.CallToolRequest, in issueShowInput) (*sdk.CallToolResult, issueShowOutput, error) {
@@ -371,9 +456,13 @@ func (m *mcpServer) issueShow(_ context.Context, _ *sdk.CallToolRequest, in issu
 	}
 	// Comments are best-effort: an issue with none, or a transient comments
 	// fetch error, shouldn't fail the show.
-	var comments []api.Comment
-	_ = m.call(http.MethodGet, fmt.Sprintf("/issues/%d/comments", in.Number), nil, http.StatusOK, &comments)
-	return nil, issueShowOutput{Status: statusOK, Issue: &iss, Comments: comments}, nil
+	var rawComments []api.Comment
+	_ = m.call(http.MethodGet, fmt.Sprintf("/issues/%d/comments", in.Number), nil, http.StatusOK, &rawComments)
+	comments := make([]mcpComment, len(rawComments))
+	for i, c := range rawComments {
+		comments[i] = mcpComment{Author: c.Author, Body: c.Body}
+	}
+	return nil, issueShowOutput{Status: statusOK, Issue: toMCPIssue(&iss), Comments: comments}, nil
 }
 
 type issueCreateInput struct {
@@ -384,9 +473,9 @@ type issueCreateInput struct {
 }
 
 type issueOutput struct {
-	Status string     `json:"status"`
-	Error  string     `json:"error,omitempty"`
-	Issue  *api.Issue `json:"issue,omitempty"`
+	Status string    `json:"status"`
+	Error  string    `json:"error,omitempty"`
+	Issue  *mcpIssue `json:"issue,omitempty"`
 }
 
 func (m *mcpServer) issueCreate(_ context.Context, _ *sdk.CallToolRequest, in issueCreateInput) (*sdk.CallToolResult, issueOutput, error) {
@@ -401,7 +490,7 @@ func (m *mcpServer) issueCreate(_ context.Context, _ *sdk.CallToolRequest, in is
 	if err := m.call(http.MethodPost, "/issues", req, http.StatusCreated, &iss); err != nil {
 		return nil, issueOutput{Status: statusError, Error: err.Error()}, nil
 	}
-	return nil, issueOutput{Status: statusOK, Issue: &iss}, nil
+	return nil, issueOutput{Status: statusOK, Issue: toMCPIssue(&iss)}, nil
 }
 
 type issueCommentInput struct {
@@ -410,9 +499,9 @@ type issueCommentInput struct {
 }
 
 type commentOutput struct {
-	Status  string       `json:"status"`
-	Error   string       `json:"error,omitempty"`
-	Comment *api.Comment `json:"comment,omitempty"`
+	Status  string      `json:"status"`
+	Error   string      `json:"error,omitempty"`
+	Comment *mcpComment `json:"comment,omitempty"`
 }
 
 func (m *mcpServer) issueComment(_ context.Context, _ *sdk.CallToolRequest, in issueCommentInput) (*sdk.CallToolResult, commentOutput, error) {
@@ -427,7 +516,8 @@ func (m *mcpServer) issueComment(_ context.Context, _ *sdk.CallToolRequest, in i
 	if err := m.call(http.MethodPost, fmt.Sprintf("/issues/%d/comments", in.Number), req, http.StatusCreated, &c); err != nil {
 		return nil, commentOutput{Status: statusError, Error: err.Error()}, nil
 	}
-	return nil, commentOutput{Status: statusOK, Comment: &c}, nil
+	mc := mcpComment{Author: c.Author, Body: c.Body}
+	return nil, commentOutput{Status: statusOK, Comment: &mc}, nil
 }
 
 type issueClaimInput struct {
@@ -448,7 +538,7 @@ func (m *mcpServer) issueClaim(_ context.Context, _ *sdk.CallToolRequest, in iss
 	if err := m.call(http.MethodPost, fmt.Sprintf("/issues/%d/claim", in.Number), req, http.StatusOK, &iss); err != nil {
 		return nil, issueOutput{Status: statusError, Error: err.Error()}, nil
 	}
-	return nil, issueOutput{Status: statusOK, Issue: &iss}, nil
+	return nil, issueOutput{Status: statusOK, Issue: toMCPIssue(&iss)}, nil
 }
 
 type issueNumberInput struct {
@@ -488,7 +578,7 @@ func (m *mcpServer) issueSetState(_ context.Context, _ *sdk.CallToolRequest, in 
 	if err := m.call(http.MethodPatch, fmt.Sprintf("/issues/%d", in.Number), req, http.StatusOK, &iss); err != nil {
 		return nil, issueOutput{Status: statusError, Error: err.Error()}, nil
 	}
-	return nil, issueOutput{Status: statusOK, Issue: &iss}, nil
+	return nil, issueOutput{Status: statusOK, Issue: toMCPIssue(&iss)}, nil
 }
 
 type issueUpdateInput struct {
@@ -526,7 +616,7 @@ func (m *mcpServer) issueUpdate(_ context.Context, _ *sdk.CallToolRequest, in is
 	if err := m.call(http.MethodPatch, fmt.Sprintf("/issues/%d", in.Number), req, http.StatusOK, &iss); err != nil {
 		return nil, issueOutput{Status: statusError, Error: err.Error()}, nil
 	}
-	return nil, issueOutput{Status: statusOK, Issue: &iss}, nil
+	return nil, issueOutput{Status: statusOK, Issue: toMCPIssue(&iss)}, nil
 }
 
 // ─── PRs ─────────────────────────────────────────────────────────────────────
@@ -562,13 +652,31 @@ func (m *mcpServer) prList(_ context.Context, _ *sdk.CallToolRequest, in prListI
 }
 
 type prShowInput struct {
-	Number int `json:"number" jsonschema:"the PR number"`
+	Number       int  `json:"number" jsonschema:"the PR number"`
+	NoDiff       bool `json:"no_diff,omitempty" jsonschema:"omit the file diff entirely"`
+	MaxDiffLines int  `json:"max_diff_lines,omitempty" jsonschema:"cap total diff lines across all files (default 300)"`
 }
 
 type prDetailOutput struct {
 	Status string                 `json:"status"`
 	Error  string                 `json:"error,omitempty"`
 	PR     *api.PullRequestDetail `json:"pr,omitempty"`
+}
+
+// truncateDiff drops whole files from c.Files once total hunk lines exceed maxLines.
+func truncateDiff(c *api.Compare, maxLines int) {
+	total := 0
+	for i := range c.Files {
+		fileLines := 0
+		for j := range c.Files[i].Hunks {
+			fileLines += len(c.Files[i].Hunks[j].Lines)
+		}
+		if total+fileLines > maxLines {
+			c.Files = c.Files[:i]
+			return
+		}
+		total += fileLines
+	}
 }
 
 func (m *mcpServer) prShow(_ context.Context, _ *sdk.CallToolRequest, in prShowInput) (*sdk.CallToolResult, prDetailOutput, error) {
@@ -578,6 +686,15 @@ func (m *mcpServer) prShow(_ context.Context, _ *sdk.CallToolRequest, in prShowI
 	var pr api.PullRequestDetail
 	if err := m.call(http.MethodGet, fmt.Sprintf("/pulls/%d", in.Number), nil, http.StatusOK, &pr); err != nil {
 		return nil, prDetailOutput{Status: statusError, Error: err.Error()}, nil
+	}
+	if in.NoDiff {
+		pr.Compare.Files = nil
+	} else {
+		maxLines := in.MaxDiffLines
+		if maxLines == 0 {
+			maxLines = 300
+		}
+		truncateDiff(&pr.Compare, maxLines)
 	}
 	return nil, prDetailOutput{Status: statusOK, PR: &pr}, nil
 }
@@ -743,7 +860,7 @@ type pipelineTriggerInput struct {
 type runOutput struct {
 	Status string     `json:"status"`
 	Error  string     `json:"error,omitempty"`
-	Run    *api.CIRun `json:"run,omitempty"`
+	Run    *mcpCIRun  `json:"run,omitempty"`
 }
 
 func (m *mcpServer) pipelineTrigger(_ context.Context, _ *sdk.CallToolRequest, in pipelineTriggerInput) (*sdk.CallToolResult, runOutput, error) {
@@ -755,7 +872,8 @@ func (m *mcpServer) pipelineTrigger(_ context.Context, _ *sdk.CallToolRequest, i
 	if err := m.call(http.MethodPost, "/runs", req, http.StatusAccepted, &run); err != nil {
 		return nil, runOutput{Status: statusError, Error: err.Error()}, nil
 	}
-	return nil, runOutput{Status: statusOK, Run: &run}, nil
+	r := toMCPCIRun(&run)
+	return nil, runOutput{Status: statusOK, Run: &r}, nil
 }
 
 type pipelineListInput struct {
@@ -764,9 +882,9 @@ type pipelineListInput struct {
 }
 
 type runListOutput struct {
-	Status string      `json:"status"`
-	Error  string      `json:"error,omitempty"`
-	Runs   []api.CIRun `json:"runs,omitempty"`
+	Status string     `json:"status"`
+	Error  string     `json:"error,omitempty"`
+	Runs   []mcpCIRun `json:"runs,omitempty"`
 }
 
 func (m *mcpServer) pipelineList(_ context.Context, _ *sdk.CallToolRequest, in pipelineListInput) (*sdk.CallToolResult, runListOutput, error) {
@@ -781,21 +899,26 @@ func (m *mcpServer) pipelineList(_ context.Context, _ *sdk.CallToolRequest, in p
 	if len(q) > 0 {
 		path += "?" + q.Encode()
 	}
-	var runs []api.CIRun
-	if err := m.call(http.MethodGet, path, nil, http.StatusOK, &runs); err != nil {
+	var apiRuns []api.CIRun
+	if err := m.call(http.MethodGet, path, nil, http.StatusOK, &apiRuns); err != nil {
 		return nil, runListOutput{Status: statusError, Error: err.Error()}, nil
 	}
-	return nil, runListOutput{Status: statusOK, Runs: runs}, nil
+	slim := make([]mcpCIRun, len(apiRuns))
+	for i := range apiRuns {
+		slim[i] = toMCPCIRun(&apiRuns[i])
+	}
+	return nil, runListOutput{Status: statusOK, Runs: slim}, nil
 }
 
 type pipelineGetInput struct {
-	Number int `json:"number" jsonschema:"the run number"`
+	Number    int `json:"number" jsonschema:"the run number"`
+	LastTurns int `json:"last_turns,omitempty" jsonschema:"cap agent turns returned (default 5; 0=default)"`
 }
 
 type runDetailOutput struct {
-	Status string           `json:"status"`
-	Error  string           `json:"error,omitempty"`
-	Run    *api.CIRunDetail `json:"run,omitempty"`
+	Status string          `json:"status"`
+	Error  string          `json:"error,omitempty"`
+	Run    *mcpCIRunDetail `json:"run,omitempty"`
 }
 
 func (m *mcpServer) pipelineGet(_ context.Context, _ *sdk.CallToolRequest, in pipelineGetInput) (*sdk.CallToolResult, runDetailOutput, error) {
@@ -806,7 +929,20 @@ func (m *mcpServer) pipelineGet(_ context.Context, _ *sdk.CallToolRequest, in pi
 	if err := m.call(http.MethodGet, fmt.Sprintf("/runs/%d", in.Number), nil, http.StatusOK, &detail); err != nil {
 		return nil, runDetailOutput{Status: statusError, Error: err.Error()}, nil
 	}
-	return nil, runDetailOutput{Status: statusOK, Run: &detail}, nil
+	lastTurns := in.LastTurns
+	if lastTurns == 0 {
+		lastTurns = 5
+	}
+	turns := detail.Turns
+	if len(turns) > lastTurns {
+		turns = turns[len(turns)-lastTurns:]
+	}
+	run := &mcpCIRunDetail{
+		mcpCIRun: toMCPCIRun(&detail.CIRun),
+		Jobs:     detail.Jobs,
+		Turns:    turns,
+	}
+	return nil, runDetailOutput{Status: statusOK, Run: run}, nil
 }
 
 // ─── agents ──────────────────────────────────────────────────────────────────
@@ -828,7 +964,8 @@ func (m *mcpServer) agentSpawn(_ context.Context, _ *sdk.CallToolRequest, in age
 	if err := m.call(http.MethodPost, fmt.Sprintf("/issues/%d/agent", in.IssueNumber), req, http.StatusAccepted, &run); err != nil {
 		return nil, runOutput{Status: statusError, Error: err.Error()}, nil
 	}
-	return nil, runOutput{Status: statusOK, Run: &run}, nil
+	r := toMCPCIRun(&run)
+	return nil, runOutput{Status: statusOK, Run: &r}, nil
 }
 
 type agentTurnInput struct {
