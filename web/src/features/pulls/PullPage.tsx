@@ -2,13 +2,13 @@ import { lazy, Suspense, useMemo } from "react"
 import "./pulls.css"
 import { Link, useParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
-import { useCreateCodeComment, useMergePull, useUpdatePull } from "@/api/mutations"
-import { useCommitCIStatus, usePull } from "@/api/queries"
-import type { MergeConflictResponse } from "@/api/types"
+import { useCreateCodeComment, useMergePull, useSubmitReview, useUpdatePull } from "@/api/mutations"
+import { useCommitCIStatus, usePull, useWhoami } from "@/api/queries"
+import type { MergeConflictResponse, PRReview } from "@/api/types"
 import CommitCIStatus from "@/features/commits/CommitCIStatus"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
-import { Button, DetailLayout, EmptyState, ErrorMessage, SidebarSection, SkeletonText, useToast } from "@/ui"
+import { Avatar, Badge, Button, DetailLayout, EmptyState, ErrorMessage, SidebarSection, SkeletonText, useToast } from "@/ui"
 
 const Markdown = lazy(() => import("@/shell/Markdown"))
 
@@ -40,13 +40,15 @@ function parseClosingRefs(text: string): number[] {
 }
 
 export default function PullPage() {
-  const { owner = "", repo = "", number = "" } = useParams()
-  const n = Number(number)
+  const { owner = "", repo = "", num = "" } = useParams()
+  const n = Number(num)
 
   const pullQ = usePull(owner, repo, n)
   const mergePull = useMergePull(owner, repo, n)
   const updatePull = useUpdatePull(owner, repo, n)
   const createComment = useCreateCodeComment(owner, repo)
+  const submitReview = useSubmitReview(owner, repo, n)
+  const whoami = useWhoami()
   const ciStatusQ = useCommitCIStatus(owner, repo)
   const toast = useToast()
   const pr = pullQ.data
@@ -55,6 +57,7 @@ export default function PullPage() {
     () => parseClosingRefs((pr?.title ?? "") + " " + (pr?.body ?? "")),
     [pr?.title, pr?.body],
   )
+  const myReview = pr?.reviews?.find((rv) => rv.author === whoami.data?.name)
   const conflicts = conflictsFrom(mergePull.error)
   const notFastForwardable = isNotFastForwardable(mergePull.error)
 
@@ -81,19 +84,32 @@ export default function PullPage() {
       ) : pullQ.error ? (
         <ErrorMessage error={pullQ.error} />
       ) : !pr ? (
-        <EmptyState>Pull request not found.</EmptyState>
+        <EmptyState>Pull req not found.</EmptyState>
       ) : (
         <DetailLayout
           sidebar={
-            closingRefs.length > 0 ? (
-              <SidebarSection label="Closes">
-                {closingRefs.map((n) => (
-                  <Link key={n} to={`/${owner}/${repo}/issues/${n}`} className="muted small">
-                    #{n}
-                  </Link>
-                ))}
-              </SidebarSection>
-            ) : undefined
+            <>
+              <ReviewSidebar
+                reviews={pr.reviews ?? []}
+                myReview={myReview}
+                isOpen={pr.state === "open"}
+                onReview={(state) =>
+                  submitReview.mutate(state, {
+                    onSuccess: () => toast(state === "approved" ? "Approved" : "Changes requested"),
+                  })
+                }
+                isPending={submitReview.isPending}
+              />
+              {closingRefs.length > 0 && (
+                <SidebarSection label="Closes">
+                  {closingRefs.map((ref) => (
+                    <Link key={ref} to={`/${owner}/${repo}/issues/${ref}`} className="muted small">
+                      #{ref}
+                    </Link>
+                  ))}
+                </SidebarSection>
+              )}
+            </>
           }
         >
           <header className="pull-head">
@@ -108,15 +124,13 @@ export default function PullPage() {
               {" · opened by "}
               {pr.author} on {new Date(pr.created_at).toLocaleDateString()}
               {pr.merged_at && <> · merged {new Date(pr.merged_at).toLocaleDateString()}</>}
-          {headRun && <CommitCIStatus owner={owner} repo={repo} run={headRun} />}
+              {headRun && <CommitCIStatus owner={owner} repo={repo} run={headRun} />}
             </div>
-            {pr.body && (
-              <div className="pull-head__body">
-                <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
-                  <Markdown content={pr.body} owner={owner} repo={repo} basePath="" />
-                </Suspense>
-              </div>
-            )}
+            <div className="pull-head__body">
+              <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
+                <Markdown content={pr.body} owner={owner} repo={repo} basePath="" />
+              </Suspense>
+            </div>
           </header>
 
           {pr.state === "open" && (
@@ -130,8 +144,8 @@ export default function PullPage() {
                     mergePull.mutate(
                       { method: "ff-only" },
                       {
-                        onSuccess: () => toast(`Pull request #${n} merged`, { variant: "success" }),
-                      }
+                        onSuccess: () => toast(`Pull req #${n} merged`, { variant: "success" }),
+                      },
                     )
                   }
                 >
@@ -145,8 +159,8 @@ export default function PullPage() {
                         { method: "merge" },
                         {
                           onSuccess: () =>
-                            toast(`Pull request #${n} merged`, { variant: "success" }),
-                        }
+                            toast(`Pull req #${n} merged`, { variant: "success" }),
+                        },
                       )
                     }
                   >
@@ -203,5 +217,56 @@ export default function PullPage() {
         </DetailLayout>
       )}
     </div>
+  )
+}
+
+function ReviewSidebar({
+  reviews,
+  myReview,
+  isOpen,
+  onReview,
+  isPending,
+}: {
+  reviews: PRReview[]
+  myReview?: PRReview
+  isOpen: boolean
+  onReview: (state: import("@/api/types").PRReviewState) => void
+  isPending: boolean
+}) {
+  return (
+    <SidebarSection label="Reviewers">
+      {reviews.length === 0 && <span className="muted small">No reviews yet</span>}
+      <ul className="review-list review-list--compact">
+        {reviews.map((rv) => (
+          <li key={rv.id} className="review-row review-row--compact">
+            <Avatar name={rv.author} />
+            <span className="review-row__author">{rv.author}</span>
+            <Badge state={rv.state === "approved" ? "done" : "in_progress"}>
+              {rv.state === "approved" ? "approved" : "changes requested"}
+            </Badge>
+          </li>
+        ))}
+      </ul>
+      {isOpen && (
+        <div className="review-actions">
+          <Button
+            variant={myReview?.state === "approved" ? "primary" : "ghost"}
+            size="small"
+            disabled={isPending}
+            onClick={() => onReview("approved")}
+          >
+            {myReview?.state === "approved" ? "✓ Approved" : "Approve"}
+          </Button>
+          <Button
+            variant={myReview?.state === "changes_requested" ? "danger" : "ghost"}
+            size="small"
+            disabled={isPending}
+            onClick={() => onReview("changes_requested")}
+          >
+            {myReview?.state === "changes_requested" ? "✗ Changes requested" : "Request changes"}
+          </Button>
+        </div>
+      )}
+    </SidebarSection>
   )
 }

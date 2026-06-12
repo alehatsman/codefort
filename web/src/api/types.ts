@@ -369,6 +369,16 @@ export interface Compare {
 export interface PullRequestDetail extends PullRequest {
   compare: Compare
   comments: CodeComment[]
+  reviews: PRReview[]
+}
+
+export type PRReviewState = "approved" | "changes_requested"
+
+export interface PRReview {
+  id: number
+  author: string
+  state: PRReviewState
+  updated_at: string
 }
 
 export interface CreatePullRequestInput {
