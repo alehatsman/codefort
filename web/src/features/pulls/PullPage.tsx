@@ -3,8 +3,9 @@ import "./pulls.css"
 import { useParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
 import { useCreateCodeComment, useMergePull, useUpdatePull } from "@/api/mutations"
-import { usePull } from "@/api/queries"
+import { useCommitCIStatus, usePull } from "@/api/queries"
 import type { MergeConflictResponse } from "@/api/types"
+import CommitCIStatus from "@/features/commits/CommitCIStatus"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
 import { Button, DetailLayout, EmptyState, ErrorMessage, SkeletonText, useToast } from "@/ui"
@@ -35,8 +36,10 @@ export default function PullPage() {
   const mergePull = useMergePull(owner, repo, n)
   const updatePull = useUpdatePull(owner, repo, n)
   const createComment = useCreateCodeComment(owner, repo)
+  const ciStatusQ = useCommitCIStatus(owner, repo)
   const toast = useToast()
   const pr = pullQ.data
+  const headRun = pr ? ciStatusQ.data?.get(pr.compare.head) : undefined
   const conflicts = conflictsFrom(mergePull.error)
   const notFastForwardable = isNotFastForwardable(mergePull.error)
 
@@ -78,6 +81,7 @@ export default function PullPage() {
               {" · opened by "}
               {pr.author} on {new Date(pr.created_at).toLocaleDateString()}
               {pr.merged_at && <> · merged {new Date(pr.merged_at).toLocaleDateString()}</>}
+          {headRun && <CommitCIStatus owner={owner} repo={repo} run={headRun} />}
             </div>
             {pr.body && (
               <div className="pull-head__body">
@@ -91,6 +95,7 @@ export default function PullPage() {
           {pr.state === "open" && (
             <div className="pull-merge">
               <div className="pull-merge__actions">
+                {headRun && <CommitCIStatus owner={owner} repo={repo} run={headRun} />}
                 <Button
                   variant="primary"
                   disabled={!mergeable || mergePull.isPending}
