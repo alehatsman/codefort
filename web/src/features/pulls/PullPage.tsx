@@ -2,12 +2,12 @@ import { lazy, Suspense } from "react"
 import "./pulls.css"
 import { useParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
-import { useCreateCodeComment, useMergePull, useUpdatePull } from "@/api/mutations"
-import { usePull } from "@/api/queries"
-import type { MergeConflictResponse } from "@/api/types"
+import { useCreateCodeComment, useMergePull, useSubmitReview, useUpdatePull } from "@/api/mutations"
+import { usePull, useWhoami } from "@/api/queries"
+import type { MergeConflictResponse, PRReview } from "@/api/types"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
-import { Button, DetailLayout, EmptyState, ErrorMessage, SkeletonText, useToast } from "@/ui"
+import { Avatar, Badge, Button, DetailLayout, EmptyState, ErrorMessage, SidebarSection, SkeletonText, useToast } from "@/ui"
 
 const Markdown = lazy(() => import("@/shell/Markdown"))
 
@@ -35,8 +35,11 @@ export default function PullPage() {
   const mergePull = useMergePull(owner, repo, n)
   const updatePull = useUpdatePull(owner, repo, n)
   const createComment = useCreateCodeComment(owner, repo)
+  const submitReview = useSubmitReview(owner, repo, n)
+  const whoami = useWhoami()
   const toast = useToast()
   const pr = pullQ.data
+  const myReview = pr?.reviews?.find((rv) => rv.author === whoami.data?.name)
   const conflicts = conflictsFrom(mergePull.error)
   const notFastForwardable = isNotFastForwardable(mergePull.error)
 
@@ -65,7 +68,23 @@ export default function PullPage() {
       ) : !pr ? (
         <EmptyState>Pull request not found.</EmptyState>
       ) : (
-        <DetailLayout>
+        <DetailLayout
+          sidebar={
+            pr ? (
+              <ReviewSidebar
+                reviews={pr.reviews ?? []}
+                myReview={myReview}
+                isOpen={pr.state === "open"}
+                onReview={(state) =>
+                  submitReview.mutate(state, {
+                    onSuccess: () => toast(state === "approved" ? "Approved" : "Changes requested"),
+                  })
+                }
+                isPending={submitReview.isPending}
+              />
+            ) : undefined
+          }
+        >
           <header className="pull-head">
             <h2 className="pull-head__title">
               {pr.title} <span className="pull-head__number">#{pr.number}</span>
@@ -171,5 +190,56 @@ export default function PullPage() {
         </DetailLayout>
       )}
     </div>
+  )
+}
+
+function ReviewSidebar({
+  reviews,
+  myReview,
+  isOpen,
+  onReview,
+  isPending,
+}: {
+  reviews: PRReview[]
+  myReview?: PRReview
+  isOpen: boolean
+  onReview: (state: import("@/api/types").PRReviewState) => void
+  isPending: boolean
+}) {
+  return (
+    <SidebarSection label="Reviewers">
+      {reviews.length === 0 && <span className="muted small">No reviews yet</span>}
+      <ul className="review-list review-list--compact">
+        {reviews.map((rv) => (
+          <li key={rv.id} className="review-row review-row--compact">
+            <Avatar name={rv.author} />
+            <span className="review-row__author">{rv.author}</span>
+            <Badge state={rv.state === "approved" ? "done" : "in_progress"}>
+              {rv.state === "approved" ? "approved" : "changes requested"}
+            </Badge>
+          </li>
+        ))}
+      </ul>
+      {isOpen && (
+        <div className="review-actions">
+          <Button
+            variant={myReview?.state === "approved" ? "primary" : "ghost"}
+            size="small"
+            disabled={isPending}
+            onClick={() => onReview("approved")}
+          >
+            {myReview?.state === "approved" ? "✓ Approved" : "Approve"}
+          </Button>
+          <Button
+            variant={myReview?.state === "changes_requested" ? "danger" : "ghost"}
+            size="small"
+            disabled={isPending}
+            onClick={() => onReview("changes_requested")}
+          >
+            {myReview?.state === "changes_requested" ? "✗ Changes requested" : "Request changes"}
+          </Button>
+        </div>
+      )}
+    </SidebarSection>
   )
 }

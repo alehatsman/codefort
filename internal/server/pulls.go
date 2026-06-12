@@ -148,6 +148,9 @@ func (s *Server) handleGetPull(w http.ResponseWriter, r *http.Request) {
 	if comments, err := storage.ListCodeComments(s.rdb, repoID, pr.HeadRef, "", true); err == nil {
 		detail.Comments = comments
 	}
+	if reviews, err := storage.ListReviews(s.rdb, repoID, num); err == nil {
+		detail.Reviews = reviews
+	}
 
 	writeJSON(w, http.StatusOK, detail)
 }
@@ -227,4 +230,35 @@ func parsePRStates(raw []string) ([]api.PRState, error) {
 		}
 	}
 	return states, nil
+}
+
+// handleSubmitReview upserts the caller's review (approved or changes_requested)
+// for the specified pull request.
+func (s *Server) handleSubmitReview(w http.ResponseWriter, r *http.Request) {
+	num, err := strconv.Atoi(r.PathValue("number"))
+	if err != nil || num <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid pull req number")
+		return
+	}
+	repoID, ok := s.lookupRepoOrFail(w, r)
+	if !ok {
+		return
+	}
+	var req api.CreateReviewRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.State != api.PRReviewApproved && req.State != api.PRReviewChangesRequested {
+		writeError(w, http.StatusBadRequest, "state must be 'approved' or 'changes_requested'")
+		return
+	}
+	actor := identityFromContext(r)
+	review, err := storage.UpsertReview(s.db, repoID, num, actor, req.State)
+	if err != nil {
+		s.logger.Error("submit review", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, review)
 }

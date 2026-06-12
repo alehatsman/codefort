@@ -448,6 +448,8 @@ export const api = {
     request<PullRequest>(`/api/repos/${owner}/${repo}/pulls/${n}`, { method: "PATCH", body }),
   mergePull: (owner: string, repo: string, n: number, body: MergeRequestInput) =>
     request<MergeResult>(`/api/repos/${owner}/${repo}/pulls/${n}/merge`, { method: "POST", body }),
+  submitReview: (owner: string, repo: string, n: number, state: import("./types").PRReviewState) =>
+    request<import("./types").PRReview>(`/api/repos/${owner}/${repo}/pulls/${n}/reviews`, { method: "POST", body: { state } }),
 
   listCIRuns: (
     owner: string,
