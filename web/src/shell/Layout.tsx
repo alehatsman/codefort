@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom"
 import "./shell.css"
 import { clearToken } from "@/api/client"
 import GlobalTabs from "@/shell/GlobalTabs"
+import NotificationBell from "@/shell/NotificationBell"
 import RepoTabs from "@/shell/RepoTabs"
 import { Menu } from "@/ui"
 
@@ -54,6 +55,7 @@ export default function Layout({ children, onSignOut }: Props) {
           {ctx ? <RepoTabs owner={ctx.owner} repo={ctx.repo} /> : <GlobalTabs />}
         </div>
         <div className="topbar__actions">
+          <NotificationBell />
           <Menu
             label="Account menu"
             align="end"
