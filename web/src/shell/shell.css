@@ -74,3 +74,104 @@
   font-style: italic;
 }
 /* .avatar moved to styles.css alongside the @/ui Avatar primitive (#280). */
+
+/* ── Notification bell ─────────────────────────────────────────── */
+.notif-bell {
+  position: relative;
+}
+
+.notif-bell__btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.notif-bell__btn:hover {
+  background: var(--surface-hover);
+  color: var(--fg);
+}
+
+.notif-bell__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--red-500, #ef4444);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  width: 280px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,.15));
+  z-index: 200;
+  overflow: hidden;
+}
+
+.notif-dropdown__empty {
+  padding: var(--space-3);
+}
+
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.notif-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.notif-row:last-child {
+  border-bottom: none;
+}
+
+.notif-row--unread {
+  background: var(--surface-accent, var(--surface-hover));
+}
+
+.notif-row__link {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  text-decoration: none;
+  color: var(--fg);
+}
+
+.notif-row__link:hover {
+  background: var(--surface-hover);
+}
+
+.notif-row__label {
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notif-row__actor {
+  font-size: var(--text-xs, 11px);
+}
