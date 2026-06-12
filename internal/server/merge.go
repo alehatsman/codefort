@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -106,6 +107,7 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 		// Head reached base via a direct push that may not have hit the mirror;
 		// push the current base out so an external mirror stays in lockstep.
 		s.mirrorMergedBranch(repoDir, pr.BaseRef)
+		s.closeLinkedIssues(repoID, pr)
 		writeJSON(w, http.StatusOK, api.MergeResult{
 			PullRequest: updated,
 			MergeCommit: baseTip,
@@ -148,6 +150,7 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 	// push it out to the mirror remote, if configured, to keep an external
 	// mirror in sync. Best-effort and async — the merge already succeeded.
 	s.mirrorMergedBranch(repoDir, pr.BaseRef)
+	s.closeLinkedIssues(repoID, pr)
 	writeJSON(w, http.StatusOK, api.MergeResult{
 		PullRequest: updated,
 		MergeCommit: newTip,
@@ -365,4 +368,41 @@ func gitRun(ctx context.Context, repoDir string, args ...string) (stdout []byte,
 		return out, -1, err
 	}
 	return out, 0, nil
+}
+
+// closingRefsRE matches GitHub-style closing keywords: closes/close/closed,
+// fixes/fix/fixed, resolves/resolve/resolved, followed by an issue number.
+var closingRefsRE = regexp.MustCompile(`(?i)\b(?:closes?|fixed?|fixes?|resolves?)\s+#(\d+)`)
+
+// parseClosingRefs returns the distinct issue numbers referenced by closing
+// keywords (closes #N, fixes #N, resolves #N) in text.
+func parseClosingRefs(text string) []int {
+	matches := closingRefsRE.FindAllStringSubmatch(text, -1)
+	seen := make(map[int]bool)
+	var nums []int
+	for _, m := range matches {
+		n, err := strconv.Atoi(m[1])
+		if err != nil || seen[n] {
+			continue
+		}
+		seen[n] = true
+		nums = append(nums, n)
+	}
+	return nums
+}
+
+// closeLinkedIssues transitions issues referenced by closing keywords in the
+// PR title+body to done. Best-effort: errors are logged and not propagated so
+// a bad issue number never fails the merge response.
+func (s *Server) closeLinkedIssues(repoID int64, pr api.PullRequest) {
+	nums := parseClosingRefs(pr.Title + " " + pr.Body)
+	if len(nums) == 0 {
+		return
+	}
+	state := api.IssueDone
+	for _, n := range nums {
+		if _, err := storage.UpdateIssue(s.db, repoID, n, &state, nil, nil, nil, nil); err != nil {
+			s.logger.Warn("close linked issue on PR merge", "issue", n, "err", err)
+		}
+	}
 }

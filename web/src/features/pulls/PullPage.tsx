@@ -1,6 +1,6 @@
-import { lazy, Suspense } from "react"
+import { lazy, Suspense, useMemo } from "react"
 import "./pulls.css"
-import { useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
 import { useCreateCodeComment, useMergePull, useUpdatePull } from "@/api/mutations"
 import { useCommitCIStatus, usePull } from "@/api/queries"
@@ -8,7 +8,7 @@ import type { MergeConflictResponse } from "@/api/types"
 import CommitCIStatus from "@/features/commits/CommitCIStatus"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
-import { Button, DetailLayout, EmptyState, ErrorMessage, SkeletonText, useToast } from "@/ui"
+import { Button, DetailLayout, EmptyState, ErrorMessage, SidebarSection, SkeletonText, useToast } from "@/ui"
 
 const Markdown = lazy(() => import("@/shell/Markdown"))
 
@@ -28,6 +28,17 @@ function isNotFastForwardable(err: unknown): boolean {
   return err instanceof ApiError && err.status === 409 && conflictsFrom(err).length === 0
 }
 
+const CLOSING_RE = /\b(?:closes?|fixed?|fixes?|resolves?)\s+#(\d+)/gi
+
+function parseClosingRefs(text: string): number[] {
+  const seen = new Set<number>()
+  for (const m of text.matchAll(CLOSING_RE)) {
+    const n = Number(m[1])
+    if (!seen.has(n)) seen.add(n)
+  }
+  return [...seen]
+}
+
 export default function PullPage() {
   const { owner = "", repo = "", number = "" } = useParams()
   const n = Number(number)
@@ -40,6 +51,10 @@ export default function PullPage() {
   const toast = useToast()
   const pr = pullQ.data
   const headRun = pr ? ciStatusQ.data?.get(pr.compare.head) : undefined
+  const closingRefs = useMemo(
+    () => parseClosingRefs((pr?.title ?? "") + " " + (pr?.body ?? "")),
+    [pr?.title, pr?.body],
+  )
   const conflicts = conflictsFrom(mergePull.error)
   const notFastForwardable = isNotFastForwardable(mergePull.error)
 
@@ -68,7 +83,19 @@ export default function PullPage() {
       ) : !pr ? (
         <EmptyState>Pull request not found.</EmptyState>
       ) : (
-        <DetailLayout>
+        <DetailLayout
+          sidebar={
+            closingRefs.length > 0 ? (
+              <SidebarSection label="Closes">
+                {closingRefs.map((n) => (
+                  <Link key={n} to={`/${owner}/${repo}/issues/${n}`} className="muted small">
+                    #{n}
+                  </Link>
+                ))}
+              </SidebarSection>
+            ) : undefined
+          }
+        >
           <header className="pull-head">
             <h2 className="pull-head__title">
               {pr.title} <span className="pull-head__number">#{pr.number}</span>
