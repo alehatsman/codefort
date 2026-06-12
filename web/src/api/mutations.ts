@@ -408,3 +408,13 @@ export function useRemoveRepoMember(owner: string, repo: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.repoMembers(owner, repo) }),
   })
 }
+
+// useSubmitReview posts approve or request-changes for the current user on a PR.
+export function useSubmitReview(owner: string, repo: string, n: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (state: import("./types").PRReviewState) =>
+      api.submitReview(owner, repo, n, state),
+    onSuccess: () => invalidatePullWrites(qc, owner, repo, n),
+  })
+}

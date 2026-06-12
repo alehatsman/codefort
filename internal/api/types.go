@@ -468,6 +468,7 @@ type PullRequestDetail struct {
 	PullRequest
 	Compare  Compare       `json:"compare"`
 	Comments []CodeComment `json:"comments"`
+	Reviews  []PRReview    `json:"reviews"`
 }
 
 // CreatePullRequest opens a PR from Head into Base. Author is stamped
@@ -888,4 +889,25 @@ type SpecDriftReport struct {
 type VerifySpecRequest struct {
 	Path string `json:"path"`
 	Ref  string `json:"ref,omitempty"`
+}
+
+// PRReviewState is the outcome of a code review: approved or changes requested.
+type PRReviewState string
+
+const (
+	PRReviewApproved          PRReviewState = "approved"
+	PRReviewChangesRequested  PRReviewState = "changes_requested"
+)
+
+// PRReview is one reviewer's verdict on a pull request.
+type PRReview struct {
+	ID        int64         `json:"id"`
+	Author    string        `json:"author"`
+	State     PRReviewState `json:"state"`
+	UpdatedAt time.Time     `json:"updated_at"`
+}
+
+// CreateReviewRequest is the body of POST …/pulls/:n/reviews.
+type CreateReviewRequest struct {
+	State PRReviewState `json:"state"`
 }

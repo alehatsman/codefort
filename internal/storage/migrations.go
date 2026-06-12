@@ -432,6 +432,22 @@ var migrations = []string{
 	CREATE INDEX IF NOT EXISTS idx_issue_deps_issue  ON issue_dependencies(repo_id, issue_number);
 	CREATE INDEX IF NOT EXISTS idx_issue_deps_target ON issue_dependencies(repo_id, depends_on_number);
 	`,
+
+	// 28: PR review state (#401). One row per (pr, reviewer); upserted on each
+	// review submit so a reviewer can change their mind. state is
+	// "approved" or "changes_requested".
+	`
+CREATE TABLE IF NOT EXISTS pr_reviews (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_id    INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+    pr_number  INTEGER NOT NULL,
+    author     TEXT    NOT NULL,
+    state      TEXT    NOT NULL CHECK(state IN ('approved','changes_requested')),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    UNIQUE (repo_id, pr_number, author)
+);
+CREATE INDEX IF NOT EXISTS idx_pr_reviews_pr ON pr_reviews(repo_id, pr_number);
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —
