@@ -230,18 +230,16 @@ function SplitTable({ hunks, lang, path, commentsByLine, onAddComment }: TablePr
         <col className="diff-col-num" />
         <col className="diff-col-code" />
       </colgroup>
-      <tbody>
-        {hunks.map((h) => (
-          <HunkSplit
-            key={h.header}
-            hunk={h}
-            lang={lang}
-            path={path}
-            commentsByLine={commentsByLine}
-            onAddComment={onAddComment}
-          />
-        ))}
-      </tbody>
+      {hunks.map((h) => (
+        <HunkSplit
+          key={h.header}
+          hunk={h}
+          lang={lang}
+          path={path}
+          commentsByLine={commentsByLine}
+          onAddComment={onAddComment}
+        />
+      ))}
     </table>
   )
 }
