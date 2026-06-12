@@ -128,7 +128,7 @@ export default function PullPage() {
             </div>
             <div className="pull-head__body">
               <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
-                <Markdown content={pr.body} owner={owner} repo={repo} basePath="" />
+                <Markdown content={pr.body ?? ""} owner={owner} repo={repo} basePath="" />
               </Suspense>
             </div>
           </header>
