@@ -535,4 +535,8 @@ export const api = {
     request<void>(`/api/repos/${owner}/${repo}/members`, { method: "POST", body }),
   removeRepoMember: (owner: string, repo: string, username: string) =>
     request<void>(`/api/repos/${owner}/${repo}/members/${username}`, { method: "DELETE" }),
+
+  // Branches.
+  createBranch: (owner: string, repo: string, body: { name: string; base?: string }) =>
+    request<{ name: string; sha: string }>(`/api/repos/${owner}/${repo}/branches`, { method: "POST", body }),
 }

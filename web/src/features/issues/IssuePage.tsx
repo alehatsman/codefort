@@ -12,6 +12,7 @@ import CommentItem from "@/features/issues/CommentItem"
 import DeleteIssueButton from "@/features/issues/DeleteIssueButton"
 import BranchTag from "@/features/repo/BranchTag"
 import SpawnAgentButton from "@/features/agents/SpawnAgentButton"
+import CreateBranchDialog from "@/features/issues/CreateBranchDialog"
 import NotFound from "@/shell/NotFound"
 import {
   Avatar,
@@ -122,6 +123,15 @@ export default function IssuePage() {
             <SidebarSection label="Agent">
               <SpawnAgentButton owner={owner} repo={repo} number={iss.number} />
             </SidebarSection>
+            {(iss.state === "todo" || iss.state === "in_progress") && (
+              <SidebarSection label="Development">
+                <CreateBranchDialog
+                  owner={owner}
+                  repo={repo}
+                  issueNumber={iss.number}
+                />
+              </SidebarSection>
+            )}
             <SidebarSection label="Danger zone">
               <DeleteIssueButton owner={owner} repo={repo} number={iss.number} />
             </SidebarSection>

@@ -911,3 +911,15 @@ type PRReview struct {
 type CreateReviewRequest struct {
 	State PRReviewState `json:"state"`
 }
+
+// CreateBranchRequest creates a new branch from a base ref.
+type CreateBranchRequest struct {
+	Name string `json:"name"` // new branch name
+	Base string `json:"base"` // base ref (branch name); defaults to repo default
+}
+
+// BranchResult is returned on successful branch creation.
+type BranchResult struct {
+	Name string `json:"name"` // created branch name
+	SHA  string `json:"sha"`  // tip commit SHA
+}

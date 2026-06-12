@@ -418,3 +418,9 @@ export function useSubmitReview(owner: string, repo: string, n: number) {
     onSuccess: () => invalidatePullWrites(qc, owner, repo, n),
   })
 }
+
+export function useCreateBranch(owner: string, repo: string) {
+  return useMutation({
+    mutationFn: (body: { name: string; base?: string }) => api.createBranch(owner, repo, body),
+  })
+}
