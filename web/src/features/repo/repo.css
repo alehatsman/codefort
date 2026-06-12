@@ -594,3 +594,82 @@
   padding: 1px var(--space-1);
   border-radius: 3px;
 }
+
+/* ---------- Branches page ---------- */
+
+.branches-page {
+  padding: var(--space-4) var(--space-5);
+}
+
+.branches-page__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 var(--space-4);
+}
+
+.branches-page__title--tags {
+  margin-top: var(--space-6);
+}
+
+.branch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.branch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.branch-row:last-child {
+  border-bottom: none;
+}
+
+.branch-row__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.branch-row__link {
+  font-weight: var(--weight-semibold);
+  color: var(--color-accent, #0969da);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch-row__link:hover {
+  text-decoration: underline;
+}
+
+.branch-row__badge {
+  flex-shrink: 0;
+}
+
+.branch-row__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.branch-row__compare {
+  text-decoration: none;
+  color: inherit;
+}
+
+.branch-row__compare:hover {
+  text-decoration: underline;
+  color: var(--color-accent, #0969da);
+}
