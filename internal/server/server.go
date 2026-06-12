@@ -196,6 +196,8 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/pulls/{number}/merge", s.handleMergePull)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/pulls/{number}/reviews", s.handleSubmitReview)
 
+	mux.HandleFunc("POST /api/repos/{owner}/{repo}/branches", s.handleCreateBranch)
+
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/code-comments", s.handleListCodeComments)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/code-comments", s.handleCreateCodeComment)
 	mux.HandleFunc("PATCH /api/repos/{owner}/{repo}/code-comments/{id}", s.handlePatchCodeComment)
