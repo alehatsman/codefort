@@ -449,7 +449,10 @@ export const api = {
   mergePull: (owner: string, repo: string, n: number, body: MergeRequestInput) =>
     request<MergeResult>(`/api/repos/${owner}/${repo}/pulls/${n}/merge`, { method: "POST", body }),
   submitReview: (owner: string, repo: string, n: number, state: import("./types").PRReviewState) =>
-    request<import("./types").PRReview>(`/api/repos/${owner}/${repo}/pulls/${n}/reviews`, { method: "POST", body: { state } }),
+    request<import("./types").PRReview>(`/api/repos/${owner}/${repo}/pulls/${n}/reviews`, {
+      method: "POST",
+      body: { state },
+    }),
 
   listCIRuns: (
     owner: string,
@@ -538,5 +541,19 @@ export const api = {
 
   // Branches.
   createBranch: (owner: string, repo: string, body: { name: string; base?: string }) =>
-    request<{ name: string; sha: string }>(`/api/repos/${owner}/${repo}/branches`, { method: "POST", body }),
+    request<{ name: string; sha: string }>(`/api/repos/${owner}/${repo}/branches`, {
+      method: "POST",
+      body,
+    }),
+
+  // Issue dependency edges.
+  addDependency: (owner: string, repo: string, number: number, dependsOn: number) =>
+    request<void>(`/api/repos/${owner}/${repo}/issues/${number}/dependencies`, {
+      method: "POST",
+      body: { depends_on: dependsOn },
+    }),
+  removeDependency: (owner: string, repo: string, number: number, target: number) =>
+    request<void>(`/api/repos/${owner}/${repo}/issues/${number}/dependencies/${target}`, {
+      method: "DELETE",
+    }),
 }

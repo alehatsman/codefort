@@ -360,3 +360,72 @@
   word-break: break-all;
   white-space: pre-wrap;
 }
+
+/* Dependency edges (DependencySection) */
+
+.dep-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.dep-group__label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dep-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.dep-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.dep-row__link {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dep-row__remove {
+  all: unset;
+  cursor: pointer;
+  color: var(--fg-muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 var(--space-1);
+  opacity: 0.6;
+}
+
+.dep-row__remove:hover {
+  opacity: 1;
+  color: var(--color-danger);
+}
+
+.dep-add-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.dep-add-input {
+  width: 6rem;
+  flex-shrink: 0;
+}
+
+.dep-add-error {
+  width: 100%;
+  color: var(--color-danger);
+}

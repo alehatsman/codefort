@@ -413,8 +413,7 @@ export function useRemoveRepoMember(owner: string, repo: string) {
 export function useSubmitReview(owner: string, repo: string, n: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (state: import("./types").PRReviewState) =>
-      api.submitReview(owner, repo, n, state),
+    mutationFn: (state: import("./types").PRReviewState) => api.submitReview(owner, repo, n, state),
     onSuccess: () => invalidatePullWrites(qc, owner, repo, n),
   })
 }
@@ -422,5 +421,21 @@ export function useSubmitReview(owner: string, repo: string, n: number) {
 export function useCreateBranch(owner: string, repo: string) {
   return useMutation({
     mutationFn: (body: { name: string; base?: string }) => api.createBranch(owner, repo, body),
+  })
+}
+
+export function useAddDependency(owner: string, repo: string, number: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (dependsOn: number) => api.addDependency(owner, repo, number, dependsOn),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.issue(owner, repo, number) }),
+  })
+}
+
+export function useRemoveDependency(owner: string, repo: string, number: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (target: number) => api.removeDependency(owner, repo, number, target),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.issue(owner, repo, number) }),
   })
 }
