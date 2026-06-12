@@ -72,6 +72,17 @@ export interface ChildIssueSummary {
   state: IssueState
 }
 
+export interface IssueRef {
+  number: number
+  title: string
+  state: IssueState
+}
+
+export interface EpicProgress {
+  total: number
+  done: number
+}
+
 export interface Issue {
   id: number
   number: number
@@ -82,6 +93,9 @@ export interface Issue {
   assignee: string | null
   parent_number?: number
   children?: ChildIssueSummary[]
+  depends_on?: IssueRef[]
+  blocks?: IssueRef[]
+  progress?: EpicProgress
   labels: string[]
   created_at: string
   updated_at: string

@@ -36,6 +36,9 @@ export default function IssuesPage() {
   const author = searchParams.get("author") ?? ""
   const label = searchParams.get("label") ?? ""
   const sort = searchParams.get("sort") ?? "newest"
+  const ready = searchParams.get("ready") === "1"
+  const blocked = searchParams.get("blocked") === "1"
+  const epics = searchParams.get("epics") === "1"
   const [search, setSearch] = useState(committedQuery)
 
   // Set or clear a single URL param without disturbing the others. An empty
@@ -79,6 +82,9 @@ export default function IssuesPage() {
   if (label) filterQuery.set("label", label)
   if (committedQuery) filterQuery.set("q", committedQuery)
   if (sort !== "newest") filterQuery.set("sort", sort)
+  if (ready) filterQuery.set("ready", "1")
+  if (blocked) filterQuery.set("blocked", "1")
+  if (epics) filterQuery.set("epics", "1")
   const filterKey = filterQuery.toString()
 
   // Reset to page 1 when the filter changes (React's adjust-state-during-render
@@ -238,6 +244,38 @@ export default function IssuesPage() {
               </select>
             </label>
           )}
+        </FilterRow>
+        <FilterRow label="view:">
+          <FilterChip
+            checked={epics}
+            onChange={() => {
+              setParam("epics", epics ? "" : "1")
+              if (!epics) {
+                setParam("ready", "")
+                setParam("blocked", "")
+              }
+            }}
+          >
+            epics
+          </FilterChip>
+          <FilterChip
+            checked={ready}
+            onChange={() => {
+              setParam("ready", ready ? "" : "1")
+              if (!ready) setParam("epics", "")
+            }}
+          >
+            ready
+          </FilterChip>
+          <FilterChip
+            checked={blocked}
+            onChange={() => {
+              setParam("blocked", blocked ? "" : "1")
+              if (!blocked) setParam("epics", "")
+            }}
+          >
+            blocked
+          </FilterChip>
         </FilterRow>
       </FilterBar>
 

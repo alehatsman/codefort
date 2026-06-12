@@ -13,6 +13,7 @@ import DeleteIssueButton from "@/features/issues/DeleteIssueButton"
 import BranchTag from "@/features/repo/BranchTag"
 import SpawnAgentButton from "@/features/agents/SpawnAgentButton"
 import CreateBranchDialog from "@/features/issues/CreateBranchDialog"
+import DependencySection from "@/features/issues/DependencySection"
 import NotFound from "@/shell/NotFound"
 import {
   Avatar,
@@ -125,13 +126,17 @@ export default function IssuePage() {
             </SidebarSection>
             {(iss.state === "todo" || iss.state === "in_progress") && (
               <SidebarSection label="Development">
-                <CreateBranchDialog
-                  owner={owner}
-                  repo={repo}
-                  issueNumber={iss.number}
-                />
+                <CreateBranchDialog owner={owner} repo={repo} issueNumber={iss.number} />
               </SidebarSection>
             )}
+            <DependencySection
+              owner={owner}
+              repo={repo}
+              issueNumber={iss.number}
+              dependsOn={iss.depends_on}
+              blocks={iss.blocks}
+              isActive={iss.state === "todo" || iss.state === "in_progress"}
+            />
             <SidebarSection label="Danger zone">
               <DeleteIssueButton owner={owner} repo={repo} number={iss.number} />
             </SidebarSection>
