@@ -111,6 +111,9 @@ export default function RepoTabs({ owner, repo }: Props) {
       <Tab to={`${base}/agents`} active={isAgents} count={pill(activeAgents)}>
         Agents
       </Tab>
+      <Tab to={`${base}/settings`} active={location.pathname.startsWith(`${base}/settings`)}>
+        Settings
+      </Tab>
     </Tabs>
   )
 }

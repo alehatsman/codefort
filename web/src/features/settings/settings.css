@@ -158,3 +158,72 @@
 .token-table__actions {
   text-align: right;
 }
+
+/* ---------- Per-repo settings ---------- */
+
+.repo-settings {
+  padding: var(--space-4) var(--space-5);
+  max-width: 680px;
+}
+
+.repo-settings__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.repo-settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.repo-settings__row:last-child {
+  border-bottom: none;
+}
+
+.repo-settings__row-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.repo-settings__row-copy p {
+  margin: var(--space-1) 0 0;
+}
+
+.settings__lead {
+  margin: 0 0 var(--space-3);
+}
+
+.repo-settings__member-table {
+  margin-bottom: var(--space-3);
+}
+
+.repo-settings__add-member {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.repo-settings__role-select {
+  height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.repo-settings__danger-buttons {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
