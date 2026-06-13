@@ -506,6 +506,7 @@
   margin-top: var(--space-5);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  background: var(--code-bg);
   overflow: hidden;
 }
 .readme-card__head {
