@@ -238,6 +238,14 @@ func (s *Server) doMerge(ctx context.Context, repoDir string, pr api.PullRequest
 			s.logger.Warn("merge update-ref (ff)", "repo", repoDir, "ref", pr.BaseRef, "err", err)
 			return "", false, nil, errBaseMoved
 		}
+		// Verify the ref actually advanced. If update-ref reported success but the
+		// ref still points at baseTip (stale lock, transient fs issue, etc.) fail
+		// here rather than marking the PR merged with the ref stuck at the old SHA.
+		if actual, verifyErr := revParse(ctx, repoDir, "refs/heads/"+pr.BaseRef); verifyErr != nil || actual != headTip {
+			s.logger.Error("merge update-ref verify: ref did not advance",
+				"repo", repoDir, "ref", pr.BaseRef, "want", headTip, "got", actual, "err", verifyErr)
+			return "", false, nil, errBaseMoved
+		}
 		return headTip, true, nil, nil
 	}
 
