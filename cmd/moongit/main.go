@@ -420,52 +420,11 @@ func runIssueEdit(args []string) error {
 		return fmt.Errorf("unexpected extra args: %v", fs.Args())
 	}
 
-	// Build a partial request from only the flags the user actually set.
-	var req api.UpdateIssueRequest
-	seen := map[string]bool{}
-	fs.Visit(func(f *flag.Flag) { seen[f.Name] = true })
-	if seen["title"] {
-		req.Title = title
-	}
-	if seen["body"] {
-		req.Body = body
-	}
-	if seen["state"] {
-		state := api.IssueState(*stateFlag)
-		if !state.Valid() {
-			return fmt.Errorf("invalid state %q (want one of: %v)", *stateFlag, api.AllIssueStates)
-		}
-		req.State = &state
-	}
-	if seen["labels"] {
-		var ls []string
-		for _, l := range strings.Split(*labelsFlag, ",") {
-			if l = strings.TrimSpace(l); l != "" {
-				ls = append(ls, l)
-			}
-		}
-		req.Labels = &ls
-	}
-	if seen["parent"] {
-		if *parent < 0 {
-			return errors.New("--parent must be a positive issue number, or 0 to clear")
-		}
-		req.Parent = parent // 0 = clear (server contract)
-	}
-
-	addEdges, err := parseIssueNums(*dependsOn)
+	req, addEdges, removeEdges, err := buildIssueEditPatch(fs, title, body, stateFlag, labelsFlag, dependsOn, removeDependsOn, parent)
 	if err != nil {
-		return fmt.Errorf("--depends-on: %w", err)
+		return err
 	}
-	removeEdges, err := parseIssueNums(*removeDependsOn)
-	if err != nil {
-		return fmt.Errorf("--remove-depends-on: %w", err)
-	}
-
 	hasPatch := req.Title != nil || req.Body != nil || req.State != nil || req.Labels != nil || req.Parent != nil
-	if !hasPatch && len(addEdges) == 0 && len(removeEdges) == 0 {
-		return errors.New("nothing to edit: pass at least one of --title, --body, --state, --labels, --parent, --depends-on, --remove-depends-on")
-	}
 
 	target, err := discoverTarget()
 	if err != nil {
@@ -527,6 +486,59 @@ func runIssueEdit(args []string) error {
 	}
 	fmt.Printf("#%d  %s  [%s]\n", iss.Number, iss.Title, iss.State)
 	return nil
+}
+
+// buildIssueEditPatch reads the parsed `issue edit` flags into an
+// UpdateIssueRequest (covering only the flags the user actually set) plus the
+// depends-on edges to add and remove. It errors on an invalid flag value or
+// when no edit was requested at all.
+func buildIssueEditPatch(fs *flag.FlagSet, title, body, stateFlag, labelsFlag, dependsOn, removeDependsOn *string, parent *int) (api.UpdateIssueRequest, []int, []int, error) {
+	var req api.UpdateIssueRequest
+	seen := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { seen[f.Name] = true })
+	if seen["title"] {
+		req.Title = title
+	}
+	if seen["body"] {
+		req.Body = body
+	}
+	if seen["state"] {
+		state := api.IssueState(*stateFlag)
+		if !state.Valid() {
+			return req, nil, nil, fmt.Errorf("invalid state %q (want one of: %v)", *stateFlag, api.AllIssueStates)
+		}
+		req.State = &state
+	}
+	if seen["labels"] {
+		var ls []string
+		for _, l := range strings.Split(*labelsFlag, ",") {
+			if l = strings.TrimSpace(l); l != "" {
+				ls = append(ls, l)
+			}
+		}
+		req.Labels = &ls
+	}
+	if seen["parent"] {
+		if *parent < 0 {
+			return req, nil, nil, errors.New("--parent must be a positive issue number, or 0 to clear")
+		}
+		req.Parent = parent // 0 = clear (server contract)
+	}
+
+	addEdges, err := parseIssueNums(*dependsOn)
+	if err != nil {
+		return req, nil, nil, fmt.Errorf("--depends-on: %w", err)
+	}
+	removeEdges, err := parseIssueNums(*removeDependsOn)
+	if err != nil {
+		return req, nil, nil, fmt.Errorf("--remove-depends-on: %w", err)
+	}
+
+	hasPatch := req.Title != nil || req.Body != nil || req.State != nil || req.Labels != nil || req.Parent != nil
+	if !hasPatch && len(addEdges) == 0 && len(removeEdges) == 0 {
+		return req, nil, nil, errors.New("nothing to edit: pass at least one of --title, --body, --state, --labels, --parent, --depends-on, --remove-depends-on")
+	}
+	return req, addEdges, removeEdges, nil
 }
 
 // parseIssueNums parses a comma-separated list of positive issue numbers.
