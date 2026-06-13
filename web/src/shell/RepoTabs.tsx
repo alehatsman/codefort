@@ -72,10 +72,10 @@ export default function RepoTabs({ owner, repo }: Props) {
     location.pathname.startsWith(`${base}/pulls`) || location.pathname.startsWith(`${base}/compare`)
   const isReview = location.pathname.startsWith(`${base}/review`)
   // Explore absorbed the former Research + Summaries tabs (and their URLs).
-  const isExplore =
-    location.pathname.startsWith(`${base}/explore`) ||
-    location.pathname.startsWith(`${base}/research`) ||
-    location.pathname.startsWith(`${base}/summaries`)
+  // const isExplore =
+  //   location.pathname.startsWith(`${base}/explore`) ||
+  //   location.pathname.startsWith(`${base}/research`) ||
+  //   location.pathname.startsWith(`${base}/summaries`)
   const isSpecs = location.pathname.startsWith(`${base}/specs`)
   const isBranches =
     location.pathname.startsWith(`${base}/branches`) || location.pathname.startsWith(`${base}/tags`)
@@ -102,9 +102,9 @@ export default function RepoTabs({ owner, repo }: Props) {
       <Tab to={`${base}/review`} active={isReview} count={pill(openReview)}>
         Review
       </Tab>
-      <Tab to={`${base}/explore`} active={isExplore}>
-        Explore
-      </Tab>
+      {/* <Tab to={`${base}/explore`} active={isExplore}> */}
+      {/*   Explore */}
+      {/* </Tab> */}
       <Tab to={`${base}/pipelines`} active={isPipelines} count={pill(livePipelines)}>
         Pipelines
       </Tab>
