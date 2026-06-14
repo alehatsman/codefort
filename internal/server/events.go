@@ -169,6 +169,19 @@ func (s *Server) emitRunQueued(repoID int64, run storage.CIRun) {
 	})
 }
 
+// emitPull records a pull-request lifecycle event on the outbound feed
+// (pull.opened / pull.merged / pull.closed, #407), carrying the number, title,
+// and branch refs so the activity feed can render and link it without a
+// follow-up fetch.
+func (s *Server) emitPull(eventType string, repoID int64, actor string, pr api.PullRequest) {
+	s.emit(eventType, repoID, actor, map[string]any{
+		"number": pr.Number,
+		"title":  pr.Title,
+		"base":   pr.BaseRef,
+		"head":   pr.HeadRef,
+	})
+}
+
 // emit appends a best-effort event to the outbound feed. A failure is logged
 // but never propagated: the feed is a notification side-channel, so a write
 // error must not fail the mutation that triggered it. data is marshaled to the

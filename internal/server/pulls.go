@@ -62,6 +62,7 @@ func (s *Server) handleCreatePull(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	s.emitPull("pull.opened", repoID, pr.Author, pr)
 	writeJSON(w, http.StatusCreated, pr)
 }
 
@@ -209,6 +210,15 @@ func (s *Server) handleUpdatePull(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	if req.State != nil {
+		actor := identityFromContext(r)
+		switch *req.State {
+		case api.PRClosed:
+			s.emitPull("pull.closed", repoID, actor, pr)
+		case api.PROpen:
+			s.emitPull("pull.opened", repoID, actor, pr)
+		}
+	}
 	writeJSON(w, http.StatusOK, pr)
 }
 
@@ -260,5 +270,9 @@ func (s *Server) handleSubmitReview(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	s.emit("review.submitted", repoID, actor, map[string]any{
+		"number": num,
+		"state":  string(req.State),
+	})
 	writeJSON(w, http.StatusOK, review)
 }
