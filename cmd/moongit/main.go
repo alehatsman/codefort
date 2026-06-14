@@ -431,7 +431,30 @@ func runIssueEdit(args []string) error {
 		return err
 	}
 
-	// Field edits go through PATCH; edge changes are subresource calls.
+	if err := applyIssueEdits(target, num, req, addEdges, removeEdges, hasPatch); err != nil {
+		return err
+	}
+
+	// Re-fetch so the printed line reflects the final state after every change.
+	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d", target.server, target.owner, target.repo, num)
+	resp, raw, err := httpDo(http.MethodGet, endpoint, nil, "")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
+	}
+	var iss api.Issue
+	if err := json.Unmarshal(raw, &iss); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	fmt.Printf("#%d  %s  [%s]\n", iss.Number, iss.Title, iss.State)
+	return nil
+}
+
+// applyIssueEdits pushes the field patch and depends-on edge changes to the
+// server. Field edits go through PATCH; edge changes are subresource calls.
+func applyIssueEdits(target target, num int, req api.UpdateIssueRequest, addEdges, removeEdges []int, hasPatch bool) error {
 	if hasPatch {
 		payload, err := json.Marshal(req)
 		if err != nil {
@@ -470,21 +493,6 @@ func runIssueEdit(args []string) error {
 			return fmt.Errorf("add depends-on %d: server returned %d: %s", m, resp.StatusCode, decodeError(raw))
 		}
 	}
-
-	// Re-fetch so the printed line reflects the final state after every change.
-	endpoint := fmt.Sprintf("%s/api/repos/%s/%s/issues/%d", target.server, target.owner, target.repo, num)
-	resp, raw, err := httpDo(http.MethodGet, endpoint, nil, "")
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("server returned %d: %s", resp.StatusCode, decodeError(raw))
-	}
-	var iss api.Issue
-	if err := json.Unmarshal(raw, &iss); err != nil {
-		return fmt.Errorf("decode response: %w", err)
-	}
-	fmt.Printf("#%d  %s  [%s]\n", iss.Number, iss.Title, iss.State)
 	return nil
 }
 
