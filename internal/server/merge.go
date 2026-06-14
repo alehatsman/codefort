@@ -108,6 +108,7 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 		// push the current base out so an external mirror stays in lockstep.
 		s.mirrorMergedBranch(repoDir, pr.BaseRef)
 		s.closeLinkedIssues(repoID, pr)
+		s.emitPull("pull.merged", repoID, identityFromContext(r), updated)
 		writeJSON(w, http.StatusOK, api.MergeResult{
 			PullRequest: updated,
 			MergeCommit: baseTip,
@@ -151,6 +152,7 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 	// mirror in sync. Best-effort and async — the merge already succeeded.
 	s.mirrorMergedBranch(repoDir, pr.BaseRef)
 	s.closeLinkedIssues(repoID, pr)
+	s.emitPull("pull.merged", repoID, identityFromContext(r), updated)
 	writeJSON(w, http.StatusOK, api.MergeResult{
 		PullRequest: updated,
 		MergeCommit: newTip,

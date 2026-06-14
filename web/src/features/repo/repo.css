@@ -76,6 +76,24 @@
 .activity-feed__item:first-child {
   border-top: none;
 }
+.activity-feed__item:hover {
+  background: var(--bg-canvas);
+}
+/* The badge + description, linking to the entity the event concerns. */
+.activity-feed__main {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  color: var(--fg);
+}
+.activity-feed__main:hover {
+  text-decoration: none;
+}
+.activity-feed__main:hover .activity-feed__desc {
+  color: var(--accent);
+}
 .activity-feed__badge {
   flex-shrink: 0;
   display: inline-block;
@@ -88,21 +106,33 @@
   background: var(--border-muted);
   color: var(--fg-muted);
 }
-.activity-feed__badge--issue {
+.activity-feed__badge--issue,
+.activity-feed__badge--review {
   background: color-mix(in srgb, var(--state-in_progress) 20%, transparent);
   color: var(--state-in_progress);
 }
-.activity-feed__badge--ci {
+.activity-feed__badge--ci,
+.activity-feed__badge--pull {
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent);
 }
-.activity-feed__badge--push {
+.activity-feed__badge--push,
+.activity-feed__badge--agent {
   background: color-mix(in srgb, var(--state-done) 20%, transparent);
   color: var(--state-done);
 }
-.activity-feed__badge--pull {
+/* Semantic status tones override the entity family for terminal outcomes. */
+.activity-feed__badge--ok {
   background: color-mix(in srgb, var(--state-todo) 20%, transparent);
   color: var(--state-todo);
+}
+.activity-feed__badge--fail {
+  background: color-mix(in srgb, var(--state-closed) 18%, transparent);
+  color: var(--state-closed);
+}
+.activity-feed__badge--warn {
+  background: color-mix(in srgb, var(--state-in_progress) 28%, transparent);
+  color: var(--state-in_progress);
 }
 .activity-feed__desc {
   flex: 1;
@@ -111,7 +141,27 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.activity-feed__desc strong {
+  font-weight: var(--weight-semibold);
+  color: var(--fg);
+}
+.activity-feed__desc code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+/* Issue / PR title appended after the number, demoted and quoted. */
+.activity-feed__title {
+  color: var(--fg-muted);
+}
+.activity-feed__title::before {
+  content: " — ";
+}
+.activity-feed__sha {
+  margin-left: 4px;
+}
 .activity-feed__repo {
+  flex-shrink: 0;
   color: var(--accent);
 }
 .activity-feed__repo:hover {
@@ -128,6 +178,110 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: var(--text-xs);
+}
+
+/* Needs-attention triage panel ----------------------------------------- */
+.attention {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+.attention--clear {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  text-align: center;
+}
+.attention__group {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+}
+.attention__group--warn {
+  border-left-color: var(--state-in_progress);
+}
+.attention__group--fail {
+  border-left-color: var(--state-closed);
+}
+.attention__group--pull {
+  border-left-color: var(--accent);
+}
+.attention__group--issue {
+  border-left-color: var(--state-todo);
+}
+.attention__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-muted);
+}
+.attention__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--border-muted);
+  color: var(--fg-default);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+.attention__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.attention__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 6px var(--space-3);
+  border-top: 1px solid var(--border-muted);
+  color: var(--fg);
+  font-size: var(--text-sm);
+}
+.attention__list li:first-child .attention__row {
+  border-top: none;
+}
+.attention__row:hover {
+  background: var(--bg-canvas);
+  text-decoration: none;
+}
+.attention__repo {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.attention__num {
+  flex-shrink: 0;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+}
+.attention__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attention__meta {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.attention__more {
+  padding: 6px var(--space-3);
+  border-top: 1px solid var(--border-muted);
 }
 .card-grid {
   display: grid;

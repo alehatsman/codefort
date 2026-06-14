@@ -1,129 +1,282 @@
 import type { ReactNode } from "react"
+import clsx from "clsx"
 import { Link } from "react-router-dom"
 import { timeAgo } from "@/shell/timeAgo"
 import type { FleetEvent } from "@/api/types"
 
 // ActivityFeed renders the live fleet event ring buffer from useFleetEvents.
-// Each event is one row: a type badge, a human description, and a relative
-// timestamp. Unknown event types fall back to a generic description.
+// Each event is one row: a type badge, a human description that links to the
+// entity it concerns (issue / PR / run / commit), the owning repo, and a
+// relative timestamp. Unknown event types fall back to a generic description.
 export default function ActivityFeed({ events }: { events: FleetEvent[] }) {
   if (events.length === 0) {
     return <p className="activity-feed activity-feed--empty muted small">Waiting for activity…</p>
   }
   return (
     <ol className="activity-feed">
-      {events.map((ev) => (
-        <li key={ev.seq} className="activity-feed__item">
-          <span className={`activity-feed__badge activity-feed__badge--${badgeClass(ev.type)}`}>
-            {shortType(ev.type)}
-          </span>
-          <span className="activity-feed__desc">{describe(ev)}</span>
-          <span
-            className="activity-feed__time muted small"
-            title={new Date(ev.time).toLocaleString()}
-          >
-            {timeAgo(new Date(ev.time).toISOString())}
-          </span>
-        </li>
-      ))}
+      {events.map((ev) => {
+        const p = parse(ev)
+        const main = (
+          <>
+            <span className={clsx("activity-feed__badge", `activity-feed__badge--${p.tone}`)}>
+              {p.badge}
+            </span>
+            <span className="activity-feed__desc">{p.body}</span>
+          </>
+        )
+        return (
+          <li key={ev.seq} className="activity-feed__item">
+            {p.href ? (
+              <Link className="activity-feed__main" to={p.href}>
+                {main}
+              </Link>
+            ) : (
+              <span className="activity-feed__main">{main}</span>
+            )}
+            {ev.repo ? (
+              <Link className="activity-feed__repo" to={`/${ev.repo}`}>
+                {ev.repo}
+              </Link>
+            ) : null}
+            <span
+              className="activity-feed__time muted small"
+              title={new Date(ev.time).toLocaleString()}
+            >
+              {timeAgo(new Date(ev.time).toISOString())}
+            </span>
+          </li>
+        )
+      })}
     </ol>
   )
 }
 
-// Abbreviate the event type for the badge: "issue.claimed" → "issue",
-// "ci.run.queued" → "ci", "push" → "push".
-function shortType(type: string): string {
-  return type.split(".")[0]
+interface Parsed {
+  // Route to the entity this event concerns, or null when there's nothing to
+  // open (e.g. a deleted repo). The whole description becomes a link when set.
+  href: string | null
+  // Short badge label + colour tone modifier.
+  badge: string
+  tone: string
+  // Human description, sans repo (the repo is rendered as a separate chip).
+  body: ReactNode
 }
 
-// Map type to a CSS modifier for badge colour.
-function badgeClass(type: string): string {
-  if (type.startsWith("issue")) return "issue"
-  if (type.startsWith("ci")) return "ci"
-  if (type === "push") return "push"
-  if (type.startsWith("pull") || type.startsWith("pr")) return "pull"
-  return "default"
-}
-
-// Build a human-readable sentence for each event type.
-function describe(ev: FleetEvent): ReactNode {
-  const { type, repo, actor, data } = ev
-  const repoLink = repo ? (
+// parse turns one fleet event into its badge, link target, and description.
+function parse(ev: FleetEvent): Parsed {
+  const { type, actor, data } = ev
+  const repo = ev.repo ?? ""
+  const num = typeof data?.number === "number" ? data.number : null
+  // Actor prefix carries its own trailing space so call sites read `{who}verb`.
+  const who = actor ? (
     <>
-      {" in "}
-      <Link className="activity-feed__repo" to={`/${repo}`}>
-        {repo}
-      </Link>
+      <strong>{actor}</strong>{" "}
     </>
   ) : null
-  const num = typeof data?.number === "number" ? data.number : null
 
   switch (type) {
-    case "push":
-      return (
-        <>
-          {actor && <strong>{actor}</strong>} pushed{" "}
-          {data?.ref ? <code>{String(data.ref).replace("refs/heads/", "")}</code> : null}
-          {repoLink}
-        </>
-      )
-    case "issue.created":
-      return (
-        <>
-          issue {num !== null ? `#${num}` : ""} created{repoLink}
-        </>
-      )
-    case "issue.claimed":
-      return (
-        <>
-          issue {num !== null ? `#${num}` : ""} claimed
-          {actor ? (
-            <>
-              {" by "}
-              <strong>{actor}</strong>
-            </>
-          ) : null}
-          {repoLink}
-        </>
-      )
-    case "issue.unclaimed":
-      return (
-        <>
-          issue {num !== null ? `#${num}` : ""} unclaimed{repoLink}
-        </>
-      )
-    case "issue.state_changed": {
-      const state = typeof data?.state === "string" ? data.state : null
-      return (
-        <>
-          issue {num !== null ? `#${num}` : ""} → {state ?? "?"}
-          {repoLink}
-        </>
-      )
+    case "push": {
+      const branch = data?.ref ? String(data.ref).replace("refs/heads/", "") : null
+      const sha = typeof data?.after === "string" ? data.after.slice(0, 7) : null
+      return {
+        href: repo && sha ? `/${repo}/commit/${data?.after}` : repo ? `/${repo}` : null,
+        badge: "push",
+        tone: "push",
+        body: (
+          <>
+            {who}pushed {branch ? <code>{branch}</code> : null}
+            {sha ? <code className="activity-feed__sha">{sha}</code> : null}
+          </>
+        ),
+      }
     }
-    case "issue.updated":
+
+    case "issue.created":
+      return issueRow(repo, num, "created", title(data), who)
+    case "issue.claimed":
+      return issueRow(repo, num, "claimed", null, who)
+    case "issue.unclaimed":
+      return issueRow(repo, num, "unclaimed", null, who)
     case "issue.commented":
-      return (
-        <>
-          {type === "issue.commented" ? "comment on" : "updated"} issue{" "}
-          {num !== null ? `#${num}` : ""}
-          {repoLink}
-        </>
-      )
+      return issueRow(repo, num, "commented on", null, who)
+    case "issue.updated":
+      return issueRow(repo, num, "updated", null, who)
+    case "issue.state_changed": {
+      const state = typeof data?.state === "string" ? data.state : "?"
+      return {
+        href: issueHref(repo, num),
+        badge: "issue",
+        tone: "issue",
+        body: (
+          <>
+            issue {numLabel(num)} → <code>{state}</code>
+          </>
+        ),
+      }
+    }
+
+    case "pull.opened":
+      return pullRow(repo, num, "opened", title(data), who, "pull")
+    case "pull.merged":
+      return pullRow(repo, num, "merged", null, who, "ok")
+    case "pull.closed":
+      return pullRow(repo, num, "closed", null, who, "muted")
+    case "review.submitted": {
+      const state = typeof data?.state === "string" ? data.state : null
+      return {
+        href: pullHref(repo, num),
+        badge: "review",
+        tone: state === "approved" ? "ok" : state === "changes_requested" ? "fail" : "review",
+        body: (
+          <>
+            {who}reviewed PR {numLabel(num)}
+            {state ? <> · {state.replace(/_/g, " ")}</> : null}
+          </>
+        ),
+      }
+    }
+
     case "ci.run.queued":
-      return (
-        <>
-          CI run {num !== null ? `#${num}` : ""} queued{repoLink}
-        </>
-      )
+      return runRow(repo, num, "pipelines", "CI", "queued", "ci", who)
+    case "ci.run.finished": {
+      const status = typeof data?.status === "string" ? data.status : "finished"
+      return {
+        href: runHref(repo, num, "pipelines"),
+        badge: "ci",
+        tone: runTone(status),
+        body: (
+          <>
+            CI {numLabel(num)} <code>{status}</code>
+          </>
+        ),
+      }
+    }
+
+    case "agent.run.started":
+      return runRow(repo, num, "agents", "agent", "started", "agent", who)
+    case "agent.run.awaiting_input":
+      return {
+        href: runHref(repo, num, "agents"),
+        badge: "agent",
+        tone: "warn",
+        body: <>agent {numLabel(num)} awaiting input</>,
+      }
+    case "agent.run.finished": {
+      const status = typeof data?.status === "string" ? data.status : "finished"
+      return {
+        href: runHref(repo, num, "agents"),
+        badge: "agent",
+        tone: runTone(status),
+        body: (
+          <>
+            agent {numLabel(num)} <code>{status}</code>
+          </>
+        ),
+      }
+    }
+
     case "repo.deleted":
-      return <>{actor && <strong>{actor}</strong>} deleted a repo</>
+      return { href: null, badge: "repo", tone: "default", body: <>{who}deleted a repo</> }
+
     default:
-      return (
-        <>
-          {type.replace(/\./g, " ")}
-          {repo ? ` · ${repo}` : ""}
-        </>
-      )
+      return {
+        href: repo ? `/${repo}` : null,
+        badge: type.split(".")[0],
+        tone: "default",
+        body: <>{type.replace(/\./g, " ")}</>,
+      }
+  }
+}
+
+// title pulls a human title from an event payload, when present.
+function title(data: FleetEvent["data"]): string | null {
+  return typeof data?.title === "string" && data.title ? data.title : null
+}
+
+function numLabel(num: number | null): string {
+  return num !== null ? `#${num}` : ""
+}
+
+function issueHref(repo: string, num: number | null): string | null {
+  return repo && num !== null ? `/${repo}/issues/${num}` : repo ? `/${repo}` : null
+}
+
+function pullHref(repo: string, num: number | null): string | null {
+  return repo && num !== null ? `/${repo}/pulls/${num}` : repo ? `/${repo}` : null
+}
+
+function runHref(repo: string, num: number | null, seg: "pipelines" | "agents"): string | null {
+  return repo && num !== null ? `/${repo}/${seg}/${num}` : repo ? `/${repo}` : null
+}
+
+// runTone maps a terminal run/CI status to a badge colour tone.
+function runTone(status: string): string {
+  if (status === "success" || status === "passed") return "ok"
+  if (status === "failed" || status === "error" || status === "canceled") return "fail"
+  return "ci"
+}
+
+function issueRow(
+  repo: string,
+  num: number | null,
+  verb: string,
+  t: string | null,
+  who: ReactNode
+): Parsed {
+  return {
+    href: issueHref(repo, num),
+    badge: "issue",
+    tone: "issue",
+    body: (
+      <>
+        {who}
+        {verb} issue {numLabel(num)}
+        {t ? <span className="activity-feed__title">{t}</span> : null}
+      </>
+    ),
+  }
+}
+
+function pullRow(
+  repo: string,
+  num: number | null,
+  verb: string,
+  t: string | null,
+  who: ReactNode,
+  tone: string
+): Parsed {
+  return {
+    href: pullHref(repo, num),
+    badge: "pull",
+    tone,
+    body: (
+      <>
+        {who}
+        {verb} PR {numLabel(num)}
+        {t ? <span className="activity-feed__title">{t}</span> : null}
+      </>
+    ),
+  }
+}
+
+function runRow(
+  repo: string,
+  num: number | null,
+  seg: "pipelines" | "agents",
+  label: string,
+  verb: string,
+  tone: string,
+  who: ReactNode
+): Parsed {
+  return {
+    href: runHref(repo, num, seg),
+    badge: seg === "agents" ? "agent" : "ci",
+    tone,
+    body: (
+      <>
+        {who}
+        {label} {numLabel(num)} {verb}
+      </>
+    ),
   }
 }

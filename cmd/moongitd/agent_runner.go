@@ -34,6 +34,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		return
 	}
 	log = log.With("repo", owner+"/"+name)
+	r.emitAgentEvent(run, "agent.run.started", nil)
 
 	// A spec-verify run targets a spec, not an issue, and finishes one-shot
 	// (no awaiting_input park, no issue handoff). It reuses everything else —
@@ -255,6 +256,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		r.failAgentRun(run.ID, job.ID, workDir)
 		return
 	}
+	r.emitAgentEvent(run, "agent.run.awaiting_input", nil)
 	log.Info("agent run awaiting input", "turn1_status", status)
 }
 
@@ -361,6 +363,7 @@ func (r *ciRunner) dispatchTurn(parent context.Context, turn storage.AgentTurn, 
 		r.failAgentRun(run.ID, jobID, agentWorkDir(r.cfg.DataDir, run.ID))
 		return
 	}
+	r.emitAgentEvent(run, "agent.run.awaiting_input", nil)
 	log.Info("agent turn done; awaiting input", "status", status)
 }
 

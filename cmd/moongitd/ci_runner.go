@@ -770,11 +770,12 @@ func (r *ciRunner) finish(run storage.CIRun, status storage.RunStatus) {
 		r.logger.Error("ci finish run", "run_id", run.ID, "status", status, "err", err)
 	}
 	// Mirror the terminal status onto the outbound fleet feed (#73), the
-	// counterpart to the server's ci.run.queued. Only CI runs surface here —
-	// agent runs reuse this spine but aren't CI, so emitting ci.run.finished for
-	// them would be misleading. Best-effort: a feed write must not mask the
-	// run's real outcome.
+	// counterpart to the server's ci.run.queued. Agent runs reuse this spine but
+	// aren't CI, so they get their own agent.run.finished lifecycle event (#407)
+	// rather than the misleading ci.run.finished. Best-effort: a feed write must
+	// not mask the run's real outcome.
 	if run.Kind.IsAgent() {
+		r.emitAgentEvent(run, "agent.run.finished", map[string]any{"status": string(status)})
 		return
 	}
 	payload, _ := json.Marshal(map[string]any{
@@ -785,6 +786,25 @@ func (r *ciRunner) finish(run storage.CIRun, status storage.RunStatus) {
 	})
 	if _, err := storage.AppendEvent(r.db, "ci.run.finished", run.RepoID, run.Trigger, string(payload)); err != nil {
 		r.logger.Error("ci finished event", "run_id", run.ID, "err", err)
+	}
+}
+
+// emitAgentEvent records an agent-run lifecycle event on the outbound fleet
+// feed (#407): agent.run.started / awaiting_input / finished. It always carries
+// the run number and, when linked, the issue it's working, so the activity feed
+// and triage panel can render and link it. Best-effort — a feed write must
+// never mask the run's real progress.
+func (r *ciRunner) emitAgentEvent(run storage.CIRun, eventType string, extra map[string]any) {
+	data := map[string]any{"number": run.Number}
+	if run.IssueNumber != nil {
+		data["issue_number"] = *run.IssueNumber
+	}
+	for k, v := range extra {
+		data[k] = v
+	}
+	payload, _ := json.Marshal(data)
+	if _, err := storage.AppendEvent(r.db, eventType, run.RepoID, run.Trigger, string(payload)); err != nil {
+		r.logger.Error("agent feed event", "type", eventType, "run_id", run.ID, "err", err)
 	}
 }
 
