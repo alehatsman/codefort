@@ -17,14 +17,11 @@
 #         build-images            (main only — runs after both gates pass)
 #
 # `quality` runs the full Go gate via the shared go-quality module
-# (`mooncake task ci` → goq/ci; see tasks.yml). For the in-container mooncake to
-# fetch that module from this moongit over http, three things line up:
-#   1. ci/Dockerfile.dev bakes golangci-lint/govulncheck/gocyclo/dupl + an M3
-#      mooncake (module insecure-host support) + python3.
-#   2. the runner gives every CI container host reachability
-#      (--add-host host.docker.internal:host-gateway, see ci_runner.go), so
-#      host.docker.internal:8080 resolves to this moongit.
-#   3. MOONCAKE_MODULE_INSECURE marks that host trusted for the http fetch.
+# (`mooncake task ci` → goq/ci; see tasks.yml). The module is fetched from
+# github.com over https (tasks.yml pins github.com/alehatsman/go-quality), so the
+# CI container only needs outbound internet — no host-gateway mapping or
+# MOONCAKE_MODULE_INSECURE trust required. ci/Dockerfile.dev still bakes the
+# static-analysis tools (golangci-lint/govulncheck/gocyclo/dupl) + python3.
 # The CI checkout is now a real working tree with .git (ci_runner.go), which the
 # gate's git-aware scripts (full.sh's `git rev-parse`) require.
 #
@@ -63,8 +60,6 @@ jobs:
     steps:
       - shell:
           cmd: mooncake task ci
-        env:
-          MOONCAKE_MODULE_INSECURE: host.docker.internal:8080
 
   web:
     image: moongit-ci-dev:latest
