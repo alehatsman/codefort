@@ -32,29 +32,25 @@ vars:
 # (alehatsman/go-quality), keeping moongit in lockstep with dex + mooncake.
 # moongit has no build tags and no bespoke CI stages, so `ci` is just goq/ci.
 #
-# PREREQ: go-quality is served by this very moongit over plain http, so the
-# fetch needs the host trusted once per shell:
-#   export MOONCAKE_MODULE_INSECURE=host.docker.internal:8080
+# go-quality is fetched from github.com over https (alehatsman/go-quality), so
+# no host trust or local moongit is needed — module resolution works on any
+# machine, including a fresh PC while this moongit host is down. moongit keeps a
+# mirror of the repo, but github is the source consumers pin.
 # (first run clones to ~/.cache/mooncake/modules/...; later runs hit cache.)
-#
-# The source uses host.docker.internal (not 127.0.0.1) so the SAME tasks.yml
-# resolves from both the host — where host.docker.internal maps to this box —
-# and a CI job container, where moongitd's runner adds the host-gateway mapping
-# (see mgitci.yml / ci_runner.go). 127.0.0.1 would mean "the container itself".
 #
 # Project-specific lint excludes live in ./.golangci.yml (goq/lint runs
 # golangci-lint in-repo so the local config is honored).
 modules:
-  goq: "host.docker.internal:8080/alehatsman/go-quality@v0.1.1"
+  goq: "github.com/alehatsman/go-quality@v0.1.1"
   # The web/ quality gate (lint/format/typecheck/build/test/vuln + ci/ci-fast)
   # comes from the shared **ts-quality** module (alehatsman/ts-quality), the TS
   # analog of go-quality. The ui-* tasks below wrap tq/*; `dir: web` is now a
   # binding-level default prop (mooncake #52), applied to every tq/* export
   # that declares it and filtered out of those that don't (#57) — tq/sync-config
-  # takes a `dest` instead, so ui-sync-config is unaffected. Same
-  # MOONCAKE_MODULE_INSECURE=host.docker.internal:8080 prereq applies (http fetch).
+  # takes a `dest` instead, so ui-sync-config is unaffected. Fetched from
+  # github.com over https (alehatsman/ts-quality) — no insecure-host prereq.
   tq:
-    source: "host.docker.internal:8080/alehatsman/ts-quality@v0.1.0"
+    source: "github.com/alehatsman/ts-quality@v0.1.0"
     props:
       dir: web
 
