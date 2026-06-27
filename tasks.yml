@@ -41,7 +41,7 @@ vars:
 # Project-specific lint excludes live in ./.golangci.yml (goq/lint runs
 # golangci-lint in-repo so the local config is honored).
 modules:
-  goq: "github.com/alehatsman/go-quality@v0.1.1"
+  goq: "github.com/alehatsman/go-quality@v0.1.2"
   # The web/ quality gate (lint/format/typecheck/build/test/vuln + ci/ci-fast)
   # comes from the shared **ts-quality** module (alehatsman/ts-quality), the TS
   # analog of go-quality. The ui-* tasks below wrap tq/*; `dir: web` is now a
