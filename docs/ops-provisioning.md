@@ -459,9 +459,17 @@ stays on PATH as long as the `quality` job's `mooncake task ci` shell-out is
 in scope (explicitly excluded from #411, see top of this section).
 `ci/README.md` documents producing `ci/provision` (`cargo build --release`,
 glibc-linked, fine on `debian:stable-slim`) the same way `ci/mooncake`
-already is. **Not yet done:** the images (`moongit-ci:latest`,
-`moongit-ci-dev:latest`) haven't actually been rebuilt from these
-Dockerfiles — see Validation below.
+already is.
+
+**Also found by actually running it (not anticipated by the spec draft):**
+`curl` had to be added to the base image too. mooncake's `assert: {http:
+{...}}` used mooncake's own built-in Go HTTP client — no external binary
+needed. provision's translated equivalent (the curl-based command assert,
+above) does need one, and the base `moongit-ci:latest` image is
+deliberately toolchain-free — it didn't carry curl. First live run of the
+`smoke` job failed with `curl: command not found`; fixed by adding `curl`
+to `ci/Dockerfile`'s package list, documented in `ci/README.md`. This is a
+real new image dependency the swap introduces, not a pre-existing gap.
 
 ### 7. `host.docker.internal` reachability
 
@@ -514,22 +522,60 @@ the `--add-host` flag, don't remove it.
   current fact, plus one already-stale `mooncake task deploy` reference
   left over from #410) corrected.
 
-**Not yet done — needs a live end-to-end run, which needs the CI images
-rebuilt and this branch's moongitd actually running the new code:**
+**Live end-to-end run — done, against an isolated scratch instance, not the
+live moongitd:**
 
-- The images (`moongit-ci:latest`, `moongit-ci-dev:latest`) haven't been
-  rebuilt from the updated Dockerfiles.
-- No real `mgitci.yml` run has gone through the full path — docker-isolated
-  session, `docker exec ... provision apply ... --json`, NDJSON parsed into
-  moongit's event log, rendered in the UI — only the pieces (translator,
-  NDJSON decoder, event-emission logic) are validated in isolation/real-CLI,
-  not wired together against a live `moongitd` claiming a real queued run.
-- `quality`'s `mooncake task ci` shell-out inside a provision-run container
-  is unverified (needs the rebuilt image).
-- A deliberately-failing step's UI rendering (not just its storage/event-log
-  status, which the unit tests cover) is unverified.
+Rebuilt `moongit-ci:latest` from the updated Dockerfile (both binaries +
+curl). Built this branch's `moongitd`/`mgit` into a scratch data dir, on a
+different port, with a fresh SQLite DB, docker isolation — a separate
+process and separate CI-container namespace from the real moongit
+deployment, so the live daemon (and its live job queue, if anything had
+been running) was never touched. Registered a throwaway repo, enabled CI,
+pushed and manually triggered runs through the real `POST .../runs` API
+(the push-hook's env-injection path wasn't reached in this pass — a
+separate, pre-existing wiring detail unrelated to #411's runner swap; not
+chased down since the manual-trigger path exercises the exact same
+`executeRun`/`runJob` code either way):
 
-This is deliberately not done in this pass: it requires rebuilding
-production CI images and running new runner code against moongitd's live
-job queue — the same daemon this session's own tooling (mgit) depends on.
-Flagging for a decision on how to proceed rather than doing it unprompted.
+- **Success case** (`smoke` job: a `run:` shell step + an `assert:{http:}`
+  step against the scratch server's own `/healthz`): both steps ran through
+  the real docker-isolated `provision apply --json` path end to end; job
+  and run finished `success`; event log showed correct `step.started` →
+  `step.stdout` → `step.completed` for the shell step and correct
+  `step.started` → `step.completed` (no stdout/stderr keys — provision
+  emitted none, correctly omitted) for the http-assert step.
+- **This is what surfaced the curl gap** (§6 above) — the first attempt
+  failed with `curl: command not found`; fixed, rebuilt the image, reran,
+  passed clean.
+- **Failure/skip cascade** (`build`→`test`→`deploy`(`exit 7`)→`notify`):
+  `build`/`test` succeeded, `deploy` failed with `exit_code: 7` (the real
+  process exit code threaded all the way from the container through
+  `provisionEvent.RC` into `storage.CIJob.ExitCode` — not just "some
+  failure"), `notify` correctly `skipped` with no exit code. Matches
+  today's mooncake-path semantics exactly (same test shape as
+  `TestExecuteRunFailurePropagatesAndSkips`, now proven for real, not just
+  against a fake).
+- Torn down cleanly: scratch process killed, scratch data dir removed, no
+  leftover `moongit-ci-*` containers, live moongitd's own `/healthz`
+  reconfirmed healthy and untouched throughout.
+
+**One real operational risk found, not yet acted on:** `sweepOrphanContainers`
+(ci_runner.go) filters by container name prefix only (`moongit-ci-`/
+`moongit-agent-`), not by data dir or port — it's Docker-daemon-wide, not
+scoped per moongitd instance. Starting the scratch instance swept 2
+pre-existing orphan containers on the shared daemon; harmless this time
+(nothing was genuinely in-flight at that moment, confirmed via `docker ps`
+before/after), but a second moongitd instance started against the same
+Docker daemon while the *live* one has real in-flight CI/agent containers
+would force-remove them. Not a regression from #411 (the sweep is
+pre-existing, untouched by this change) and out of this issue's scope to
+fix, but worth its own issue if a second local instance (staging, another
+dev) is ever going to coexist with the production one on one Docker host.
+
+**Still not done:** `quality`'s `mooncake task ci` shell-out inside a
+provision-run container (needs `moongit-ci-dev:latest` rebuilt — not done
+in this pass, only the base `moongit-ci:latest` was) and a deliberately-
+failing step's actual UI rendering (the storage/event-log data it renders
+from is proven correct above; the UI component itself wasn't opened).
+Neither blocks merging on its own judgment, but flagging both rather than
+claiming a clean sweep.

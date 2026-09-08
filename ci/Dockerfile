@@ -10,9 +10,17 @@
 # mgitci.yml should derive from it (FROM moongit-ci:latest) or bundle both
 # binaries the same way.
 #
-# Scope is isolation only — no language toolchains are baked in. A repo that
-# needs Go/node/etc. authors a per-job `image:` pointing at a toolchain image
-# that also carries provision.
+# `curl` is baked in too: mooncake's `assert: {http: {...}}` (no provision
+# equivalent — assert takes command/expr only) translates to a curl-based
+# command assert (docs/ops-provisioning.md's CI-runner section). mooncake's
+# own http assert used its built-in Go HTTP client and needed no external
+# binary; provision's does, so this is a new image dependency the swap
+# introduces — found by actually running the `smoke` job's translated plan
+# for real (curl: command not found on the untouched base image).
+#
+# Scope is otherwise isolation only — no language toolchains are baked in. A
+# repo that needs Go/node/etc. authors a per-job `image:` pointing at a
+# toolchain image that also carries provision.
 #
 # Build (from the moongit repo root):
 #   1. produce a static mooncake binary into ci/mooncake (see ci/README.md)
@@ -21,7 +29,7 @@
 FROM debian:stable-slim
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates \
+ && apt-get install -y --no-install-recommends git ca-certificates curl \
  && rm -rf /var/lib/apt/lists/*
 
 # mooncake must be a statically-linked build (CGO_ENABLED=0) so it runs

@@ -7,7 +7,10 @@ So **every image used for CI must carry `provision` (and `git`) on PATH.**
 `mooncake` stays too, as long as the `quality` job's own `mooncake task ci`
 shell-out is in scope — #411 explicitly excludes rewriting the goq/tq gate
 itself as native provision plans; that's a separate, deferred follow-up.
-This directory builds the default image, `moongit-ci:latest`.
+`curl` is needed too: a job using `assert: {http: {...}}` (mooncake's own
+shape — provision's `assert` has no HTTP prober) translates to a curl-based
+command assert, so any image running one needs `curl` on PATH. This
+directory builds the default image, `moongit-ci:latest`.
 
 ## Build
 
