@@ -1,0 +1,20 @@
+description: snapshot the SQLite DB + bare repos to a timestamped tarball
+
+steps:
+  - vars_file: ./vars.yml
+
+  - name: backup dir
+    file: { path: "{{ backup_dir }}", state: dir }
+
+  - name: write backup tarball
+    shell: |
+      set -eu
+      ts=$(date -u +%Y%m%dT%H%M%SZ)
+      tmp=$(mktemp -d)
+      trap "rm -rf $tmp" EXIT
+      sqlite3 "{{ data_dir }}/moongit.db" ".backup '$tmp/moongit.db'"
+      tar czf "{{ backup_dir }}/moongit-$ts.tar.gz" \
+        -C "{{ data_dir }}" repos \
+        -C "$tmp" moongit.db
+      echo "wrote {{ backup_dir }}/moongit-$ts.tar.gz"
+    changed_when: "false"

@@ -1,0 +1,20 @@
+description: repack + prune every bare repo under the data dir (reclaims loose objects from a long-running fleet)
+
+steps:
+  - vars_file: ./vars.yml
+
+  - name: gc all repos
+    shell: |
+      set -eu
+      repos="{{ data_dir }}/repos"
+      test -d "$repos" || { echo "no repos dir at $repos"; exit 0; }
+      count=0
+      # Bare repos live at repos/<owner>/<name>.git
+      for d in "$repos"/*/*.git; do
+        [ -d "$d" ] || continue
+        echo "gc $d"
+        git --git-dir="$d" gc --prune=now --quiet
+        count=$((count + 1))
+      done
+      echo "gc complete: $count repo(s)"
+    changed_when: "false"

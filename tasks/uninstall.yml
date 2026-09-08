@@ -1,0 +1,20 @@
+description: "reverse of `provision apply tasks/install.yml` — stop service, remove binaries + unit"
+
+steps:
+  - vars_file: ./vars.yml
+
+  - name: disable + stop service
+    shell: systemctl --user disable --now moongit.service || true
+    changed_when: "false"
+
+  - name: remove unit + binaries
+    shell: "rm -f {{ unit_path }} {{ binary_path }} {{ client_path }}"
+    changed_when: "false"
+
+  - name: daemon-reload
+    shell: systemctl --user daemon-reload
+    changed_when: "false"
+
+  - name: done
+    shell: echo "moongit uninstalled (data dir {{ data_dir }} preserved)"
+    changed_when: "false"

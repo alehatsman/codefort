@@ -1,0 +1,33 @@
+# moongitd runs every CI/agent job in a throwaway container (see
+# cmd/moongitd/ci_runner.go), so these images must exist locally. They are
+# local-only (never pushed to a registry) and not auto-built, so a fresh box
+# or a `docker image prune` leaves them missing and the runner fails with
+# `docker run … exit status 125 (pull access denied)`. This task rebuilds
+# them from ci/ + agent/, compiling the git-ignored binary build inputs first.
+# See ci/README.md and agent/README.md.
+description: build the CI container images (moongit-ci + moongit-ci-dev) the runner needs
+
+steps:
+  - vars_file: ./vars.yml
+
+  # ci/mooncake (git-ignored build input): the static mooncake the runner
+  # execs inside every CI container (until #411 swaps that to provision).
+  - name: build ci/mooncake
+    shell: |
+      set -eu
+      test -d "{{ mooncake_src }}" || { echo "mooncake checkout not found at {{ mooncake_src }} — pass --var mooncake_src=/path/to/mooncake"; exit 1; }
+      CGO_ENABLED=0 go -C "{{ mooncake_src }}" build -o "$(pwd)/ci/mooncake" ./cmd
+      echo "built ci/mooncake"
+    changed_when: "false"
+
+  - name: build moongit-ci image
+    cmd: [docker, build, -t, "moongit-ci:latest", "ci/"]
+    changed_when: "false"
+
+  - name: build moongit-ci-dev image
+    cmd: [docker, build, -t, "moongit-ci-dev:latest", -f, "ci/Dockerfile.dev", "ci/"]
+    changed_when: "false"
+
+  - name: done
+    shell: echo "built moongit-ci:latest + moongit-ci-dev:latest"
+    changed_when: "false"

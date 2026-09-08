@@ -1,0 +1,10 @@
+description: "register and init a repo against the installed data dir. Pass --var owner=<owner> --var name=<name>"
+
+steps:
+  - vars_file: ./vars.yml
+
+  - name: create repo
+    cmd: ["{{ binary_path }}", repo, create, "{{ owner }}/{{ name }}"]
+    env:
+      MOONGIT_DATA_DIR: "{{ data_dir }}"
+    changed_when: "false"

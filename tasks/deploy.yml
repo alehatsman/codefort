@@ -1,0 +1,89 @@
+# Fast dev-loop deploy of the CURRENT working tree — bypasses the
+# HEAD-gated `mooncake apply -t moongit` in dotfiles. Rebuilds both
+# binaries + the web UI (served from web/dist via MOONGIT_WEB_DIR),
+# reinstalls to ~/.local/bin, and restarts the live service. Does not
+# touch the .sha sidecar, so a later `apply` still reconciles to HEAD.
+#
+# Shared-prod safety (#300): binaries install to one shared path and the
+# served bundle is one fixed dir, so a deploy from a stale/other checkout
+# silently regresses prod. Two guards below close that:
+#   1. Refuse unless HEAD == the current branch's upstream tip, so only a
+#      checkout that is level with canonical main may deploy.
+#   2. Sync the freshly-built bundle into the served {{ web_dir }}, so a
+#      deploy from a worktree can't leave web behind the new binary.
+description: rebuild daemon + client + web UI, reinstall to ~/.local/bin, restart moongit.service
+
+steps:
+  - vars_file: ./vars.yml
+
+  - name: deploy guard (#300)
+    shell: |
+      set -eu
+      git fetch -q "$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | cut -d/ -f1)" 2>/dev/null || true
+      upstream="$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || true)"
+      if [ -z "$upstream" ]; then
+        echo "REFUSING DEPLOY (#300): current branch has no upstream — deploy only from a checkout tracking canonical main." >&2
+        exit 1
+      fi
+      head="$(git rev-parse HEAD)"
+      tip="$(git rev-parse "$upstream")"
+      if [ "$head" != "$tip" ]; then
+        echo "REFUSING DEPLOY (#300): HEAD ($head) != $upstream ($tip)." >&2
+        echo "This checkout is not level with canonical main; deploying would silently regress shared prod." >&2
+        echo "Reconcile (git pull --ff-only / git push), or run the HEAD-gated 'mooncake apply -t moongit' from dotfiles." >&2
+        exit 1
+      fi
+      echo "deploy guard ok: HEAD == $upstream ($tip)"
+    changed_when: "false"
+
+  - name: "~/.local/bin directory"
+    file: { path: "{{ home }}/.local/bin", state: dir }
+
+  - name: build moongitd
+    cmd: [go, build, -trimpath, -ldflags, "-s -w", -o, "{{ binary_path }}", ./cmd/moongitd]
+    changed_when: "false"
+
+  - name: build moongit
+    cmd: [go, build, -trimpath, -ldflags, "-s -w", -o, "{{ client_path }}", ./cmd/moongit]
+    changed_when: "false"
+
+  - name: mgitd alias
+    file: { path: "{{ home }}/.local/bin/mgitd", src: "{{ binary_path }}", state: link }
+
+  - name: mgit alias
+    file: { path: "{{ home }}/.local/bin/mgit", src: "{{ client_path }}", state: link }
+
+  - name: npm install (web)
+    shell: npm install
+    creates: web/node_modules
+    cwd: web
+
+  - name: npm run build (web)
+    cmd: [npm, run, build]
+    cwd: web
+    changed_when: "false"
+
+  # Land the just-built bundle in the dir moongitd serves. No-op when the
+  # invocation CWD already IS the canonical checkout (source == dest);
+  # required when deploying from a worktree so binary+web can't split (#300).
+  - name: sync web bundle to served dir
+    shell: |
+      set -eu
+      src="$(realpath web/dist)"
+      dst="$(realpath -m '{{ web_dir }}')"
+      if [ "$src" != "$dst" ]; then
+        mkdir -p "$dst"
+        rsync -a --delete "$src/" "$dst/"
+        echo "synced web bundle: $src -> $dst"
+      else
+        echo "web bundle already at served dir ($dst); no sync needed"
+      fi
+    changed_when: "false"
+
+  - name: restart moongit.service
+    shell: systemctl --user restart moongit.service
+    changed_when: "false"
+
+  - name: done
+    shell: 'echo "deployed: rebuilt + reinstalled binaries, rebuilt web UI (synced to served dir), restarted moongit.service"'
+    changed_when: "false"

@@ -1,0 +1,9 @@
+description: run moongitd in the foreground against ./data/ (dev mode)
+
+steps:
+  - name: data/repos directory
+    file: { path: data/repos, state: dir }
+
+  - name: run moongitd
+    cmd: [go, run, ./cmd/moongitd]
+    changed_when: "false"

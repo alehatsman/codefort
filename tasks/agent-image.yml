@@ -1,0 +1,31 @@
+description: "build the agent container image (moongit-agent:latest). Requires moongit-ci:latest — run `provision apply tasks/ci-images.yml` first."
+
+steps:
+  - vars_file: ./vars.yml
+
+  # agent/{mooncake,mgit,dex} (git-ignored build inputs, per agent/README.md):
+  # the runner execs mooncake/mgit/dex inside the agent container; the agent
+  # image derives FROM moongit-ci:latest, so that base must already exist.
+  - name: build agent/{mooncake,mgit,dex}
+    shell: |
+      set -eu
+      docker image inspect moongit-ci:latest >/dev/null 2>&1 || { echo "moongit-ci:latest missing — run 'provision apply tasks/ci-images.yml' first (the agent image is FROM it)"; exit 1; }
+      test -d "{{ mooncake_src }}" || { echo "mooncake checkout not found at {{ mooncake_src }} — pass --var mooncake_src=/path"; exit 1; }
+      test -d "{{ dex_src }}" || { echo "dex checkout not found at {{ dex_src }} — pass --var dex_src=/path"; exit 1; }
+      CGO_ENABLED=0 go -C "{{ mooncake_src }}" build -o "$(pwd)/agent/mooncake" ./cmd
+      CGO_ENABLED=0 go build -o "$(pwd)/agent/mgit" ./cmd/moongit
+      # dex pulls in the sqlite-vec cgo bindings, so it needs CGO + the
+      # sqlite_fts5 tag (same as dex's own build); a CGO_ENABLED=0 build
+      # no longer compiles. The resulting binary is dynamically linked but
+      # runs in the debian-based image (host glibc <= image glibc).
+      CGO_ENABLED=1 go -C "{{ dex_src }}" build -tags sqlite_fts5 -o "$(pwd)/agent/dex" ./cmd/dex
+      echo "built agent/{mooncake,mgit,dex} build inputs"
+    changed_when: "false"
+
+  - name: build moongit-agent image
+    cmd: [docker, build, -t, "moongit-agent:latest", "agent/"]
+    changed_when: "false"
+
+  - name: done
+    shell: echo "built moongit-agent:latest"
+    changed_when: "false"
