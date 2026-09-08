@@ -1,0 +1,27 @@
+description: "restore from a backup tarball. Pass --var tarball=/path/to/file.tar.gz"
+
+steps:
+  # vars_file loads values raw (unrendered) — a `{{ home }}`-containing
+  # value from a file never gets a second render pass (provision spec
+  # §3.3). An inline `vars:` step's values ARE rendered, so home-anchored
+  # paths live here, not in a shared vars_file (confirmed with Provision
+  # master mind, moongit issue #410).
+  - vars:
+      data_dir: "{{ home }}/.local/share/moongit"
+
+  - name: stop moongit.service
+    shell: systemctl --user stop moongit.service || true
+    changed_when: "false"
+
+  - name: restore from tarball
+    shell: |
+      set -eu
+      test -f "{{ tarball }}" || { echo "tarball not found: {{ tarball }}"; exit 1; }
+      rm -rf "{{ data_dir }}/repos" "{{ data_dir }}/moongit.db"*
+      tar xzf "{{ tarball }}" -C "{{ data_dir }}"
+      echo "restored from {{ tarball }}"
+    changed_when: "false"
+
+  - name: start moongit.service
+    shell: systemctl --user start moongit.service || true
+    changed_when: "false"

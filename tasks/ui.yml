@@ -1,0 +1,12 @@
+description: start the Vite dev server on :5173 (proxies /api/* to the daemon on :8080)
+
+steps:
+  - name: npm install (web)
+    shell: npm install
+    creates: web/node_modules
+    cwd: web
+
+  - name: npm run dev (web)
+    cmd: [npm, run, dev]
+    cwd: web
+    changed_when: "false"

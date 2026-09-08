@@ -1,0 +1,5 @@
+description: remove dev build artifacts (keeps ./data/)
+
+steps:
+  - name: remove bin/
+    file: { path: bin, state: absent, force: true }

@@ -1,31 +1,19 @@
-# Imperative operations. Run with `mooncake task <name>`.
+# The Go + web quality gate. Run with `mooncake task <name>`.
 # List all tasks: `mooncake task`.
 #
 # Host/server provisioning is NOT here — it lives in the dotfiles repo
 # (~/dotfiles/components/moongit), applied with `mooncake apply -c
-# ~/dotfiles/main_pc.yml -t moongit`. This file holds the dev loop plus
-# a few ops helpers that act on the installed location.
+# ~/dotfiles/main_pc.yml -t moongit`.
+#
+# The dev-loop tasks (build/install/deploy/backup/gc/restore/uninstall/
+# create-repo/run/ui/clean/ci-images/agent-image) moved to tasks/
+# (provision) — see docs/ops-provisioning.md and moongit issue #410. This
+# file now holds only the goq/tq-backed quality-gate tasks, plus `tidy`,
+# which #410 didn't scope out. The CI runner (mgitci.yml,
+# cmd/moongitd/ci_runner.go) still execs mooncake in-container — tracked
+# separately in #411.
 
 version: "1.0"
-
-vars:
-  # Match the install paths the dotfiles moongit component uses so
-  # backup/restore/uninstall operate on the same locations the systemd
-  # service uses.
-  binary_path: "{{ home }}/.local/bin/moongitd"
-  client_path: "{{ home }}/.local/bin/moongit"
-  data_dir:    "{{ home }}/.local/share/moongit"
-  unit_path:   "{{ home }}/.config/systemd/user/moongit.service"
-  backup_dir:  "{{ home }}/.local/share/moongit/backups"
-  # The SPA dir moongitd actually serves (MOONGIT_WEB_DIR), pinned by the
-  # dotfiles moongit component to the canonical checkout. `deploy` builds web
-  # in the invocation CWD then syncs into THIS dir, so a deploy from a worktree
-  # can't leave the served bundle behind the freshly-installed binary (#300).
-  web_dir:     "{{ home }}/projects/moongit/web/dist"
-  # Sibling checkouts the container-image builds compile their static binaries
-  # from. Override per-box with `--vars '{mooncake_src: …, dex_src: …}'`.
-  mooncake_src: "{{ home }}/projects/mooncake"
-  dex_src:      "{{ home }}/projects/dex"
 
 # The Go quality gate (lint/vuln/scan/ai-lint/arch-snapshot/budget-status/dupl
 # + the fast/full CI gates) comes from the shared **go-quality** module
@@ -55,120 +43,11 @@ modules:
       dir: web
 
 tasks:
-  # ---- dev loop ---------------------------------------------------------
   tidy:
     desc: Sync Go module dependencies
     steps:
       - cmd:
           argv: ["go", "mod", "tidy"]
-
-  build:
-    desc: Build both binaries to ./bin/ (dev tree)
-    steps:
-      - file.write:
-          path: bin
-          state: directory
-      - cmd:
-          argv: ["go", "build", "-o", "bin/moongitd", "./cmd/moongitd"]
-      - cmd:
-          argv: ["go", "build", "-o", "bin/moongit", "./cmd/moongit"]
-
-  install:
-    desc: Build both binaries into ~/.local/bin + create mgitd/mgit aliases (no systemd changes)
-    steps:
-      - file.write:
-          path: "{{ home }}/.local/bin"
-          state: directory
-      - cmd:
-          argv: ["go", "build", "-o", "{{ binary_path }}", "./cmd/moongitd"]
-      - cmd:
-          argv: ["go", "build", "-o", "{{ client_path }}", "./cmd/moongit"]
-      - file.write:
-          path: "{{ home }}/.local/bin/mgitd"
-          src: "{{ binary_path }}"
-          state: link
-      - file.write:
-          path: "{{ home }}/.local/bin/mgit"
-          src: "{{ client_path }}"
-          state: link
-      - log:
-          msg: "installed moongitd + moongit to {{ home }}/.local/bin (aliases: mgitd, mgit)"
-
-  deploy:
-    # Fast dev-loop deploy of the CURRENT working tree — bypasses the
-    # HEAD-gated `mooncake apply -t moongit` in dotfiles. Rebuilds both
-    # binaries + the web UI (served from web/dist via MOONGIT_WEB_DIR),
-    # reinstalls to ~/.local/bin, and restarts the live service. Does not
-    # touch the .sha sidecar, so a later `apply` still reconciles to HEAD.
-    #
-    # Shared-prod safety (#300): binaries install to one shared path and the
-    # served bundle is one fixed dir, so a deploy from a stale/other checkout
-    # silently regresses prod. Two guards below close that:
-    #   1. Refuse unless HEAD == the current branch's upstream tip, so only a
-    #      checkout that is level with canonical main may deploy.
-    #   2. Sync the freshly-built bundle into the served {{ web_dir }}, so a
-    #      deploy from a worktree can't leave web behind the new binary.
-    desc: Rebuild daemon + client + web UI, reinstall to ~/.local/bin, restart moongit.service
-    steps:
-      - shell:
-          cmd: |
-            set -eu
-            git fetch -q "$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | cut -d/ -f1)" 2>/dev/null || true
-            upstream="$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || true)"
-            if [ -z "$upstream" ]; then
-              echo "REFUSING DEPLOY (#300): current branch has no upstream — deploy only from a checkout tracking canonical main." >&2
-              exit 1
-            fi
-            head="$(git rev-parse HEAD)"
-            tip="$(git rev-parse "$upstream")"
-            if [ "$head" != "$tip" ]; then
-              echo "REFUSING DEPLOY (#300): HEAD ($head) != $upstream ($tip)." >&2
-              echo "This checkout is not level with canonical main; deploying would silently regress shared prod." >&2
-              echo "Reconcile (git pull --ff-only / git push), or run the HEAD-gated 'mooncake apply -t moongit' from dotfiles." >&2
-              exit 1
-            fi
-            echo "deploy guard ok: HEAD == $upstream ($tip)"
-      - file.write:
-          path: "{{ home }}/.local/bin"
-          state: directory
-      - cmd:
-          argv: ["go", "build", "-trimpath", "-ldflags", "-s -w", "-o", "{{ binary_path }}", "./cmd/moongitd"]
-      - cmd:
-          argv: ["go", "build", "-trimpath", "-ldflags", "-s -w", "-o", "{{ client_path }}", "./cmd/moongit"]
-      - file.write:
-          path: "{{ home }}/.local/bin/mgitd"
-          src: "{{ binary_path }}"
-          state: link
-      - file.write:
-          path: "{{ home }}/.local/bin/mgit"
-          src: "{{ client_path }}"
-          state: link
-      - shell:
-          cmd: "npm install"
-          creates: web/node_modules
-        cwd: web
-      - cmd:
-          argv: ["npm", "run", "build"]
-        cwd: web
-      # Land the just-built bundle in the dir moongitd serves. No-op when the
-      # invocation CWD already IS the canonical checkout (source == dest);
-      # required when deploying from a worktree so binary+web can't split (#300).
-      - shell:
-          cmd: |
-            set -eu
-            src="$(realpath web/dist)"
-            dst="$(realpath -m '{{ web_dir }}')"
-            if [ "$src" != "$dst" ]; then
-              mkdir -p "$dst"
-              rsync -a --delete "$src/" "$dst/"
-              echo "synced web bundle: $src -> $dst"
-            else
-              echo "web bundle already at served dir ($dst); no sync needed"
-            fi
-      - shell:
-          cmd: "systemctl --user restart moongit.service"
-      - log:
-          msg: "deployed: rebuilt + reinstalled binaries, rebuilt web UI (synced to served dir), restarted moongit.service"
 
   # ---- Go quality gate (via the go-quality module) ----------------------
   # Pure single-use wrappers collapse to the `use:` shorthand; `mooncake task`
@@ -211,26 +90,6 @@ tasks:
 
   ci: goq/ci
 
-  run:
-    desc: Run moongitd in the foreground against ./data/ (dev mode)
-    steps:
-      - file.write:
-          path: data/repos
-          state: directory
-      - cmd:
-          argv: ["go", "run", "./cmd/moongitd"]
-
-  ui:
-    desc: Start the Vite dev server on :5173 (proxies /api/* to the daemon on :8080)
-    steps:
-      - shell:
-          cmd: "npm install"
-          creates: web/node_modules
-        cwd: web
-      - cmd:
-          argv: ["npm", "run", "dev"]
-        cwd: web
-
   # ---- web quality gate (ts-quality module; dir: web via tq default props) --
   # Pure wrappers collapse to the `use:` shorthand — dir:web comes from the tq
   # binding default and `mooncake task` lists each ts-quality component's desc.
@@ -259,132 +118,3 @@ tasks:
       # subdir resolves against the module cache dir, not the repo, so pin it.
       - use: tq/sync-config
         props: { dest: "{{ invocation_dir }}/web/biome.base.json" }
-
-  clean:
-    desc: Remove dev build artifacts (keeps ./data/)
-    steps:
-      - shell:
-          cmd: "rm -rf bin"
-
-  # ---- CI / agent container images --------------------------------------
-  # moongitd runs every CI/agent job in a throwaway container (see
-  # cmd/moongitd/ci_runner.go), so these images must exist locally. They are
-  # local-only (never pushed to a registry) and not auto-built, so a fresh box
-  # or a `docker image prune` leaves them missing and the runner fails with
-  # `docker run … exit status 125 (pull access denied)`. These targets rebuild
-  # them from ci/ + agent/, compiling the git-ignored binary build inputs first.
-  # See ci/README.md and agent/README.md.
-  ci-images:
-    desc: Build the CI container images (moongit-ci + moongit-ci-dev) the runner needs
-    steps:
-      # ci/mooncake (git-ignored build input): the static mooncake the runner
-      # execs inside every CI container.
-      - shell:
-          cmd: |
-            set -eu
-            test -d "{{ mooncake_src }}" || { echo "mooncake checkout not found at {{ mooncake_src }} — pass --vars '{mooncake_src: /path/to/mooncake}'"; exit 1; }
-            CGO_ENABLED=0 go -C "{{ mooncake_src }}" build -o "{{ invocation_dir }}/ci/mooncake" ./cmd
-            echo "built ci/mooncake"
-      - cmd:
-          argv: ["docker", "build", "-t", "moongit-ci:latest", "ci/"]
-      - cmd:
-          argv: ["docker", "build", "-t", "moongit-ci-dev:latest", "-f", "ci/Dockerfile.dev", "ci/"]
-      - log:
-          msg: "built moongit-ci:latest + moongit-ci-dev:latest"
-
-  agent-image:
-    desc: Build the agent container image (moongit-agent:latest). Requires moongit-ci:latest — run `ci-images` first.
-    steps:
-      # agent/{mooncake,mgit,dex} (git-ignored build inputs, per agent/README.md):
-      # the runner execs mooncake/mgit/dex inside the agent container; the agent
-      # image derives FROM moongit-ci:latest, so that base must already exist.
-      - shell:
-          cmd: |
-            set -eu
-            docker image inspect moongit-ci:latest >/dev/null 2>&1 || { echo "moongit-ci:latest missing — run 'mooncake task ci-images' first (the agent image is FROM it)"; exit 1; }
-            test -d "{{ mooncake_src }}" || { echo "mooncake checkout not found at {{ mooncake_src }} — pass --vars '{mooncake_src: /path}'"; exit 1; }
-            test -d "{{ dex_src }}" || { echo "dex checkout not found at {{ dex_src }} — pass --vars '{dex_src: /path}'"; exit 1; }
-            CGO_ENABLED=0 go -C "{{ mooncake_src }}" build -o "{{ invocation_dir }}/agent/mooncake" ./cmd
-            CGO_ENABLED=0 go build -o "{{ invocation_dir }}/agent/mgit" ./cmd/moongit
-            # dex pulls in the sqlite-vec cgo bindings, so it needs CGO + the
-            # sqlite_fts5 tag (same as dex's own build); a CGO_ENABLED=0 build
-            # no longer compiles. The resulting binary is dynamically linked but
-            # runs in the debian-based image (host glibc <= image glibc).
-            CGO_ENABLED=1 go -C "{{ dex_src }}" build -tags sqlite_fts5 -o "{{ invocation_dir }}/agent/dex" ./cmd/dex
-            echo "built agent/{mooncake,mgit,dex} build inputs"
-      - cmd:
-          argv: ["docker", "build", "-t", "moongit-agent:latest", "agent/"]
-      - log:
-          msg: "built moongit-agent:latest"
-
-  # ---- ops (work against the installed location) ------------------------
-  create-repo:
-    desc: 'Register and init a repo against the installed data dir. Pass --vars with {owner, name}'
-    steps:
-      - cmd:
-          argv: ["{{ binary_path }}", "repo", "create", "{{ owner }}/{{ name }}"]
-        env:
-          MOONGIT_DATA_DIR: "{{ data_dir }}"
-
-  backup:
-    desc: Snapshot the SQLite DB + bare repos to a timestamped tarball
-    steps:
-      - file.write:
-          path: "{{ backup_dir }}"
-          state: directory
-      - shell:
-          cmd: |
-            set -eu
-            ts=$(date -u +%Y%m%dT%H%M%SZ)
-            tmp=$(mktemp -d)
-            trap "rm -rf $tmp" EXIT
-            sqlite3 "{{ data_dir }}/moongit.db" ".backup '$tmp/moongit.db'"
-            tar czf "{{ backup_dir }}/moongit-$ts.tar.gz" \
-              -C "{{ data_dir }}" repos \
-              -C "$tmp" moongit.db
-            echo "wrote {{ backup_dir }}/moongit-$ts.tar.gz"
-
-  gc:
-    desc: Repack + prune every bare repo under the data dir (reclaims loose objects from a long-running fleet)
-    steps:
-      - shell:
-          cmd: |
-            set -eu
-            repos="{{ data_dir }}/repos"
-            test -d "$repos" || { echo "no repos dir at $repos"; exit 0; }
-            count=0
-            # Bare repos live at repos/<owner>/<name>.git
-            for d in "$repos"/*/*.git; do
-              [ -d "$d" ] || continue
-              echo "gc $d"
-              git --git-dir="$d" gc --prune=now --quiet
-              count=$((count + 1))
-            done
-            echo "gc complete: $count repo(s)"
-
-  restore:
-    desc: 'Restore from a backup tarball. Pass --vars with {tarball: /path/to/file.tar.gz}'
-    steps:
-      - shell:
-          cmd: "systemctl --user stop moongit.service || true"
-      - shell:
-          cmd: |
-            set -eu
-            test -f "{{ tarball }}" || { echo "tarball not found: {{ tarball }}"; exit 1; }
-            rm -rf "{{ data_dir }}/repos" "{{ data_dir }}/moongit.db"*
-            tar xzf "{{ tarball }}" -C "{{ data_dir }}"
-            echo "restored from {{ tarball }}"
-      - shell:
-          cmd: "systemctl --user start moongit.service || true"
-
-  uninstall:
-    desc: Reverse of `mooncake apply` — stop service, remove binaries + unit
-    steps:
-      - shell:
-          cmd: "systemctl --user disable --now moongit.service || true"
-      - shell:
-          cmd: "rm -f {{ unit_path }} {{ binary_path }} {{ client_path }}"
-      - shell:
-          cmd: "systemctl --user daemon-reload"
-      - log:
-          msg: "moongit uninstalled (data dir {{ data_dir }} preserved)"

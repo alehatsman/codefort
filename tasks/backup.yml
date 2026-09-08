@@ -1,0 +1,27 @@
+description: snapshot the SQLite DB + bare repos to a timestamped tarball
+
+steps:
+  # vars_file loads values raw (unrendered) — a `{{ home }}`-containing
+  # value from a file never gets a second render pass (provision spec
+  # §3.3). An inline `vars:` step's values ARE rendered, so home-anchored
+  # paths live here, not in a shared vars_file (confirmed with Provision
+  # master mind, moongit issue #410).
+  - vars:
+      backup_dir: "{{ home }}/.local/share/moongit/backups"
+      data_dir: "{{ home }}/.local/share/moongit"
+
+  - name: backup dir
+    file: { path: "{{ backup_dir }}", state: dir }
+
+  - name: write backup tarball
+    shell: |
+      set -eu
+      ts=$(date -u +%Y%m%dT%H%M%SZ)
+      tmp=$(mktemp -d)
+      trap "rm -rf $tmp" EXIT
+      sqlite3 "{{ data_dir }}/moongit.db" ".backup '$tmp/moongit.db'"
+      tar czf "{{ backup_dir }}/moongit-$ts.tar.gz" \
+        -C "{{ data_dir }}" repos \
+        -C "$tmp" moongit.db
+      echo "wrote {{ backup_dir }}/moongit-$ts.tar.gz"
+    changed_when: "false"
