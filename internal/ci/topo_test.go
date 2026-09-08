@@ -1,8 +1,9 @@
 package ci
 
 import (
-	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestTopoOrderRespectsNeeds(t *testing.T) {
@@ -44,7 +45,7 @@ jobs:
 	}
 }
 
-func TestMooncakeStepsTranslation(t *testing.T) {
+func TestJobStepMetaAndTranslateJobPlan(t *testing.T) {
 	p, err := Parse([]byte(`
 version: "1"
 jobs:
@@ -56,30 +57,55 @@ jobs:
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	steps, err := MooncakeSteps(p.Jobs["j"])
+	meta, err := JobStepMeta(p.Jobs["j"])
 	if err != nil {
-		t.Fatalf("MooncakeSteps: %v", err)
+		t.Fatalf("JobStepMeta: %v", err)
+	}
+	if len(meta) != 2 {
+		t.Fatalf("meta = %d, want 2", len(meta))
+	}
+	// run: sugar -> a provision shell step.
+	if meta[0].Action != "shell" {
+		t.Errorf("step 0 action = %q, want shell", meta[0].Action)
+	}
+	// Label is the human log caption: the command, not a generic action name
+	// — so the UI shows "go test ./...", not "shell".
+	if meta[0].Label != "go test ./..." {
+		t.Errorf("step 0 label = %q, want %q", meta[0].Label, "go test ./...")
+	}
+	// mooncake's `cmd: {argv: [...]}` is rewritten to provision's bare
+	// sequence `cmd: [...]` (the argv: wrapper drops, docs/ops-
+	// provisioning.md's translation table) — action stays "cmd", and the
+	// label is now the real command rather than the old generic "cmd".
+	if meta[1].Action != "cmd" {
+		t.Errorf("step 1 action = %q, want cmd", meta[1].Action)
+	}
+	if meta[1].Label != "go vet ./..." {
+		t.Errorf("step 1 label = %q, want %q", meta[1].Label, "go vet ./...")
+	}
+
+	planYAML, err := TranslateJobPlan(p.Jobs["j"])
+	if err != nil {
+		t.Fatalf("TranslateJobPlan: %v", err)
+	}
+	var steps []map[string]any
+	if err := yaml.Unmarshal(planYAML, &steps); err != nil {
+		t.Fatalf("translated plan is not a step list: %v\n%s", err, planYAML)
 	}
 	if len(steps) != 2 {
-		t.Fatalf("steps = %d, want 2", len(steps))
+		t.Fatalf("plan steps = %d, want 2\n%s", len(steps), planYAML)
 	}
-	// run: sugar -> shell action; YAML carries the cmd.
-	if steps[0].Action != "shell" {
-		t.Errorf("step 0 action = %q, want shell", steps[0].Action)
+	if steps[0]["shell"] != "go test ./..." {
+		t.Errorf("step 0 shell = %v, want %q", steps[0]["shell"], "go test ./...")
 	}
-	if !strings.Contains(steps[0].YAML, "go test ./...") {
-		t.Errorf("step 0 YAML missing cmd:\n%s", steps[0].YAML)
+	cmd, ok := steps[1]["cmd"].([]any)
+	if !ok || len(cmd) != 3 || cmd[0] != "go" || cmd[1] != "vet" || cmd[2] != "./..." {
+		t.Errorf("step 1 cmd = %#v, want [go vet ./...]", steps[1]["cmd"])
 	}
-	// raw step passes through; action is its top-level key.
-	if steps[1].Action != "cmd" {
-		t.Errorf("step 1 action = %q, want cmd", steps[1].Action)
-	}
-	// Label is the human log caption: the command for a run: step, the action
-	// otherwise — so the UI shows "go test ./...", not a generic "shell".
-	if steps[0].Label != "go test ./..." {
-		t.Errorf("step 0 label = %q, want %q", steps[0].Label, "go test ./...")
-	}
-	if steps[1].Label != "cmd" {
-		t.Errorf("step 1 label = %q, want cmd", steps[1].Label)
+	// Every emitted shell/cmd step needs an idempotency gate or `validate
+	// --strict` fails it (provision spec §6.1) — CI steps are exit-code-is-
+	// the-contract, not state changes.
+	if steps[0]["changed_when"] != "false" || steps[1]["changed_when"] != "false" {
+		t.Errorf("steps missing changed_when: false\n%s", planYAML)
 	}
 }

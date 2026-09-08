@@ -3,8 +3,10 @@
 # The base image (ci/Dockerfile, moongit-ci:latest) is deliberately
 # toolchain-free; this derives from it and adds the Go + Node toolchains
 # moongit's pipeline needs (go build/test/vet/fmt, web build) plus the
-# static-analysis toolchain the go-quality gate shells out to. It still carries
-# mooncake + git from the base, which the runner execs inside the container.
+# static-analysis toolchain the go-quality gate shells out to. It still
+# carries provision + mooncake + git from the base — provision is what the
+# runner execs inside the container (#411); mooncake stays for the `quality`
+# job's own `mooncake task ci` shell-out.
 #
 # `mooncake task ci` (go-quality module) runs golangci-lint/govulncheck/gocyclo/
 # dupl, so those are baked here at pinned versions; dupl-report.sh pipes through
@@ -66,7 +68,7 @@ RUN CGO_ENABLED=0 GOBIN=/usr/local/bin go install \
  && go clean -cache -modcache \
  && rm -rf /tmp/go /tmp/.cache
 
-RUN go version && node --version && mooncake --version && python3 --version && docker --version \
+RUN go version && node --version && provision --version && mooncake --version && python3 --version && docker --version \
  && for t in golangci-lint govulncheck gocyclo dupl; do \
       command -v "$t" >/dev/null || { echo "missing tool: $t" >&2; exit 1; }; \
     done

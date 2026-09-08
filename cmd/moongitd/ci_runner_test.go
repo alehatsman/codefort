@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -15,12 +16,13 @@ import (
 	"github.com/alehatsman/moongit/internal/ci"
 	"github.com/alehatsman/moongit/internal/config"
 	"github.com/alehatsman/moongit/internal/storage"
+	"gopkg.in/yaml.v3"
 )
 
 // newTestRunner builds a runner over a migrated temp DB with one repo and one
 // queued run, injecting fake checkout/pipeline/exec boundaries so no real git
-// or mooncake is involved.
-func newTestRunner(t *testing.T, pipeline string, enabled bool, exec stepExecutor) (*ciRunner, storage.CIRun) {
+// or provision is involved.
+func newTestRunner(t *testing.T, pipeline string, enabled bool, exec planExecutor) (*ciRunner, storage.CIRun) {
 	t.Helper()
 	dir := t.TempDir()
 	db, err := storage.Open(filepath.Join(dir, "ci.db"))
@@ -50,7 +52,15 @@ func newTestRunner(t *testing.T, pipeline string, enabled bool, exec stepExecuto
 	r := &ciRunner{
 		db: db,
 		cfg: &config.Config{
-			DataDir:        dir,
+			DataDir: dir,
+			// Matches DataDir, as a non-containerized moongitd (this test
+			// harness's shape) always has it: r.hostPath is then a no-op, so
+			// the plan file runJob writes under the real workDir and the one
+			// the fakes below read back from agree. Leaving this unset (both
+			// zero-value "") makes hostPath's HostDataDir==DataDir check fail
+			// and silently hand the fakes a mistranslated workDir — harmless
+			// while no fake touched the filesystem, real once one does.
+			HostDataDir:    dir,
 			ReposDir:       filepath.Join(dir, "repos"),
 			CIRunTimeout:   time.Minute,
 			CIPollInterval: time.Second,
@@ -72,24 +82,65 @@ func newTestRunner(t *testing.T, pipeline string, enabled bool, exec stepExecuto
 
 const failSentinel = "FAIL_HERE"
 
-func successExec(context.Context, string, string) (stepResult, error) {
-	return stepResult{RC: 0, Stdout: "ok\n"}, nil
-}
-
-func sentinelExec(_ context.Context, _ string, stepYAML string) (stepResult, error) {
-	if strings.Contains(stepYAML, failSentinel) {
-		return stepResult{RC: 1, Failed: true, Stderr: "boom\n"}, nil
+// planStepNames reads the plan file runJob wrote (workDir/planFile) and
+// returns each step's `name:` field, in order — enough for the fakes below to
+// know how many steps to synthesize events for, and (sentinelExec) to spot
+// the failure sentinel a test plants in one step's `run:` command (which the
+// translator carries into that step's name/shell fields).
+func planStepNames(workDir, planFile string) ([]string, error) {
+	data, err := os.ReadFile(filepath.Join(workDir, planFile))
+	if err != nil {
+		return nil, err
 	}
-	return stepResult{RC: 0, Stdout: "ok\n"}, nil
+	var steps []struct {
+		Name string `yaml:"name"`
+	}
+	if err := yaml.Unmarshal(data, &steps); err != nil {
+		return nil, err
+	}
+	names := make([]string, len(steps))
+	for i, s := range steps {
+		names[i] = s.Name
+	}
+	return names, nil
 }
 
-// trackingExec returns a step executor that records the peak number of
+func successExec(_ context.Context, workDir, planFile string, onEvent func(provisionEvent)) (provisionEvent, error) {
+	names, err := planStepNames(workDir, planFile)
+	if err != nil {
+		return provisionEvent{}, err
+	}
+	for i := range names {
+		onEvent(provisionEvent{Event: "step", Index: i + 1, Status: "ok", Stdout: "ok\n"})
+	}
+	return provisionEvent{Event: "summary", Total: len(names), OK: len(names)}, nil
+}
+
+func sentinelExec(_ context.Context, workDir, planFile string, onEvent func(provisionEvent)) (provisionEvent, error) {
+	names, err := planStepNames(workDir, planFile)
+	if err != nil {
+		return provisionEvent{}, err
+	}
+	for i, name := range names {
+		idx := i + 1
+		if strings.Contains(name, failSentinel) {
+			rc := 1
+			onEvent(provisionEvent{Event: "step", Index: idx, Status: "failed", RC: &rc, Stderr: "boom\n"})
+			// apply stops at the first failure — no further step events.
+			return provisionEvent{Event: "summary", Total: len(names), OK: i, Failed: 1}, nil
+		}
+		onEvent(provisionEvent{Event: "step", Index: idx, Status: "ok", Stdout: "ok\n"})
+	}
+	return provisionEvent{Event: "summary", Total: len(names), OK: len(names)}, nil
+}
+
+// trackingExec returns a plan executor that records the peak number of
 // concurrent in-flight executions, holding each for hold so any overlap is
 // observable. With one step per job, the peak doubles as the peak number of
 // concurrently executing runs.
-func trackingExec(hold time.Duration) (stepExecutor, *int64) {
+func trackingExec(hold time.Duration) (planExecutor, *int64) {
 	var cur, maxSeen int64
-	exec := func(context.Context, string, string) (stepResult, error) {
+	exec := func(_ context.Context, workDir, planFile string, onEvent func(provisionEvent)) (provisionEvent, error) {
 		n := atomic.AddInt64(&cur, 1)
 		for {
 			old := atomic.LoadInt64(&maxSeen)
@@ -99,7 +150,14 @@ func trackingExec(hold time.Duration) (stepExecutor, *int64) {
 		}
 		time.Sleep(hold)
 		atomic.AddInt64(&cur, -1)
-		return stepResult{RC: 0, Stdout: "ok\n"}, nil
+		names, err := planStepNames(workDir, planFile)
+		if err != nil {
+			return provisionEvent{}, err
+		}
+		for i := range names {
+			onEvent(provisionEvent{Event: "step", Index: i + 1, Status: "ok", Stdout: "ok\n"})
+		}
+		return provisionEvent{Event: "summary", Total: len(names), OK: len(names)}, nil
 	}
 	return exec, &maxSeen
 }
@@ -308,12 +366,13 @@ jobs:
     steps: [{run: echo build}]
 `
 	started := make(chan struct{})
-	// Mimic a real step that honors ctx: it blocks until shutdown cancels the
-	// run, then reports the cancellation like parseStepResult does.
-	blockingExec := func(ctx context.Context, _, _ string) (stepResult, error) {
+	// Mimic a real plan exec that honors ctx: it blocks until shutdown
+	// cancels the run, then reports the cancellation like runProvisionPlan
+	// does.
+	blockingExec := func(ctx context.Context, _, _ string, _ func(provisionEvent)) (provisionEvent, error) {
 		close(started)
 		<-ctx.Done()
-		return stepResult{}, ctx.Err()
+		return provisionEvent{}, ctx.Err()
 	}
 	r, run := newTestRunner(t, pipeline, true, blockingExec)
 
@@ -366,10 +425,11 @@ jobs:
   build:
     steps: [{run: echo build}]
 `
-	// A step that honors ctx and reports its cancellation, like parseStepResult.
-	blockingExec := func(ctx context.Context, _, _ string) (stepResult, error) {
+	// A plan exec that honors ctx and reports its cancellation, like
+	// runProvisionPlan.
+	blockingExec := func(ctx context.Context, _, _ string, _ func(provisionEvent)) (provisionEvent, error) {
 		<-ctx.Done()
-		return stepResult{}, ctx.Err()
+		return provisionEvent{}, ctx.Err()
 	}
 	r, run := newTestRunner(t, pipeline, true, blockingExec)
 	r.cfg.CIRunTimeout = 20 * time.Millisecond // fire the run timeout, not a shutdown
@@ -403,10 +463,10 @@ jobs:
     steps: [{run: echo build}]
 `
 	started := make(chan struct{})
-	blockingExec := func(ctx context.Context, _, _ string) (stepResult, error) {
+	blockingExec := func(ctx context.Context, _, _ string, _ func(provisionEvent)) (provisionEvent, error) {
 		close(started)
 		<-ctx.Done()
-		return stepResult{}, ctx.Err()
+		return provisionEvent{}, ctx.Err()
 	}
 	r, run := newTestRunner(t, pipeline, true, blockingExec)
 
@@ -584,27 +644,40 @@ func TestContainerName(t *testing.T) {
 	}
 }
 
-func TestParseStepResult(t *testing.T) {
-	// mooncake prints JSON to stdout even when the step fails and exits
-	// non-zero; parseStepResult must trust stdout, not the process error.
-	stdout := []byte(`{"rc":3,"failed":true,"stdout":"boom\n"}`)
-	res, err := parseStepResult(context.Background(), stdout, nil, errors.New("exit status 3"))
+func TestRunProvisionPlan(t *testing.T) {
+	// provision prints its JSON stream to stdout even when a step fails and
+	// the process exits non-zero (exit 1 is apply's normal "a step failed"
+	// contract); runProvisionPlan must trust the streamed events, not the
+	// process exit code, the same rule the old parseStepResult had for
+	// mooncake.
+	script := `printf '{"event":"step","index":1,"name":"a","status":"failed","rc":3,"stdout":"boom"}\n{"event":"summary","total":1,"failed":1}\n'; exit 1`
+	var got []provisionEvent
+	summary, err := runProvisionPlan(context.Background(), exec.Command("sh", "-c", script), func(ev provisionEvent) { got = append(got, ev) })
 	if err != nil {
-		t.Fatalf("parseStepResult: %v", err)
+		t.Fatalf("runProvisionPlan: %v", err)
 	}
-	if res.RC != 3 || !res.Failed || res.Stdout != "boom\n" {
-		t.Errorf("got %+v, want rc=3 failed=true stdout=boom", res)
+	if len(got) != 1 || got[0].Status != "failed" || got[0].RC == nil || *got[0].RC != 3 || got[0].Stdout != "boom" {
+		t.Errorf("streamed events = %+v, want one failed step rc=3 stdout=boom", got)
+	}
+	if summary.Total != 1 || summary.Failed != 1 {
+		t.Errorf("summary = %+v, want total=1 failed=1", summary)
 	}
 
-	// Unparseable stdout surfaces as an executor error (with stderr context).
-	if _, err := parseStepResult(context.Background(), []byte("not json"), []byte("kaboom"), errors.New("x")); err == nil {
-		t.Error("parseStepResult accepted non-JSON stdout, want error")
+	// An unparseable line surfaces as an executor error.
+	if _, err := runProvisionPlan(context.Background(), exec.Command("sh", "-c", `printf 'not json\n'`), func(provisionEvent) {}); err == nil {
+		t.Error("runProvisionPlan accepted a non-JSON line, want error")
+	}
+
+	// A missing summary line (process exits clean but never emits one) is an
+	// executor error — a runner reading this stream needs the terminal count.
+	if _, err := runProvisionPlan(context.Background(), exec.Command("sh", "-c", `true`), func(provisionEvent) {}); err == nil {
+		t.Error("runProvisionPlan accepted a stream with no summary line, want error")
 	}
 
 	// A cancelled context is an executor error regardless of output.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := parseStepResult(ctx, stdout, nil, nil); err == nil {
-		t.Error("parseStepResult ignored a cancelled context, want error")
+	if _, err := runProvisionPlan(ctx, exec.Command("sh", "-c", script), func(provisionEvent) {}); err == nil {
+		t.Error("runProvisionPlan ignored a cancelled context, want error")
 	}
 }

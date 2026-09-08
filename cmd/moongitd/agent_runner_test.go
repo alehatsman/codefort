@@ -27,8 +27,8 @@ type fakeAgentSession struct {
 	block    bool // when set, ExecStream blocks until ctx is cancelled (force-stop tests)
 }
 
-func (f *fakeAgentSession) Exec(context.Context, string) (stepResult, error) {
-	return stepResult{}, nil
+func (f *fakeAgentSession) ExecPlan(context.Context, string, func(provisionEvent)) (provisionEvent, error) {
+	return provisionEvent{}, nil
 }
 
 func (f *fakeAgentSession) ExecStream(ctx context.Context, argv []string, onLine, onStderr func([]byte)) (int, error) {

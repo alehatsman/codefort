@@ -1,10 +1,16 @@
 # moongit CI base image
 
 When CI runs with container isolation (the default — `MOONGIT_CI_ISOLATION=docker`),
-moongitd executes each job inside a throwaway container and runs every step as
-`docker exec <container> mooncake step '<yaml>'`. So **every image used for CI
-must carry `mooncake` (and `git`) on PATH.** This directory builds the default
-image, `moongit-ci:latest`.
+moongitd executes each job inside a throwaway container as one streamed
+`docker exec <container> provision apply /work/<job>.plan.yml --json` (#411).
+So **every image used for CI must carry `provision` (and `git`) on PATH.**
+`mooncake` stays too, as long as the `quality` job's own `mooncake task ci`
+shell-out is in scope — #411 explicitly excludes rewriting the goq/tq gate
+itself as native provision plans; that's a separate, deferred follow-up.
+`curl` is needed too: a job using `assert: {http: {...}}` (mooncake's own
+shape — provision's `assert` has no HTTP prober) translates to a curl-based
+command assert, so any image running one needs `curl` on PATH. This
+directory builds the default image, `moongit-ci:latest`.
 
 ## Build
 
@@ -18,14 +24,26 @@ image, `moongit-ci:latest`.
 
    `ci/mooncake` is git-ignored — it's a build input, not source.
 
-2. **Build the image** from the moongit repo root:
+2. **Produce a `provision` binary** into `ci/provision`:
+
+   ```sh
+   # from a provision checkout
+   cargo build --release
+   cp target/release/provision /path/to/moongit/ci/provision
+   ```
+
+   A plain release build is glibc-linked, which is fine here since
+   `moongit-ci:latest` is `debian:stable-slim` (glibc). `ci/provision` is
+   git-ignored — it's a build input, not source.
+
+3. **Build the image** from the moongit repo root:
 
    ```sh
    docker build -t moongit-ci:latest ci/
    ```
 
-The `mooncake --version` step in the Dockerfile fails the build early if the
-binary is missing or not executable in the image.
+The `mooncake --version` / `provision --version` steps in the Dockerfile fail
+the build early if either binary is missing or not executable in the image.
 
 ## Configuration
 
@@ -61,13 +79,13 @@ A job may pin its own image in `mgitci.yml`:
 version: "1"
 jobs:
   build:
-    image: my-go-toolchain:latest   # must also carry mooncake + git on PATH
+    image: my-go-toolchain:latest   # must also carry provision + git on PATH
     steps:
       - run: go build ./...
 ```
 
-The override image **must include `mooncake`** (the runner execs it inside the
-container). The simplest way is to derive from this base:
+The override image **must include `provision`** (the runner execs it inside
+the container). The simplest way is to derive from this base:
 
 ```dockerfile
 FROM moongit-ci:latest

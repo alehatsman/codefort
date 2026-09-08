@@ -102,18 +102,19 @@ jobs:
 	}
 }
 
-func TestTranslateRunSugar(t *testing.T) {
+func TestTranslateJobPlanRunSugar(t *testing.T) {
 	p, err := Parse([]byte(exampleYAML))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	got, err := TranslateJob(p.Jobs["test"])
+	got, err := TranslateJobPlan(p.Jobs["test"])
 	if err != nil {
-		t.Fatalf("TranslateJob: %v", err)
+		t.Fatalf("TranslateJobPlan: %v", err)
 	}
 
-	// Output must be a top-level sequence (mooncake rejects a tasks: map), and
-	// each `run:` must have become a shell step with a cmd.
+	// Output must be a top-level sequence (provision's plan-file root, spec
+	// §3 — a mapping root is a component, which apply/plan would reject
+	// here), and each `run:` must have become a provision shell step.
 	var steps []map[string]any
 	if err := yaml.Unmarshal(got, &steps); err != nil {
 		t.Fatalf("translated output is not a step list: %v\n%s", err, got)
@@ -121,41 +122,35 @@ func TestTranslateRunSugar(t *testing.T) {
 	if len(steps) != 2 {
 		t.Fatalf("steps = %d, want 2\n%s", len(steps), got)
 	}
-	shell, ok := steps[0]["shell"].(map[string]any)
-	if !ok {
-		t.Fatalf("step 0 is not a shell step: %#v", steps[0])
-	}
-	if shell["cmd"] != "go build ./..." {
-		t.Errorf("step 0 cmd = %q, want %q", shell["cmd"], "go build ./...")
+	if steps[0]["shell"] != "go build ./..." {
+		t.Errorf("step 0 shell = %v, want %q", steps[0]["shell"], "go build ./...")
 	}
 }
 
-func TestTranslateRawStepPassthrough(t *testing.T) {
+func TestTranslateJobPlanRewritesRawCmdArgv(t *testing.T) {
 	p, err := Parse([]byte(exampleYAML))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	got, err := TranslateJob(p.Jobs["lint"])
+	got, err := TranslateJobPlan(p.Jobs["lint"])
 	if err != nil {
-		t.Fatalf("TranslateJob: %v", err)
+		t.Fatalf("TranslateJobPlan: %v", err)
 	}
 
 	var steps []map[string]any
 	if err := yaml.Unmarshal(got, &steps); err != nil {
 		t.Fatalf("translated output is not a step list: %v\n%s", err, got)
 	}
-	// lint: step 0 is `run: gofmt -l .` (sugar -> shell), step 1 is a raw
-	// `cmd` step that must pass through untouched.
+	// lint: step 0 is `run: gofmt -l .` (sugar -> shell), step 1 is
+	// mooncake's raw `cmd: {argv: [...]}` — rewritten to provision's
+	// bare-sequence `cmd: [...]` (the argv: wrapper drops), not passed
+	// through as-is.
 	if _, ok := steps[0]["shell"]; !ok {
 		t.Errorf("step 0 should be a shell step: %#v", steps[0])
 	}
-	cmd, ok := steps[1]["cmd"].(map[string]any)
-	if !ok {
-		t.Fatalf("step 1 raw cmd step not preserved: %#v", steps[1])
-	}
-	argv, ok := cmd["argv"].([]any)
-	if !ok || len(argv) != 3 || argv[0] != "go" {
-		t.Errorf("step 1 argv = %#v, want [go vet ./...]", cmd["argv"])
+	cmd, ok := steps[1]["cmd"].([]any)
+	if !ok || len(cmd) != 3 || cmd[0] != "go" || cmd[1] != "vet" {
+		t.Errorf("step 1 cmd = %#v, want [go vet ./...]", steps[1]["cmd"])
 	}
 }
 

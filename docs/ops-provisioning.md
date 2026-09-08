@@ -1,10 +1,18 @@
-# Ops provisioning — mooncake → provision (dev loop)
+# Ops provisioning — mooncake → provision
 
-Tracks moongit issue #410. Scope: moongit's local dev-loop tasks move from
-mooncake (`tasks.yml`) to provision (`~/projects/futurumlab/provision`), a
-new `tasks/` directory of provision plan/component files. The CI runner
-(`mgitci.yml`, `cmd/moongitd/ci_runner.go`) and the go-quality/ts-quality
-gate stay on mooncake — tracked separately in #411.
+Tracks the mooncake → provision migration (`~/projects/futurumlab/provision`)
+in two parts:
+
+- **Dev loop (#410, done).** moongit's local dev-loop tasks moved from
+  mooncake (`tasks.yml`) to provision's `tasks/` directory of plan/component
+  files. See "Layout" through "Validation — done" below.
+- **CI runner (#411, this section).** `mgitci.yml` jobs execute under
+  provision instead of mooncake inside `cmd/moongitd/ci_runner.go`. See
+  "CI runner" below. The goq/tq quality-gate rewrite itself (native
+  provision plans replacing `mooncake task ci`) is explicitly excluded from
+  #411 and stays a separate, larger, deferred follow-up — `quality`'s job
+  keeps shelling out to `mooncake task ci` as one step inside the
+  (now provision-run) job.
 
 ## Layout
 
@@ -227,3 +235,347 @@ thing to type is not worth a translation layer (explicit > magic).
   different repo, unverified by anything here). Deferred by explicit
   choice, not a gap in the port itself — both showed correct `plan`
   output.
+
+## CI runner (#411)
+
+Replaces mooncake as `cmd/moongitd/ci_runner.go`'s exec target. This is a
+model change, not a binary swap — see moongit issue #411 for the full
+before/after and why. This section is the code gate: no code lands until
+this holds.
+
+### Why: two incompatible execution models
+
+**mooncake today:** `internal/ci.MooncakeSteps` (translate.go:107) renders
+each job step to a standalone YAML document. `runJob` (ci_runner.go:625)
+loops, calling `jobSession.Exec(ctx, stepYAML) (stepResult, error)` once per
+step — N subprocess invocations (`mooncake step '<yaml>'`), each returning
+one JSON object `{rc,stdout,stderr,duration_ms,changed,failed,skipped,
+action,error}`. mooncake never sees a whole job, only one step's YAML at a
+time; moongit's event log is synthesized by the Go loop driving it.
+
+**provision:** one whole plan file, one process, streamed NDJSON — one line
+per step as it runs, ending in a summary line (confirmed with Provision
+master mind, provision spec §8/§9.3; sample in #410's comments):
+
+```
+{"event":"step","index":1,"line":3,"name":"say hi","status":"ok","rc":0,"stdout":"hi\n","stderr":"","duration_ms":102}
+{"event":"step","index":2,"line":6,"name":"touch nothing","status":"changed","diff":"create directory marker mode 0755","duration_ms":0}
+{"event":"step","index":3,"line":8,"name":"skipped","status":"skipped","reason":"when: false","duration_ms":0}
+{"event":"step","index":4,"line":11,"name":"fails","status":"failed","rc":4,"stdout":"","stderr":"bad\n","message":"exit","duration_ms":102}
+{"event":"summary","plan":"job.yml","total":4,"ok":1,"changed":1,"skipped":1,"failed":1,"unknown":0,"would_change":0,"would_run":0,"would_run_unprobed":0,"interrupted":false,"duration_ms":206}
+```
+
+`rc`/`stdout`/`stderr` are present only when the step ran a command
+(shell/cmd/assert); absent on typed actions (file/template/pkg/service) and
+on skips. Provision's `apply` (no `--keep-going`) stops at the first
+failure by default — matches mooncake's current all-or-nothing semantics
+(ci_runner.go:680-686), so no behavior change there.
+
+### Translation-layer scope (what mgitci.yml actually uses today)
+
+Audited every job in `mgitci.yml`: exactly three step shapes are
+authored — `run: "<cmd>"` sugar, raw `shell: {cmd: "..."}`, and raw
+`assert: {http: {url, status, contains}}` (the `smoke` job). No `cmd:`,
+`file:`, `template:`, `pkg:`, or `service:` steps exist in the repo today,
+so the translator only needs to handle those three, though a raw
+provision-native step (any other top-level key) should still pass through
+untouched the way `TranslateJob` does today — same "escape hatch" contract,
+just re-targeted.
+
+**Gap: `assert: {http: {...}}` has no provision equivalent.** provision's
+`assert` action (spec §6.7) takes `command` (exit-code) or `expr`
+(boolean expression over facts/vars) — no built-in HTTP prober. Translated
+to a `command`-form assert using `curl -f` (fails non-2xx) piping through
+`grep -q` for the body-contains check:
+
+```yaml
+# mgitci.yml today:
+- assert:
+    http: { url: "http://host.docker.internal:8080/healthz", status: 200, contains: "ok" }
+
+# translated:
+- name: "assert http://host.docker.internal:8080/healthz"
+  assert:
+    command: 'curl -sf http://host.docker.internal:8080/healthz | grep -q "ok"'
+    msg: "http://host.docker.internal:8080/healthz did not return 200 containing \"ok\""
+```
+
+`curl -f` alone covers `status: 200` (curl exits nonzero on any 4xx/5xx);
+`grep -q` covers `contains`. A future `contains`-less assert (status-only)
+drops the pipe. This is a real (if small) behavior-preserving rewrite in
+the translator, not a pass-through — documented here because it's the one
+construct in current use that provision doesn't express natively.
+
+### 1. `internal/ci` translation shape
+
+Replace `MooncakeSteps(job) ([]MooncakeStep, error)` (a list of
+independently-invoked step YAMLs) with:
+
+```go
+// TranslateJobPlan renders a job's steps as ONE provision plan document —
+// a top-level YAML sequence, provision's plan-file shape (spec §3). run:
+// sugar becomes a provision shell step; raw shell/assert steps are
+// rewritten per the translations above; any other raw step (a top-level
+// key this translator doesn't recognize) passes through untouched, same
+// escape hatch TranslateJob offers today. Every emitted shell/cmd/assert
+// step gets `changed_when: "false"` (CI steps are exit-code-is-the-
+// contract, not idempotent state changes — matches #410's own tasks/*.yml
+// idiom) so `validate --strict` (if ever run over these) is clean.
+func TranslateJobPlan(job Job) ([]byte, error)
+```
+
+`TranslateJob` (mooncake single-file form, still used by... — audit at
+implementation time whether anything besides tests still calls it; if not,
+retire it rather than keep two translators) and `MooncakeSteps` are
+replaced; `inspectStep`/`stepAction`/`shellStep`-equivalent helpers are
+reused/adapted, not reinvented — `inspectStep`'s `run:` classification is
+shape-agnostic and needn't change.
+
+Each emitted step gets a `name:` derived the same way today's `Label`
+is computed (the command for `run:`/`shell:`, a synthesized description for
+`assert`) — provision's NDJSON carries `name` per step (see below), and
+that's what becomes the event log's `step.started` "name" field, so losing
+it would regress the UI's step labels.
+
+### 2. `runJob`'s loop: from per-step `Exec` to one streamed `Exec`
+
+Replace the per-step `sess.Exec(ctx, step.YAML)` calls (ci_runner.go:625-
+687) with one call that writes the translated plan to a file in the job's
+workspace, runs `provision apply <planfile> --json` once, and reads stdout
+line-by-line as NDJSON — architecturally the `streamCommand`/`ExecStream`
+machinery already used for agent turns (ci_runner.go:977), not a third
+execution model. Concretely:
+
+```go
+// jobSession.Exec's replacement: runs ONE provision plan end-to-end,
+// invoking onEvent for each NDJSON line as it arrives (so runJob can emit
+// step.started/stdout/stderr/completed incrementally, matching today's
+// per-step cadence) and returning the parsed summary line once the
+// process exits.
+type jobSession interface {
+    ExecPlan(ctx context.Context, planYAML string, onEvent func(provisionEvent)) (summary, error)
+    Close() error
+}
+```
+
+`dockerSession.Exec` (ci_runner.go:949) becomes `dockerSession.ExecPlan`:
+writes `planYAML` to `/work/<job>.plan.yml` inside the container's
+bind-mounted workspace, execs `docker exec <name> provision apply
+/work/<job>.plan.yml --json`, and streams stdout through `streamCommand`'s
+existing `bufio.Reader.ReadBytes('\n')` loop (already handles a line
+arriving mid-write — same class of problem, no new machinery). `hostSession`
+gets the equivalent non-docker variant. The `docker exec <name> mooncake
+step '<yaml>'` invocation (ci_runner.go:950) goes away entirely.
+
+### 3. `stepResult` / `parseStepResult`: from single-shot to streaming
+
+Replace `stepResult` (ci_runner.go:31, one-shot JSON unmarshal of a whole
+`mooncake step` invocation) with `provisionEvent`, one per NDJSON line:
+
+```go
+// provisionEvent is one line of `provision apply --json` output — either a
+// step event or the trailing summary. rc/stdout/stderr/diff/reason/message
+// are optional per provision spec §9.3: rc/stdout/stderr only on command
+// steps (shell/cmd/assert), diff only when there is one, reason only on a
+// skip, message only on a failure.
+type provisionEvent struct {
+    Event      string `json:"event"` // "step" | "summary"
+    Index      int    `json:"index,omitempty"`
+    Line       int    `json:"line,omitempty"`
+    Name       string `json:"name,omitempty"`
+    Status     string `json:"status,omitempty"` // ok | changed | skipped | failed | unknown | would_change | would_run
+    RC         *int   `json:"rc,omitempty"`
+    Stdout     string `json:"stdout,omitempty"`
+    Stderr     string `json:"stderr,omitempty"`
+    Diff       string `json:"diff,omitempty"`
+    Reason     string `json:"reason,omitempty"`
+    Message    string `json:"message,omitempty"`
+    DurationMS int    `json:"duration_ms,omitempty"`
+    // summary-only fields
+    Total, OK, Changed, Skipped, Failed int
+}
+```
+
+`parseStepResult` (ci_runner.go:1143, single `json.Unmarshal` of a whole
+stdout buffer) is replaced by a per-line decode inside the `ExecPlan`
+streaming loop — `json.Unmarshal([]byte(line), &ev)` per NDJSON line, not a
+whole-buffer parse. An unparseable line is an executor error (same
+contract `parseStepResult` has today for unparseable stdout); a cancelled
+context is still an executor error regardless of output-so-far.
+
+### 4. Status classification
+
+Today: `failed := res.Failed || res.RC != 0` (ci_runner.go:665), assuming
+rc/stdout/stderr are always present — true only because every CI step
+today is a command (`run:`/raw `shell:`/raw `assert:`). Provision's typed
+actions (file/template/pkg/service — not in use today, but the translator
+must not crash if one shows up later) omit rc/stdout/stderr entirely.
+Rewritten around provision's `status` string:
+
+```go
+failed := ev.Status == "failed"
+skipped := ev.Status == "skipped"
+// "changed"/"ok" both map to today's non-failed, non-skipped step.completed.
+// "would_change"/"would_run"/"unknown" don't occur under `apply` (those are
+// plan-only statuses) — apply either does the work or fails; treat their
+// appearance as an executor error (a provision version mismatch) rather
+// than silently mapping them to something.
+```
+
+moongit's job-level status still derives from "any step failed" (not the
+summary line's more granular counts) — matches current semantics
+(ci_runner.go:664-671), a deliberate no-behavior-change choice, not an
+oversight: the summary's `changed`/`ok`/`skipped` breakdown is available
+for a future richer job-status view but isn't wired to `storage.JobStatus`
+here.
+
+### 5. Test doubles (`ci_runner_test.go`)
+
+Every existing test builds `stepExecutor` as `func(ctx, workDir, stepYAML
+string) (stepResult, error)` — one call per step
+(`successExec`/`sentinelExec`/`trackingExec`/`blockingExec`). The new shape
+is one call per **job**, taking a callback:
+
+```go
+type stepExecutor func(ctx context.Context, workDir, planYAML string, onEvent func(provisionEvent)) (summary, error)
+```
+
+Each existing fake is rewritten to synthesize a small NDJSON-shaped event
+sequence (one `provisionEvent{Status: "ok"}` per step in the plan, or one
+`{Status: "failed"}` for `sentinelExec`'s `FAIL_HERE` sentinel) rather than
+returning one `stepResult`. `blockingExec` keeps its `<-ctx.Done()` shape —
+that's testing the cancellation path, not the per-step contract, and stays
+representative either way. No test asserts on `stepResult`'s literal shape
+directly (they read back `storage`/`ci.Event` — the stable public
+contracts), so the blast radius is the five fakes plus `TestParseStepResult`
+(ci_runner_test.go:587), which is replaced by a streaming-decode
+equivalent test.
+
+### 6. CI image
+
+Done: `ci/Dockerfile` and `ci/Dockerfile.dev` now bake `provision` alongside
+`mooncake` (both binaries coexisting is fine — disk cost only). `mooncake`
+stays on PATH as long as the `quality` job's `mooncake task ci` shell-out is
+in scope (explicitly excluded from #411, see top of this section).
+`ci/README.md` documents producing `ci/provision` (`cargo build --release`,
+glibc-linked, fine on `debian:stable-slim`) the same way `ci/mooncake`
+already is.
+
+**Also found by actually running it (not anticipated by the spec draft):**
+`curl` had to be added to the base image too. mooncake's `assert: {http:
+{...}}` used mooncake's own built-in Go HTTP client — no external binary
+needed. provision's translated equivalent (the curl-based command assert,
+above) does need one, and the base `moongit-ci:latest` image is
+deliberately toolchain-free — it didn't carry curl. First live run of the
+`smoke` job failed with `curl: command not found`; fixed by adding `curl`
+to `ci/Dockerfile`'s package list, documented in `ci/README.md`. This is a
+real new image dependency the swap introduces, not a pre-existing gap.
+
+### 7. `host.docker.internal` reachability
+
+`openDockerSession`'s comment (ci_runner.go:856-858) says host reachability
+exists so `mooncake task ci` can reach host-served go-quality modules over
+http. That's moot for module fetch since #408 (go-quality now resolves via
+github). Still needed for: the `smoke` job's `assert` steps (hit
+`host.docker.internal:8080` directly) and nothing else identified — keep
+the `--add-host` flag, don't remove it.
+
+### Validation — done and not-yet-done
+
+**Done:**
+
+- `go build ./...`, `go vet ./...`, and the full `go test ./...` suite pass
+  (every package, not just `internal/ci`/`cmd/moongitd`) — no regression
+  anywhere else in the module.
+- `internal/ci`'s translator, run for real against the actual `mgitci.yml`
+  (all three live jobs — `quality`, `web`, `smoke`): `TranslateJobPlan`'s
+  output for each job validates clean under the real installed `provision
+  0.9.1` binary (`provision validate --strict`), including `smoke`'s
+  http-assert rewrite.
+- The http-assert curl/grep rewrite, applied for real (`provision apply
+  --json`) against the live moongit host at `127.0.0.1:8080` — both the
+  healthy case (200 + "ok" body, step reports `ok`) and a deliberately
+  wrong-port failure case (step reports `failed`, `msg` surfaced, exit 1) —
+  confirming the translation preserves the status+contains semantics, not
+  just that it parses.
+- The real `--json` NDJSON shape, captured directly from that same live
+  `provision apply --json` run, confirmed byte-for-byte against
+  `provisionEvent`'s field names/types (including the stdout/stderr
+  fd split the spec promises — `--json`'s NDJSON is pure stdout, the
+  human-readable summary is pure stderr, verified by redirecting each away
+  independently).
+- `ci_runner_test.go`'s five fakes (`successExec`/`sentinelExec`/
+  `trackingExec`/two `blockingExec` closures) rewritten to the new
+  `planExecutor` shape and passing, including the interrupted/timeout/
+  cancel discriminator tests; `TestParseStepResult` replaced by
+  `TestRunProvisionPlan` (a real subprocess exercising the streaming NDJSON
+  decoder — non-zero exit + valid summary is not an error, an unparseable
+  line is, a missing summary line is, a cancelled context is).
+- Found and fixed one real test-harness bug surfaced by this rewrite (not a
+  production bug): `newTestRunner`'s config never set `HostDataDir`, so
+  `hostPath`'s identity check silently mismatched and handed the fakes a
+  wrong workDir — invisible while no fake touched the filesystem, real once
+  `planExecutor` fakes read the plan file `runJob` wrote for real.
+- `ci/Dockerfile`, `ci/Dockerfile.dev`, `ci/README.md`, and `ci/.gitignore`
+  updated to bake/build `provision` alongside `mooncake`; `mgitci.yml`'s
+  header comments (the two that stated the mooncake-per-step mechanism as
+  current fact, plus one already-stale `mooncake task deploy` reference
+  left over from #410) corrected.
+
+**Live end-to-end run — done, against an isolated scratch instance, not the
+live moongitd:**
+
+Rebuilt `moongit-ci:latest` from the updated Dockerfile (both binaries +
+curl). Built this branch's `moongitd`/`mgit` into a scratch data dir, on a
+different port, with a fresh SQLite DB, docker isolation — a separate
+process and separate CI-container namespace from the real moongit
+deployment, so the live daemon (and its live job queue, if anything had
+been running) was never touched. Registered a throwaway repo, enabled CI,
+pushed and manually triggered runs through the real `POST .../runs` API
+(the push-hook's env-injection path wasn't reached in this pass — a
+separate, pre-existing wiring detail unrelated to #411's runner swap; not
+chased down since the manual-trigger path exercises the exact same
+`executeRun`/`runJob` code either way):
+
+- **Success case** (`smoke` job: a `run:` shell step + an `assert:{http:}`
+  step against the scratch server's own `/healthz`): both steps ran through
+  the real docker-isolated `provision apply --json` path end to end; job
+  and run finished `success`; event log showed correct `step.started` →
+  `step.stdout` → `step.completed` for the shell step and correct
+  `step.started` → `step.completed` (no stdout/stderr keys — provision
+  emitted none, correctly omitted) for the http-assert step.
+- **This is what surfaced the curl gap** (§6 above) — the first attempt
+  failed with `curl: command not found`; fixed, rebuilt the image, reran,
+  passed clean.
+- **Failure/skip cascade** (`build`→`test`→`deploy`(`exit 7`)→`notify`):
+  `build`/`test` succeeded, `deploy` failed with `exit_code: 7` (the real
+  process exit code threaded all the way from the container through
+  `provisionEvent.RC` into `storage.CIJob.ExitCode` — not just "some
+  failure"), `notify` correctly `skipped` with no exit code. Matches
+  today's mooncake-path semantics exactly (same test shape as
+  `TestExecuteRunFailurePropagatesAndSkips`, now proven for real, not just
+  against a fake).
+- Torn down cleanly: scratch process killed, scratch data dir removed, no
+  leftover `moongit-ci-*` containers, live moongitd's own `/healthz`
+  reconfirmed healthy and untouched throughout.
+
+**One real operational risk found, not yet acted on:** `sweepOrphanContainers`
+(ci_runner.go) filters by container name prefix only (`moongit-ci-`/
+`moongit-agent-`), not by data dir or port — it's Docker-daemon-wide, not
+scoped per moongitd instance. Starting the scratch instance swept 2
+pre-existing orphan containers on the shared daemon; harmless this time
+(nothing was genuinely in-flight at that moment, confirmed via `docker ps`
+before/after), but a second moongitd instance started against the same
+Docker daemon while the *live* one has real in-flight CI/agent containers
+would force-remove them. Not a regression from #411 (the sweep is
+pre-existing, untouched by this change) and out of this issue's scope to
+fix, but worth its own issue if a second local instance (staging, another
+dev) is ever going to coexist with the production one on one Docker host.
+
+**Still not done:** `quality`'s `mooncake task ci` shell-out inside a
+provision-run container (needs `moongit-ci-dev:latest` rebuilt — not done
+in this pass, only the base `moongit-ci:latest` was) and a deliberately-
+failing step's actual UI rendering (the storage/event-log data it renders
+from is proven correct above; the UI component itself wasn't opened).
+Neither blocks merging on its own judgment, but flagging both rather than
+claiming a clean sweep.

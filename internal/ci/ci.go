@@ -1,11 +1,13 @@
 // Package ci parses and validates moongit's per-repo CI spec (mgitci.yml) and
-// translates each job into a mooncake playbook so moongitd can execute it.
+// translates each job into a provision plan so moongitd can execute it.
 //
 // mgitci.yml describes a pipeline of jobs wired into a DAG by `needs`; moongit
-// owns that DAG. mooncake itself is flat — it executes a top-level *list of
-// steps* (a `tasks:` map is rejected). So translation is per-job: one job's
-// steps become one mooncake step-list playbook. `run: "<cmd>"` is sugar for a
-// shell step; any other step is a raw mooncake step passed through untouched.
+// owns that DAG. provision itself is flat — it executes a top-level *list of
+// steps* (a mapping root is a component, not a plan — provision spec §3). So
+// translation is per-job: one job's steps become one provision plan file.
+// `run: "<cmd>"` is sugar for a shell step; mooncake's own raw shell/cmd/
+// assert-http shapes (mgitci.yml's legacy authoring surface) are rewritten to
+// provision's native syntax; any other raw step passes through untouched.
 package ci
 
 import (

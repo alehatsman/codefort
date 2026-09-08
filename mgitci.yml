@@ -3,14 +3,18 @@
 # the CI host, which IS the prod server, so 127.0.0.1:8080 is always local.
 # Checks: /healthz (no auth), SPA root, and three API endpoints (Bearer token
 # from MOONGIT_TOKEN in the service env — mint via: mgit token create smoke-ci).
-# A failed assertion fails the step; mooncake aborts on the first failure.
+# A failed assertion fails the step; provision aborts on the first failure.
 #
 # moongit CI — moongit's own pipeline (dogfooding the moongitci stack).
 #
 # Schema: version "1", jobs wired into a DAG via `needs`; `run:` is sugar for a
-# mooncake shell step. Every job runs in a throwaway container off `image:`
-# (see ci/Dockerfile.dev — the toolchain image carrying go + node + mooncake +
-# the static-analysis tools the gate needs).
+# shell step. Every job runs in a throwaway container off `image:` (see
+# ci/Dockerfile.dev — the toolchain image carrying go + node + provision +
+# the static-analysis tools the gate needs). ci_runner.go translates each
+# job's steps into one provision plan and execs `provision apply --json`
+# inside the container (#411) — `run:`/raw `shell:`/raw `assert:{http:}` are
+# mooncake's own authoring shapes, still what's written here, still what
+# ci_runner.go translates from; only the exec target changed.
 #
 # DAG:  quality      web        (two independent roots)
 #          \           /
@@ -31,7 +35,8 @@
 #
 # Deploy is intentionally NOT automated via CI. moongitd runs the pipeline —
 # a self-deploy would interrupt the very run that triggered it. Deploy manually:
-# `mooncake task deploy` or `mooncake apply -c ~/dotfiles/main_pc.yml -t moongit`.
+# `provision apply tasks/deploy.yml` (#410) or
+# `mooncake apply -c ~/dotfiles/main_pc.yml -t moongit`.
 version: "1"
 on:
   schedule:
