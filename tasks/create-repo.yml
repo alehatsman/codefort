@@ -1,7 +1,14 @@
 description: "register and init a repo against the installed data dir. Pass --var owner=<owner> --var name=<name>"
 
 steps:
-  - vars_file: ./vars.yml
+  # vars_file loads values raw (unrendered) — a `{{ home }}`-containing
+  # value from a file never gets a second render pass (provision spec
+  # §3.3). An inline `vars:` step's values ARE rendered, so home-anchored
+  # paths live here, not in a shared vars_file (confirmed with Provision
+  # master mind, moongit issue #410).
+  - vars:
+      binary_path: "{{ home }}/.local/bin/moongitd"
+      data_dir: "{{ home }}/.local/share/moongit"
 
   - name: create repo
     cmd: ["{{ binary_path }}", repo, create, "{{ owner }}/{{ name }}"]

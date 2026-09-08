@@ -1,7 +1,15 @@
 description: "build the agent container image (moongit-agent:latest). Requires moongit-ci:latest — run `provision apply tasks/ci-images.yml` first."
 
 steps:
-  - vars_file: ./vars.yml
+  # vars_file loads values raw (unrendered) — a `{{ home }}`-containing
+  # value from a file never gets a second render pass (provision spec
+  # §3.3). An inline `vars:` step's values ARE rendered, so home-anchored
+  # paths live here, not in a shared vars_file (confirmed with Provision
+  # master mind, moongit issue #410).
+  # Override per-box with --var mooncake_src=/path --var dex_src=/path.
+  - vars:
+      mooncake_src: "{{ home }}/projects/mooncake"
+      dex_src: "{{ home }}/projects/dex"
 
   # agent/{mooncake,mgit,dex} (git-ignored build inputs, per agent/README.md):
   # the runner execs mooncake/mgit/dex inside the agent container; the agent

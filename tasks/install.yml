@@ -1,7 +1,14 @@
 description: build both binaries into ~/.local/bin + create mgitd/mgit aliases (no systemd changes)
 
 steps:
-  - vars_file: ./vars.yml
+  # vars_file loads values raw (unrendered) — a `{{ home }}`-containing
+  # value from a file never gets a second render pass (provision spec
+  # §3.3). An inline `vars:` step's values ARE rendered, so home-anchored
+  # paths live here, not in a shared vars_file (confirmed with Provision
+  # master mind, moongit issue #410).
+  - vars:
+      binary_path: "{{ home }}/.local/bin/moongitd"
+      client_path: "{{ home }}/.local/bin/moongit"
 
   - name: "~/.local/bin directory"
     file: { path: "{{ home }}/.local/bin", state: dir }
