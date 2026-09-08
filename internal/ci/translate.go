@@ -66,86 +66,244 @@ func firstToolchainUsed(job Job) string {
 	return ""
 }
 
-// TranslateJob converts a job's steps into a mooncake playbook: a top-level
-// YAML *sequence* of steps (mooncake rejects a `tasks:` map). `run: "<cmd>"`
-// sugar becomes `- shell: {cmd: "<cmd>"}`; every other step is a raw mooncake
-// step passed through untouched. The job must already be valid (see
-// Pipeline.Validate); TranslateJob still surfaces step errors defensively.
-func TranslateJob(job Job) ([]byte, error) {
-	steps := make([]*yaml.Node, 0, len(job.Steps))
+// StepMeta is one job step's action and display Label — the same pair
+// TranslateJobPlan bakes into that step's provision `name:` field, and what
+// the runner uses to synthesize step.started events in execution order
+// (see docs/ops-provisioning.md's CI-runner section: provision's --json
+// stream reports a step only once it has finished — there is no separate
+// "step started" line — so the runner pre-declares each step's start from
+// the plan it already built, in the order `apply` guarantees: a job's steps
+// run strictly sequentially, so step N finishing means step N+1 is starting).
+type StepMeta struct {
+	Action string
+	Label  string
+}
+
+// JobStepMeta returns each step's action/Label pair, in order. Shares
+// classifyStep with TranslateJobPlan so the two can't drift — same
+// classification, two different projections of it.
+func JobStepMeta(job Job) ([]StepMeta, error) {
+	out := make([]StepMeta, 0, len(job.Steps))
 	for i := range job.Steps {
-		node := &job.Steps[i]
-		runCmd, isRun, err := inspectStep(node)
+		rs, err := classifyStep(&job.Steps[i])
 		if err != nil {
 			return nil, fmt.Errorf("step %d: %w", i, err)
 		}
-		if isRun {
-			steps = append(steps, shellStep(runCmd))
-		} else {
-			steps = append(steps, node)
+		out = append(out, StepMeta{Action: rs.action, Label: rs.label})
+	}
+	return out, nil
+}
+
+// TranslateJobPlan renders a job's steps as one provision plan document — a
+// top-level YAML sequence (provision spec §3: a plan file's root is a
+// sequence; a component's is a mapping, which `apply`/`plan` would reject
+// here the same way mooncake rejected a `tasks:` map). `run:` sugar and
+// mooncake's own raw shell/cmd/assert-http shapes are rewritten to
+// provision's native syntax (see docs/ops-provisioning.md's CI-runner
+// section for why each rewrite is needed and how); any other raw step — an
+// unrecognized top-level key, or a shell/cmd/assert step already written in
+// provision's own shape — passes through untouched, the same escape hatch
+// the old mooncake translator offered.
+func TranslateJobPlan(job Job) ([]byte, error) {
+	steps := make([]*yaml.Node, 0, len(job.Steps))
+	for i := range job.Steps {
+		rs, err := classifyStep(&job.Steps[i])
+		if err != nil {
+			return nil, fmt.Errorf("step %d: %w", i, err)
 		}
+		steps = append(steps, rs.node)
 	}
 	seq := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: steps}
 	return yaml.Marshal(seq)
 }
 
-// MooncakeStep is one translated step ready to hand to `mooncake step
-// '<YAML>'`, plus its action (the step's top-level key) and a human Label for
-// the step.started event. Label is what the UI shows in the log timeline: the
-// command for a `run:` step, the action otherwise — so a reader sees
-// `go test ./...`, not a generic `shell`.
-type MooncakeStep struct {
-	YAML   string
-	Action string
-	Label  string
+// rewrittenStep is one step's translation result: the provision-shaped node
+// ready to marshal, plus the action/label pair JobStepMeta and
+// TranslateJobPlan both need.
+type rewrittenStep struct {
+	node   *yaml.Node
+	action string
+	label  string
 }
 
-// MooncakeSteps renders a job's steps individually, applying the same
-// translation as TranslateJob (run: sugar -> shell; raw steps pass through).
-// The in-process runner executes each step with `mooncake step` so it can
-// observe per-step rc/stdout/stderr and synthesize the event stream.
-func MooncakeSteps(job Job) ([]MooncakeStep, error) {
-	out := make([]MooncakeStep, 0, len(job.Steps))
-	for i := range job.Steps {
-		node := &job.Steps[i]
-		runCmd, isRun, err := inspectStep(node)
-		if err != nil {
-			return nil, fmt.Errorf("step %d: %w", i, err)
-		}
-		n := node
-		if isRun {
-			n = shellStep(runCmd)
-		}
-		b, err := yaml.Marshal(n)
-		if err != nil {
-			return nil, err
-		}
-		action := stepAction(n)
-		label := action
-		if isRun {
-			label = runCmd
-		}
-		out = append(out, MooncakeStep{YAML: string(b), Action: action, Label: label})
+// classifyStep renders one mgitci.yml step into a rewrittenStep. Recognizes
+// `run:` sugar, raw `shell: {cmd: "..."}`, raw `cmd: {argv: [...]}`, and raw
+// `assert: {http: {...}}` — mooncake's own shapes for those, in real or
+// historical (test fixture) use in mgitci.yml. Anything else — an
+// unrecognized top-level key, or a shell/cmd/assert step already written in
+// provision's own shape (a plain-scalar `shell`, a bare-sequence `cmd`, an
+// assert.command/.expr) — passes through unchanged: classifyStep only
+// rewrites a shape it can positively identify as mooncake's, never guesses.
+func classifyStep(node *yaml.Node) (rewrittenStep, error) {
+	n := node
+	if n.Kind == yaml.DocumentNode && len(n.Content) == 1 {
+		n = n.Content[0]
 	}
-	return out, nil
+	if n.Kind != yaml.MappingNode || len(n.Content) == 0 {
+		return rewrittenStep{}, fmt.Errorf("step must be a non-empty mapping (got %s)", kindName(n.Kind))
+	}
+
+	if runCmd, isRun, err := inspectStep(node); err != nil {
+		return rewrittenStep{}, err
+	} else if isRun {
+		return rewrittenStep{node: shellNode(runCmd), action: "shell", label: runCmd}, nil
+	}
+
+	key := n.Content[0].Value
+	val := n.Content[1]
+	switch key {
+	case "shell":
+		if cmd, ok := mooncakeShellCmd(val); ok {
+			return rewrittenStep{node: shellNode(cmd), action: "shell", label: cmd}, nil
+		}
+	case "cmd":
+		if argv, ok := mooncakeCmdArgv(val); ok {
+			return rewrittenStep{node: cmdNode(argv), action: "cmd", label: strings.Join(argv, " ")}, nil
+		}
+	case "assert":
+		a, ok, err := mooncakeHTTPAssert(val)
+		if err != nil {
+			return rewrittenStep{}, err
+		}
+		if ok {
+			return rewrittenStep{node: httpAssertNode(a), action: "assert", label: "assert " + a.URL}, nil
+		}
+	}
+	return rewrittenStep{node: node, action: key, label: key}, nil
 }
 
-// stepAction returns a step mapping's top-level key (its mooncake action), or
-// "" when indeterminate.
-func stepAction(node *yaml.Node) string {
-	if node.Kind == yaml.DocumentNode && len(node.Content) == 1 {
-		node = node.Content[0]
+// mooncakeShellCmd extracts cmd from mooncake's `shell: {cmd: "..."}` shape,
+// or reports ok=false for anything else (already provision-shaped, or
+// malformed — malformed is Validate's job to catch, not this one's).
+func mooncakeShellCmd(val *yaml.Node) (string, bool) {
+	if val.Kind != yaml.MappingNode || len(val.Content) != 2 || val.Content[0].Value != "cmd" {
+		return "", false
 	}
-	if node.Kind == yaml.MappingNode && len(node.Content) >= 1 {
-		return node.Content[0].Value
+	if val.Content[1].Kind != yaml.ScalarNode {
+		return "", false
 	}
-	return ""
+	return val.Content[1].Value, true
+}
+
+// mooncakeCmdArgv extracts argv from mooncake's `cmd: {argv: [...]}` shape.
+func mooncakeCmdArgv(val *yaml.Node) ([]string, bool) {
+	if val.Kind != yaml.MappingNode || len(val.Content) != 2 || val.Content[0].Value != "argv" {
+		return nil, false
+	}
+	seq := val.Content[1]
+	if seq.Kind != yaml.SequenceNode {
+		return nil, false
+	}
+	argv := make([]string, 0, len(seq.Content))
+	for _, item := range seq.Content {
+		if item.Kind != yaml.ScalarNode {
+			return nil, false
+		}
+		argv = append(argv, item.Value)
+	}
+	return argv, true
+}
+
+// httpAssertSpec is mgitci.yml's mooncake-native assert.http shape.
+type httpAssertSpec struct {
+	URL      string
+	Contains string
+}
+
+// mooncakeHTTPAssert extracts url/status/contains from mooncake's
+// `assert: {http: {...}}` shape and validates it translates. provision has
+// no built-in HTTP prober (spec §6.7: assert takes command/expr only), so
+// this becomes a curl-based command assert (httpAssertNode) — see
+// docs/ops-provisioning.md's CI-runner section. Only status 200 is
+// supported: there is no single curl invocation that checks an arbitrary
+// status *and* a body substring at once (curl -f discards the body on a
+// non-2xx response), and every http assert in mgitci.yml checks 200
+// (audited for #411) — a different status is a translation error, not a
+// silent wrong check.
+func mooncakeHTTPAssert(val *yaml.Node) (httpAssertSpec, bool, error) {
+	if val.Kind != yaml.MappingNode || len(val.Content) != 2 || val.Content[0].Value != "http" {
+		return httpAssertSpec{}, false, nil
+	}
+	var raw struct {
+		URL      string `yaml:"url"`
+		Status   int    `yaml:"status"`
+		Contains string `yaml:"contains"`
+	}
+	if err := val.Content[1].Decode(&raw); err != nil {
+		return httpAssertSpec{}, false, fmt.Errorf("assert.http: %w", err)
+	}
+	if raw.URL == "" {
+		return httpAssertSpec{}, false, fmt.Errorf("assert.http: url is required")
+	}
+	if raw.Status != 0 && raw.Status != 200 {
+		return httpAssertSpec{}, false, fmt.Errorf("assert.http: status %d not supported by the provision translator (only 200 — see docs/ops-provisioning.md)", raw.Status)
+	}
+	return httpAssertSpec{URL: raw.URL, Contains: raw.Contains}, true, nil
+}
+
+// shellNode builds a provision shell step: `{name, shell, changed_when:
+// "false"}`. changed_when is required: a bare shell step with no
+// idempotency gate reports `changed: unknown` and fails `validate --strict`
+// (spec §6.1) — every CI step is exit-code-is-the-contract, not a state
+// change (matches #410's own tasks/*.yml idiom).
+func shellNode(cmd string) *yaml.Node {
+	return mapNode(
+		scalar("name"), scalar(cmd),
+		scalar("shell"), scalar(cmd),
+		scalar("changed_when"), scalar("false"),
+	)
+}
+
+// cmdNode builds a provision cmd step: `{name, cmd: [...], changed_when:
+// "false"}` — same idempotency rule as shellNode.
+func cmdNode(argv []string) *yaml.Node {
+	items := make([]*yaml.Node, len(argv))
+	for i, a := range argv {
+		items[i] = scalar(a)
+	}
+	seq := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: items}
+	return mapNode(
+		scalar("name"), scalar(strings.Join(argv, " ")),
+		scalar("cmd"), seq,
+		scalar("changed_when"), scalar("false"),
+	)
+}
+
+// httpAssertNode builds a provision command-form assert equivalent to
+// mooncake's `assert: {http: {url, status: 200, contains}}` — see
+// mooncakeHTTPAssert. assert never changes anything (spec §6.7), so unlike
+// shellNode/cmdNode it needs no changed_when.
+func httpAssertNode(a httpAssertSpec) *yaml.Node {
+	cmd := fmt.Sprintf("curl -sf %s", a.URL)
+	msg := fmt.Sprintf("%s did not return 200", a.URL)
+	if a.Contains != "" {
+		cmd = fmt.Sprintf("curl -sf %s | grep -q %s", a.URL, shellQuote(a.Contains))
+		msg = fmt.Sprintf("%s did not return 200 containing %q", a.URL, a.Contains)
+	}
+	return mapNode(
+		scalar("name"), scalar("assert "+a.URL),
+		scalar("assert"), mapNode(scalar("command"), scalar(cmd), scalar("msg"), scalar(msg)),
+	)
+}
+
+// shellQuote wraps s in single quotes for embedding in a generated shell
+// command line, escaping any single quote it contains.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+func scalar(v string) *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v}
+}
+
+func mapNode(pairs ...*yaml.Node) *yaml.Node {
+	return &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: pairs}
 }
 
 // inspectStep classifies a step node. It returns (cmd, true, nil) for `run:`
-// sugar, ("", false, nil) for a raw mooncake step to pass through, and an
-// error for a malformed step. Shared by Validate and TranslateJob so both
-// agree on what a well-formed step is.
+// sugar, ("", false, nil) for a raw step to pass through, and an error for a
+// malformed step. Shared by Validate and classifyStep so both agree on what a
+// well-formed step is.
 func inspectStep(node *yaml.Node) (runCmd string, isRun bool, err error) {
 	// A document-level node wraps its real content; unwrap it.
 	if node.Kind == yaml.DocumentNode && len(node.Content) == 1 {
@@ -172,24 +330,6 @@ func inspectStep(node *yaml.Node) (runCmd string, isRun bool, err error) {
 		return val.Value, true, nil
 	}
 	return "", false, nil
-}
-
-// shellStep builds the node for `{shell: {cmd: "<cmd>"}}` — mooncake's shell
-// action, the target of `run:` sugar.
-func shellStep(cmd string) *yaml.Node {
-	scalar := func(v string) *yaml.Node {
-		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v}
-	}
-	shellBody := &yaml.Node{
-		Kind:    yaml.MappingNode,
-		Tag:     "!!map",
-		Content: []*yaml.Node{scalar("cmd"), scalar(cmd)},
-	}
-	return &yaml.Node{
-		Kind:    yaml.MappingNode,
-		Tag:     "!!map",
-		Content: []*yaml.Node{scalar("shell"), shellBody},
-	}
 }
 
 func kindName(k yaml.Kind) string {

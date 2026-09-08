@@ -1,3 +1,4 @@
-# Build input copied in before `docker build` — produced from a mooncake
-# checkout, not source. See README.md.
+# Build inputs copied in before `docker build` — produced from mooncake/
+# provision checkouts, not source. See README.md.
 /mooncake
+/provision

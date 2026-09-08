@@ -26,38 +26,69 @@ import (
 	"github.com/alehatsman/moongit/internal/storage"
 )
 
-// stepResult is the subset of `mooncake step` JSON the runner maps onto the
-// event stream.
-type stepResult struct {
-	RC         int    `json:"rc"`
-	Stdout     string `json:"stdout"`
-	Stderr     string `json:"stderr"`
-	DurationMS int    `json:"duration_ms"`
-	Changed    bool   `json:"changed"`
-	Failed     bool   `json:"failed"`
-	Skipped    bool   `json:"skipped"`
-	Action     string `json:"action"`
-	Error      string `json:"error"`
+// provisionEvent is one line of `provision apply <plan> --json` output —
+// either a step event or the trailing summary line (spec §9.3). rc/stdout/
+// stderr/diff/reason/message are present only when provision has them for
+// that line: rc/stdout/stderr on a step that ran a command (shell/cmd/
+// assert), whatever its status; diff only when there is one; reason only on
+// a skip; message (+ rc/stderr again) only on a failure. A typed action or a
+// skipped step carries none of the command fields — see docs/
+// ops-provisioning.md's CI-runner section, item 3.
+type provisionEvent struct {
+	Event      string `json:"event"` // "step" | "summary"
+	Index      int    `json:"index,omitempty"`
+	Line       int    `json:"line,omitempty"`
+	File       string `json:"file,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Status     string `json:"status,omitempty"` // ok | changed | unknown | skipped | failed | would_change | would_run | would_run_unprobed
+	RC         *int   `json:"rc,omitempty"`
+	Stdout     string `json:"stdout,omitempty"`
+	Stderr     string `json:"stderr,omitempty"`
+	Diff       string `json:"diff,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+	Message    string `json:"message,omitempty"`
+	DurationMS int    `json:"duration_ms,omitempty"`
+
+	// Summary-only fields (Event == "summary").
+	Plan             string `json:"plan,omitempty"`
+	Total            int    `json:"total,omitempty"`
+	OK               int    `json:"ok,omitempty"`
+	Changed          int    `json:"changed,omitempty"`
+	Skipped          int    `json:"skipped,omitempty"`
+	Unknown          int    `json:"unknown,omitempty"`
+	Failed           int    `json:"failed,omitempty"`
+	WouldChange      int    `json:"would_change,omitempty"`
+	WouldRun         int    `json:"would_run,omitempty"`
+	WouldRunUnprobed int    `json:"would_run_unprobed,omitempty"`
+	Interrupted      bool   `json:"interrupted,omitempty"`
 }
 
 // The runner's external boundaries, injected so the orchestration is testable
-// without the real git / mooncake / docker binaries.
+// without the real git / provision / docker binaries.
 type (
-	// stepExecutor runs one mooncake step (YAML) in workDir. It backs the host
-	// session and is the unit tests' injection point.
-	stepExecutor func(ctx context.Context, workDir, stepYAML string) (stepResult, error)
+	// planExecutor runs one job's provision plan (already written at planFile,
+	// relative to workDir) in workDir, streaming decoded NDJSON events to
+	// onEvent as they arrive and returning the trailing summary once the
+	// process exits. It backs the host session and is the unit tests'
+	// injection point.
+	planExecutor func(ctx context.Context, workDir, planFile string, onEvent func(provisionEvent)) (provisionEvent, error)
 	// checkoutFunc materializes the repo tree at commitSHA into workDir.
 	checkoutFunc func(ctx context.Context, bareRepo, commitSHA, workDir string) error
 	// pipelineReader reads mgitci.yml at commitSHA; ok=false means absent.
 	pipelineReader func(ctx context.Context, bareRepo, commitSHA string) (raw []byte, ok bool, err error)
 )
 
-// jobSession executes one job's steps in some environment and is closed when
-// the job finishes. It is the runner's isolation seam: runJob emits the same
-// event stream regardless of whether the session runs steps on the host or in
-// a per-job container.
+// jobSession executes one job's provision plan in some environment and is
+// closed when the job finishes. It is the runner's isolation seam: runJob
+// emits the same event stream regardless of whether the session runs the
+// plan on the host or in a per-job container.
 type jobSession interface {
-	Exec(ctx context.Context, stepYAML string) (stepResult, error)
+	// ExecPlan runs the plan at planFile — a path resolved against the
+	// session's own working directory (the host workDir for hostSession,
+	// "/work/<planFile>" inside the container for dockerSession) — streaming
+	// each decoded NDJSON step event to onEvent as it arrives and returning
+	// the trailing summary event once the process exits.
+	ExecPlan(ctx context.Context, planFile string, onEvent func(provisionEvent)) (provisionEvent, error)
 	Close() error
 }
 
@@ -142,10 +173,10 @@ func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner 
 	if cfg.CIIsolation == "none" {
 		// Legacy path: steps run on the host as the moongitd user.
 		r.newSession = func(_ context.Context, _, workDir, _ string, _ []string) (jobSession, error) {
-			return &hostSession{workDir: workDir, exec: runMooncakeStep, stream: runClaudeStreamHost}, nil
+			return &hostSession{workDir: workDir, exec: runProvisionPlanHost, stream: runClaudeStreamHost}, nil
 		}
 		r.newAgentSession = func(_ context.Context, _, workDir, _ string, _ []string) (jobSession, error) {
-			return &hostSession{workDir: workDir, exec: runMooncakeStep, stream: runClaudeStreamHost}, nil
+			return &hostSession{workDir: workDir, exec: runProvisionPlanHost, stream: runClaudeStreamHost}, nil
 		}
 		r.attachSession = func(_ context.Context, _ string) (jobSession, error) {
 			return nil, errors.New("agent turn resume requires docker isolation")
@@ -562,12 +593,18 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	log.Info("ci run finished", "status", final)
 }
 
-// runJob executes one job's steps via mooncake, emitting the event stream into
-// the job's events.jsonl, and returns its terminal status.
+// runJob executes one job's steps via provision, emitting the event stream
+// into the job's events.jsonl, and returns its terminal status.
 func (r *ciRunner) runJob(ctx context.Context, owner, repo string, runNum int, jobName string, jobID int64, job ci.Job, workDir string) storage.JobStatus {
 	log := r.logger.With("run", runNum, "job", jobName)
 
-	steps, err := ci.MooncakeSteps(job)
+	meta, err := ci.JobStepMeta(job)
+	if err != nil {
+		log.Error("ci translate steps", "err", err)
+		r.finishJob(jobID, storage.JobError, nil)
+		return storage.JobError
+	}
+	planYAML, err := ci.TranslateJobPlan(job)
 	if err != nil {
 		log.Error("ci translate steps", "err", err)
 		r.finishJob(jobID, storage.JobError, nil)
@@ -585,8 +622,18 @@ func (r *ciRunner) runJob(ctx context.Context, owner, repo string, runNum int, j
 	if err := storage.StartJob(r.db, jobID); err != nil {
 		log.Error("ci start job", "err", err)
 	}
-	r.emit(elog, ci.EventRunStarted, map[string]any{"total_steps": len(steps)})
-	r.emit(elog, ci.EventPlanLoaded, map[string]any{"total_steps": len(steps)})
+	r.emit(elog, ci.EventRunStarted, map[string]any{"total_steps": len(meta)})
+	r.emit(elog, ci.EventPlanLoaded, map[string]any{"total_steps": len(meta)})
+
+	// The plan lives in the job's own workspace so it's reachable inside a
+	// per-job container at /work/<name>, the same way the checked-out repo
+	// already is (openDockerSession bind-mounts workDir at /work).
+	planFile := jobName + ".plan.yml"
+	if err := os.WriteFile(filepath.Join(workDir, planFile), planYAML, 0o644); err != nil {
+		log.Error("ci write plan", "err", err)
+		r.finishJob(jobID, storage.JobError, nil)
+		return storage.JobError
+	}
 
 	// Open the job's execution environment (a per-job container under docker
 	// isolation, or the host otherwise). A failure here — e.g. the image is
@@ -622,71 +669,110 @@ func (r *ciRunner) runJob(ctx context.Context, owner, repo string, runNum int, j
 	}
 	defer sess.Close()
 
-	for i, step := range steps {
+	// provision's --json stream reports a step only once it has finished —
+	// there is no separate "step started" line (docs/ops-provisioning.md's
+	// CI-runner section). `apply` runs a job's steps strictly sequentially, so
+	// step N's event arriving means step N+1 is starting; pre-declare step
+	// 1's start now (already known from the plan just written), then chain
+	// each later start off the previous step's arrival below. next holds the
+	// 1-based id of the step currently in flight (started, not yet reported).
+	next := 0
+	startStep := func(i int) {
+		if i >= len(meta) {
+			return
+		}
 		stepID := fmt.Sprintf("step-%04d", i+1)
 		r.emit(elog, ci.EventStepStarted, map[string]any{
-			"step_id": stepID, "action": step.Action, "name": step.Label, "global_step": i + 1,
+			"step_id": stepID, "action": meta[i].Action, "name": meta[i].Label, "global_step": i + 1,
 		})
+		next = i + 1
+	}
+	startStep(0)
 
-		res, execErr := sess.Exec(ctx, step.YAML)
-		if execErr != nil {
-			// A graceful shutdown cancels the step's context — parent cancellation
-			// surfaces as context.Canceled, distinct from a run-timeout's
-			// DeadlineExceeded. That's operator-induced (a deploy/restart), not a
-			// gate failure, so finalize the job interrupted — neutral, not error.
-			if errors.Is(ctx.Err(), context.Canceled) {
-				r.emit(elog, ci.EventStepStderr, map[string]any{
-					"step_id": stepID, "stream": "stderr", "line": "step interrupted: runner shutting down", "line_number": 1,
-				})
-				r.emit(elog, ci.EventStepCompleted, map[string]any{
-					"step_id": stepID, "result": map[string]any{"rc": -1, "failed": true, "status": "interrupted"},
-				})
-				r.finishJob(jobID, storage.JobInterrupted, nil)
-				log.Info("ci step interrupted by shutdown", "step", stepID)
-				return storage.JobInterrupted
-			}
-			// Couldn't run the step (mooncake missing, or run-timeout).
-			r.emit(elog, ci.EventStepStderr, map[string]any{
-				"step_id": stepID, "stream": "stderr", "line": execErr.Error(), "line_number": 1,
-			})
-			r.emit(elog, ci.EventStepCompleted, map[string]any{
-				"step_id": stepID, "result": map[string]any{"rc": -1, "failed": true, "status": "error"},
-			})
-			r.emit(elog, ci.EventRunFailed, map[string]any{"step_id": stepID, "error": execErr.Error()})
-			r.finishJob(jobID, storage.JobError, nil)
-			log.Error("ci step exec", "step", stepID, "err", execErr)
-			return storage.JobError
+	var failedStep *provisionEvent
+	_, execErr := sess.ExecPlan(ctx, planFile, func(ev provisionEvent) {
+		i := ev.Index - 1 // provision's index is 1-based, matching meta's order
+		if i < 0 || i >= len(meta) {
+			// Defensive: an index outside the plan we generated would be a
+			// provision/translator mismatch, not a normal outcome — fall back
+			// to the step we're expecting rather than mis-indexing meta.
+			i = next - 1
 		}
+		stepID := fmt.Sprintf("step-%04d", i+1)
 
-		emitLines(r, elog, stepID, ci.EventStepStdout, "stdout", res.Stdout)
-		emitLines(r, elog, stepID, ci.EventStepStderr, "stderr", res.Stderr)
+		emitLines(r, elog, stepID, ci.EventStepStdout, "stdout", ev.Stdout)
+		emitLines(r, elog, stepID, ci.EventStepStderr, "stderr", ev.Stderr)
 
-		stepStatus := "ok"
-		failed := res.Failed || res.RC != 0
-		switch {
-		case failed:
-			stepStatus = "failed"
-		case res.Skipped:
-			stepStatus = "skipped"
+		failed := ev.Status == "failed"
+		result := map[string]any{"status": ev.Status, "failed": failed}
+		if ev.RC != nil {
+			result["rc"] = *ev.RC
+		}
+		if ev.Stdout != "" {
+			result["stdout"] = ev.Stdout
+		}
+		if ev.Stderr != "" {
+			result["stderr"] = ev.Stderr
 		}
 		r.emit(elog, ci.EventStepCompleted, map[string]any{
-			"step_id": stepID, "duration_ms": res.DurationMS, "changed": res.Changed,
-			"result": map[string]any{
-				"rc": res.RC, "failed": res.Failed, "status": stepStatus,
-				"stdout": res.Stdout, "stderr": res.Stderr,
-			},
+			"step_id": stepID, "duration_ms": ev.DurationMS,
+			"changed": ev.Status == "changed",
+			"result":  result,
 		})
 
 		if failed {
-			r.emit(elog, ci.EventRunFailed, map[string]any{"step_id": stepID, "rc": res.RC})
-			rc := res.RC
-			r.finishJob(jobID, storage.JobFailed, &rc)
-			log.Info("ci job failed", "step", stepID, "rc", rc)
-			return storage.JobFailed
+			e := ev
+			failedStep = &e
 		}
+		// The step just reported as done; its successor (if any) is what
+		// `apply` runs next — provision stops at the first failure, so no
+		// further events arrive once failedStep is set.
+		startStep(i + 1)
+	})
+
+	if execErr != nil {
+		stepID := fmt.Sprintf("step-%04d", next)
+		// A graceful shutdown cancels the plan's context — parent cancellation
+		// surfaces as context.Canceled, distinct from a run-timeout's
+		// DeadlineExceeded. That's operator-induced (a deploy/restart), not a
+		// gate failure, so finalize the job interrupted — neutral, not error.
+		if errors.Is(ctx.Err(), context.Canceled) {
+			r.emit(elog, ci.EventStepStderr, map[string]any{
+				"step_id": stepID, "stream": "stderr", "line": "step interrupted: runner shutting down", "line_number": 1,
+			})
+			r.emit(elog, ci.EventStepCompleted, map[string]any{
+				"step_id": stepID, "result": map[string]any{"rc": -1, "failed": true, "status": "interrupted"},
+			})
+			r.finishJob(jobID, storage.JobInterrupted, nil)
+			log.Info("ci step interrupted by shutdown", "step", stepID)
+			return storage.JobInterrupted
+		}
+		// Couldn't run the plan (provision missing, or run-timeout).
+		r.emit(elog, ci.EventStepStderr, map[string]any{
+			"step_id": stepID, "stream": "stderr", "line": execErr.Error(), "line_number": 1,
+		})
+		r.emit(elog, ci.EventStepCompleted, map[string]any{
+			"step_id": stepID, "result": map[string]any{"rc": -1, "failed": true, "status": "error"},
+		})
+		r.emit(elog, ci.EventRunFailed, map[string]any{"step_id": stepID, "error": execErr.Error()})
+		r.finishJob(jobID, storage.JobError, nil)
+		log.Error("ci plan exec", "step", stepID, "err", execErr)
+		return storage.JobError
 	}
 
-	r.emit(elog, ci.EventRunCompleted, map[string]any{"total_steps": len(steps)})
+	if failedStep != nil {
+		rc := 1
+		if failedStep.RC != nil {
+			rc = *failedStep.RC
+		}
+		stepID := fmt.Sprintf("step-%04d", failedStep.Index)
+		r.emit(elog, ci.EventRunFailed, map[string]any{"step_id": stepID, "rc": rc})
+		r.finishJob(jobID, storage.JobFailed, &rc)
+		log.Info("ci job failed", "step", stepID, "rc", rc)
+		return storage.JobFailed
+	}
+
+	r.emit(elog, ci.EventRunCompleted, map[string]any{"total_steps": len(meta)})
 	zero := 0
 	r.finishJob(jobID, storage.JobSuccess, &zero)
 	return storage.JobSuccess
@@ -814,17 +900,17 @@ func (r *ciRunner) finishJob(jobID int64, status storage.JobStatus, exitCode *in
 	}
 }
 
-// hostSession runs a job's steps on the host via the injected stepExecutor (the
-// legacy, non-isolated path; also the unit tests' seam). It owns no resources,
-// so Close is a no-op.
+// hostSession runs a job's plan on the host via the injected planExecutor
+// (the legacy, non-isolated path; also the unit tests' seam). It owns no
+// resources, so Close is a no-op.
 type hostSession struct {
 	workDir string
-	exec    stepExecutor
+	exec    planExecutor
 	stream  streamExecutor
 }
 
-func (h *hostSession) Exec(ctx context.Context, stepYAML string) (stepResult, error) {
-	return h.exec(ctx, h.workDir, stepYAML)
+func (h *hostSession) ExecPlan(ctx context.Context, planFile string, onEvent func(provisionEvent)) (provisionEvent, error) {
+	return h.exec(ctx, h.workDir, planFile, onEvent)
 }
 
 // ExecStream runs an agent command on the host. nil stream means this session
@@ -838,11 +924,12 @@ func (h *hostSession) ExecStream(ctx context.Context, argv []string, onLine, onS
 
 func (h *hostSession) Close() error { return nil }
 
-// dockerSession runs a job's steps inside a single throwaway container, keeping
+// dockerSession runs a job's plan inside a single throwaway container, keeping
 // repo-authored commands off the host. The container is started detached
-// (`sleep infinity`) at Open and torn down at Close; each step is a
-// `docker exec mooncake step` into it, so steps share the bind-mounted
-// workspace and the per-step JSON contract is identical to the host path.
+// (`sleep infinity`) at Open and torn down at Close; the plan runs as one
+// `docker exec provision apply /work/<plan> --json` into it, so the job
+// shares the bind-mounted workspace and the streamed NDJSON contract is
+// identical to the host path.
 type dockerSession struct {
 	name   string
 	logger *slog.Logger
@@ -851,11 +938,13 @@ type dockerSession struct {
 // openDockerSession starts the per-job container. The workspace is bind-mounted
 // at /work and the container runs as the moongitd uid:gid so files it writes
 // stay owned by moongitd (root-owned files would break workspace cleanup). The
-// image must be glibc-based and carry `mooncake` on PATH (see ci/Dockerfile).
+// image must be glibc-based and carry `provision` on PATH (see ci/Dockerfile);
+// `mooncake` stays on PATH too as long as the `quality` job's `mooncake task
+// ci` shell-out is in scope (#411 explicitly excludes the goq/tq rewrite).
 //
 // Host reachability (host.docker.internal -> the host gateway, same mapping the
-// agent path uses) lets a job reach this moongit — needed by `mooncake task ci`
-// to fetch the go-quality module over http from host.docker.internal:8080.
+// agent path uses) lets a job reach this moongit — needed by the `smoke` job's
+// (translated) http asserts, which hit host.docker.internal:8080 directly.
 func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, image string, extraVols []string) (jobSession, error) {
 	args := []string{
 		"run", "-d", "--rm",
@@ -946,13 +1035,9 @@ func writeAgentEnvFile(env []string) (string, error) {
 	return f.Name(), nil
 }
 
-func (d *dockerSession) Exec(ctx context.Context, stepYAML string) (stepResult, error) {
-	cmd := exec.CommandContext(ctx, "docker", "exec", d.name, "mooncake", "step", stepYAML)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	runErr := cmd.Run()
-	return parseStepResult(ctx, stdout.Bytes(), stderr.Bytes(), runErr)
+func (d *dockerSession) ExecPlan(ctx context.Context, planFile string, onEvent func(provisionEvent)) (provisionEvent, error) {
+	cmd := exec.CommandContext(ctx, "docker", "exec", d.name, "provision", "apply", "/work/"+planFile, "--json")
+	return runProvisionPlan(ctx, cmd, onEvent)
 }
 
 // ExecStream runs an agent command in the container and streams its stdout
@@ -1027,6 +1112,84 @@ func streamCommand(ctx context.Context, cmd *exec.Cmd, onLine, onStderr func(lin
 		return -1, fmt.Errorf("agent exec: %v (%s)", werr, strings.TrimSpace(stderr.String()))
 	}
 	return 0, nil
+}
+
+// runProvisionPlan starts cmd (a `provision apply <plan> --json` invocation)
+// and decodes each stdout line as a provisionEvent, calling onEvent for each
+// step line as it arrives and returning the trailing summary line once the
+// process exits. Mirrors streamCommand's ReadBytes loop (no 64 KB
+// bufio.Scanner cap — same class of "a line arriving mid-write" problem) and
+// its stderr-after-stdout draining, but decodes each line as it goes rather
+// than handing raw bytes to a callback: the runner needs the parsed event,
+// not the text.
+//
+// A non-zero exit (apply's own "a step failed", exit 1) is expected and
+// reported via the streamed step/summary events, not an executor error —
+// mirrors the old parseStepResult's "mooncake prints JSON even on failure"
+// rule. Only a failure to start/run the process, an unparseable line, a
+// missing summary line, or a cancelled context is an executor error.
+func runProvisionPlan(ctx context.Context, cmd *exec.Cmd, onEvent func(provisionEvent)) (provisionEvent, error) {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return provisionEvent{}, err
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return provisionEvent{}, err
+	}
+	if err := cmd.Start(); err != nil {
+		return provisionEvent{}, err
+	}
+	// Accumulate stderr off-goroutine; only surfaced in an error message.
+	var stderr bytes.Buffer
+	var stderrDone sync.WaitGroup
+	stderrDone.Add(1)
+	go func() {
+		defer stderrDone.Done()
+		_, _ = io.Copy(&stderr, stderrPipe)
+	}()
+
+	var summary provisionEvent
+	var sawSummary bool
+	r := bufio.NewReader(stdout)
+	for {
+		line, rerr := r.ReadBytes('\n')
+		if trimmed := bytes.TrimSpace(line); len(trimmed) > 0 {
+			var ev provisionEvent
+			if jerr := json.Unmarshal(trimmed, &ev); jerr != nil {
+				stderrDone.Wait()
+				_ = cmd.Wait()
+				return provisionEvent{}, fmt.Errorf("provision --json: unparseable line %q: %v (stderr: %s)", trimmed, jerr, strings.TrimSpace(stderr.String()))
+			}
+			if ev.Event == "summary" {
+				summary = ev
+				sawSummary = true
+			} else {
+				onEvent(ev)
+			}
+		}
+		if rerr != nil {
+			break // EOF (process closing stdout) or read error; Wait reports the real outcome
+		}
+	}
+	stderrDone.Wait()
+
+	werr := cmd.Wait()
+	if ctx.Err() != nil {
+		return provisionEvent{}, fmt.Errorf("plan cancelled: %w", ctx.Err())
+	}
+	if werr != nil {
+		var ee *exec.ExitError
+		if !errors.As(werr, &ee) {
+			return provisionEvent{}, fmt.Errorf("provision apply: %v (stderr: %s)", werr, strings.TrimSpace(stderr.String()))
+		}
+		// Exit 1 (a step failed) falls through — the failure is already in the
+		// streamed events; nothing further to report here.
+	}
+	if !sawSummary {
+		return provisionEvent{}, fmt.Errorf("provision apply: no summary line (stderr: %s)", strings.TrimSpace(stderr.String()))
+	}
+	return summary, nil
 }
 
 // Close removes the container. It uses a fresh background context with a short
@@ -1124,31 +1287,12 @@ func (r *ciRunner) hostPath(containerPath string) string {
 	return containerPath
 }
 
-// runMooncakeStep executes one translated step via `mooncake step '<YAML>'` in
-// workDir. It backs the host session.
-func runMooncakeStep(ctx context.Context, workDir, stepYAML string) (stepResult, error) {
-	cmd := exec.CommandContext(ctx, "mooncake", "step", stepYAML)
+// runProvisionPlanHost executes one job's provision plan via `provision apply
+// <planFile> --json` in workDir. It backs the host session.
+func runProvisionPlanHost(ctx context.Context, workDir, planFile string, onEvent func(provisionEvent)) (provisionEvent, error) {
+	cmd := exec.CommandContext(ctx, "provision", "apply", planFile, "--json")
 	cmd.Dir = workDir
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	runErr := cmd.Run()
-	return parseStepResult(ctx, stdout.Bytes(), stderr.Bytes(), runErr)
-}
-
-// parseStepResult turns a `mooncake step` invocation's output into a stepResult.
-// mooncake prints its JSON result to stdout even when the step fails and the
-// process exits non-zero, so we parse stdout regardless of exit code and only
-// treat an unparseable result (or a cancelled context) as an executor error.
-func parseStepResult(ctx context.Context, stdout, stderr []byte, runErr error) (stepResult, error) {
-	if ctx.Err() != nil {
-		return stepResult{}, fmt.Errorf("step cancelled: %w", ctx.Err())
-	}
-	var res stepResult
-	if jerr := json.Unmarshal(stdout, &res); jerr != nil {
-		return stepResult{}, fmt.Errorf("mooncake step: %v (stderr: %s)", runErr, strings.TrimSpace(string(stderr)))
-	}
-	return res, nil
+	return runProvisionPlan(ctx, cmd, onEvent)
 }
 
 // gitCheckout materializes the repo tree at commitSHA into workDir as a real

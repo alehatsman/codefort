@@ -453,12 +453,15 @@ equivalent test.
 
 ### 6. CI image
 
-`ci/Dockerfile` and `ci/Dockerfile.dev` bake `provision` instead of/
-alongside `mooncake`: `mooncake` must stay on PATH as long as the `quality`
-job's `mooncake task ci` shell-out is in scope (explicitly excluded from
-#411, see top of this section) — audit at implementation time whether both
-binaries coexisting in the image is fine (near-certainly yes; disk cost
-only) rather than trying to drop mooncake from the image prematurely.
+Done: `ci/Dockerfile` and `ci/Dockerfile.dev` now bake `provision` alongside
+`mooncake` (both binaries coexisting is fine — disk cost only). `mooncake`
+stays on PATH as long as the `quality` job's `mooncake task ci` shell-out is
+in scope (explicitly excluded from #411, see top of this section).
+`ci/README.md` documents producing `ci/provision` (`cargo build --release`,
+glibc-linked, fine on `debian:stable-slim`) the same way `ci/mooncake`
+already is. **Not yet done:** the images (`moongit-ci:latest`,
+`moongit-ci-dev:latest`) haven't actually been rebuilt from these
+Dockerfiles — see Validation below.
 
 ### 7. `host.docker.internal` reachability
 
@@ -469,23 +472,64 @@ github). Still needed for: the `smoke` job's `assert` steps (hit
 `host.docker.internal:8080` directly) and nothing else identified — keep
 the `--add-host` flag, don't remove it.
 
-### Validation plan (not yet run — this section specs the work, doesn't
-claim it done)
+### Validation — done and not-yet-done
 
-- A real `mgitci.yml` run — `web` job first (lowest risk, plain `npm`
-  steps, no host reachability, no docker_socket) — completes end-to-end
-  through the provision-driven container: status, step-level stdout/
-  stderr, and timing surface in the moongit UI identically to the mooncake
-  path today.
-- `quality`'s `mooncake task ci` shell-out still passes inside the
-  provision-run container (proves the deferred goq/tq half isn't
-  regressed by the image/runner change).
-- `smoke`'s translated `assert: {command: curl ...}` steps pass against
-  the live host, both the healthy case and (manually, by pointing at a
-  wrong port) the failure case, to confirm the curl/grep rewrite actually
-  preserves the status+contains semantics.
-- A deliberately-failing step in a test job produces the same job-failure
-  behavior (stop at first failure, correct exit status, correct UI
-  rendering) as today's mooncake path.
-- `ci_runner_test.go` passes with the rewritten fakes; `TestParseStepResult`
-  is replaced by a streaming-NDJSON-decode equivalent.
+**Done:**
+
+- `go build ./...`, `go vet ./...`, and the full `go test ./...` suite pass
+  (every package, not just `internal/ci`/`cmd/moongitd`) — no regression
+  anywhere else in the module.
+- `internal/ci`'s translator, run for real against the actual `mgitci.yml`
+  (all three live jobs — `quality`, `web`, `smoke`): `TranslateJobPlan`'s
+  output for each job validates clean under the real installed `provision
+  0.9.1` binary (`provision validate --strict`), including `smoke`'s
+  http-assert rewrite.
+- The http-assert curl/grep rewrite, applied for real (`provision apply
+  --json`) against the live moongit host at `127.0.0.1:8080` — both the
+  healthy case (200 + "ok" body, step reports `ok`) and a deliberately
+  wrong-port failure case (step reports `failed`, `msg` surfaced, exit 1) —
+  confirming the translation preserves the status+contains semantics, not
+  just that it parses.
+- The real `--json` NDJSON shape, captured directly from that same live
+  `provision apply --json` run, confirmed byte-for-byte against
+  `provisionEvent`'s field names/types (including the stdout/stderr
+  fd split the spec promises — `--json`'s NDJSON is pure stdout, the
+  human-readable summary is pure stderr, verified by redirecting each away
+  independently).
+- `ci_runner_test.go`'s five fakes (`successExec`/`sentinelExec`/
+  `trackingExec`/two `blockingExec` closures) rewritten to the new
+  `planExecutor` shape and passing, including the interrupted/timeout/
+  cancel discriminator tests; `TestParseStepResult` replaced by
+  `TestRunProvisionPlan` (a real subprocess exercising the streaming NDJSON
+  decoder — non-zero exit + valid summary is not an error, an unparseable
+  line is, a missing summary line is, a cancelled context is).
+- Found and fixed one real test-harness bug surfaced by this rewrite (not a
+  production bug): `newTestRunner`'s config never set `HostDataDir`, so
+  `hostPath`'s identity check silently mismatched and handed the fakes a
+  wrong workDir — invisible while no fake touched the filesystem, real once
+  `planExecutor` fakes read the plan file `runJob` wrote for real.
+- `ci/Dockerfile`, `ci/Dockerfile.dev`, `ci/README.md`, and `ci/.gitignore`
+  updated to bake/build `provision` alongside `mooncake`; `mgitci.yml`'s
+  header comments (the two that stated the mooncake-per-step mechanism as
+  current fact, plus one already-stale `mooncake task deploy` reference
+  left over from #410) corrected.
+
+**Not yet done — needs a live end-to-end run, which needs the CI images
+rebuilt and this branch's moongitd actually running the new code:**
+
+- The images (`moongit-ci:latest`, `moongit-ci-dev:latest`) haven't been
+  rebuilt from the updated Dockerfiles.
+- No real `mgitci.yml` run has gone through the full path — docker-isolated
+  session, `docker exec ... provision apply ... --json`, NDJSON parsed into
+  moongit's event log, rendered in the UI — only the pieces (translator,
+  NDJSON decoder, event-emission logic) are validated in isolation/real-CLI,
+  not wired together against a live `moongitd` claiming a real queued run.
+- `quality`'s `mooncake task ci` shell-out inside a provision-run container
+  is unverified (needs the rebuilt image).
+- A deliberately-failing step's UI rendering (not just its storage/event-log
+  status, which the unit tests cover) is unverified.
+
+This is deliberately not done in this pass: it requires rebuilding
+production CI images and running new runner code against moongitd's live
+job queue — the same daemon this session's own tooling (mgit) depends on.
+Flagging for a decision on how to proceed rather than doing it unprompted.
