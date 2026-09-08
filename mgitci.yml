@@ -1,8 +1,8 @@
-# smoke: a host-mode (no image) cron job that hits the live prod server
-# every 5 minutes. No container spin-up — mooncake steps run directly on
-# the CI host, which IS the prod server, so 127.0.0.1:8080 is always local.
-# Checks: /healthz (no auth), SPA root, and three API endpoints (Bearer token
-# from MOONGIT_TOKEN in the service env — mint via: mgit token create smoke-ci).
+# smoke: runs in moongit-ci:latest on a cron schedule, reaching the live prod
+# server via host.docker.internal:8080 (127.0.0.1 inside the container is the
+# container's own loopback, not the host) — see the `smoke` job below for the
+# current checks (currently just /healthz + SPA root; no Bearer-token API
+# checks yet, env passthrough to CI containers is a TODO).
 # A failed assertion fails the step; provision aborts on the first failure.
 #
 # moongit CI — moongit's own pipeline (dogfooding the moongitci stack).

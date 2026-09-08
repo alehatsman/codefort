@@ -10,8 +10,9 @@
 # (provision) — see docs/ops-provisioning.md and moongit issue #410. This
 # file now holds only the goq/tq-backed quality-gate tasks, plus `tidy`,
 # which #410 didn't scope out. The CI runner (mgitci.yml,
-# cmd/moongitd/ci_runner.go) still execs mooncake in-container — tracked
-# separately in #411.
+# cmd/moongitd/ci_runner.go) execs provision in-container now (#411); the
+# `quality` job's own `mooncake task ci` shell-out below is what still
+# needs mooncake — that rewrite is a separate, deferred follow-up.
 
 version: "1.0"
 
