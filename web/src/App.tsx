@@ -1,5 +1,6 @@
 import { useState } from "react"
-import { Navigate, Route, Routes, useParams } from "react-router-dom"
+// Navigate/useParams come back with the commented-out ExploreRedirect below.
+import { Route, Routes } from "react-router-dom"
 import { getToken } from "@/api/client"
 import AgentsPage from "@/features/agents/AgentsPage"
 import GlobalAgentsPage from "@/features/agents/GlobalAgentsPage"
@@ -33,10 +34,15 @@ import DevGalleryPage from "@/ui/DevGalleryPage"
 
 // The old Research and Summaries tabs merged into one Explore tab; keep their
 // URLs working by redirecting to the merged page.
-function ExploreRedirect() {
-  const { owner = "", repo = "" } = useParams()
-  return <Navigate to={`/${owner}/${repo}/explore`} replace />
-}
+// Explore absorbed the former Research + Summaries tabs and their URLs, so
+// these two redirect into it. Disabled alongside the Explore route itself
+// (ce12340) — while that route is commented out they would land on NotFound,
+// which is worse than 404ing directly: a redirect implies somewhere to go.
+// All three come back together.
+// function ExploreRedirect() {
+//   const { owner = "", repo = "" } = useParams()
+//   return <Navigate to={`/${owner}/${repo}/explore`} replace />
+// }
 
 export default function App() {
   const [hasToken, setHasToken] = useState<boolean>(() => getToken() !== null)
@@ -72,8 +78,8 @@ export default function App() {
         <Route path="/:owner/:repo/tags" element={<TagsPage />} />
         {/* <Route path="/:owner/:repo/explore" element={<ExplorePage />} /> */}
         <Route path="/:owner/:repo/specs" element={<SpecsPage />} />
-        <Route path="/:owner/:repo/research" element={<ExploreRedirect />} />
-        <Route path="/:owner/:repo/summaries" element={<ExploreRedirect />} />
+        {/* <Route path="/:owner/:repo/research" element={<ExploreRedirect />} /> */}
+        {/* <Route path="/:owner/:repo/summaries" element={<ExploreRedirect />} /> */}
         <Route path="/:owner/:repo/review" element={<ReviewPage />} />
         <Route path="/:owner/:repo/pipelines" element={<PipelinesPage />} />
         <Route path="/:owner/:repo/pipelines/:number" element={<PipelinesPage />} />

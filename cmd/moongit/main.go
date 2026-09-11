@@ -61,15 +61,17 @@ func printUsage(w io.Writer) {
 	fmt.Fprint(w, `moongit — client for the moongit server
 
 USAGE:
-    moongit issue create  --title <t> [--body <b>] [--parent <n>]
-    moongit issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--limit n] [--ready|--blocked|--epics]
+    moongit issue create  --title <t> [--body <b>] [--parent <n>] [--labels <a,b>]
+    moongit issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--label <l>]
+                          [--limit n] [--ready|--blocked|--epics]
     moongit issue show    <number>
     moongit issue edit    <number> [--title <t>] [--body <b>] [--state <s>] [--parent <n>|0]
+                                   [--labels <a,b>]
                                    [--depends-on <m,...>] [--remove-depends-on <m,...>]
     moongit issue set-state <number> <todo|in_progress|done|closed>
     moongit issue claim   <number> [--state s]
     moongit issue unclaim <number>
-    moongit issue delete  <number> [--yes]
+    moongit issue delete  <number> [--yes|-y]
     moongit issue comment <number> --body <b>
 
     moongit review list    [--ref <branch>] [--path <p>] [--state open|resolved|all] [--json]
@@ -82,23 +84,28 @@ USAGE:
     moongit pr list    [--state open|merged|closed|all]
     moongit pr show    <number>
     moongit pr merge   <number> [--ff-only]
+    moongit pr close   <number>
+    moongit pr reopen  <number>
 
     moongit ci validate  [path]   (defaults to ./mgitci.yml)
     moongit ci run       <ref>    (trigger a run for a branch/tag/sha)
 
-    moongit repo delete  <owner>/<name> [--yes]   (irreversible)
+    moongit repo delete  <owner>/<name> [--yes|-y]   (irreversible)
 
     moongit events                (tail the fleet event feed; Ctrl-C to stop)
         [--repo owner/name] [--types a,b] [--since <seq>] [--once]
 
-    moongit mcp                   (serve the toolset over stdio as an MCP server)
+    moongit mcp [--profile full|review]
+                                  (serve the toolset over stdio as an MCP server)
 
 Identity: the server stamps author/assignee from the name of the token
 in MOONGIT_TOKEN. Mint a token with "moongitd token create <name>" and
 export MOONGIT_TOKEN=mgt_... before running the client.
 
-Run inside a git checkout whose 'origin' remote points at a moongit
-server. The target repo is parsed from the remote URL.
+Run inside a git checkout of the target repo. owner/repo is parsed from
+the 'moongit' remote, falling back to 'origin'. MOONGIT_SERVER overrides
+only the server host — owner/repo always comes from the remote, so a
+checkout is required even when it is set.
 `)
 }
 
@@ -690,7 +697,7 @@ func runIssueDelete(args []string) error {
 
 func runIssueComment(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: moongit issue comment <number> --body <b> [--author <a>]")
+		return errors.New("usage: moongit issue comment <number> --body <b>")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -956,8 +963,9 @@ func runReviewDelete(args []string) error {
 	return nil
 }
 
-// runCI dispatches `moongit ci <subcommand>`. CI subcommands are local-only
-// (no server round-trip): they operate on the mgitci.yml in the working copy.
+// runCI dispatches `moongit ci <subcommand>`. `validate` is local-only — it
+// parses the mgitci.yml in the working copy and never touches the server.
+// `run` does round-trip: it POSTs a run for a ref.
 func runCI(args []string) error {
 	if len(args) == 0 {
 		return errors.New("usage: moongit ci <validate|run>")

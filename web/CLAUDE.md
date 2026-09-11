@@ -7,8 +7,9 @@ Vite + React 19 SPA. Read this before adding or editing components.
 `src/` is grouped by **feature**, not by technical type:
 
 - `src/features/<feature>/` — pages + components + helpers for one feature
-  (`issues`, `pulls`, `repo`, `commits`, `pipelines`, `agents`, `explore`,
-  `settings`). A feature owns everything specific to it; put new files for a
+  (`issues`, `pulls`, `repo`, `commits`, `pipelines`, `agents`, `specs`,
+  `settings`, and `explore` — which is present but currently unrouted, see
+  ce12340). A feature owns everything specific to it; put new files for a
   feature here, not in a global drawer.
 - `src/shell/` — cross-cutting app chrome (`Layout`, nav tabs, `Avatar`,
   `Markdown`, `NotFound`, `keyboardNav`, `timeAgo`).
@@ -40,8 +41,12 @@ default vocabulary: build new pages by composing these, not by hand-stitching
   domain-agnostic — pass per-instance styling via a `className`/option prop.
 - **Every primitive gets a `/dev/ui` row.** `DevGalleryPage.tsx` is the living
   gallery (our Storybook) and the design-token reference; add a section when you
-  add a primitive or variant, and check it against both themes via the top-bar
-  switcher.
+  add a primitive or variant, and check it against both color schemes. The
+  schemes are `github` and `monokai` (`src/theme.ts`), switched in
+  Settings → Appearance — not the top bar. Light/dark is a separate axis: the
+  base scheme follows `prefers-color-scheme` via a `@media` block in
+  `styles.css`, so a primitive needs checking in both schemes *and* both system
+  appearances.
 - **Caller-derived state stays out of the primitive.** Route matching, mutation
   wiring, etc. live at the call site (see `Tab`'s `active` prop); the primitive
   owns markup + class composition only.
