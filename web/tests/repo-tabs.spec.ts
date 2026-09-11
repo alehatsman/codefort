@@ -26,7 +26,7 @@ test.beforeEach(async ({ page }) => {
   await seedToken(page)
 })
 
-test("repo tabs show count pills, drop Settings, and put Specs second", async ({ page }) => {
+test("repo tabs show count pills, keep Settings, and put Specs second", async ({ page }) => {
   await mockApi(page, {
     // 2 open issues → Issues pill "2".
     issues: [
@@ -107,8 +107,9 @@ test("repo tabs show count pills, drop Settings, and put Specs second", async ({
   await expect(tabs.filter({ hasText: "Pipelines" }).locator(".tab__count")).toHaveText("2")
   await expect(tabs.filter({ hasText: "Agents" }).locator(".tab__count")).toHaveText("2")
 
-  // The Settings tab is gone (its content moved to the global /settings page).
-  await expect(page.getByRole("link", { name: "Settings", exact: true })).toHaveCount(0)
+  // The repo Settings tab came back in fa6d8c0 (visibility, CI, members, danger
+  // zone) — it's a per-repo page again, not folded into global /settings.
+  await expect(page.getByRole("link", { name: "Settings", exact: true })).toHaveCount(1)
 })
 
 test("tabs render no count pill when there's nothing waiting", async ({ page }) => {

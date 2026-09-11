@@ -1049,6 +1049,7 @@ a.file-tree__commit:hover {
   background: var(--border);
   border-radius: var(--radius-pill);
   transition: background 0.15s ease;
+  pointer-events: none;
 }
 .switch__thumb {
   position: absolute;
@@ -1059,6 +1060,7 @@ a.file-tree__commit:hover {
   background: var(--bg);
   border-radius: var(--radius-circle);
   transition: transform 0.15s ease;
+  pointer-events: none;
 }
 .switch__input:checked ~ .switch__track {
   background: var(--accent);

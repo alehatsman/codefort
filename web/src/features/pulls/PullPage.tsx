@@ -50,7 +50,7 @@ function parseClosingRefs(text: string): number[] {
 }
 
 export default function PullPage() {
-  const { owner = "", repo = "", num = "" } = useParams()
+  const { owner = "", repo = "", number: num = "" } = useParams()
   const n = Number(num)
 
   const pullQ = usePull(owner, repo, n)
@@ -94,7 +94,7 @@ export default function PullPage() {
       ) : pullQ.error ? (
         <ErrorMessage error={pullQ.error} />
       ) : !pr ? (
-        <EmptyState>Pull req not found.</EmptyState>
+        <EmptyState>Pull request not found.</EmptyState>
       ) : (
         <DetailLayout
           sidebar={
@@ -236,7 +236,7 @@ function PullMergePanel({
           onClick={() =>
             mergePull.mutate(
               { method: "ff-only" },
-              { onSuccess: () => toast(`Pull req #${n} merged`, { variant: "success" }) }
+              { onSuccess: () => toast(`Pull request #${n} merged`, { variant: "success" }) }
             )
           }
         >
@@ -248,7 +248,7 @@ function PullMergePanel({
             onClick={() =>
               mergePull.mutate(
                 { method: "merge" },
-                { onSuccess: () => toast(`Pull req #${n} merged`, { variant: "success" }) }
+                { onSuccess: () => toast(`Pull request #${n} merged`, { variant: "success" }) }
               )
             }
           >

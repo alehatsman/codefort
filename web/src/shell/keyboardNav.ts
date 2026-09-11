@@ -124,13 +124,14 @@ function handleListNavKey(
 }
 
 // Repo tabs, in the order h/l walk them. Suffixes append to `/owner/repo`.
-const TAB_SUFFIXES = ["", "/issues", "/explore", "/pipelines", "/agents"] as const
+// Explore is disabled (ce12340, "disable explore broken, no summaries in dex
+// anymore") — dropped here too so h/l doesn't cycle onto a dead route.
+const TAB_SUFFIXES = ["", "/issues", "/pipelines", "/agents"] as const
 
 /**
- * h/l (and ←/→) cycle between the repo tabs (Code / Issues / Explore /
- * Pipelines). The active tab is derived from the URL, matching `RepoTabs`'s
- * own logic — including the legacy /research and /summaries URLs that now land
- * on Explore.
+ * h/l (and ←/→) cycle between the repo tabs (Code / Issues / Pipelines /
+ * Agents). The active tab is derived from the URL, matching `RepoTabs`'s
+ * own logic.
  */
 export function useTabNav(owner: string, repo: string, enabled = true) {
   const navigate = useNavigate()
@@ -139,14 +140,8 @@ export function useTabNav(owner: string, repo: string, enabled = true) {
 
   let current = 0
   if (pathname.startsWith(`${base}/issues`)) current = 1
-  else if (
-    pathname.startsWith(`${base}/explore`) ||
-    pathname.startsWith(`${base}/research`) ||
-    pathname.startsWith(`${base}/summaries`)
-  )
-    current = 2
-  else if (pathname.startsWith(`${base}/pipelines`)) current = 3
-  else if (pathname.startsWith(`${base}/agents`)) current = 4
+  else if (pathname.startsWith(`${base}/pipelines`)) current = 2
+  else if (pathname.startsWith(`${base}/agents`)) current = 3
   const currentRef = useRef(current)
   currentRef.current = current
 
