@@ -4,7 +4,7 @@
 # Claude session to work an issue — see cmd/moongitd/agent_runner.go. moongitd
 # opens this image exactly like a CI container (`docker run --user <uid:gid>
 # -v <workspace>:/work … sleep infinity`, then `docker exec`), so it derives
-# FROM the CI base to inherit the mooncake/git contract and the uid:gid
+# FROM the CI base to inherit the provision/git contract and the uid:gid
 # bind-mount convention, and adds the `claude` CLI plus the dex stdio->REST MCP
 # shim on PATH.
 #
@@ -31,7 +31,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # dex stdio->REST MCP shim (option A): a static `dex` binary carrying
-# `dex mcp --remote <url>` (dex#6). Dropped in like ci/mooncake — a build
+# `dex mcp --remote <url>` (dex#6). Dropped in like ci/provision — a build
 # input, not source (agent/dex is git-ignored). The shim only proxies to a
 # remote `dex serve`, so it opens no local index (no FTS5 build tag needed,
 # unlike the host indexer).
@@ -40,17 +40,9 @@ RUN chmod +x /usr/local/bin/dex
 
 # mgit — the moongit issue client, so the agent can comment on the issue it's
 # working (MOONGIT_TOKEN + MOONGIT_SERVER are injected per run, #77). A static
-# build dropped in like dex/mooncake (agent/mgit is a git-ignored build input).
+# build dropped in like dex (agent/mgit is a git-ignored build input).
 COPY mgit /usr/local/bin/mgit
 RUN chmod +x /usr/local/bin/mgit
-
-# mooncake — the executor for the `mooncake-agent` execution model (#110):
-# `mooncake agent run --output-format json` (mooncake #48; pilot→agent #75).
-# Overrides the mooncake inherited from moongit-ci:latest with a build carrying
-# the JSON event stream the runner parses. A static build dropped in like
-# dex/mgit (agent/mooncake is a git-ignored build input).
-COPY mooncake /usr/local/bin/mooncake
-RUN chmod +x /usr/local/bin/mooncake
 
 # The agent runs as an arbitrary uid:gid with no passwd entry, so point HOME at
 # a world-writable dir for claude's config/cache/logs (auth itself comes from
@@ -59,7 +51,7 @@ RUN chmod +x /usr/local/bin/mooncake
 ENV HOME=/tmp
 
 # Fail the build early if any tool the agent needs is missing or unrunnable
-# (mirrors the CI base's `mooncake --version` check).
-RUN claude --version && dex --version && mgit help >/dev/null && mooncake --version && git --version
+# (mirrors the CI base's `provision --version` check).
+RUN claude --version && dex --version && mgit help >/dev/null && git --version
 
 WORKDIR /work

@@ -1,0 +1,172 @@
+# Configuration
+
+`moongitd` is configured entirely through `MOONGIT_*` environment variables —
+there is no config file, no flags for these, and nothing persisted at install
+time. `internal/config/config.go` (`config.Load`) is the single source of truth:
+it reads the environment once at startup, resolves `MOONGIT_DATA_DIR` to an
+absolute path, and returns an error that aborts startup if any typed value fails
+to parse. A variable set to the **empty string counts as unset** and falls back
+to its default, so you cannot blank out a defaulted value by exporting `VAR=`;
+to disable something, set the documented disabling value (usually `0`).
+
+Parse failures are loud, not silent: a bad duration (`MOONGIT_CI_RUN_TIMEOUT=15`
+— no unit), a non-numeric int/float, or an unknown `MOONGIT_CI_ISOLATION` value
+makes `moongitd` exit with `config: MOONGIT_…: …` instead of booting on a
+half-understood configuration. Durations use Go syntax (`5s`, `15m`, `168h`).
+Range clamping, in contrast, is silent and happens in the runner, not at load —
+noted per variable below.
+
+## Core
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MOONGIT_ADDR` | `:8080` | Listen address for the one HTTP port that serves `/api/*`, git smart-HTTP, and the SPA. |
+| `MOONGIT_DATA_DIR` | `data` | Root of all server state. Resolved to an absolute path at load (relative values are relative to the process CWD, which makes them fragile under systemd — prefer absolute). Created on startup along with the repos dir. |
+| `MOONGIT_DB_PATH` | `$MOONGIT_DATA_DIR/moongit.db` | SQLite database file. Split out only if you want the DB on different storage than the repos. |
+| `MOONGIT_REPOS_DIR` | `$MOONGIT_DATA_DIR/repos` | Bare git repositories. |
+| `MOONGIT_HOST_DATA_DIR` | value of `MOONGIT_DATA_DIR` | The **host-side** path that corresponds to `MOONGIT_DATA_DIR` when moongitd itself runs in a container. CI and agent runners bind-mount workspaces into sibling containers via the host Docker daemon, which resolves bind sources on the host filesystem — so a containerised moongitd must translate `/data` back to e.g. `/home/user/.local/share/moongit`. Leave unset for non-containerised deployments. |
+| `MOONGIT_WEB_DIR` | *(empty)* | Directory holding the built web UI (`web/dist`). When set, moongitd serves it as an SPA with history-API fallback. Empty means API + git only — the UI is opt-in so a headless deployment ships no static surface. |
+| `MOONGIT_EVENT_RETAIN` | `10000` | Cap on retained outbound feed events; a periodic reaper prunes older rows so the `events` table stays bounded. Zero or negative disables retention (unbounded growth). |
+
+## Auth & limits
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MOONGIT_BASIC_USER` | *(empty)* | HTTP Basic username gating the web UI and git smart-HTTP. Empty disables Basic auth — moongit is open by default and expects to sit on a trusted network or behind a proxy. |
+| `MOONGIT_BASIC_PASS` | *(empty)* | Password for the above. |
+| `MOONGIT_RATE_LIMIT` | `0` | Per-IP request rate limit in requests/second (float). `0` disables rate limiting. Non-numeric values fail startup. |
+| `MOONGIT_CLAIM_LEASE` | `60m` | How long an issue claim stays exclusive before another agent may steal it. A claim older than this is treated as orphaned — the owner crashed or lost context. Owners heartbeat by re-claiming. `0` disables expiry: claims hold until explicitly unclaimed. |
+| `MOONGIT_AGENT_TOKEN_TTL` | `168h` (7d) | Idle TTL for per-agent session tokens (`agent#<n>`), measured from last use, or creation if never used. These are minted one-per-spawn and never explicitly revoked, so a reaper sweeps idle ones. `0` disables the sweep. |
+
+The `/api` surface is unaffected by Basic auth — it keeps Bearer-token auth
+(`mgt_…`) in all cases.
+
+## Git SSH transport
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MOONGIT_SSH_ADDR` | *(empty)* | Listen address for the opt-in git SSH transport, e.g. `:2222`. Empty keeps moongitd a single HTTP port; set it to serve git over SSH with publickey auth against registered keys. |
+| `MOONGIT_SSH_HOST_KEY` | `$MOONGIT_DATA_DIR/ssh_host_ed25519_key` | Persisted SSH host private key. Generated (ed25519, mode 0600) on first use if absent, so the host identity is stable across restarts and clients don't see key-changed warnings. Only read when `MOONGIT_SSH_ADDR` is set. |
+
+## CI runner
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MOONGIT_CI_ISOLATION` | `docker` | How a job's steps execute. `docker` runs each job in a throwaway container so repo-authored commands never touch the host; `none` runs them on the host as the moongitd user — the legacy path, RCE by design, only for deployments that trust every CI-enabled repo. Any other value **fails startup**. |
+| `MOONGIT_CI_DEFAULT_IMAGE` | `moongit-ci:latest` | Image a job runs in when its `mgitci.yml` sets no `image:`. Must be glibc-based and carry `provision`, `git`, and `curl` on PATH (see `ci/README.md`). Only used when isolation is `docker`. |
+| `MOONGIT_CI_RUN_TIMEOUT` | `15m` | Hard wall-clock limit for a single run; the runner executes under a context with this deadline and kills + errors an overrunning run. Zero or negative disables it — not recommended, CI runs untrusted repo code. |
+| `MOONGIT_CI_POLL_INTERVAL` | `5s` | How often an idle runner polls for a queued run. Zero or negative is silently treated as `5s` by the runner. |
+| `MOONGIT_CI_JOB_CONCURRENCY` | `4` | How many of a run's jobs execute at once. The runner schedules jobs in dependency waves and runs every ready job (all `needs` satisfied) concurrently up to this cap. Values `< 1` are silently clamped to `1`. |
+| `MOONGIT_MAX_CONCURRENCY` | `runtime.NumCPU()` | Cap on concurrent **runs** across one shared budget that CI and agent runs both draw from. A CI run still bounds its own jobs by `MOONGIT_CI_JOB_CONCURRENCY`, so this is not a strict cap on job containers. Values `< 1` are clamped to `1`. Replaces the former independent CI/agent run caps. |
+| `MOONGIT_CI_SECRET` | *(empty)* | Gates the loopback `/internal/ci/events` endpoint the post-receive hook calls. Empty means the server generates a fresh secret per process — sufficient, since it's injected into the hook env at push time and never persisted. Set it only when something outside the process must call that endpoint. |
+| `MOONGIT_CI_RETAIN_RUNS` | `50` | How many of a repo's most recent CI runs are kept; a periodic reaper prunes terminal runs beyond this many along with their on-disk event logs, keeping disk and DB bounded. `queued`/`running` runs are never pruned. Zero or negative disables retention. |
+
+## Agent runs
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MOONGIT_AGENT_DEFAULT_IMAGE` | `moongit-agent:latest` | Image an agent run executes in — the CI base plus the `claude` CLI, the dex MCP shim, and `mgit` (see `agent/README.md`). Only used when isolation is `docker`. |
+| `MOONGIT_AGENT_RESERVED` | `2` | Slots of `MOONGIT_MAX_CONCURRENCY` only agent-family runs may take, so a CI backlog can never lock out an agent spawn. Silently clamped to `[0, MOONGIT_MAX_CONCURRENCY]`. |
+| `MOONGIT_AGENT_RUN_TIMEOUT` | `60m` | Whole-session lifetime cap. A run parked in `awaiting_input` past this age is reaped — container torn down, run finalized — so an abandoned session can't hold a container forever. Zero or negative disables the reaper. |
+| `MOONGIT_AGENT_TURN_TIMEOUT` | `15m` | Per-turn wall-clock limit: one `claude` invocation (first turn or follow-up) runs under this deadline; an overrunning turn is killed and errored. Zero or negative disables the per-turn deadline. |
+| `MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN` | *(empty)* | Subscription token from `claude setup-token`, injected per run as `CLAUDE_CODE_OAUTH_TOKEN`. |
+| `MOONGIT_AGENT_ANTHROPIC_API_KEY` | *(empty)* | Alternate auth path, injected as `ANTHROPIC_API_KEY`. Exactly one credential is needed for the agent to authenticate headlessly. |
+| `MOONGIT_AGENT_LLM_BASE_URL` | *(empty)* | Optional `ANTHROPIC_BASE_URL` override — an Anthropic-compatible gateway now, a local model later. |
+| `MOONGIT_AGENT_SERVER_URL` | `http://host.docker.internal:<port of MOONGIT_ADDR>` | How the in-container agent reaches this moongitd for `mgit` and git. The default routes over the host gateway (the container gets `--add-host host.docker.internal:host-gateway`); override it when moongitd is reachable at a stable address instead. Port falls back to `8080` if `MOONGIT_ADDR` carries none. |
+| `MOONGIT_AGENT_DEX_PROJECT` | *(empty)* | dex project id (keyed by the canonical repo root) the agent's dex MCP queries, injected as `DEX_PROJECT`. Empty omits the project pin from the dex wiring. |
+
+Credentials are **never baked into the image** — they are injected as container
+env at creation and revoked on finalize, alongside an ephemeral per-run moongit
+token named `agent-run-<runID>`.
+
+Auth precedence inside the container is a single slot, first match wins:
+`ANTHROPIC_AUTH_TOKEN` (Settings only) → `CLAUDE_CODE_OAUTH_TOKEN` from Settings
+→ `MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN` → `MOONGIT_AGENT_ANTHROPIC_API_KEY`.
+
+## Code intelligence (dex)
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MOONGIT_DEX_URL` | *(empty)* | Base URL of a dex `serve` daemon, e.g. `http://127.0.0.1:8080`. Trailing slashes are stripped. Empty disables the Intel tab and omits the agent's dex MCP server entirely. |
+| `MOONGIT_DEX_TOKEN` | *(empty)* | Bearer token dex was started with (`DEX_SERVE_TOKEN`). Leave empty when dex runs token-less on loopback. Only forwarded when `MOONGIT_DEX_URL` is set. |
+
+## Client (`mgit`)
+
+The client reads no `MOONGIT_*` config beyond two variables; everything else it
+derives from the checkout's git remotes.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MOONGIT_TOKEN` | *(empty)* | Bearer token (`mgt_…`) sent as `Authorization: Bearer`. **The token's name is your identity** — the server stamps author/assignee/claim owner from it — so never share one. Mint with `moongitd token create <name>`. Unset means unauthenticated requests. |
+| `MOONGIT_SERVER` | *(derived)* | Overrides the server base URL otherwise derived from the `moongit` remote (preferred, the code mirror) or `origin`. Trailing slash stripped. **Required** when the chosen remote is SSH or scp-form, since those carry no http base URL — `mgit` errors out asking for it. |
+
+Owner/repo always come from the remote URL, never from `MOONGIT_SERVER`, so
+`mgit` must run inside a checkout of the target repo.
+
+## Runtime overrides
+
+Three agent values are also settable in the UI (Settings → Agent) and persisted
+in the `settings` table. They are read **per run**, at spawn time, and win over
+their env counterparts — so an operator can rotate a credential or repoint the
+LLM endpoint with no `moongitd` restart. Secrets are write-only: the API reports
+only whether a value is set, never the value.
+
+| Setting key | Overrides | Injected as |
+| --- | --- | --- |
+| `agent.claude_oauth_token` | `MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN` | `CLAUDE_CODE_OAUTH_TOKEN` |
+| `agent.llm_base_url` | `MOONGIT_AGENT_LLM_BASE_URL` | `ANTHROPIC_BASE_URL` |
+| `agent.anthropic_auth_token` | *(no env equivalent)* | `ANTHROPIC_AUTH_TOKEN` — the bearer for a custom-endpoint gateway. When set it claims the container's auth slot alone, ahead of every OAuth/API-key path. |
+
+A fourth key, `agent.execution_model`, is not an env var at all: it sets the
+default execution model for runs that don't pick one at spawn (`claude-edit` is
+the only valid value today; the field stayed pluggable in shape). Clearing any
+of these (setting them to `""` over the API) deletes the row and restores the
+env fallback.
+
+## Minimal deployments
+
+**(a) Bare API + git.** No UI, no CI, no agents — a headless coordination
+backend. Everything else defaults.
+
+```sh
+MOONGIT_ADDR=:8080
+MOONGIT_DATA_DIR=/var/lib/moongit
+```
+
+**(b) UI + CI.** Serve the SPA and run containerised CI. Requires
+`moongit-ci:latest` built (see `ci/README.md`) and a reachable Docker daemon.
+
+```sh
+MOONGIT_ADDR=:8080
+MOONGIT_DATA_DIR=/var/lib/moongit
+MOONGIT_WEB_DIR=/opt/moongit/web/dist
+MOONGIT_CI_ISOLATION=docker
+MOONGIT_CI_DEFAULT_IMAGE=moongit-ci:latest
+MOONGIT_MAX_CONCURRENCY=4
+MOONGIT_BASIC_USER=ops
+MOONGIT_BASIC_PASS=<pass>
+```
+
+**(c) UI + CI + agent runs.** Adds the agent image, a credential, and dex for
+the Intel tab and the agent's code-intelligence MCP. Credentials can equally be
+set in Settings → Agent instead of the env.
+
+```sh
+MOONGIT_ADDR=:8080
+MOONGIT_DATA_DIR=/var/lib/moongit
+MOONGIT_WEB_DIR=/opt/moongit/web/dist
+MOONGIT_CI_DEFAULT_IMAGE=moongit-ci:latest
+MOONGIT_AGENT_DEFAULT_IMAGE=moongit-agent:latest
+MOONGIT_MAX_CONCURRENCY=6
+MOONGIT_AGENT_RESERVED=2
+MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN=<claude setup-token value>
+MOONGIT_DEX_URL=http://127.0.0.1:8080
+MOONGIT_DEX_TOKEN=<dex serve token>
+MOONGIT_AGENT_DEX_PROJECT=moongit
+MOONGIT_BASIC_USER=ops
+MOONGIT_BASIC_PASS=<pass>
+```
+
+If moongitd itself runs in a container, add `MOONGIT_HOST_DATA_DIR` to (b) and
+(c) — without it the sibling CI/agent containers bind-mount paths that don't
+exist on the host.

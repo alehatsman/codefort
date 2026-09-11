@@ -4,17 +4,17 @@ An **agent run** (the "Spawn agent" button on an issue) executes a containerized
 Claude session to work the issue. moongitd opens this image exactly like a CI
 container — `docker run --user <uid:gid> -v <workspace>:/work … sleep infinity`,
 then `docker exec` (see `cmd/moongitd/agent_runner.go`) — so it derives `FROM
-moongit-ci:latest` to inherit the `mooncake`/`git` contract and the uid:gid
+moongit-ci:latest` to inherit the `provision`/`git` contract and the uid:gid
 bind-mount convention, and adds the `claude` CLI plus the dex stdio→REST MCP
 shim on PATH. This directory builds the default agent image,
 `moongit-agent:latest`.
 
 ## Build
 
-> Shortcut: `mooncake task agent-image` automates everything below (it compiles
-> the build inputs and runs the `docker build`). It needs `moongit-ci:latest`
-> first — `mooncake task ci-images` builds that. The manual steps follow for
-> reference / one-off builds.
+> Shortcut: `provision apply tasks/agent-image.yml` automates everything below
+> (it compiles the build inputs and runs the `docker build`). It needs
+> `moongit-ci:latest` first — `provision apply tasks/ci-images.yml` builds that.
+> The manual steps follow for reference / one-off builds.
 
 1. **Drop a `dex` binary** carrying the MCP shim (`dex mcp --remote`, from
    dex#6) into `agent/dex`. dex pulls in the sqlite-vec cgo bindings, so it must
@@ -58,7 +58,9 @@ The runner reads these (see `internal/config/config.go`):
 | env | default | meaning |
 | --- | --- | --- |
 | `MOONGIT_AGENT_DEFAULT_IMAGE` | `moongit-agent:latest` | image an agent run executes in (parallel to `MOONGIT_CI_DEFAULT_IMAGE`). |
-| `MOONGIT_AGENT_RUN_CONCURRENCY` | `1` | how many agent runs execute at once (separate pool from CI). |
+| `MOONGIT_MAX_CONCURRENCY` | `runtime.NumCPU()` | total runs in flight, agent **and** CI, from one shared budget (not separate pools). |
+| `MOONGIT_AGENT_RESERVED` | `2` | slots inside that budget only agent runs may take, so a CI backlog can never starve a spawn. |
+| `MOONGIT_AGENT_SERVER_URL` | loopback `MOONGIT_ADDR` | base URL injected as `MOONGIT_SERVER` so in-container `mgit` reaches this daemon. |
 | `MOONGIT_AGENT_RUN_TIMEOUT` | `60m` | whole-session lifetime cap; a parked run past this is reaped. |
 | `MOONGIT_AGENT_TURN_TIMEOUT` | `15m` | per-turn wall-clock limit. |
 | `MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN` | — | subscription token (`claude setup-token`) → `CLAUDE_CODE_OAUTH_TOKEN`. |

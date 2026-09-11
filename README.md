@@ -76,13 +76,13 @@ SQLite file:
 | **Code review** | Line-anchored review comments on any ref, resolvable/reopenable, surfaced on the Review tab |
 | **CI runner** | `mgitci.yml` jobs wired into a DAG via `needs:`, each in a throwaway container; in-process, no worker tier |
 | **Agent runs** | Spawn a containerized Claude CLI agent from an issue; live transcript over SSE; awaiting-input → finish lifecycle |
-| **dex Intel tab** | Semantic code intel (search, summaries, overview) when `MOONGIT_DEX_URL` points at a dex server |
+| **dex code intel** | Semantic code-intel API (search, summaries, overview) when `MOONGIT_DEX_URL` points at a dex server; the Explore/Intel UI tab is currently disabled |
 | **Event feed** | `GET /api/events` — a DB-backed SSE stream of push / issue / CI / agent events; `mgit events` tails it |
 | **MCP server** | `mgit mcp` serves the toolset over stdio so an agent drives issues, reviews, pipelines, and runs directly |
 
 The web SPA ships as static files served by the same process — Code,
-Commits, Issues, Board, Pulls, Pipelines, Review, Intel, and Settings
-tabs, no SSR tier, no hydration tax.
+Commits, Issues, Board, Pulls, Pipelines, Review, Specs, Agents, and
+Settings tabs, no SSR tier, no hydration tax.
 
 ### The `mgit` client
 
@@ -159,6 +159,9 @@ staying a single binary you fully own.
 | `MOONGIT_SSH_ADDR` | Opt-in git SSH transport (e.g. `:2222`); empty keeps it one port |
 | `MOONGIT_SSH_HOST_KEY` | SSH host key path (default `$MOONGIT_DATA_DIR/ssh_host_ed25519_key`); generated if absent |
 | `MOONGIT_DEX_URL` / `MOONGIT_DEX_TOKEN` | dex server for the Intel tab; empty disables it |
+
+That's the short list — the ones you'll actually set. See
+[`docs/config.md`](docs/config.md) for the complete `MOONGIT_*` reference.
 
 The client honors `MOONGIT_TOKEN` (identity) and `MOONGIT_SERVER`
 (overrides the `origin` remote when pointing at a specific server).

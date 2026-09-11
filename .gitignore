@@ -23,7 +23,6 @@
 # Agent image build inputs (binaries, not source) — see agent/README.md
 agent/dex
 agent/mgit
-agent/mooncake
 
 .playwright-mcp
 
