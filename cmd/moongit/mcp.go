@@ -226,11 +226,11 @@ func (m *mcpServer) newServer() *sdk.Server {
 
 	// ── pipelines (CI runs) ──────────────────────────────────────────────────
 	addTool(m, srv, &sdk.Tool{
-		Name: "pipeline_trigger",
+		Name:        "pipeline_trigger",
 		Description: "Trigger a CI run for a ref (branch, tag, SHA).",
 	}, m.pipelineTrigger)
 	addTool(m, srv, &sdk.Tool{
-		Name: "pipeline_list",
+		Name:        "pipeline_list",
 		Description: "List runs. Filter by kind (ci|agent).",
 	}, m.pipelineList)
 	addTool(m, srv, &sdk.Tool{
@@ -244,7 +244,7 @@ func (m *mcpServer) newServer() *sdk.Server {
 		Description: "Spawn an agent on an issue. Options: ref, model (claude-edit), tool_profile (full|review).",
 	}, m.agentSpawn)
 	addTool(m, srv, &sdk.Tool{
-		Name: "agent_turn",
+		Name:        "agent_turn",
 		Description: "Queue a follow-up message on an agent run.",
 	}, m.agentTurn)
 
@@ -627,9 +627,9 @@ type prListInput struct {
 }
 
 type prListOutput struct {
-	Status string             `json:"status"`
-	Error  string             `json:"error,omitempty"`
-	PRs    []api.PullRequest  `json:"prs,omitempty"`
+	Status string            `json:"status"`
+	Error  string            `json:"error,omitempty"`
+	PRs    []api.PullRequest `json:"prs,omitempty"`
 }
 
 func (m *mcpServer) prList(_ context.Context, _ *sdk.CallToolRequest, in prListInput) (*sdk.CallToolResult, prListOutput, error) {
@@ -707,9 +707,9 @@ type prCreateInput struct {
 }
 
 type prOutput struct {
-	Status string            `json:"status"`
-	Error  string            `json:"error,omitempty"`
-	PR     *api.PullRequest  `json:"pr,omitempty"`
+	Status string           `json:"status"`
+	Error  string           `json:"error,omitempty"`
+	PR     *api.PullRequest `json:"pr,omitempty"`
 }
 
 func (m *mcpServer) prCreate(_ context.Context, _ *sdk.CallToolRequest, in prCreateInput) (*sdk.CallToolResult, prOutput, error) {
@@ -730,9 +730,9 @@ type prMergeInput struct {
 }
 
 type prMergeOutput struct {
-	Status string            `json:"status"`
-	Error  string            `json:"error,omitempty"`
-	Result *api.MergeResult  `json:"result,omitempty"`
+	Status string           `json:"status"`
+	Error  string           `json:"error,omitempty"`
+	Result *api.MergeResult `json:"result,omitempty"`
 }
 
 func (m *mcpServer) prMerge(_ context.Context, _ *sdk.CallToolRequest, in prMergeInput) (*sdk.CallToolResult, prMergeOutput, error) {
@@ -858,9 +858,9 @@ type pipelineTriggerInput struct {
 }
 
 type runOutput struct {
-	Status string     `json:"status"`
-	Error  string     `json:"error,omitempty"`
-	Run    *mcpCIRun  `json:"run,omitempty"`
+	Status string    `json:"status"`
+	Error  string    `json:"error,omitempty"`
+	Run    *mcpCIRun `json:"run,omitempty"`
 }
 
 func (m *mcpServer) pipelineTrigger(_ context.Context, _ *sdk.CallToolRequest, in pipelineTriggerInput) (*sdk.CallToolResult, runOutput, error) {

@@ -902,8 +902,8 @@ type VerifySpecRequest struct {
 type PRReviewState string
 
 const (
-	PRReviewApproved          PRReviewState = "approved"
-	PRReviewChangesRequested  PRReviewState = "changes_requested"
+	PRReviewApproved         PRReviewState = "approved"
+	PRReviewChangesRequested PRReviewState = "changes_requested"
 )
 
 // PRReview is one reviewer's verdict on a pull request.

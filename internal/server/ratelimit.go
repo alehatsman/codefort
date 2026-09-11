@@ -50,10 +50,10 @@ func min(a, b float64) float64 {
 
 // ipLimiter holds per-IP token buckets. Keys are the client IP string.
 type ipLimiter struct {
-	mu       sync.Mutex
-	buckets  map[string]*tokenBucket
-	rate     float64
-	burst    int
+	mu      sync.Mutex
+	buckets map[string]*tokenBucket
+	rate    float64
+	burst   int
 }
 
 func newIPLimiter(perSecond float64, burst int) *ipLimiter {

@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	ErrNotFound    = errors.New("not found")
-	ErrForbidden   = errors.New("forbidden")
+	ErrNotFound     = errors.New("not found")
+	ErrForbidden    = errors.New("forbidden")
 	ErrInvalidInput = errors.New("invalid input")
 	// ErrNotOwner is returned by Unclaim when the caller is not the current
 	// assignee. Distinct from ErrForbidden so the issue handler can map it
