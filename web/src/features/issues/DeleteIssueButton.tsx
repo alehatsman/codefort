@@ -18,7 +18,7 @@ export default function DeleteIssueButton({ owner, repo, number }: Props) {
     del.mutate(undefined, {
       onSuccess: () => {
         dialogRef.current?.close()
-        navigate(`/${owner}/${repo}/issues`)
+        void navigate(`/${owner}/${repo}/issues`)
       },
     })
   }

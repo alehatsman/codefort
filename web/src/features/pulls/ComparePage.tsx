@@ -2,8 +2,8 @@ import { useState } from "react"
 import "./pulls.css"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
-import { useCompare, useRefs } from "@/api/queries"
 import { useCreatePull } from "@/api/mutations"
+import { useCompare, useRefs } from "@/api/queries"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
 import { Button, EmptyState, ErrorMessage, PageHeader, SkeletonText } from "@/ui"
@@ -49,7 +49,7 @@ export default function ComparePage() {
     if (!t) return
     createPull.mutate(
       { base, head, title: t, body: body.trim() || undefined },
-      { onSuccess: (pr) => navigate(`/${owner}/${repo}/pulls/${pr.number}`) }
+      { onSuccess: (pr) => void navigate(`/${owner}/${repo}/pulls/${pr.number}`) }
     )
   }
 
@@ -62,40 +62,7 @@ export default function ComparePage() {
 
       <PageHeader title="Compare branches" />
 
-      <div className="compare__pickers">
-        <label className="filter-select">
-          <span className="filter-label">base:</span>
-          <select
-            value={base}
-            onChange={(e) => setRef("base", e.target.value)}
-            aria-label="Base branch"
-          >
-            {branches.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </label>
-        <span className="compare__arrow" aria-hidden="true">
-          ←
-        </span>
-        <label className="filter-select">
-          <span className="filter-label">head:</span>
-          <select
-            value={head}
-            onChange={(e) => setRef("head", e.target.value)}
-            aria-label="Head branch"
-          >
-            <option value="">choose a branch…</option>
-            {branches.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <BranchPickers branches={branches} base={base} head={head} setRef={setRef} />
 
       {sameBranch && <EmptyState>Pick two different branches to compare.</EmptyState>}
       {!head && !sameBranch && <EmptyState>Choose a head branch to compare.</EmptyState>}
@@ -105,37 +72,119 @@ export default function ComparePage() {
 
       {compareQ.data && (
         <>
-          <form className="compare__create" onSubmit={onCreate}>
-            <input
-              type="text"
-              className="compare__title"
-              placeholder={compareQ.data.commits[0]?.subject ?? "Pull request title"}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              aria-label="Pull request title"
-            />
-            <textarea
-              className="compare__body"
-              placeholder="Description (optional)"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              aria-label="Pull request description"
-            />
-            {createPull.error && (
-              <div className="error inline">
-                {createPull.error instanceof ApiError
-                  ? createPull.error.message
-                  : "Failed to create pull request."}
-              </div>
-            )}
-            <Button type="submit" variant="primary" disabled={!canCreate || createPull.isPending}>
-              {createPull.isPending ? "Creating…" : "Create pull request"}
-            </Button>
-          </form>
+          <CreatePullForm
+            defaultTitle={compareQ.data.commits[0]?.subject ?? "Pull request title"}
+            title={title}
+            setTitle={setTitle}
+            body={body}
+            setBody={setBody}
+            onSubmit={onCreate}
+            canCreate={canCreate}
+            createPull={createPull}
+          />
 
           <CompareView compare={compareQ.data} />
         </>
       )}
     </div>
+  )
+}
+
+function BranchPickers({
+  branches,
+  base,
+  head,
+  setRef,
+}: {
+  branches: string[]
+  base: string
+  head: string
+  setRef: (key: "base" | "head", value: string) => void
+}) {
+  return (
+    <div className="compare__pickers">
+      <label className="filter-select">
+        <span className="filter-label">base:</span>
+        <select
+          value={base}
+          onChange={(e) => setRef("base", e.target.value)}
+          aria-label="Base branch"
+        >
+          {branches.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+      </label>
+      <span className="compare__arrow" aria-hidden="true">
+        ←
+      </span>
+      <label className="filter-select">
+        <span className="filter-label">head:</span>
+        <select
+          value={head}
+          onChange={(e) => setRef("head", e.target.value)}
+          aria-label="Head branch"
+        >
+          <option value="">choose a branch…</option>
+          {branches.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  )
+}
+
+function CreatePullForm({
+  defaultTitle,
+  title,
+  setTitle,
+  body,
+  setBody,
+  onSubmit,
+  canCreate,
+  createPull,
+}: {
+  defaultTitle: string
+  title: string
+  setTitle: (v: string) => void
+  body: string
+  setBody: (v: string) => void
+  onSubmit: (e: React.FormEvent) => void
+  canCreate: boolean
+  createPull: ReturnType<typeof useCreatePull>
+}) {
+  return (
+    <form className="compare__create" onSubmit={onSubmit}>
+      <input
+        type="text"
+        className="compare__title"
+        placeholder={defaultTitle}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        aria-label="Pull request title"
+      />
+      <textarea
+        className="compare__body"
+        placeholder="Description (optional)"
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        aria-label="Pull request description"
+      />
+      {createPull.error && (
+        <div className="error inline">
+          {createPull.error instanceof ApiError
+            ? createPull.error.message
+            : "Failed to create pull request."}
+        </div>
+      )}
+      <Button type="submit" variant="primary" disabled={!canCreate || createPull.isPending}>
+        {createPull.isPending ? "Creating…" : "Create pull request"}
+      </Button>
+    </form>
   )
 }

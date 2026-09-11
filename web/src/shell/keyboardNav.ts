@@ -16,6 +16,20 @@ function isEditableTarget(): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable
 }
 
+type ListNavAction = { type: "activate" } | { type: "move"; delta: number } | null
+
+// The key → action mapping for `useListNav`, pulled out to module scope so
+// its if/else-if chain doesn't stack cognitive complexity on top of the
+// keydown handler that calls it.
+function resolveListNavAction(e: KeyboardEvent, grid: boolean, cols: number): ListNavAction {
+  if (e.key === "j" || e.key === "ArrowDown") return { type: "move", delta: grid ? cols : 1 }
+  if (e.key === "k" || e.key === "ArrowUp") return { type: "move", delta: grid ? -cols : -1 }
+  if (grid && (e.key === "l" || e.key === "ArrowRight")) return { type: "move", delta: 1 }
+  if (grid && (e.key === "h" || e.key === "ArrowLeft")) return { type: "move", delta: -1 }
+  if (e.key === "Enter") return { type: "activate" }
+  return null
+}
+
 interface ListNavOptions {
   count: number
   onActivate: (index: number) => void
@@ -50,37 +64,15 @@ export function useListNav({ count, onActivate, getColumns, enabled = true }: Li
 
   useEffect(() => {
     if (!enabled || count === 0) return
-    function onKey(e: KeyboardEvent) {
-      if (isEditableTarget() || e.metaKey || e.ctrlKey || e.altKey) return
-      // In grid mode j/k jump a row; in list mode they step by one. h/l only
-      // navigate in grid mode (a list leaves them to the tab switcher).
-      const grid = !!columnsRef.current
-      // biome-ignore lint/style/noNonNullAssertion: guarded by `grid` above — current is non-null here
-      const cols = grid ? Math.max(1, Math.round(columnsRef.current!())) : 1
-      let delta: number | null = null
-      if (e.key === "j" || e.key === "ArrowDown") delta = grid ? cols : 1
-      else if (e.key === "k" || e.key === "ArrowUp") delta = grid ? -cols : -1
-      else if (grid && (e.key === "l" || e.key === "ArrowRight")) delta = 1
-      else if (grid && (e.key === "h" || e.key === "ArrowLeft")) delta = -1
-      else if (e.key === "Enter") {
-        const i = indexRef.current
-        if (i >= 0 && i < count) {
-          e.preventDefault()
-          activateRef.current(i)
-        }
-        return
-      }
-      if (delta === null) return
-      e.preventDefault()
-      const step = delta
-      // First key just selects the top item; afterwards move and clamp so a
-      // row/cell step never runs off either end of the list.
-      setIndex((i) => {
-        if (i < 0) return 0
-        const target = i + step
-        return target >= 0 && target < count ? target : i
-      })
-    }
+    const onKey = (e: KeyboardEvent) =>
+      handleListNavKey(
+        e,
+        count,
+        columnsRef.current,
+        indexRef.current,
+        activateRef.current,
+        setIndex
+      )
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [count, enabled])
@@ -94,6 +86,41 @@ export function useListNav({ count, onActivate, getColumns, enabled = true }: Li
   }, [index])
 
   return { index }
+}
+
+// The keydown handler for `useListNav`, pulled out to module scope so its
+// branches don't stack cognitive complexity on top of the effect's.
+function handleListNavKey(
+  e: KeyboardEvent,
+  count: number,
+  getColumns: (() => number) | undefined,
+  currentIndex: number,
+  activate: (index: number) => void,
+  setIndex: (fn: (i: number) => number) => void
+) {
+  if (isEditableTarget() || e.metaKey || e.ctrlKey || e.altKey) return
+  // In grid mode j/k jump a row; in list mode they step by one. h/l only
+  // navigate in grid mode (a list leaves them to the tab switcher).
+  const grid = !!getColumns
+  const cols = grid ? Math.max(1, Math.round(getColumns())) : 1
+  const action = resolveListNavAction(e, grid, cols)
+  if (!action) return
+  if (action.type === "activate") {
+    if (currentIndex >= 0 && currentIndex < count) {
+      e.preventDefault()
+      activate(currentIndex)
+    }
+    return
+  }
+  e.preventDefault()
+  const step = action.delta
+  // First key just selects the top item; afterwards move and clamp so a
+  // row/cell step never runs off either end of the list.
+  setIndex((i) => {
+    if (i < 0) return 0
+    const target = i + step
+    return target >= 0 && target < count ? target : i
+  })
 }
 
 // Repo tabs, in the order h/l walk them. Suffixes append to `/owner/repo`.
@@ -125,19 +152,27 @@ export function useTabNav(owner: string, repo: string, enabled = true) {
 
   useEffect(() => {
     if (!enabled || !owner || !repo) return
-    function onKey(e: KeyboardEvent) {
-      if (isEditableTarget() || e.metaKey || e.ctrlKey || e.altKey) return
-      const right = e.key === "l" || e.key === "ArrowRight"
-      const left = e.key === "h" || e.key === "ArrowLeft"
-      if (!right && !left) return
-      e.preventDefault()
-      const i = currentRef.current
-      const target = right ? Math.min(i + 1, TAB_SUFFIXES.length - 1) : Math.max(i - 1, 0)
-      if (target !== i) navigate(`${base}${TAB_SUFFIXES[target]}`)
-    }
+    const onKey = (e: KeyboardEvent) => handleTabNavKey(e, base, currentRef.current, navigate)
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [enabled, owner, repo, base, navigate])
 
   return current
+}
+
+// The keydown handler for `useTabNav`, pulled out to module scope so its
+// branches don't stack cognitive complexity on top of the effect's.
+function handleTabNavKey(
+  e: KeyboardEvent,
+  base: string,
+  current: number,
+  navigate: (to: string) => void
+) {
+  if (isEditableTarget() || e.metaKey || e.ctrlKey || e.altKey) return
+  const right = e.key === "l" || e.key === "ArrowRight"
+  const left = e.key === "h" || e.key === "ArrowLeft"
+  if (!right && !left) return
+  e.preventDefault()
+  const target = right ? Math.min(current + 1, TAB_SUFFIXES.length - 1) : Math.max(current - 1, 0)
+  if (target !== current) navigate(`${base}${TAB_SUFFIXES[target]}`)
 }

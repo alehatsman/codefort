@@ -1,0 +1,8 @@
+description: assert web/ did not quietly weaken the shared biome/tsconfig baseline
+
+# tq/config-check. tasks/ui-ci.yml already runs it as a step of the full
+# gate — this task runs it alone.
+steps:
+  - name: config drift
+    use: "{{ home }}/.cache/provision/tools/ts-quality/config-check.yml"
+    props: { dir: web }

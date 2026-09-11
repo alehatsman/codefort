@@ -6,7 +6,9 @@ import { mockApi, seedToken } from "./mockApi"
 // per-repo row markup but spans every repo, tagging each row with its owning
 // repo and linking back into that repo's detail route.
 
-const nowIso = () => new Date().toISOString()
+function nowIso() {
+  return new Date().toISOString()
+}
 
 test.beforeEach(async ({ page }) => {
   await seedToken(page)
@@ -97,7 +99,11 @@ async function mockAggregates(page: import("@playwright/test").Page) {
             },
           ]
         : [{ ...base, number: 1, kind: "ci", repo: { owner: "alice", name: "demo" } }]
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rows) })
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(rows),
+    })
   })
 }
 
@@ -161,7 +167,10 @@ test("global nav links the cross-repo aggregate views", async ({ page }) => {
   await expect(page).toHaveURL(/\/pulls$/)
   const prRow = page.locator(".issue-list li", { hasText: "alice pr" })
   await expect(prRow.locator(".repo-tag")).toHaveText("alice/demo")
-  await expect(prRow.getByRole("link", { name: "alice pr" })).toHaveAttribute("href", "/alice/demo/pulls/5")
+  await expect(prRow.getByRole("link", { name: "alice pr" })).toHaveAttribute(
+    "href",
+    "/alice/demo/pulls/5"
+  )
 
   // Pipelines tab: CI runs across repos, run link into the owning repo.
   await page.locator("nav.tabs").getByRole("link", { name: "Pipelines" }).click()

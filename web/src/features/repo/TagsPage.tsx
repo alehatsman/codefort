@@ -3,8 +3,8 @@ import { useParams } from "react-router-dom"
 import { useRefs } from "@/api/queries"
 import type { RepoTag } from "@/api/types"
 import OverviewCard from "@/shell/OverviewCard"
-import { EmptyState, ErrorMessage, Spinner } from "@/ui"
 import { timeAgo } from "@/shell/timeAgo"
+import { EmptyState, ErrorMessage, Spinner } from "@/ui"
 
 export default function TagsPage() {
   const { owner = "", repo = "" } = useParams()

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import { seedToken } from "./mockApi"
 
 test.beforeEach(async ({ page }) => {
@@ -8,7 +8,11 @@ test.beforeEach(async ({ page }) => {
 test("GET issues returns 500 → inline error visible", async ({ page }) => {
   // Stub the minimum repo plumbing so the page reaches the issues query.
   await page.route(/\/api\/whoami$/, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ name: "test-user" }) })
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ name: "test-user" }),
+    })
   )
   await page.route(/\/api\/repos$/, (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
@@ -18,9 +22,12 @@ test("GET issues returns 500 → inline error visible", async ({ page }) => {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        id: 1, owner: "alice", name: "demo",
+        id: 1,
+        owner: "alice",
+        name: "demo",
         created_at: new Date().toISOString(),
-        open_issues: 0, total_issues: 0,
+        open_issues: 0,
+        total_issues: 0,
       }),
     })
   )
@@ -39,7 +46,11 @@ test("GET issues returns 500 → inline error visible", async ({ page }) => {
 
 test("POST issue returns 500 → modal stays open, error is shown", async ({ page }) => {
   await page.route(/\/api\/whoami$/, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ name: "test-user" }) })
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ name: "test-user" }),
+    })
   )
   await page.route(/\/api\/repos$/, (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
@@ -49,9 +60,12 @@ test("POST issue returns 500 → modal stays open, error is shown", async ({ pag
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        id: 1, owner: "alice", name: "demo",
+        id: 1,
+        owner: "alice",
+        name: "demo",
         created_at: new Date().toISOString(),
-        open_issues: 0, total_issues: 0,
+        open_issues: 0,
+        total_issues: 0,
       }),
     })
   )

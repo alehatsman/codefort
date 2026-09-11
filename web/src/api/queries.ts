@@ -404,11 +404,16 @@ export function useIntelSummaries(owner: string, repo: string, enabled: boolean)
   })
 }
 
-// Poll the list while any run is still live, so a freshly pushed run shows
-// progress without a refresh; stop once everything is terminal. Shared by
-// useCIRuns and useCommitCIStatus, the two readers of this query.
-function ciRunsRefetchInterval(q: { state: { data?: CIRun[] } }) {
-  return q.state.data?.some((r) => isLiveStatus(r.status)) ? 3000 : false
+// Poll while any run is still live, so a freshly pushed run shows progress
+// without a refresh; stop once everything is terminal. Shared logic between
+// useCIRuns (data: CIRun[]) and useCommitCIStatus (data: Map<string, CIRun>,
+// via `select`) — each wires its own typed refetchInterval below rather than
+// sharing one callback, so TanStack's `select` inference isn't forced to the
+// other reader's shape.
+function anyRunLive(runs: Iterable<CIRun> | undefined): boolean {
+  if (!runs) return false
+  for (const r of runs) if (isLiveStatus(r.status)) return true
+  return false
 }
 
 export function useCIRuns(owner: string, repo: string, kind: "" | "ci" | "agent" = "", query = "") {
@@ -425,7 +430,7 @@ export function useCIRuns(owner: string, repo: string, kind: "" | "ci" | "agent"
         q: params.get("q") ?? undefined,
       }),
     enabled: !!owner && !!repo,
-    refetchInterval: ciRunsRefetchInterval,
+    refetchInterval: (q) => (anyRunLive(q.state.data) ? 3000 : false),
   })
 }
 
@@ -439,12 +444,12 @@ export function useCommitCIStatus(owner: string, repo: string, enabled = true) {
     queryKey: keys.ciRuns(owner, repo),
     queryFn: () => api.listCIRuns(owner, repo),
     enabled: !!owner && !!repo && enabled,
-    refetchInterval: ciRunsRefetchInterval,
     select: (runs) => {
       const byCommit = new Map<string, CIRun>()
       for (const run of runs) if (!byCommit.has(run.commit_sha)) byCommit.set(run.commit_sha, run)
       return byCommit
     },
+    refetchInterval: (q) => (anyRunLive(q.state.data?.values()) ? 3000 : false),
   })
 }
 

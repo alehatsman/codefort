@@ -1,6 +1,6 @@
 import clsx from "clsx"
+import type { Dispatch, ReactNode, SetStateAction } from "react"
 import { useMemo, useRef, useState } from "react"
-import type { ReactNode } from "react"
 import type { CodeComment, DiffFile, DiffHunk, DiffLine } from "@/api/types"
 import { Button } from "@/ui"
 import { highlightLine, langFromPath } from "@/ui/highlight"
@@ -9,8 +9,8 @@ interface Props {
   file: DiffFile
   /** "split" = side-by-side (default), "unified" = single column. */
   mode: "split" | "unified"
-  comments?: CodeComment[]
-  onAddComment?: (path: string, line: number, body: string) => Promise<void>
+  comments?: CodeComment[] | undefined
+  onAddComment?: ((path: string, line: number, body: string) => Promise<void>) | undefined
 }
 
 const STATUS_LABEL: Record<DiffFile["status"], string> = {
@@ -136,10 +136,10 @@ function pairRows(lines: DiffLine[]): SplitRow[] {
 
 interface TableProps {
   hunks: DiffHunk[]
-  lang?: string
+  lang?: string | undefined
   path: string
   commentsByLine: Map<number, CodeComment[]>
-  onAddComment?: (path: string, line: number, body: string) => Promise<void>
+  onAddComment?: ((path: string, line: number, body: string) => Promise<void>) | undefined
 }
 
 // InlineCommentForm renders an open textarea + cancel/submit when the user
@@ -252,10 +252,10 @@ function HunkSplit({
   onAddComment,
 }: {
   hunk: DiffHunk
-  lang?: string
+  lang?: string | undefined
   path: string
   commentsByLine: Map<number, CodeComment[]>
-  onAddComment?: (path: string, line: number, body: string) => Promise<void>
+  onAddComment?: ((path: string, line: number, body: string) => Promise<void>) | undefined
 }) {
   const rows = pairRows(hunk.lines)
   const [openLine, setOpenLine] = useState<number | null>(null)
@@ -268,63 +268,112 @@ function HunkSplit({
           {hunk.header || "…"}
         </td>
       </tr>
-      {rows.flatMap((r) => {
-        const lineNo = r.right?.new ?? r.left?.old ?? 0
-        const isChanged = r.left?.kind !== "context" || r.right?.kind !== "context"
-        const rowComments = commentsByLine.get(lineNo) ?? []
-
-        const rowEl = (
-          <tr
-            key={`${r.left?.old ?? "_"}:${r.right?.new ?? "_"}`}
-            className={clsx("diff-row", { "has-comments": rowComments.length > 0 })}
-          >
-            <td className="diff-num" data-line={r.left ? r.left.old : ""} />
-            <td className={`diff-code diff-code--${r.left ? r.left.kind : "empty"}`}>
-              {r.left ? cell(r.left.text, lang) : null}
-            </td>
-            <td className="diff-num" data-line={r.right ? r.right.new : ""} />
-            <td className={`diff-code diff-code--${r.right ? r.right.kind : "empty"}`}>
-              {r.right ? cell(r.right.text, lang) : null}
-              {onAddComment && isChanged && lineNo > 0 && (
-                <button
-                  type="button"
-                  className="diff-add-comment"
-                  onClick={() => setOpenLine((prev) => (prev === lineNo ? null : lineNo))}
-                  aria-label="Add inline comment"
-                >
-                  +
-                </button>
-              )}
-            </td>
-          </tr>
-        )
-
-        const extra: ReactNode[] = []
-        if (rowComments.length > 0) {
-          extra.push(
-            <InlineCommentThread key={`thread-${lineNo}`} comments={rowComments} colSpan={4} />
-          )
-        }
-        if (onAddComment && openLine === lineNo) {
-          extra.push(
-            <InlineCommentForm
-              key={`form-${lineNo}`}
-              path={path}
-              lineNo={lineNo}
-              colSpan={4}
-              onSubmit={async (p, l, b) => {
-                await onAddComment(p, l, b)
-                setOpenLine(null)
-              }}
-              onCancel={() => setOpenLine(null)}
-            />
-          )
-        }
-
-        return extra.length > 0 ? [rowEl, ...extra] : rowEl
-      })}
+      {rows.flatMap((r) =>
+        renderSplitRow(r, {
+          lang,
+          path,
+          commentsByLine,
+          onAddComment,
+          openLine,
+          setOpenLine,
+        })
+      )}
     </tbody>
   )
+}
+
+// renderSplitRow draws one split-view row plus any inline comment
+// thread/form beneath it. Pulled out to module scope so its branching
+// doesn't stack cognitive complexity on top of the flatMap that calls it.
+function renderSplitRow(
+  r: SplitRow,
+  ctx: {
+    lang?: string | undefined
+    path: string
+    commentsByLine: Map<number, CodeComment[]>
+    onAddComment?: ((path: string, line: number, body: string) => Promise<void>) | undefined
+    openLine: number | null
+    setOpenLine: Dispatch<SetStateAction<number | null>>
+  }
+): ReactNode[] {
+  const { lang, path, commentsByLine, onAddComment, openLine, setOpenLine } = ctx
+  const lineNo = r.right?.new ?? r.left?.old ?? 0
+  const isChanged = r.left?.kind !== "context" || r.right?.kind !== "context"
+  const rowComments = commentsByLine.get(lineNo) ?? []
+
+  const rowEl = (
+    <tr
+      key={`${r.left?.old ?? "_"}:${r.right?.new ?? "_"}`}
+      className={clsx("diff-row", { "has-comments": rowComments.length > 0 })}
+    >
+      <td className="diff-num" data-line={r.left ? r.left.old : ""} />
+      <td className={`diff-code diff-code--${r.left ? r.left.kind : "empty"}`}>
+        {r.left ? cell(r.left.text, lang) : null}
+      </td>
+      <td className="diff-num" data-line={r.right ? r.right.new : ""} />
+      <td className={`diff-code diff-code--${r.right ? r.right.kind : "empty"}`}>
+        {r.right ? cell(r.right.text, lang) : null}
+        {onAddComment && isChanged && lineNo > 0 && (
+          <button
+            type="button"
+            className="diff-add-comment"
+            onClick={() => setOpenLine((prev) => (prev === lineNo ? null : lineNo))}
+            aria-label="Add inline comment"
+          >
+            +
+          </button>
+        )}
+      </td>
+    </tr>
+  )
+
+  const extra = renderInlineExtras(4, {
+    path,
+    lineNo,
+    rowComments,
+    onAddComment,
+    openLine,
+    setOpenLine,
+  })
+  return extra.length > 0 ? [rowEl, ...extra] : [rowEl]
+}
+
+// renderInlineExtras builds the inline comment thread and/or open comment
+// form beneath a diff row, shared by the split and unified renderers.
+function renderInlineExtras(
+  colSpan: number,
+  ctx: {
+    path: string
+    lineNo: number
+    rowComments: CodeComment[]
+    onAddComment?: ((path: string, line: number, body: string) => Promise<void>) | undefined
+    openLine: number | null
+    setOpenLine: Dispatch<SetStateAction<number | null>>
+  }
+): ReactNode[] {
+  const { path, lineNo, rowComments, onAddComment, openLine, setOpenLine } = ctx
+  const extra: ReactNode[] = []
+  if (rowComments.length > 0) {
+    extra.push(
+      <InlineCommentThread key={`thread-${lineNo}`} comments={rowComments} colSpan={colSpan} />
+    )
+  }
+  if (onAddComment && openLine === lineNo) {
+    extra.push(
+      <InlineCommentForm
+        key={`form-${lineNo}`}
+        path={path}
+        lineNo={lineNo}
+        colSpan={colSpan}
+        onSubmit={async (p, l, b) => {
+          await onAddComment(p, l, b)
+          setOpenLine(null)
+        }}
+        onCancel={() => setOpenLine(null)}
+      />
+    )
+  }
+  return extra
 }
 
 function UnifiedTable({ hunks, lang, path, commentsByLine, onAddComment }: TableProps) {
@@ -359,10 +408,10 @@ function HunkUnified({
   onAddComment,
 }: {
   hunk: DiffHunk
-  lang?: string
+  lang?: string | undefined
   path: string
   commentsByLine: Map<number, CodeComment[]>
-  onAddComment?: (path: string, line: number, body: string) => Promise<void>
+  onAddComment?: ((path: string, line: number, body: string) => Promise<void>) | undefined
 }) {
   const [openLine, setOpenLine] = useState<number | null>(null)
 
@@ -373,61 +422,70 @@ function HunkUnified({
           {hunk.header || "…"}
         </td>
       </tr>
-      {hunk.lines.flatMap((l) => {
-        const lineNo = l.new || l.old || 0
-        const isChanged = l.kind !== "context"
-        const rowComments = commentsByLine.get(lineNo) ?? []
-
-        const rowEl = (
-          <tr
-            key={`${l.old}:${l.new}`}
-            className={clsx("diff-row", { "has-comments": rowComments.length > 0 })}
-          >
-            <td className="diff-num" data-line={l.old || ""} />
-            <td className="diff-num" data-line={l.new || ""} />
-            <td className={`diff-code diff-code--${l.kind}`}>
-              <span className="diff-marker">
-                {l.kind === "add" ? "+" : l.kind === "del" ? "−" : " "}
-              </span>
-              {cell(l.text, lang)}
-              {onAddComment && isChanged && lineNo > 0 && (
-                <button
-                  type="button"
-                  className="diff-add-comment"
-                  onClick={() => setOpenLine((prev) => (prev === lineNo ? null : lineNo))}
-                  aria-label="Add inline comment"
-                >
-                  +
-                </button>
-              )}
-            </td>
-          </tr>
-        )
-
-        const extra: ReactNode[] = []
-        if (rowComments.length > 0) {
-          extra.push(
-            <InlineCommentThread key={`thread-${lineNo}`} comments={rowComments} colSpan={3} />
-          )
-        }
-        if (onAddComment && openLine === lineNo) {
-          extra.push(
-            <InlineCommentForm
-              key={`form-${lineNo}`}
-              path={path}
-              lineNo={lineNo}
-              colSpan={3}
-              onSubmit={async (p, ln, b) => {
-                await onAddComment(p, ln, b)
-                setOpenLine(null)
-              }}
-              onCancel={() => setOpenLine(null)}
-            />
-          )
-        }
-
-        return extra.length > 0 ? [rowEl, ...extra] : rowEl
-      })}
+      {hunk.lines.flatMap((l) =>
+        renderUnifiedRow(l, {
+          lang,
+          path,
+          commentsByLine,
+          onAddComment,
+          openLine,
+          setOpenLine,
+        })
+      )}
     </>
   )
+}
+
+// renderUnifiedRow draws one unified-view row plus any inline comment
+// thread/form beneath it. Pulled out to module scope so its branching
+// doesn't stack cognitive complexity on top of the flatMap that calls it.
+function renderUnifiedRow(
+  l: DiffLine,
+  ctx: {
+    lang?: string | undefined
+    path: string
+    commentsByLine: Map<number, CodeComment[]>
+    onAddComment?: ((path: string, line: number, body: string) => Promise<void>) | undefined
+    openLine: number | null
+    setOpenLine: Dispatch<SetStateAction<number | null>>
+  }
+): ReactNode[] {
+  const { lang, path, commentsByLine, onAddComment, openLine, setOpenLine } = ctx
+  const lineNo = l.new || l.old || 0
+  const isChanged = l.kind !== "context"
+  const rowComments = commentsByLine.get(lineNo) ?? []
+
+  const rowEl = (
+    <tr
+      key={`${l.old}:${l.new}`}
+      className={clsx("diff-row", { "has-comments": rowComments.length > 0 })}
+    >
+      <td className="diff-num" data-line={l.old || ""} />
+      <td className="diff-num" data-line={l.new || ""} />
+      <td className={`diff-code diff-code--${l.kind}`}>
+        <span className="diff-marker">{l.kind === "add" ? "+" : l.kind === "del" ? "−" : " "}</span>
+        {cell(l.text, lang)}
+        {onAddComment && isChanged && lineNo > 0 && (
+          <button
+            type="button"
+            className="diff-add-comment"
+            onClick={() => setOpenLine((prev) => (prev === lineNo ? null : lineNo))}
+            aria-label="Add inline comment"
+          >
+            +
+          </button>
+        )}
+      </td>
+    </tr>
+  )
+
+  const extra = renderInlineExtras(3, {
+    path,
+    lineNo,
+    rowComments,
+    onAddComment,
+    openLine,
+    setOpenLine,
+  })
+  return extra.length > 0 ? [rowEl, ...extra] : [rowEl]
 }

@@ -31,10 +31,10 @@ export default function SkeletonTable({ rows = 6, columns = 4, headers, classNam
         </thead>
       )}
       <tbody>
-        {Array.from({ length: rows }, (_, r) => (
+        {Array.from({ length: rows }, (_row, r) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: fixed-count static placeholder, never reorders
           <tr key={r}>
-            {Array.from({ length: cols }, (_, c) => (
+            {Array.from({ length: cols }, (_col, c) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: fixed-count static placeholder, never reorders
               <td key={c}>
                 <Skeleton variant="line" width={c === 0 ? "70%" : "55%"} />

@@ -1,7 +1,6 @@
 import clsx from "clsx"
 import "./settings.css"
 import { useEffect, useRef, useState } from "react"
-import { useAgentSettings, useRepos, useSSHKeys, useTokens, useWhoami } from "@/api/queries"
 import {
   useAddSSHKey,
   useCreateToken,
@@ -11,6 +10,7 @@ import {
   useRevokeToken,
   useUpdateAgentSettings,
 } from "@/api/mutations"
+import { useAgentSettings, useRepos, useSSHKeys, useTokens, useWhoami } from "@/api/queries"
 import type { CIRunExecutionModel, CreatedToken, Repo, SSHKey, Token } from "@/api/types"
 import ThemeSelect from "@/features/settings/ThemeSelect"
 import {
@@ -355,6 +355,61 @@ function AgentSection() {
         restarting the server. Stored write-only — it's never shown again.
       </p>
 
+      <ClaudeTokenFields
+        settingsQ={settingsQ}
+        update={update}
+        token={token}
+        setToken={setToken}
+        configured={configured}
+        envFallback={envFallback}
+        onSave={save}
+        onClear={clear}
+      />
+
+      <DefaultModelField settingsQ={settingsQ} update={update} />
+
+      <CustomEndpointFields
+        settingsQ={settingsQ}
+        update={update}
+        baseUrl={baseUrl}
+        setBaseUrl={setBaseUrl}
+        savedBaseUrl={savedBaseUrl}
+        authToken={authToken}
+        setAuthToken={setAuthToken}
+        authConfigured={authConfigured}
+        onSaveBaseUrl={saveBaseUrl}
+        onSaveAuthToken={saveAuthToken}
+      />
+
+      <ErrorMessage error={update.error} inline />
+    </section>
+  )
+}
+
+type AgentSettingsQuery = ReturnType<typeof useAgentSettings>
+type AgentSettingsUpdate = ReturnType<typeof useUpdateAgentSettings>
+
+function ClaudeTokenFields({
+  settingsQ,
+  update,
+  token,
+  setToken,
+  configured,
+  envFallback,
+  onSave,
+  onClear,
+}: {
+  settingsQ: AgentSettingsQuery
+  update: AgentSettingsUpdate
+  token: string
+  setToken: (v: string) => void
+  configured: boolean
+  envFallback: boolean
+  onSave: (e: React.FormEvent) => void
+  onClear: () => void
+}) {
+  return (
+    <>
       <div className={clsx("agent-token-status", { "is-set": configured || envFallback })}>
         {settingsQ.isLoading
           ? "Checking…"
@@ -365,7 +420,7 @@ function AgentSection() {
               : "No Claude token configured — agent runs can't authenticate yet."}
       </div>
 
-      <form className="agent-token-form" onSubmit={save}>
+      <form className="agent-token-form" onSubmit={onSave}>
         <Input
           type="password"
           value={token}
@@ -386,121 +441,154 @@ function AgentSection() {
             {update.isPending ? "Saving…" : "Save token"}
           </Button>
           {configured && (
-            <Button variant="danger" size="small" onClick={clear} disabled={update.isPending}>
+            <Button variant="danger" size="small" onClick={onClear} disabled={update.isPending}>
+              Clear
+            </Button>
+          )}
+        </div>
+      </form>
+    </>
+  )
+}
+
+function DefaultModelField({
+  settingsQ,
+  update,
+}: {
+  settingsQ: AgentSettingsQuery
+  update: AgentSettingsUpdate
+}) {
+  return (
+    <div className="agent-default-model">
+      <FormField
+        className="agent-default-model__label"
+        label="Default execution model"
+        hint="The model new agent runs use when “Spawn agent” doesn’t pick one. Per-run choices at spawn still win."
+      >
+        {({ controlId, describedBy }) => (
+          <Select
+            id={controlId}
+            aria-describedby={describedBy}
+            value={settingsQ.data?.execution_model ?? ""}
+            disabled={update.isPending || settingsQ.isLoading}
+            onChange={(e) =>
+              update.mutate({ execution_model: e.target.value as "" | CIRunExecutionModel })
+            }
+          >
+            <option value="">Server default (claude-edit)</option>
+            <option value="claude-edit">Claude (edit files)</option>
+            <option value="mooncake-agent">Mooncake agent (run actions)</option>
+          </Select>
+        )}
+      </FormField>
+    </div>
+  )
+}
+
+function CustomEndpointFields({
+  settingsQ,
+  update,
+  baseUrl,
+  setBaseUrl,
+  savedBaseUrl,
+  authToken,
+  setAuthToken,
+  authConfigured,
+  onSaveBaseUrl,
+  onSaveAuthToken,
+}: {
+  settingsQ: AgentSettingsQuery
+  update: AgentSettingsUpdate
+  baseUrl: string
+  setBaseUrl: (v: string) => void
+  savedBaseUrl: string
+  authToken: string
+  setAuthToken: (v: string) => void
+  authConfigured: boolean
+  onSaveBaseUrl: (e: React.FormEvent) => void
+  onSaveAuthToken: (e: React.FormEvent) => void
+}) {
+  return (
+    <div className="agent-endpoint">
+      <h3 className="settings__subtitle">Custom endpoint</h3>
+      <p className="muted small">
+        Point agent runs at an Anthropic-compatible gateway or local model. The base URL is injected
+        as <code>ANTHROPIC_BASE_URL</code> (overriding <code>MOONGIT_AGENT_LLM_BASE_URL</code>); the
+        auth token as <code>ANTHROPIC_AUTH_TOKEN</code>, which then becomes the agent's auth
+        (replacing the Claude token above). The token is stored write-only — it's never shown again.
+        Leave both blank to use Anthropic directly.
+      </p>
+
+      <form className="agent-token-form" onSubmit={onSaveBaseUrl}>
+        <Input
+          type="url"
+          value={baseUrl}
+          onChange={(e) => setBaseUrl(e.target.value)}
+          placeholder="https://gateway.example.com"
+          aria-label="LLM base URL"
+          autoComplete="off"
+        />
+        <div className="agent-token-form__actions">
+          <Button
+            type="submit"
+            variant="primary"
+            size="small"
+            disabled={update.isPending || baseUrl.trim() === savedBaseUrl}
+          >
+            {update.isPending ? "Saving…" : "Save base URL"}
+          </Button>
+          {savedBaseUrl !== "" && (
+            <Button
+              variant="danger"
+              size="small"
+              onClick={() => update.mutate({ llm_base_url: "" })}
+              disabled={update.isPending}
+            >
               Clear
             </Button>
           )}
         </div>
       </form>
 
-      <div className="agent-default-model">
-        <FormField
-          className="agent-default-model__label"
-          label="Default execution model"
-          hint="The model new agent runs use when “Spawn agent” doesn’t pick one. Per-run choices at spawn still win."
-        >
-          {({ controlId, describedBy }) => (
-            <Select
-              id={controlId}
-              aria-describedby={describedBy}
-              value={settingsQ.data?.execution_model ?? ""}
-              disabled={update.isPending || settingsQ.isLoading}
-              onChange={(e) =>
-                update.mutate({ execution_model: e.target.value as "" | CIRunExecutionModel })
-              }
+      <div className={clsx("agent-token-status", { "is-set": authConfigured })}>
+        {settingsQ.isLoading
+          ? "Checking…"
+          : authConfigured
+            ? "✓ A gateway auth token is configured."
+            : "No gateway auth token — runs authenticate with the Claude token above."}
+      </div>
+
+      <form className="agent-token-form" onSubmit={onSaveAuthToken}>
+        <Input
+          type="password"
+          value={authToken}
+          onChange={(e) => setAuthToken(e.target.value)}
+          placeholder={authConfigured ? "Replace auth token" : "Paste auth token"}
+          aria-label="Gateway auth token"
+          autoComplete="off"
+        />
+        <div className="agent-token-form__actions">
+          <Button
+            type="submit"
+            variant="primary"
+            size="small"
+            disabled={update.isPending || authToken.trim() === ""}
+          >
+            {update.isPending ? "Saving…" : "Save auth token"}
+          </Button>
+          {authConfigured && (
+            <Button
+              variant="danger"
+              size="small"
+              onClick={() => update.mutate({ anthropic_auth_token: "" })}
+              disabled={update.isPending}
             >
-              <option value="">Server default (claude-edit)</option>
-              <option value="claude-edit">Claude (edit files)</option>
-              <option value="mooncake-agent">Mooncake agent (run actions)</option>
-            </Select>
+              Clear
+            </Button>
           )}
-        </FormField>
-      </div>
-
-      <div className="agent-endpoint">
-        <h3 className="settings__subtitle">Custom endpoint</h3>
-        <p className="muted small">
-          Point agent runs at an Anthropic-compatible gateway or local model. The base URL is
-          injected as <code>ANTHROPIC_BASE_URL</code> (overriding{" "}
-          <code>MOONGIT_AGENT_LLM_BASE_URL</code>
-          ); the auth token as <code>ANTHROPIC_AUTH_TOKEN</code>, which then becomes the agent's
-          auth (replacing the Claude token above). The token is stored write-only — it's never shown
-          again. Leave both blank to use Anthropic directly.
-        </p>
-
-        <form className="agent-token-form" onSubmit={saveBaseUrl}>
-          <Input
-            type="url"
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="https://gateway.example.com"
-            aria-label="LLM base URL"
-            autoComplete="off"
-          />
-          <div className="agent-token-form__actions">
-            <Button
-              type="submit"
-              variant="primary"
-              size="small"
-              disabled={update.isPending || baseUrl.trim() === savedBaseUrl}
-            >
-              {update.isPending ? "Saving…" : "Save base URL"}
-            </Button>
-            {savedBaseUrl !== "" && (
-              <Button
-                variant="danger"
-                size="small"
-                onClick={() => update.mutate({ llm_base_url: "" })}
-                disabled={update.isPending}
-              >
-                Clear
-              </Button>
-            )}
-          </div>
-        </form>
-
-        <div className={clsx("agent-token-status", { "is-set": authConfigured })}>
-          {settingsQ.isLoading
-            ? "Checking…"
-            : authConfigured
-              ? "✓ A gateway auth token is configured."
-              : "No gateway auth token — runs authenticate with the Claude token above."}
         </div>
-
-        <form className="agent-token-form" onSubmit={saveAuthToken}>
-          <Input
-            type="password"
-            value={authToken}
-            onChange={(e) => setAuthToken(e.target.value)}
-            placeholder={authConfigured ? "Replace auth token" : "Paste auth token"}
-            aria-label="Gateway auth token"
-            autoComplete="off"
-          />
-          <div className="agent-token-form__actions">
-            <Button
-              type="submit"
-              variant="primary"
-              size="small"
-              disabled={update.isPending || authToken.trim() === ""}
-            >
-              {update.isPending ? "Saving…" : "Save auth token"}
-            </Button>
-            {authConfigured && (
-              <Button
-                variant="danger"
-                size="small"
-                onClick={() => update.mutate({ anthropic_auth_token: "" })}
-                disabled={update.isPending}
-              >
-                Clear
-              </Button>
-            )}
-          </div>
-        </form>
-      </div>
-
-      <ErrorMessage error={update.error} inline />
-    </section>
+      </form>
+    </div>
   )
 }
 

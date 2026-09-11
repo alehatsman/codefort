@@ -5,7 +5,7 @@
  * Run with:
  *   BASE_URL=http://127.0.0.1:8080 npx playwright test tests/phase2-smoke.spec.ts --headed=false
  */
-import { test, expect } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:8080"
 
@@ -71,7 +71,10 @@ test.describe("Repo visibility", () => {
   test.beforeEach(async ({ page }) => {
     // Register a fresh user and capture the token.
     const r = await page.request.post(`${BASE}/api/auth/register`, {
-      data: { username: `repovis_${SUFFIX}_${Math.random().toString(36).slice(2, 6)}`, password: PASS },
+      data: {
+        username: `repovis_${SUFFIX}_${Math.random().toString(36).slice(2, 6)}`,
+        password: PASS,
+      },
     })
     const body = await r.json()
     authToken = body.secret

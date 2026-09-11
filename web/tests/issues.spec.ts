@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import { mockApi, seedToken } from "./mockApi"
 
 test.beforeEach(async ({ page }) => {
@@ -195,8 +195,14 @@ test("search narrows the list by title/body, and #number jumps to the issue", as
 test("the issue list paginates at 25 per page", async ({ page }) => {
   const now = new Date().toISOString()
   const issues = Array.from({ length: 30 }, (_, i) => ({
-    id: i + 1, number: i + 1, title: `Task ${i + 1}`, author: "alice",
-    state: "todo" as const, assignee: null, created_at: now, updated_at: now,
+    id: i + 1,
+    number: i + 1,
+    title: `Task ${i + 1}`,
+    author: "alice",
+    state: "todo" as const,
+    assignee: null,
+    created_at: now,
+    updated_at: now,
   }))
   await mockApi(page, { issues })
   await page.goto("/alice/demo/issues")
@@ -227,8 +233,14 @@ test("the Board↔List toggle defaults to Board on the left and switches views",
   await mockApi(page, {
     issues: [
       {
-        id: 1, number: 1, title: "Toggle me", author: "alice", state: "todo",
-        assignee: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        id: 1,
+        number: 1,
+        title: "Toggle me",
+        author: "alice",
+        state: "todo",
+        assignee: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       },
     ],
   })
@@ -523,10 +535,13 @@ test("spawn agent from an issue navigates to the new run", async ({ page }) => {
   await page.getByLabel("Model").selectOption("mooncake-agent")
   await page.getByLabel(/Allow shell commands/).check()
   const spawnReq = page.waitForRequest(
-    (r) => r.url().includes("/issues/1/agent") && r.method() === "POST",
+    (r) => r.url().includes("/issues/1/agent") && r.method() === "POST"
   )
   await page.getByRole("button", { name: "Spawn agent" }).click()
-  expect((await spawnReq).postDataJSON()).toMatchObject({ model: "mooncake-agent", allow_shell: true })
+  expect((await spawnReq).postDataJSON()).toMatchObject({
+    model: "mooncake-agent",
+    allow_shell: true,
+  })
 
   // Agent runs live under the Agents tab; we land on the new run's view, which
   // shows the chosen model and that shell is allowed.

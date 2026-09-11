@@ -2,19 +2,20 @@ import { lazy, Suspense, useState } from "react"
 import "./issues.css"
 import { Link, useParams } from "react-router-dom"
 import { useComments, useIssue, useIssueCommits, useWhoami } from "@/api/queries"
-import OverviewCard from "@/shell/OverviewCard"
-import StateButtons from "@/features/issues/StateButtons"
+import type { ChildIssueSummary, Issue } from "@/api/types"
+import SpawnAgentButton from "@/features/agents/SpawnAgentButton"
 import AssigneeControl from "@/features/issues/AssigneeControl"
 import CommentForm from "@/features/issues/CommentForm"
-import EditIssueForm from "@/features/issues/EditIssueForm"
-import StateIcon from "@/features/issues/StateIcon"
 import CommentItem from "@/features/issues/CommentItem"
-import DeleteIssueButton from "@/features/issues/DeleteIssueButton"
-import BranchTag from "@/features/repo/BranchTag"
-import SpawnAgentButton from "@/features/agents/SpawnAgentButton"
 import CreateBranchDialog from "@/features/issues/CreateBranchDialog"
+import DeleteIssueButton from "@/features/issues/DeleteIssueButton"
 import DependencySection from "@/features/issues/DependencySection"
+import EditIssueForm from "@/features/issues/EditIssueForm"
+import StateButtons from "@/features/issues/StateButtons"
+import StateIcon from "@/features/issues/StateIcon"
+import BranchTag from "@/features/repo/BranchTag"
 import NotFound from "@/shell/NotFound"
+import OverviewCard from "@/shell/OverviewCard"
 import {
   Avatar,
   Badge,
@@ -26,7 +27,6 @@ import {
   SkeletonText,
   Spinner,
 } from "@/ui"
-import type { ChildIssueSummary } from "@/api/types"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it only
 // when an issue with a body is actually shown.
@@ -95,53 +95,7 @@ export default function IssuePage() {
       )}
 
       <DetailLayout
-        sidebar={
-          <>
-            <SidebarSection label="State">
-              <StateButtons owner={owner} repo={repo} number={iss.number} current={iss.state} />
-            </SidebarSection>
-            {iss.labels.length > 0 && (
-              <SidebarSection label="Labels">
-                <div className="issue-labels">
-                  {iss.labels.map((l) => (
-                    <span key={l} className="issue-label">
-                      {l}
-                    </span>
-                  ))}
-                </div>
-              </SidebarSection>
-            )}
-            <SidebarSection label="Assignee">
-              <AssigneeControl
-                owner={owner}
-                repo={repo}
-                number={iss.number}
-                assignee={iss.assignee}
-                state={iss.state}
-                me={me.data?.name}
-              />
-            </SidebarSection>
-            <SidebarSection label="Agent">
-              <SpawnAgentButton owner={owner} repo={repo} number={iss.number} />
-            </SidebarSection>
-            {(iss.state === "todo" || iss.state === "in_progress") && (
-              <SidebarSection label="Development">
-                <CreateBranchDialog owner={owner} repo={repo} issueNumber={iss.number} />
-              </SidebarSection>
-            )}
-            <DependencySection
-              owner={owner}
-              repo={repo}
-              issueNumber={iss.number}
-              dependsOn={iss.depends_on}
-              blocks={iss.blocks}
-              isActive={iss.state === "todo" || iss.state === "in_progress"}
-            />
-            <SidebarSection label="Danger zone">
-              <DeleteIssueButton owner={owner} repo={repo} number={iss.number} />
-            </SidebarSection>
-          </>
-        }
+        sidebar={<IssueSidebar owner={owner} repo={repo} iss={iss} me={me.data?.name} />}
       >
         {editing ? (
           <EditIssueForm
@@ -154,19 +108,7 @@ export default function IssuePage() {
             onDone={() => setEditing(false)}
           />
         ) : (
-          iss.body && (
-            <div className="body">
-              <div className="body__head">
-                <Avatar name={iss.author} /> {iss.author} •{" "}
-                {new Date(iss.created_at).toLocaleString()}
-              </div>
-              <div className="body__content">
-                <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
-                  <Markdown content={iss.body} owner={owner} repo={repo} basePath="" />
-                </Suspense>
-              </div>
-            </div>
-          )
+          <IssueBody owner={owner} repo={repo} iss={iss} />
         )}
 
         {iss.children && iss.children.length > 0 && (
@@ -223,6 +165,83 @@ export default function IssuePage() {
 
         <CommentForm owner={owner} repo={repo} number={iss.number} />
       </DetailLayout>
+    </div>
+  )
+}
+
+function IssueSidebar({
+  owner,
+  repo,
+  iss,
+  me,
+}: {
+  owner: string
+  repo: string
+  iss: Issue
+  me?: string | undefined
+}) {
+  const dev = iss.state === "todo" || iss.state === "in_progress"
+  return (
+    <>
+      <SidebarSection label="State">
+        <StateButtons owner={owner} repo={repo} number={iss.number} current={iss.state} />
+      </SidebarSection>
+      {iss.labels.length > 0 && (
+        <SidebarSection label="Labels">
+          <div className="issue-labels">
+            {iss.labels.map((l) => (
+              <span key={l} className="issue-label">
+                {l}
+              </span>
+            ))}
+          </div>
+        </SidebarSection>
+      )}
+      <SidebarSection label="Assignee">
+        <AssigneeControl
+          owner={owner}
+          repo={repo}
+          number={iss.number}
+          assignee={iss.assignee}
+          state={iss.state}
+          me={me}
+        />
+      </SidebarSection>
+      <SidebarSection label="Agent">
+        <SpawnAgentButton owner={owner} repo={repo} number={iss.number} />
+      </SidebarSection>
+      {dev && (
+        <SidebarSection label="Development">
+          <CreateBranchDialog owner={owner} repo={repo} issueNumber={iss.number} />
+        </SidebarSection>
+      )}
+      <DependencySection
+        owner={owner}
+        repo={repo}
+        issueNumber={iss.number}
+        dependsOn={iss.depends_on}
+        blocks={iss.blocks}
+        isActive={dev}
+      />
+      <SidebarSection label="Danger zone">
+        <DeleteIssueButton owner={owner} repo={repo} number={iss.number} />
+      </SidebarSection>
+    </>
+  )
+}
+
+function IssueBody({ owner, repo, iss }: { owner: string; repo: string; iss: Issue }) {
+  if (!iss.body) return null
+  return (
+    <div className="body">
+      <div className="body__head">
+        <Avatar name={iss.author} /> {iss.author} • {new Date(iss.created_at).toLocaleString()}
+      </div>
+      <div className="body__content">
+        <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
+          <Markdown content={iss.body} owner={owner} repo={repo} basePath="" />
+        </Suspense>
+      </div>
     </div>
   )
 }

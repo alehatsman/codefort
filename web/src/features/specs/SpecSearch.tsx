@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react"
 import { useMutation } from "@tanstack/react-query"
+import { useEffect, useRef, useState } from "react"
 import { api } from "@/api/client"
-import { ErrorMessage } from "@/ui"
 import type { SpecSearchHit, SpecSearchResult } from "@/api/types"
+import { ErrorMessage } from "@/ui"
 
 interface Props {
   open: boolean

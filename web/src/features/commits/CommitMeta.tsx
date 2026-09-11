@@ -8,8 +8,8 @@ interface Props {
   owner: string
   repo: string
   commit: Commit
-  ciRun?: CIRun
-  className?: string
+  ciRun?: CIRun | undefined
+  className?: string | undefined
 }
 
 /**

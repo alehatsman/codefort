@@ -1,9 +1,35 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
   "extends": ["./biome.base.json"],
   "plugins": ["./biome-plugins/prefer-function-decls.grit"],
+  "files": {
+    "includes": [
+      "!**/node_modules",
+      "!**/dist",
+      "!**/build",
+      "!**/coverage",
+      "!**/.gate",
+      "!**/*.min.js",
+      "!**/*.gen.ts",
+      "!biome.base.json",
+      "!tsconfig.base.json",
+      "!biome-plugins",
+      "!*.log",
+      "!.vite",
+      "!*.tsbuildinfo",
+      "!playwright-report",
+      "!test-results",
+      "!.playwright-mcp"
+    ]
+  },
   "linter": {
     "rules": {
+      "correctness": {
+        "noUnresolvedImports": "off"
+      },
+      "nursery": {
+        "noBaseToString": "off"
+      },
       "a11y": {
         "noLabelWithoutControl": {
           "level": "error",
@@ -20,5 +46,33 @@
         "noDescendingSpecificity": "off"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["tests/**"],
+      "linter": {
+        "rules": {
+          "security": {
+            "noSecrets": "off"
+          },
+          "complexity": {
+            "noExcessiveCognitiveComplexity": {
+              "level": "warn",
+              "options": { "maxAllowedComplexity": 20 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/ui/index.ts"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noBarrelFile": "off"
+          }
+        }
+      }
+    }
+  ]
 }

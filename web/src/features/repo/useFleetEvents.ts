@@ -17,53 +17,15 @@ export function useFleetEvents(): FleetEvent[] {
     const ctrl = new AbortController()
     let cancelled = false
 
-    async function run() {
-      while (!cancelled) {
-        try {
-          const headers = new Headers({ Accept: "text/event-stream" })
-          const token = getToken()
-          if (token) headers.set("Authorization", `Bearer ${token}`)
-          // Resume from last seen seq so reconnects don't re-deliver what we
-          // already have. On first connect lastSeq=0, so the server streams
-          // from now (WHERE seq > 0 picks up the full backlog — acceptable for
-          // a personal fleet with a bounded event table).
-          if (lastSeq.current > 0) headers.set("Last-Event-ID", String(lastSeq.current))
-
-          const resp = await fetch("/api/events", { headers, signal: ctrl.signal })
-          if (!resp.ok || !resp.body) {
-            await sleep(5000)
-            continue
-          }
-
-          const reader = resp.body.getReader()
-          const decoder = new TextDecoder()
-          let buf = ""
-          for (;;) {
-            const { value, done } = await reader.read()
-            if (done) break
-            buf += decoder.decode(value, { stream: true })
-            let sep = buf.indexOf("\n\n")
-            while (sep !== -1) {
-              const frame = buf.slice(0, sep)
-              buf = buf.slice(sep + 2)
-              const ev = parseFrame(frame)
-              if (ev) {
-                lastSeq.current = Math.max(lastSeq.current, ev.seq)
-                setEvents((prev) => [ev, ...prev].slice(0, RING_SIZE))
-              }
-              sep = buf.indexOf("\n\n")
-            }
-          }
-          // Server closed the stream — reconnect after a brief pause.
-          if (!cancelled) await sleep(1000)
-        } catch {
-          if (cancelled || ctrl.signal.aborted) return
-          await sleep(3000)
-        }
+    void runFleetStream(
+      ctrl,
+      lastSeq,
+      () => cancelled,
+      (ev) => {
+        lastSeq.current = Math.max(lastSeq.current, ev.seq)
+        setEvents((prev) => [ev, ...prev].slice(0, RING_SIZE))
       }
-    }
-
-    run()
+    )
     return () => {
       cancelled = true
       ctrl.abort()
@@ -71,6 +33,71 @@ export function useFleetEvents(): FleetEvent[] {
   }, [])
 
   return events
+}
+
+// runFleetStream owns the reconnect loop: fetch + consume, retrying on a
+// drop or a clean server close, until cancelled. Top-level (not nested
+// inside the effect that starts it) so its own control flow doesn't stack
+// cognitive complexity on top of the effect's.
+async function runFleetStream(
+  ctrl: AbortController,
+  lastSeq: { current: number },
+  isCancelled: () => boolean,
+  onEvent: (ev: FleetEvent) => void
+) {
+  while (!isCancelled()) {
+    try {
+      const connected = await streamFleetEvents(ctrl.signal, lastSeq.current, onEvent)
+      if (!connected) {
+        await sleep(5000)
+        continue
+      }
+      // Server closed the stream — reconnect after a brief pause.
+      if (!isCancelled()) await sleep(1000)
+    } catch {
+      if (isCancelled() || ctrl.signal.aborted) return
+      await sleep(3000)
+    }
+  }
+}
+
+// streamFleetEvents makes one fetch + SSE-consume attempt. Returns false on
+// an HTTP-level failure (caller backs off and retries the fetch itself);
+// a true return means the stream connected and later closed naturally.
+async function streamFleetEvents(
+  signal: AbortSignal,
+  lastSeq: number,
+  onEvent: (ev: FleetEvent) => void
+): Promise<boolean> {
+  const headers = new Headers({ Accept: "text/event-stream" })
+  const token = getToken()
+  if (token) headers.set("Authorization", `Bearer ${token}`)
+  // Resume from last seen seq so reconnects don't re-deliver what we already
+  // have. On first connect lastSeq=0, so the server streams from now (WHERE
+  // seq > 0 picks up the full backlog — acceptable for a personal fleet with
+  // a bounded event table).
+  if (lastSeq > 0) headers.set("Last-Event-ID", String(lastSeq))
+
+  const resp = await fetch("/api/events", { headers, signal })
+  if (!resp.ok || !resp.body) return false
+
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ""
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    let sep = buf.indexOf("\n\n")
+    while (sep !== -1) {
+      const frame = buf.slice(0, sep)
+      buf = buf.slice(sep + 2)
+      const ev = parseFrame(frame)
+      if (ev) onEvent(ev)
+      sep = buf.indexOf("\n\n")
+    }
+  }
+  return true
 }
 
 function parseFrame(frame: string): FleetEvent | null {

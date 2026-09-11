@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import { mockApi, seedToken } from "./mockApi"
 
 const now = new Date().toISOString()
@@ -27,6 +27,7 @@ test("repos grid: hjkl moves spatially (j/k a row, h/l a cell), Enter opens", as
   // Read the live column count rather than hard-coding the grid math.
   const cols = await page.evaluate(
     () =>
+      // biome-ignore lint/style/noNonNullAssertion: the prior toHaveCount assertion proves .card-grid rendered
       getComputedStyle(document.querySelector(".card-grid")!)
         .gridTemplateColumns.split(" ")
         .filter(Boolean).length

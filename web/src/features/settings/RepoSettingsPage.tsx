@@ -1,7 +1,6 @@
 import "./settings.css"
 import { useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { useRepo, useRepoMembers } from "@/api/queries"
 import {
   useAddRepoMember,
   useDeleteRepo,
@@ -9,10 +8,10 @@ import {
   useSetCIEnabled,
   useSetRepoVisibility,
 } from "@/api/mutations"
+import { useRepo, useRepoMembers } from "@/api/queries"
 import type { AddMemberInput } from "@/api/types"
 import OverviewCard from "@/shell/OverviewCard"
-import { useToast } from "@/ui"
-import { Button, ErrorMessage, SkeletonText } from "@/ui"
+import { Button, ErrorMessage, SkeletonText, useToast } from "@/ui"
 
 export default function RepoSettingsPage() {
   const { owner = "", repo = "" } = useParams()
@@ -223,7 +222,7 @@ function DangerSection({ owner, repo }: { owner: string; repo: string }) {
       {
         onSuccess: () => {
           toast(`Deleted ${slug}`, { variant: "success" })
-          navigate("/")
+          void navigate("/")
         },
       }
     )

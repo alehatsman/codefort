@@ -1,4 +1,4 @@
-# The Go + web quality gate. Run with `mooncake task <name>`.
+# The Go quality gate. Run with `mooncake task <name>`.
 # List all tasks: `mooncake task`.
 #
 # Host/server provisioning is NOT here — it lives in the dotfiles repo
@@ -7,11 +7,16 @@
 #
 # The dev-loop tasks (build/install/deploy/backup/gc/restore/uninstall/
 # create-repo/run/ui/clean/ci-images/agent-image) moved to tasks/
-# (provision) — see docs/ops-provisioning.md and moongit issue #410. This
-# file now holds only the goq/tq-backed quality-gate tasks, plus `tidy`,
-# which #410 didn't scope out. The CI runner (mgitci.yml,
-# cmd/moongitd/ci_runner.go) still execs mooncake in-container — tracked
-# separately in #411.
+# (provision) — see docs/ops-provisioning.md and moongit issue #410. The
+# web/ quality gate (ts-quality) moved there too, in the same pass that
+# picked up ts-quality's provision-migration rewrite (upstream dropped
+# mooncake-module compatibility outright — see docs/ops-provisioning.md's
+# "Quality gate — ts-quality" section). This file now holds only the
+# goq-backed Go quality-gate tasks, plus `tidy`, which #410 didn't scope
+# out. The CI runner (mgitci.yml, cmd/moongitd/ci_runner.go) still execs
+# `mooncake task ci` for the Go gate in-container — tracked separately in
+# #411 as explicitly deferred; the `web` CI job now runs the provision-native
+# ts-quality gate instead (tasks/ui-ci.yml).
 
 version: "1.0"
 
@@ -30,17 +35,6 @@ version: "1.0"
 # golangci-lint in-repo so the local config is honored).
 modules:
   goq: "github.com/alehatsman/go-quality@v0.1.2"
-  # The web/ quality gate (lint/format/typecheck/build/test/vuln + ci/ci-fast)
-  # comes from the shared **ts-quality** module (alehatsman/ts-quality), the TS
-  # analog of go-quality. The ui-* tasks below wrap tq/*; `dir: web` is now a
-  # binding-level default prop (mooncake #52), applied to every tq/* export
-  # that declares it and filtered out of those that don't (#57) — tq/sync-config
-  # takes a `dest` instead, so ui-sync-config is unaffected. Fetched from
-  # github.com over https (alehatsman/ts-quality) — no insecure-host prereq.
-  tq:
-    source: "github.com/alehatsman/ts-quality@v0.1.0"
-    props:
-      dir: web
 
 tasks:
   tidy:
@@ -90,31 +84,8 @@ tasks:
 
   ci: goq/ci
 
-  # ---- web quality gate (ts-quality module; dir: web via tq default props) --
-  # Pure wrappers collapse to the `use:` shorthand — dir:web comes from the tq
-  # binding default and `mooncake task` lists each ts-quality component's desc.
-  ui-test-install: tq/tools
-
-  ui-build: tq/build
-
-  ui-lint: tq/lint
-
-  ui-format: tq/format
-
-  ui-typecheck: tq/typecheck
-
-  ui-vuln: tq/vuln
-
-  ui-test: tq/test
-
-  ui-ci: tq/ci
-
-  ui-ci-fast: tq/ci-fast
-
-  ui-sync-config:
-    desc: Refresh web/biome.base.json from the shared ts-quality baseline
-    steps:
-      # Absolute dest via {{ invocation_dir }}: a relative module dest with a
-      # subdir resolves against the module cache dir, not the repo, so pin it.
-      - use: tq/sync-config
-        props: { dest: "{{ invocation_dir }}/web/biome.base.json" }
+  # ---- web quality gate — moved to tasks/ui-*.yml (provision) -----------
+  # ts-quality's provision-migration rewrite dropped mooncake-module
+  # compatibility (no more name:/version: keys), so it can no longer be
+  # `use`d from here. Run `provision list tasks/` — ui-tools, ui-sync-config,
+  # ui-config-check, ui-findings, ui-fast, ui-ci.

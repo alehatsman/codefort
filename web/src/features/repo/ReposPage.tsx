@@ -1,24 +1,24 @@
 import { useMemo, useRef } from "react"
 import "./repo.css"
-import { Link, useNavigate } from "react-router-dom"
 import {
+  closestCenter,
   DndContext,
+  type DragEndEvent,
   DragOverlay,
   PointerSensor,
-  closestCenter,
   useSensor,
   useSensors,
-  type DragEndEvent,
 } from "@dnd-kit/core"
-import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable"
+import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import { Link, useNavigate } from "react-router-dom"
 import { useRepos } from "@/api/queries"
+import type { Repo } from "@/api/types"
 import CIStatusIcon from "@/features/pipelines/CIStatusIcon"
 import NewRepoForm from "@/features/repo/NewRepoForm"
 import { applyOrder, useRepoOrder } from "@/features/repo/useRepoOrder"
-import { Badge, Button, Card, EmptyState, ErrorMessage, PageHeader, SkeletonText } from "@/ui"
-import type { Repo } from "@/api/types"
 import { useListNav } from "@/shell/keyboardNav"
+import { Badge, Button, Card, EmptyState, ErrorMessage, PageHeader, SkeletonText } from "@/ui"
 
 export default function ReposPage() {
   const { data, isLoading, error } = useRepos()
@@ -34,7 +34,7 @@ export default function ReposPage() {
     getColumns: () => gridColumnCount(gridRef.current),
     onActivate: (i) => {
       const r = sorted[i]
-      if (r) navigate(`/${r.owner}/${r.name}`)
+      if (r) void navigate(`/${r.owner}/${r.name}`)
     },
   })
 

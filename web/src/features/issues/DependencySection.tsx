@@ -9,8 +9,8 @@ interface Props {
   owner: string
   repo: string
   issueNumber: number
-  dependsOn?: IssueRef[]
-  blocks?: IssueRef[]
+  dependsOn?: IssueRef[] | undefined
+  blocks?: IssueRef[] | undefined
   isActive: boolean
 }
 
@@ -73,7 +73,9 @@ export default function DependencySection({
                 owner={owner}
                 repo={repo}
                 canRemove={false}
-                onRemove={() => {}}
+                onRemove={() => {
+                  // canRemove is false — the remove control isn't rendered, so this never fires.
+                }}
               />
             ))}
           </ul>

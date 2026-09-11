@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react"
 import ReactMarkdown, { type Components } from "react-markdown"
-import remarkGfm from "remark-gfm"
-import rehypeSanitize from "rehype-sanitize"
 import { Link } from "react-router-dom"
+import rehypeSanitize from "rehype-sanitize"
+import remarkGfm from "remark-gfm"
 import { api } from "@/api/client"
-import { highlight, highlightNodes } from "@/ui/highlight"
 import { isExternalRef, resolveRepoPath } from "@/features/repo/repoPath"
+import { highlight, highlightNodes } from "@/ui/highlight"
 
 interface Props {
   content: string
@@ -90,7 +90,7 @@ interface RawImageProps {
   owner: string
   repo: string
   path: string
-  alt?: string
+  alt?: string | undefined
 }
 
 /**

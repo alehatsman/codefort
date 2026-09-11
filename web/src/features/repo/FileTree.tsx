@@ -9,15 +9,15 @@ interface Props {
   repo: string
   entries: TreeEntry[]
   // Index of the keyboard-selected row, or -1 when nothing is selected.
-  selectedIndex?: number
+  selectedIndex?: number | undefined
   // Last commit touching each entry, keyed by full path. Absent while the
   // tree-commits query is still loading (each row shows a placeholder).
-  commits?: Record<string, Commit>
+  commits?: Record<string, Commit> | undefined
   // True while the commit annotations are loading, to drive the placeholder.
-  commitsLoading?: boolean
+  commitsLoading?: boolean | undefined
   // dex summaries keyed by repo path. An entry whose path has one shows it as
   // a hover tooltip with the dotted-underline affordance; the rest stay plain.
-  summaries?: Record<string, string>
+  summaries?: Record<string, string> | undefined
 }
 
 /**

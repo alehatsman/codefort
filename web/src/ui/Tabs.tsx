@@ -29,11 +29,11 @@ interface TabProps {
   /** Router destination. */
   to: string
   /** Whether this tab matches the current route — caller-derived. */
-  active?: boolean
+  active?: boolean | undefined
   /** Optional count pill rendered after the label (e.g. open-issue count). */
-  count?: number
+  count?: number | undefined
   /** Renders the tab as a non-navigable `.is-disabled` span. */
-  disabled?: boolean
+  disabled?: boolean | undefined
   children: ReactNode
 }
 

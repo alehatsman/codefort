@@ -1,10 +1,10 @@
-import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
+import { useState } from "react"
 import { Link } from "react-router-dom"
 import { api } from "@/api/client"
+import type { WriteSpecResult } from "@/api/types"
 import Markdown from "@/shell/Markdown"
 import { Button, ErrorMessage } from "@/ui"
-import type { WriteSpecResult } from "@/api/types"
 
 interface Props {
   owner: string

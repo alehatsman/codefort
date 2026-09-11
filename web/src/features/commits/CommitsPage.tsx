@@ -2,8 +2,8 @@ import { Link, useParams } from "react-router-dom"
 import "./commits.css"
 import { useCommitCIStatus, useInfiniteCommits, useRepo } from "@/api/queries"
 import type { CIRun, Commit } from "@/api/types"
-import OverviewCard from "@/shell/OverviewCard"
 import CommitCIStatus from "@/features/commits/CommitCIStatus"
+import OverviewCard from "@/shell/OverviewCard"
 import { Avatar, EmptyState, ErrorMessage, RelativeTime, SkeletonList } from "@/ui"
 
 const PER_PAGE = 30
@@ -84,7 +84,7 @@ function CommitRow({
   owner: string
   repo: string
   commit: Commit
-  ciRun?: CIRun
+  ciRun?: CIRun | undefined
 }) {
   const to = `/${owner}/${repo}/commit/${commit.sha}`
   return (

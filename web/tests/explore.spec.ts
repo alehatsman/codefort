@@ -117,12 +117,24 @@ test("Explore: hero summary, layered package map, and hotspots render", async ({
 const PACKAGE_GRAPH = {
   status: "ok",
   nodes: [
-    { package: "github.com/acme/demo/cmd/demo", in_degree: 0, out_degree: 1, page_rank: 0.02, is_main: true },
+    {
+      package: "github.com/acme/demo/cmd/demo",
+      in_degree: 0,
+      out_degree: 1,
+      page_rank: 0.02,
+      is_main: true,
+    },
     // A second entry point (a `main`) with a SHORT import chain: it imports the
     // foundation directly, skipping the server layer. Its longest chain is one
     // hop, but is_main pins every executable to the Entry points row regardless
     // of subtree height.
-    { package: "github.com/acme/demo/cmd/tool", in_degree: 0, out_degree: 1, page_rank: 0.01, is_main: true },
+    {
+      package: "github.com/acme/demo/cmd/tool",
+      in_degree: 0,
+      out_degree: 1,
+      page_rank: 0.01,
+      is_main: true,
+    },
     {
       package: "github.com/acme/demo/internal/server",
       in_degree: 1,
@@ -147,13 +159,19 @@ const PACKAGE_GRAPH = {
     { package: "fixtures.testdata.beta", in_degree: 1, out_degree: 0, page_rank: 0 },
   ],
   edges: [
-    { from_package: "github.com/acme/demo/cmd/demo", to_package: "github.com/acme/demo/internal/server" },
+    {
+      from_package: "github.com/acme/demo/cmd/demo",
+      to_package: "github.com/acme/demo/internal/server",
+    },
     {
       from_package: "github.com/acme/demo/internal/server",
       to_package: "github.com/acme/demo/internal/storage",
     },
     // cmd/tool imports the foundation directly — the short-tower entry point.
-    { from_package: "github.com/acme/demo/cmd/tool", to_package: "github.com/acme/demo/internal/storage" },
+    {
+      from_package: "github.com/acme/demo/cmd/tool",
+      to_package: "github.com/acme/demo/internal/storage",
+    },
     { from_package: "fixtures.testdata.alpha", to_package: "fixtures.testdata.beta" },
   ],
 }
@@ -238,7 +256,9 @@ test("Explore: package map layers by dex import graph with degree + cross-links"
   // common prefix (which the dotted fixtures would collapse to "").
   await expect(server.locator(".pkg-card__path")).toHaveText("internal/server")
   // The off-module fixture is shown with its full path (non-navigable).
-  await expect(page.locator(".pkg-card__path", { hasText: "fixtures.testdata.alpha" })).toBeVisible()
+  await expect(
+    page.locator(".pkg-card__path", { hasText: "fixtures.testdata.alpha" })
+  ).toBeVisible()
 })
 
 test("Explore: package map falls back to in_degree-0 roots when dex omits is_main", async ({
@@ -254,14 +274,26 @@ test("Explore: package map falls back to in_degree-0 roots when dex omits is_mai
     status: "ok",
     nodes: [
       { package: "github.com/acme/demo/cmd/demo", in_degree: 0, out_degree: 1, page_rank: 0.02 },
-      { package: "github.com/acme/demo/internal/storage", in_degree: 1, out_degree: 0, page_rank: 0.05 },
+      {
+        package: "github.com/acme/demo/internal/storage",
+        in_degree: 1,
+        out_degree: 0,
+        page_rank: 0.05,
+      },
     ],
     edges: [
-      { from_package: "github.com/acme/demo/cmd/demo", to_package: "github.com/acme/demo/internal/storage" },
+      {
+        from_package: "github.com/acme/demo/cmd/demo",
+        to_package: "github.com/acme/demo/internal/storage",
+      },
     ],
   }
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel\/package-graph$/, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(noMainGraph) })
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(noMainGraph),
+    })
   )
 
   await page.goto("/alice/demo/explore")
@@ -285,7 +317,13 @@ test("Explore: an oversized tier collapses its cards behind a toggle", async ({ 
   const fanOut = {
     status: "ok",
     nodes: [
-      { package: "github.com/acme/demo/cmd/app", in_degree: 0, out_degree: 16, page_rank: 0.02, is_main: true },
+      {
+        package: "github.com/acme/demo/cmd/app",
+        in_degree: 0,
+        out_degree: 16,
+        page_rank: 0.02,
+        is_main: true,
+      },
       ...leaves.map((p) => ({ package: p, in_degree: 1, out_degree: 0, page_rank: 0.01 })),
     ],
     edges: leaves.map((p) => ({ from_package: "github.com/acme/demo/cmd/app", to_package: p })),

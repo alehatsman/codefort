@@ -1,7 +1,7 @@
-import { useRef, useState } from "react"
 import { useDroppable } from "@dnd-kit/core"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import clsx from "clsx"
+import { useRef, useState } from "react"
 import type { Issue, IssueState } from "@/api/types"
 import BoardCard from "@/features/issues/BoardCard"
 import StateIcon from "@/features/issues/StateIcon"
@@ -77,7 +77,9 @@ export default function BoardColumn({ state, items, showRepo = false }: Props) {
         {items.length > 0 && (
           <div className="board-col__virtual" style={{ height: rowVirtualizer.getTotalSize() }}>
             {rowVirtualizer.getVirtualItems().map((vItem) => {
-              const { issue, owner, repo } = visible[vItem.index]
+              const item = visible[vItem.index]
+              if (!item) return null
+              const { issue, owner, repo } = item
               return (
                 <div
                   key={vItem.key}

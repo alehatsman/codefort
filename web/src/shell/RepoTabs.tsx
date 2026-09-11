@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom"
 import { useCIRuns, useCodeComments, useRepo, useSpecsList } from "@/api/queries"
-import { useTabNav } from "@/shell/keyboardNav"
 import type { CIRun } from "@/api/types"
+import { useTabNav } from "@/shell/keyboardNav"
 import { Tab, Tabs } from "@/ui"
 
 interface Props {

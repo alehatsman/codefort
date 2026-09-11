@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { useFleetEvents } from "@/features/repo/useFleetEvents"
 import type { FleetEvent } from "@/api/types"
+import { useFleetEvents } from "@/features/repo/useFleetEvents"
 
 const LS_KEY = "notif-last-seen"
 
@@ -17,16 +17,19 @@ function eventLabel(ev: FleetEvent): string {
   const t = ev.type
   if (t === "push") return `${ev.actor ?? "someone"} pushed to ${ev.repo ?? "a repo"}`
   if (t.startsWith("issue")) return `Issue ${t.replace("issue.", "")} in ${ev.repo ?? "a repo"}`
-  if (t.startsWith("ci") || t.startsWith("run")) return `CI ${t.replace(/^(ci|run)\./, "")} in ${ev.repo ?? "a repo"}`
+  if (t.startsWith("ci") || t.startsWith("run"))
+    return `CI ${t.replace(/^(ci|run)\./, "")} in ${ev.repo ?? "a repo"}`
   if (t.startsWith("agent")) return `Agent ${t.replace("agent.", "")} in ${ev.repo ?? "a repo"}`
-  if (t.startsWith("pr") || t.startsWith("pull")) return `PR ${t.replace(/^(pr|pull)\./, "")} in ${ev.repo ?? "a repo"}`
+  if (t.startsWith("pr") || t.startsWith("pull"))
+    return `PR ${t.replace(/^(pr|pull)\./, "")} in ${ev.repo ?? "a repo"}`
   return `${t} in ${ev.repo ?? "a repo"}`
 }
 
 function eventHref(ev: FleetEvent): string {
   if (!ev.repo) return "/"
   const base = `/${ev.repo}`
-  const n = (ev.data?.number as number | undefined) ?? (ev.data?.run_number as number | undefined)
+  const n =
+    (ev.data?.["number"] as number | undefined) ?? (ev.data?.["run_number"] as number | undefined)
   if (ev.type === "push") return `${base}/commits`
   if (ev.type.startsWith("issue") && n) return `${base}/issues/${n}`
   if ((ev.type.startsWith("ci") || ev.type.startsWith("run")) && n) return `${base}/pipelines/${n}`
@@ -67,7 +70,7 @@ export default function NotificationBell() {
 
   return (
     <div className="notif-bell" ref={ref}>
-      <button className="notif-bell__btn" onClick={toggle} aria-label="Notifications">
+      <button type="button" className="notif-bell__btn" onClick={toggle} aria-label="Notifications">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M8 1a5 5 0 0 0-5 5v3l-1 1.5V12h12v-1.5L13 9V6a5 5 0 0 0-5-5Zm0 13.5a1.5 1.5 0 0 0 1.5-1.5h-3A1.5 1.5 0 0 0 8 14.5Z" />
         </svg>
@@ -80,8 +83,15 @@ export default function NotificationBell() {
           ) : (
             <ul className="notif-list">
               {events.slice(0, 15).map((ev) => (
-                <li key={ev.seq} className={`notif-row${ev.seq > lastSeen ? " notif-row--unread" : ""}`}>
-                  <Link to={eventHref(ev)} className="notif-row__link" onClick={() => setOpen(false)}>
+                <li
+                  key={ev.seq}
+                  className={`notif-row${ev.seq > lastSeen ? " notif-row--unread" : ""}`}
+                >
+                  <Link
+                    to={eventHref(ev)}
+                    className="notif-row__link"
+                    onClick={() => setOpen(false)}
+                  >
                     <span className="notif-row__label">{eventLabel(ev)}</span>
                     {ev.actor && <span className="notif-row__actor muted small">{ev.actor}</span>}
                   </Link>

@@ -60,73 +60,18 @@ export function useJobEventStream(
     setDone(false)
     setError(null)
 
-    async function run() {
-      const url = `/api/repos/${owner}/${repo}/runs/${runNumber}/jobs/${encodeURIComponent(
-        job
-      )}/events`
-      // Reconnect while the run is live and we haven't been told the stream is
-      // done; a clean close (done) breaks the loop.
-      while (!cancelled) {
-        try {
-          const headers = new Headers({ Accept: "text/event-stream" })
-          const token = getToken()
-          if (token) headers.set("Authorization", `Bearer ${token}`)
-          if (lastSeq.current > 0) headers.set("Last-Event-ID", String(lastSeq.current))
+    const url = `/api/repos/${owner}/${repo}/runs/${runNumber}/jobs/${encodeURIComponent(
+      job
+    )}/events`
 
-          const resp = await fetch(url, { headers, signal: ctrl.signal })
-          if (!resp.ok || !resp.body) {
-            setError(`stream failed (${resp.status})`)
-            return
-          }
-
-          const reader = resp.body.getReader()
-          const decoder = new TextDecoder()
-          let buf = ""
-          // The server ends a still-live stream with a `resume` sentinel so a
-          // buffer-until-close network hop flushes the body; that's a pause,
-          // not the end. On seeing it we reconnect (from lastSeq) instead of
-          // marking the stream done.
-          let paused = false
-          for (;;) {
-            const { value, done: streamDone } = await reader.read()
-            if (streamDone) break
-            buf += decoder.decode(value, { stream: true })
-            // SSE frames are separated by a blank line.
-            let sep = buf.indexOf("\n\n")
-            while (sep !== -1) {
-              const frame = buf.slice(0, sep)
-              buf = buf.slice(sep + 2)
-              if (isResumeFrame(frame)) {
-                paused = true
-              } else {
-                const ev = parseFrame(frame)
-                if (ev) {
-                  lastSeq.current = Math.max(lastSeq.current, ev.seq)
-                  setEvents((prev) => [...prev, ev])
-                }
-              }
-              sep = buf.indexOf("\n\n")
-            }
-          }
-          // Paused close: the run is still live, the server just rotated the
-          // connection so a buffering hop flushes. Reconnect from lastSeq.
-          if (paused) {
-            if (cancelled) return
-            continue
-          }
-          // Stream closed with no resume sentinel: the run is terminal (or this
-          // job is done). Mark done and stop reconnecting.
-          if (!cancelled) setDone(true)
-          return
-        } catch {
-          if (cancelled || ctrl.signal.aborted) return
-          // Transient network drop on a live run — back off and resume.
-          await sleep(1000)
-        }
-      }
-    }
-
-    run()
+    void runStream(url, ctrl, lastSeq, () => cancelled, {
+      onEvent: (ev) => {
+        lastSeq.current = Math.max(lastSeq.current, ev.seq)
+        setEvents((prev) => [...prev, ev])
+      },
+      onError: setError,
+      onDone: () => setDone(true),
+    })
     return () => {
       cancelled = true
       ctrl.abort()
@@ -134,6 +79,103 @@ export function useJobEventStream(
   }, [owner, repo, runNumber, job, enabled, resubscribeKey])
 
   return { events, done, error }
+}
+
+interface StreamHandlers {
+  onEvent: (ev: CIEvent) => void
+  onError: (msg: string) => void
+}
+
+// runStream owns the reconnect loop: fetch + consume, then retry on a
+// transient drop while the run is still live, until the stream reports a
+// clean close (done) or an HTTP-level error. Top-level (not nested inside the
+// effect that starts it) so its own control flow doesn't stack cognitive
+// complexity on top of the effect's.
+async function runStream(
+  url: string,
+  ctrl: AbortController,
+  lastSeq: { current: number },
+  isCancelled: () => boolean,
+  handlers: StreamHandlers & { onDone: () => void }
+) {
+  // Reconnect while the run is live and we haven't been told the stream is
+  // done; a clean close (done) breaks the loop.
+  while (!isCancelled()) {
+    try {
+      const outcome = await streamOnce(url, lastSeq.current, ctrl.signal, handlers)
+      if (outcome === "error") return
+      // A paused close means the run is still live and the server just
+      // rotated the connection so a buffering hop flushes — reconnect from
+      // lastSeq (the `while` condition above re-checks isCancelled on the
+      // next spin, so a cancel during this stream exits there). A closed
+      // stream with no resume sentinel means the run (or this job) is
+      // terminal — mark done and stop reconnecting.
+      if (outcome === "paused") continue
+      if (isCancelled()) return
+      handlers.onDone()
+      return
+    } catch {
+      if (isCancelled() || ctrl.signal.aborted) return
+      // Transient network drop on a live run — back off and resume.
+      await sleep(1000)
+    }
+  }
+}
+
+// streamOnce makes one fetch + SSE-consume attempt (the caller's `run` loop
+// retries on a transient drop). Returns "error" on an HTTP-level failure
+// (already reported via onError), or consumeSSE's "paused"/"closed".
+async function streamOnce(
+  url: string,
+  lastSeq: number,
+  signal: AbortSignal,
+  handlers: StreamHandlers
+): Promise<"paused" | "closed" | "error"> {
+  const headers = new Headers({ Accept: "text/event-stream" })
+  const token = getToken()
+  if (token) headers.set("Authorization", `Bearer ${token}`)
+  if (lastSeq > 0) headers.set("Last-Event-ID", String(lastSeq))
+
+  const resp = await fetch(url, { headers, signal })
+  if (!resp.ok || !resp.body) {
+    handlers.onError(`stream failed (${resp.status})`)
+    return "error"
+  }
+  return consumeSSE(resp.body, handlers.onEvent)
+}
+
+// consumeSSE reads one SSE stream to its natural end (a network drop throws
+// out of `reader.read()`, which the caller's try/catch handles), calling
+// onEvent for each parsed frame. Returns "paused" for the server's resume
+// sentinel (still-live run, reconnect from lastSeq) or "closed" for a clean
+// end (run/job terminal).
+async function consumeSSE(
+  body: ReadableStream<Uint8Array>,
+  onEvent: (ev: CIEvent) => void
+): Promise<"paused" | "closed"> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ""
+  let paused = false
+  for (;;) {
+    const { value, done: streamDone } = await reader.read()
+    if (streamDone) break
+    buf += decoder.decode(value, { stream: true })
+    // SSE frames are separated by a blank line.
+    let sep = buf.indexOf("\n\n")
+    while (sep !== -1) {
+      const frame = buf.slice(0, sep)
+      buf = buf.slice(sep + 2)
+      if (isResumeFrame(frame)) {
+        paused = true
+      } else {
+        const ev = parseFrame(frame)
+        if (ev) onEvent(ev)
+      }
+      sep = buf.indexOf("\n\n")
+    }
+  }
+  return paused ? "paused" : "closed"
 }
 
 // parseFrame extracts the CIEvent from one SSE frame. The event's full JSON is

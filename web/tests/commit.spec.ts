@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test"
-import { mockApi, seedToken, type State } from "./mockApi"
+import { expect, test } from "@playwright/test"
+import { mockApi, type State, seedToken } from "./mockApi"
 
 test.beforeEach(async ({ page }) => {
   await seedToken(page)

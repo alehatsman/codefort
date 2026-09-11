@@ -350,7 +350,7 @@ function parseQuery(url: URL): {
 
 function applyIssueFilters(issues: Issue[], q: ReturnType<typeof parseQuery>): Issue[] {
   let out = issues
-  if (q.states) out = out.filter((i) => q.states!.includes(i.state))
+  if (q.states) out = out.filter((i) => q.states?.includes(i.state))
   if (q.assignee === "null") out = out.filter((i) => i.assignee === null)
   else if (q.assignee) out = out.filter((i) => i.assignee === q.assignee)
   if (q.author) out = out.filter((i) => i.author === q.author)
@@ -392,7 +392,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const url = new URL(req.url())
     const [, , , owner, name] = url.pathname.split("/")
     const repo = state.repos.find((r) => r.owner === owner && r.name === name)
-    if (!repo) return json(route, 404, { error: "repo not registered: " + owner + "/" + name })
+    if (!repo) return json(route, 404, { error: `repo not registered: ${owner}/${name}` })
     if (req.method() === "DELETE") {
       state.repos = state.repos.filter((r) => r !== repo)
       recountRepos(state)
@@ -548,7 +548,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/commit\/[^/]+$/, (route) => {
     const sha = new URL(route.request().url()).pathname.split("/").pop() ?? ""
     const detail = state.commitDetails[sha]
-    if (!detail) return json(route, 404, { error: "commit not found: " + sha })
+    if (!detail) return json(route, 404, { error: `commit not found: ${sha}` })
     return json(route, 200, detail)
   })
 
@@ -601,7 +601,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     if (req.method() === "POST") {
       const body = req.postDataJSON() as { name: string }
       if (state.tokens.some((t) => t.name === body.name)) {
-        return json(route, 409, { error: "token name already exists: " + body.name })
+        return json(route, 409, { error: `token name already exists: ${body.name}` })
       }
       const tok: Token = {
         id: state.tokens.length + 1,
@@ -609,7 +609,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
         created_at: nowIso(),
       }
       state.tokens.push(tok)
-      return json(route, 201, { ...tok, secret: "mgt_" + "a".repeat(64) })
+      return json(route, 201, { ...tok, secret: `mgt_${"a".repeat(64)}` })
     }
     return route.continue()
   })
@@ -638,7 +638,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       const key: SSHKey = {
         id: state.sshKeys.length + 1,
         token_name: state.identity,
-        fingerprint: "SHA256:" + "b".repeat(43),
+        fingerprint: `SHA256:${"b".repeat(43)}`,
         comment: body.comment || "",
         created_at: nowIso(),
       }
@@ -715,7 +715,12 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     if (req.method() === "GET") return json(route, 200, { ...iss, labels: iss.labels ?? [] })
     if (req.method() === "PATCH") {
       // Partial update: only the provided fields change (mirrors the server).
-      const body = req.postDataJSON() as { state?: IssueState; title?: string; body?: string; labels?: string[] }
+      const body = req.postDataJSON() as {
+        state?: IssueState
+        title?: string
+        body?: string
+        labels?: string[]
+      }
       if (body.state !== undefined) iss.state = body.state
       if (body.title !== undefined) iss.title = body.title
       if (body.body !== undefined) iss.body = body.body
@@ -977,7 +982,12 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
     const req = route.request()
     const url = new URL(req.url())
     if (req.method() === "POST") {
-      const body = req.postDataJSON() as { base: string; head: string; title: string; body?: string }
+      const body = req.postDataJSON() as {
+        base: string
+        head: string
+        title: string
+        body?: string
+      }
       const number = state.pulls.length ? Math.max(...state.pulls.map((p) => p.number)) + 1 : 1
       const pr: PullRequest = {
         id: state.pulls.length + 1,
@@ -1009,7 +1019,11 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
         (p) => p.title.toLowerCase().includes(q) || (p.body ?? "").toLowerCase().includes(q)
       )
     }
-    return json(route, 200, [...out].sort((a, b) => b.number - a.number))
+    return json(
+      route,
+      200,
+      [...out].sort((a, b) => b.number - a.number)
+    )
   })
 
   return state
@@ -1018,6 +1032,6 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
 /** Set the token in localStorage before app boot so TokenGate doesn't intercept. */
 export async function seedToken(page: Page) {
   await page.addInitScript(() => {
-    localStorage.setItem("moongit_token", "mgt_test_" + "x".repeat(60))
+    localStorage.setItem("moongit_token", `mgt_test_${"x".repeat(60)}`)
   })
 }

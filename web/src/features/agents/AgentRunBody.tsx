@@ -4,13 +4,13 @@ import clsx from "clsx"
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useCancelAgentRun, useCreateAgentTurn, useFinishAgentRun } from "@/api/mutations"
 import type { CIEvent, CIRunDetail } from "@/api/types"
-import { Button, ErrorMessage, Spinner } from "@/ui"
 // Temporary seam: agents reuse the pipelines run-event stream + duration
 // helper. The run shell is shared today (one PipelinesPage/GlobalRunsPage takes
 // a `kind` prop); when agents grow their own run components this dependency on
 // pipelines/ should be cut over to agents-local equivalents.
 import { useJobEventStream } from "@/features/pipelines/ciEvents"
 import { formatDuration } from "@/features/pipelines/runHelpers"
+import { Button, ErrorMessage, Spinner } from "@/ui"
 
 // Terminal agent-run statuses: no further turns, the message box closes.
 const TERMINAL = ["success", "failed", "canceled", "error", "interrupted", "stalled"]
@@ -90,7 +90,7 @@ function AgentTranscript({
   // pending turns, so there's no overlap with the transcript's turn cards.
   const cards = useMemo(() => {
     const built = buildCards(entries)
-    for (const t of (run.turns ?? []).filter((t) => t.status === "pending")) {
+    for (const t of (run.turns ?? []).filter((turn) => turn.status === "pending")) {
       built.push({
         id: `queued-${t.seq}`,
         title: "You · queued",
@@ -110,18 +110,10 @@ function AgentTranscript({
   // `done`, which also closes on error) so a parked awaiting_input run — turn
   // already completed — correctly shows nothing.
   const terminal = TERMINAL.includes(run.status)
-  const phase = useMemo<"planning" | "working" | null>(() => {
-    if (terminal || error) return null
-    let started = 0
-    let completed = 0
-    for (const e of events) {
-      if (e.type === "agent.turn.started") started++
-      else if (e.type === "agent.turn.completed") completed++
-    }
-    if (started <= completed) return null
-    const lastTurn = entries.map((e) => e.kind).lastIndexOf("turn")
-    return lastTurn >= 0 && lastTurn < entries.length - 1 ? "working" : "planning"
-  }, [events, entries, terminal, error])
+  const phase = useMemo<"planning" | "working" | null>(
+    () => computeAgentPhase(terminal, error, events, entries),
+    [events, entries, terminal, error]
+  )
 
   // The transcript is a bounded, windowed scroll region: only the on-screen
   // cards are mounted (a long-running session accrues many turns), and it
@@ -134,7 +126,7 @@ function AgentTranscript({
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 96,
     overscan: 6,
-    getItemKey: (i) => cards[i].id,
+    getItemKey: (i) => cards[i]?.id ?? i,
   })
 
   // "Stuck" = the viewport is at (or near) the end, so we keep pinning to the
@@ -178,17 +170,21 @@ function AgentTranscript({
       {cards.length === 0 && !done && <Spinner label="Waiting for the agent…" />}
       <div ref={scrollRef} className="agent-transcript" onScroll={onScroll}>
         <div className="agent-transcript__sizer" style={{ height: total }}>
-          {virtualizer.getVirtualItems().map((vi) => (
-            <div
-              key={vi.key}
-              data-index={vi.index}
-              ref={virtualizer.measureElement}
-              className="agent-transcript__row"
-              style={{ transform: `translateY(${vi.start}px)` }}
-            >
-              {renderCard(cards[vi.index])}
-            </div>
-          ))}
+          {virtualizer.getVirtualItems().map((vi) => {
+            const card = cards[vi.index]
+            if (!card) return null
+            return (
+              <div
+                key={vi.key}
+                data-index={vi.index}
+                ref={virtualizer.measureElement}
+                className="agent-transcript__row"
+                style={{ transform: `translateY(${vi.start}px)` }}
+              >
+                {renderCard(card)}
+              </div>
+            )
+          })}
         </div>
         {phase && (
           <div className={clsx("agent-working", `agent-working--${phase}`)} aria-live="polite">
@@ -223,17 +219,46 @@ interface Card {
   body: AgentEntry[]
 }
 
+// computeAgentPhase derives "planning"/"working"/null for the in-flight-turn
+// hint. Pulled out to module scope so its branches don't stack cognitive
+// complexity on top of the useMemo that calls it.
+function computeAgentPhase(
+  terminal: boolean,
+  error: string | null,
+  events: CIEvent[],
+  entries: AgentEntry[]
+): "planning" | "working" | null {
+  if (terminal || error) return null
+  let started = 0
+  let completed = 0
+  for (const e of events) {
+    if (e.type === "agent.turn.started") started++
+    else if (e.type === "agent.turn.completed") completed++
+  }
+  if (started <= completed) return null
+  const lastTurn = entries.map((e) => e.kind).lastIndexOf("turn")
+  return lastTurn >= 0 && lastTurn < entries.length - 1 ? "working" : "planning"
+}
+
 // buildCards groups the flat entries into cards. A "turn" or a "plan" system
 // entry opens a card (its label becomes the title); every following non-header
 // entry is appended to that card's body. A turn's prompt rides the turn entry's
 // text, so it's pushed into the body as prose.
 function buildCards(entries: AgentEntry[]): Card[] {
-  const isHeader = (e: AgentEntry) =>
-    e.kind === "turn" || (e.kind === "system" && (e.label ?? "").startsWith("plan"))
+  const cards = groupEntriesIntoCards(entries)
+  for (const c of cards) deriveCardStatus(c)
+  return cards
+}
+
+function isCardHeader(e: AgentEntry): boolean {
+  return e.kind === "turn" || (e.kind === "system" && (e.label ?? "").startsWith("plan"))
+}
+
+function groupEntriesIntoCards(entries: AgentEntry[]): Card[] {
   const cards: Card[] = []
   let cur: Card | null = null
   for (const e of entries) {
-    if (isHeader(e)) {
+    if (isCardHeader(e)) {
       cur = { id: e.id ?? `c${cards.length}`, title: e.label ?? "", body: [] }
       cards.push(cur)
       if (e.kind === "turn" && e.text) {
@@ -247,20 +272,21 @@ function buildCards(entries: AgentEntry[]): Card[] {
     }
     cur.body.push(e)
   }
-  // Derive each card's head status from its steps: failed wins, then running,
-  // else ok if it ran any step at all.
-  for (const c of cards) {
-    for (const b of c.body) {
-      if (b.kind !== "step") continue
-      if (b.status === "failed") {
-        c.status = "failed"
-        break
-      }
-      if (b.status === "running") c.status = "running"
-      else if (c.status !== "running") c.status = "ok"
-    }
-  }
   return cards
+}
+
+// Derive a card's head status from its steps: failed wins, then running,
+// else ok if it ran any step at all.
+function deriveCardStatus(c: Card): void {
+  for (const b of c.body) {
+    if (b.kind !== "step") continue
+    if (b.status === "failed") {
+      c.status = "failed"
+      break
+    }
+    if (b.status === "running") c.status = "running"
+    else if (c.status !== "running") c.status = "ok"
+  }
 }
 
 // renderCard draws one section as a CI-style step card: a head (status dot +
@@ -424,7 +450,7 @@ const STEP_GLYPH: Record<StepStatus, string> = {
 interface AgentEntry {
   // id is a stable React key, assigned by foldAgentEvents from the source
   // event's seq + a per-event sub-index. The fold helpers don't set it.
-  id?: string
+  id?: string | undefined
   kind:
     | "step"
     | "turn"
@@ -438,8 +464,8 @@ interface AgentEntry {
     | "raw"
   // status is set only on "step" entries; it's mutated in place when the step
   // resolves so the live row flips ▶ → ✓/~/✗ without spawning a second line.
-  status?: StepStatus
-  label?: string
+  status?: StepStatus | undefined
+  label?: string | undefined
   text: string
 }
 
@@ -460,36 +486,54 @@ function foldAgentEvents(events: CIEvent[]): AgentEntry[] {
     // Tag every entry this event produces with a key stable across appends and
     // deterministic re-folds: the event seq plus its position within the event.
     const start = out.length
-    switch (ev.type) {
-      case "agent.turn.started": {
-        const turn = typeof d.turn === "number" ? d.turn : "?"
-        out.push({ kind: "turn", label: `Turn ${turn}`, text: asString(d.prompt) })
-        break
-      }
-      case "agent.turn.completed": {
-        const status = typeof d.status === "string" ? d.status : "done"
-        const bits = [`status: ${status}`]
-        if (typeof d.num_turns === "number" && d.num_turns > 0) bits.push(`${d.num_turns} steps`)
-        if (typeof d.duration_ms === "number" && d.duration_ms > 0)
-          bits.push(formatDuration(d.duration_ms))
-        if (typeof d.cost_usd === "number" && d.cost_usd > 0) bits.push(`$${d.cost_usd.toFixed(4)}`)
-        out.push({ kind: "result", label: "Turn complete", text: bits.join(" · ") })
-        break
-      }
-      case "agent.raw":
-        out.push({ kind: "raw", text: asString(d.line) })
-        break
-      case "agent.message":
-        if (d.mooncake) {
-          out.push(...foldMooncakeEvent(d.mooncake as Record<string, unknown>, mc, out))
-        } else {
-          out.push(...foldClaudeMessage(d.claude as Record<string, unknown> | undefined))
-        }
-        break
+    out.push(...foldOneAgentEvent(ev.type, d, mc, out))
+    for (let i = start; i < out.length; i++) {
+      const entry = out[i]
+      if (entry) entry.id = `${ev.seq}.${i - start}`
     }
-    for (let i = start; i < out.length; i++) out[i].id = `${ev.seq}.${i - start}`
   }
   return out
+}
+
+// foldOneAgentEvent dispatches one event to its case handler, pulled out to
+// module scope so the switch doesn't stack cognitive complexity on top of
+// the fold loop.
+function foldOneAgentEvent(
+  type: string,
+  d: Record<string, unknown>,
+  mc: MooncakeState,
+  out: AgentEntry[]
+): AgentEntry[] {
+  switch (type) {
+    case "agent.turn.started":
+      return [foldTurnStarted(d)]
+    case "agent.turn.completed":
+      return [foldTurnCompleted(d)]
+    case "agent.raw":
+      return [{ kind: "raw", text: asString(d["line"]) }]
+    case "agent.message":
+      return d["mooncake"]
+        ? foldMooncakeEvent(d["mooncake"] as Record<string, unknown>, mc, out)
+        : foldClaudeMessage(d["claude"] as Record<string, unknown> | undefined)
+    default:
+      return []
+  }
+}
+
+function foldTurnStarted(d: Record<string, unknown>): AgentEntry {
+  const turn = typeof d["turn"] === "number" ? d["turn"] : "?"
+  return { kind: "turn", label: `Turn ${turn}`, text: asString(d["prompt"]) }
+}
+
+function foldTurnCompleted(d: Record<string, unknown>): AgentEntry {
+  const status = typeof d["status"] === "string" ? d["status"] : "done"
+  const bits = [`status: ${status}`]
+  if (typeof d["num_turns"] === "number" && d["num_turns"] > 0) bits.push(`${d["num_turns"]} steps`)
+  if (typeof d["duration_ms"] === "number" && d["duration_ms"] > 0)
+    bits.push(formatDuration(d["duration_ms"]))
+  if (typeof d["cost_usd"] === "number" && d["cost_usd"] > 0)
+    bits.push(`$${d["cost_usd"].toFixed(4)}`)
+  return { kind: "result", label: "Turn complete", text: bits.join(" · ") }
 }
 
 // MooncakeState carries the in-flight mooncake steps across the fold: a step's
@@ -500,13 +544,16 @@ interface MooncakeState {
   // index is the step's row position in the fold's `out` array, so a later
   // step.completed mutates the same row the step.started pushed (the live ▶
   // line flips in place rather than appending a second row).
-  steps: Map<string, { action?: string; name?: string; lines: string[]; index: number }>
-  last?: string
+  steps: Map<
+    string,
+    { action?: string | undefined; name?: string | undefined; lines: string[]; index: number }
+  >
+  last?: string | undefined
   // The in-flight planner entry during the plan phase (#171). mooncake #76
   // streams the planner's output as planner.delta between plan.generating and
   // plan.loaded; we accumulate a run of same-kind deltas into one row (mutated
   // in place) and start a new row when the kind flips (text ⇄ thinking).
-  planner?: { index: number; kind: AgentEntry["kind"] }
+  planner?: { index: number; kind: AgentEntry["kind"] } | undefined
 }
 
 // foldMooncakeEvent turns one mooncake NDJSON event (data.mooncake on a
@@ -522,8 +569,8 @@ function foldMooncakeEvent(
   mc: MooncakeState,
   out: AgentEntry[]
 ): AgentEntry[] {
-  const type = typeof m.type === "string" ? m.type : ""
-  const data = (m.data as Record<string, unknown>) ?? {}
+  const type = typeof m["type"] === "string" ? m["type"] : ""
+  const data = (m["data"] ?? {}) as Record<string, unknown>
 
   switch (type) {
     case "plan.generating":
@@ -533,134 +580,181 @@ function foldMooncakeEvent(
       // so a re-plan iteration starts a new run of rows.
       mc.planner = undefined
       return []
-    case "planner.delta": {
-      // Live planner output. kind is "text" (the plan being written) or
-      // "thinking" (reasoning, rendered dimmed). Append to the current row when
-      // the kind matches; otherwise open a new row so the dim/normal styling
-      // tracks the kind. The first row of the block carries the "planning…"
-      // label so the reader knows the agent is mid-plan.
-      const text = asString(data.text)
-      if (!text) return []
-      const kind: AgentEntry["kind"] = data.kind === "thinking" ? "thinking" : "planning"
-      if (mc.planner && mc.planner.kind === kind) {
-        out[mc.planner.index].text += text
-        return []
-      }
-      const index = out.length
-      const label = mc.planner ? undefined : "planning…"
-      out.push({ kind, label, text })
-      mc.planner = { index, kind }
-      return []
-    }
-    case "plan.loaded": {
-      // The plan is final; close the planner block so any later delta (a
-      // re-plan iteration) opens a fresh row rather than appending here.
-      mc.planner = undefined
-      const n = data.total_steps
-      return [
-        { kind: "system", label: typeof n === "number" ? `plan · ${n} steps` : "plan", text: "" },
-      ]
-    }
-    case "step.started": {
-      const id = asString(data.step_id)
-      const name = typeof data.name === "string" ? data.name : ""
-      // Push the live row now (▶) and remember where it sits so step.completed
-      // can flip it in place.
-      const index = out.length
-      out.push({ kind: "step", status: "running", label: name || id || "step", text: "" })
-      mc.steps.set(id, {
-        action: typeof data.action === "string" ? data.action : undefined,
-        name: name || undefined,
-        lines: [],
-        index,
-      })
-      mc.last = id
-      return []
-    }
+    case "planner.delta":
+      return foldPlannerDelta(data, mc, out)
+    case "plan.loaded":
+      return foldPlanLoaded(data, mc)
+    case "step.started":
+      return foldStepStarted(data, mc, out)
     case "step.stdout":
-    case "step.stderr": {
-      const id = data.step_id ? asString(data.step_id) : mc.last
-      const step = id ? mc.steps.get(id) : undefined
-      if (step) step.lines.push(asString(data.line))
-      return []
-    }
+    case "step.stderr":
+      return foldStepOutput(data, mc)
     case "file.created":
     case "file.modified":
-    case "file.deleted": {
-      // file.* carries no step_id; attach to the step in flight.
-      const step = mc.last ? mc.steps.get(mc.last) : undefined
-      if (step) step.lines.push(`${type.slice("file.".length)} ${asString(data.path)}`)
-      return []
-    }
+    case "file.deleted":
+      return foldFileEvent(type, data, mc)
     case "step.completed":
     case "step.failed":
-    case "step.skipped": {
-      const id = asString(data.step_id)
-      const tracked = mc.steps.get(id)
-      mc.steps.delete(id)
-      const result = (data.result as Record<string, unknown>) ?? {}
-      const action = tracked?.action ?? (typeof data.action === "string" ? data.action : "")
-      // Resolve the terminal status from the event type or the result payload.
-      const status: StepStatus =
-        type === "step.failed" || result.failed || result.status === "failed"
-          ? "failed"
-          : type === "step.skipped" || result.status === "skipped"
-            ? "skipped"
-            : result.status === "changed"
-              ? "changed"
-              : "ok"
-      const row = tracked ? out[tracked.index] : undefined
-      if (!row) return []
-      row.status = status
-      // Details surface only on failure — keep the success log a clean list.
-      if (status === "failed") {
-        const lines: string[] = []
-        // For cmd/shell steps the executed command rides result.target (the
-        // rendered argv); lead with it as a `$ …` line so a failure shows what
-        // actually ran. Other actions put a path/package in target — skip it.
-        const cmdline = action === "cmd" || action === "shell" ? asString(result.target) : ""
-        if (cmdline) lines.push(`$ ${cmdline}`)
-        lines.push(...(tracked?.lines ?? []))
-        const err = asString(result.error) || asString(data.error_message)
-        if (err) lines.push(err)
-        row.text = lines.join("\n")
-      }
-      return []
-    }
-    case "run.completed": {
-      const num = (k: string) => (typeof data[k] === "number" ? (data[k] as number) : 0)
-      const bits = [`ok=${num("success_steps")}`, `changed=${num("changed_steps")}`]
-      if (num("skipped_steps") > 0) bits.push(`skipped=${num("skipped_steps")}`)
-      bits.push(`failed=${num("failed_steps")}`)
-      if (num("duration_ms") > 0) bits.push(formatDuration(num("duration_ms")))
-      return [{ kind: "result", label: "RECAP", text: bits.join("  ") }]
-    }
-    case "agent.completed": {
-      // The mooncake agent wraps one or more plan/execute loops; status +
-      // stop_reason already ride the "Turn complete" line, but the iteration
-      // count is shown nowhere else. Surface it only when it actually
-      // re-planned (>1) or stopped for a non-success reason — otherwise noise.
-      const iterations = typeof data.iterations === "number" ? data.iterations : 0
-      const stop = typeof data.stop_reason === "string" ? data.stop_reason : ""
-      const bits: string[] = []
-      if (iterations > 1) bits.push(`${iterations} iterations`)
-      if (stop && stop !== "success") bits.push(stop)
-      if (bits.length === 0) return []
-      return [{ kind: "system", label: "mooncake", text: bits.join(" · ") }]
-    }
+    case "step.skipped":
+      return foldStepTerminal(type, data, mc, out)
+    case "run.completed":
+      return foldRunCompleted(data)
+    case "agent.completed":
+      return foldAgentCompleted(data)
     default:
       // run.started, etc — redundant with the above / the turn line.
       return []
   }
 }
 
+// Live planner output. kind is "text" (the plan being written) or "thinking"
+// (reasoning, rendered dimmed). Append to the current row when the kind
+// matches; otherwise open a new row so the dim/normal styling tracks the
+// kind. The first row of the block carries the "planning…" label so the
+// reader knows the agent is mid-plan.
+function foldPlannerDelta(
+  data: Record<string, unknown>,
+  mc: MooncakeState,
+  out: AgentEntry[]
+): AgentEntry[] {
+  const text = asString(data["text"])
+  if (!text) return []
+  const kind: AgentEntry["kind"] = data["kind"] === "thinking" ? "thinking" : "planning"
+  if (mc.planner && mc.planner.kind === kind) {
+    const row = out[mc.planner.index]
+    if (row) row.text += text
+    return []
+  }
+  const index = out.length
+  const label = mc.planner ? undefined : "planning…"
+  out.push({ kind, label, text })
+  mc.planner = { index, kind }
+  return []
+}
+
+// The plan is final; close the planner block so any later delta (a re-plan
+// iteration) opens a fresh row rather than appending here.
+function foldPlanLoaded(data: Record<string, unknown>, mc: MooncakeState): AgentEntry[] {
+  mc.planner = undefined
+  const n = data["total_steps"]
+  return [{ kind: "system", label: typeof n === "number" ? `plan · ${n} steps` : "plan", text: "" }]
+}
+
+// Push the live row now (▶) and remember where it sits so step.completed
+// can flip it in place.
+function foldStepStarted(
+  data: Record<string, unknown>,
+  mc: MooncakeState,
+  out: AgentEntry[]
+): AgentEntry[] {
+  const id = asString(data["step_id"])
+  const name = typeof data["name"] === "string" ? data["name"] : ""
+  const index = out.length
+  out.push({ kind: "step", status: "running", label: name || id || "step", text: "" })
+  mc.steps.set(id, {
+    action: typeof data["action"] === "string" ? data["action"] : undefined,
+    name: name || undefined,
+    lines: [],
+    index,
+  })
+  mc.last = id
+  return []
+}
+
+function foldStepOutput(data: Record<string, unknown>, mc: MooncakeState): AgentEntry[] {
+  const id = data["step_id"] ? asString(data["step_id"]) : mc.last
+  const step = id ? mc.steps.get(id) : undefined
+  if (step) step.lines.push(asString(data["line"]))
+  return []
+}
+
+// file.* carries no step_id; attach to the step in flight.
+function foldFileEvent(
+  type: string,
+  data: Record<string, unknown>,
+  mc: MooncakeState
+): AgentEntry[] {
+  const step = mc.last ? mc.steps.get(mc.last) : undefined
+  if (step) step.lines.push(`${type.slice("file.".length)} ${asString(data["path"])}`)
+  return []
+}
+
+// Resolves the terminal status from the event type or the result payload.
+function resolveStepStatus(type: string, result: Record<string, unknown>): StepStatus {
+  if (type === "step.failed" || result["failed"] || result["status"] === "failed") return "failed"
+  if (type === "step.skipped" || result["status"] === "skipped") return "skipped"
+  if (result["status"] === "changed") return "changed"
+  return "ok"
+}
+
+// Details surface only on failure — keep the success log a clean list.
+function failureLines(
+  action: string,
+  result: Record<string, unknown>,
+  data: Record<string, unknown>,
+  tracked: { lines: string[] } | undefined
+): string {
+  const lines: string[] = []
+  // For cmd/shell steps the executed command rides result.target (the
+  // rendered argv); lead with it as a `$ …` line so a failure shows what
+  // actually ran. Other actions put a path/package in target — skip it.
+  const cmdline = action === "cmd" || action === "shell" ? asString(result["target"]) : ""
+  if (cmdline) lines.push(`$ ${cmdline}`)
+  lines.push(...(tracked?.lines ?? []))
+  const err = asString(result["error"]) || asString(data["error_message"])
+  if (err) lines.push(err)
+  return lines.join("\n")
+}
+
+function foldStepTerminal(
+  type: string,
+  data: Record<string, unknown>,
+  mc: MooncakeState,
+  out: AgentEntry[]
+): AgentEntry[] {
+  const id = asString(data["step_id"])
+  const tracked = mc.steps.get(id)
+  mc.steps.delete(id)
+  const result = (data["result"] ?? {}) as Record<string, unknown>
+  const action = tracked?.action ?? (typeof data["action"] === "string" ? data["action"] : "")
+  const status = resolveStepStatus(type, result)
+  const row = tracked ? out[tracked.index] : undefined
+  if (!row) return []
+  row.status = status
+  if (status === "failed") row.text = failureLines(action, result, data, tracked)
+  return []
+}
+
+function foldRunCompleted(data: Record<string, unknown>): AgentEntry[] {
+  const num = (k: string) => (typeof data[k] === "number" ? (data[k] as number) : 0)
+  const bits = [`ok=${num("success_steps")}`, `changed=${num("changed_steps")}`]
+  if (num("skipped_steps") > 0) bits.push(`skipped=${num("skipped_steps")}`)
+  bits.push(`failed=${num("failed_steps")}`)
+  if (num("duration_ms") > 0) bits.push(formatDuration(num("duration_ms")))
+  return [{ kind: "result", label: "RECAP", text: bits.join("  ") }]
+}
+
+// The mooncake agent wraps one or more plan/execute loops; status +
+// stop_reason already ride the "Turn complete" line, but the iteration count
+// is shown nowhere else. Surface it only when it actually re-planned (>1) or
+// stopped for a non-success reason — otherwise noise.
+function foldAgentCompleted(data: Record<string, unknown>): AgentEntry[] {
+  const iterations = typeof data["iterations"] === "number" ? data["iterations"] : 0
+  const stop = typeof data["stop_reason"] === "string" ? data["stop_reason"] : ""
+  const bits: string[] = []
+  if (iterations > 1) bits.push(`${iterations} iterations`)
+  if (stop && stop !== "success") bits.push(stop)
+  if (bits.length === 0) return []
+  return [{ kind: "system", label: "mooncake", text: bits.join(" · ") }]
+}
+
 // foldClaudeMessage turns one claude stream-json object into zero or more
 // transcript entries.
 function foldClaudeMessage(obj: Record<string, unknown> | undefined): AgentEntry[] {
-  if (!obj || typeof obj.type !== "string") return []
-  switch (obj.type) {
+  if (!obj || typeof obj["type"] !== "string") return []
+  switch (obj["type"]) {
     case "system":
-      return [{ kind: "system", label: "session", text: asString(obj.model ?? obj.subtype) }]
+      return [{ kind: "system", label: "session", text: asString(obj["model"] ?? obj["subtype"]) }]
     case "assistant":
     case "user":
       return foldMessageContent(obj)
@@ -672,27 +766,27 @@ function foldClaudeMessage(obj: Record<string, unknown> | undefined): AgentEntry
 }
 
 function foldMessageContent(obj: Record<string, unknown>): AgentEntry[] {
-  const message = obj.message as { content?: unknown } | undefined
+  const message = obj["message"] as { content?: unknown } | undefined
   const content = message?.content
   if (!Array.isArray(content)) return []
   const out: AgentEntry[] = []
   for (const block of content) {
     if (!block || typeof block !== "object") continue
     const b = block as Record<string, unknown>
-    switch (b.type) {
+    switch (b["type"]) {
       case "text":
-        out.push({ kind: "assistant", text: asString(b.text) })
+        out.push({ kind: "assistant", text: asString(b["text"]) })
         break
       case "thinking":
-        out.push({ kind: "thinking", label: "thinking", text: asString(b.thinking) })
+        out.push({ kind: "thinking", label: "thinking", text: asString(b["thinking"]) })
         break
       case "tool_use":
         // Compact, like a terminal action line — the name is the signal; the
         // input args are dropped to keep the log scannable (details-on-failure).
-        out.push({ kind: "tool_use", label: `🔧 ${asString(b.name)}`, text: "" })
+        out.push({ kind: "tool_use", label: `🔧 ${asString(b["name"])}`, text: "" })
         break
       case "tool_result":
-        out.push({ kind: "tool_result", label: "result", text: asString(b.content) })
+        out.push({ kind: "tool_result", label: "result", text: asString(b["content"]) })
         break
     }
   }

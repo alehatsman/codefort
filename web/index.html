@@ -11,11 +11,13 @@
       // resolves to monokai. "monokai-web"/"monokai-code" are legacy ids from
       // the earlier 3-scheme selector (the latter mapped to github/base).
       try {
-        var t = localStorage.getItem("moongit:theme")
+        const t = localStorage.getItem("moongit:theme")
         if (t !== "github" && t !== "monokai-code") {
           document.documentElement.setAttribute("data-theme", "monokai")
         }
-      } catch (e) {}
+      } catch {
+        // localStorage can throw (e.g. Safari private mode) — default theme is fine.
+      }
     </script>
   </head>
   <body>

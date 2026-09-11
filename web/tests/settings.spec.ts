@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import { mockApi, seedToken } from "./mockApi"
 
 test.beforeEach(async ({ page }) => {
@@ -205,7 +205,7 @@ test("agent section sets the default execution model", async ({ page }) => {
   await expect(select).toHaveValue("") // server default
 
   const putReq = page.waitForRequest(
-    (r) => r.url().includes("/api/settings/agent") && r.method() === "PUT",
+    (r) => r.url().includes("/api/settings/agent") && r.method() === "PUT"
   )
   await select.selectOption("mooncake-agent")
   expect((await putReq).postDataJSON()).toMatchObject({ execution_model: "mooncake-agent" })

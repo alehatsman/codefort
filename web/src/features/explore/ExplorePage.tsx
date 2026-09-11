@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import "./explore.css"
-import { Link, useParams } from "react-router-dom"
 import { useMutation, useQueries } from "@tanstack/react-query"
+import { Link, useParams } from "react-router-dom"
 import { api } from "@/api/client"
 import {
   keys,
@@ -11,9 +11,6 @@ import {
   useIntelSummaries,
   useRepo,
 } from "@/api/queries"
-import OverviewCard from "@/shell/OverviewCard"
-import { Button, EmptyState, ErrorMessage, Input, RelativeTime, Spinner } from "@/ui"
-import { absoluteTime, timeAgo } from "@/shell/timeAgo"
 import type {
   Commit,
   IntelPackageGraph,
@@ -22,6 +19,9 @@ import type {
   IntelSearchKind,
   IntelSearchResult,
 } from "@/api/types"
+import OverviewCard from "@/shell/OverviewCard"
+import { absoluteTime, timeAgo } from "@/shell/timeAgo"
+import { Button, EmptyState, ErrorMessage, Input, RelativeTime, Spinner } from "@/ui"
 
 /**
  * Explore tab: the single human-facing "what is this codebase" home, merged
@@ -180,7 +180,7 @@ function Hero({
 }: {
   repo: string
   project: IntelProject
-  summary?: string
+  summary?: string | undefined
   loading: boolean
 }) {
   const composed = Math.max(0, project.chunks - project.pending_summaries)
@@ -235,8 +235,9 @@ function Hotspots({
 }) {
   const ranked = useMemo(() => {
     return packages
-      .filter((p) => p.path !== "." && p.path !== "" && lastCommitByPath[p.path])
+      .filter((p) => p.path !== "." && p.path !== "")
       .map((p) => ({ pkg: p, commit: lastCommitByPath[p.path] }))
+      .filter((x): x is { pkg: IntelPackageSummary; commit: Commit } => x.commit !== undefined)
       .sort((a, b) => Date.parse(b.commit.date) - Date.parse(a.commit.date))
       .slice(0, 6)
   }, [packages, lastCommitByPath])
@@ -293,7 +294,7 @@ interface MapProps {
   owner: string
   repo: string
   packages: IntelPackageSummary[]
-  graph?: IntelPackageGraph
+  graph?: IntelPackageGraph | undefined
   graphLoading: boolean
   lastCommitByPath: Record<string, Commit>
   loading: boolean
@@ -392,7 +393,7 @@ interface PkgRef {
 interface PkgCard extends PkgRef {
   pkg: string
   summary: string
-  commit?: Commit
+  commit?: Commit | undefined
   inDegree: number
   outDegree: number
   uses: PkgRef[]
@@ -693,7 +694,7 @@ function tierLabel(rank: number, maxRank: number): string {
 function deriveModulePrefix(paths: string[]): string {
   if (paths.length === 0) return ""
   const byHead = new Map<string, string[]>()
-  for (const p of paths) pushTo(byHead, p.split("/")[0], p)
+  for (const p of paths) pushTo(byHead, p.split("/")[0] ?? p, p)
   let largest: string[] = []
   for (const group of byHead.values()) if (group.length > largest.length) largest = group
   return commonPathPrefix(largest)
@@ -704,7 +705,7 @@ function deriveModulePrefix(paths: string[]): string {
 // import path to its repo-relative directory.
 function commonPathPrefix(paths: string[]): string {
   if (paths.length === 0) return ""
-  let parts = paths[0].split("/")
+  let parts = (paths[0] ?? "").split("/")
   for (const p of paths) {
     const ps = p.split("/")
     let i = 0
@@ -730,7 +731,7 @@ function PackageCard({
   owner: string
   repo: string
   pkg: IntelPackageSummary
-  commit?: Commit
+  commit?: Commit | undefined
 }) {
   return (
     <details className="pkg-card">

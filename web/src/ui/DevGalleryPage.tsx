@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import type { BadgeState, ButtonVariant, StatusGlyph } from "@/ui"
 import {
   Avatar,
   Badge,
@@ -48,7 +49,6 @@ import {
   Tooltip,
   useToast,
 } from "@/ui"
-import type { BadgeState, ButtonVariant, StatusGlyph } from "@/ui"
 
 /**
  * Living gallery for the base UI primitives — an in-repo alternative to
@@ -654,7 +654,14 @@ function PaginationSection() {
       <p className="gallery__sublabel">120 items, 15 per page — prev/next with range</p>
       <Pagination page={page} pageSize={15} total={120} onPageChange={setPage} />
       <p className="gallery__sublabel">Single page (total ≤ pageSize) renders nothing</p>
-      <Pagination page={1} pageSize={15} total={10} onPageChange={() => {}} />
+      <Pagination
+        page={1}
+        pageSize={15}
+        total={10}
+        onPageChange={() => {
+          // Gallery demo: renders nothing at a single page, so this never fires.
+        }}
+      />
     </Section>
   )
 }
@@ -747,12 +754,7 @@ function DataSection() {
         </DataState>
       </Section>
       <Section title="DataList — data">
-        <DataList
-          data={GALLERY_ITEMS}
-          isLoading={false}
-          error={null}
-          empty="No items."
-        >
+        <DataList data={GALLERY_ITEMS} isLoading={false} error={null} empty="No items.">
           {(items) =>
             items.map((item) => (
               <ListRow key={item.id} to="#" title={item.label} meta={`id=${item.id}`} />
