@@ -47,10 +47,18 @@ git-hosting, issues, and pull-requests specs defer to it.
 - WHILE a single Basic credential is configured, the git smart-HTTP surface and
   the web UI require it; unset, they stay open. The `/api` surface always uses
   its own bearer auth regardless, and `/healthz` is always open.
-- WHILE a valid token is present, the data plane is open: any token may mint or
-  revoke tokens, create/update/delete issues and PRs, and claim work. Ordering
-  and ownership come from the claim lock and author-only deletes, not from
-  per-token permissions.
+- WHILE a valid token is present, the data plane is open by default: any token
+  may mint or revoke tokens, create/update/delete issues and PRs, and claim work.
+  Ordering and ownership come from the claim lock and author-only deletes, not
+  from per-token permissions. The one exception is a repo explicitly marked
+  private, whose coarse owner/write/read grants are the access-control spec's
+  domain.
+- WHERE a token belongs to a user account, that account — not the token's name —
+  is the principal an access check resolves. The two differ on purpose: a login
+  mints a token named `<user>-session` so a browser session is revocable on its
+  own, while the account behind it is what owns repos and holds memberships.
+  Tokens with no linked account (admin-provisioned, and ephemeral per-run agent
+  tokens) fall back to matching on their name.
 - WHERE a run needs to act as itself, an ephemeral per-run token is minted with a
   deterministic name and revoked when the run finalizes, so automated actors get
   the same attributable identity without a long-lived secret.
@@ -63,9 +71,13 @@ git-hosting, issues, and pull-requests specs defer to it.
   only states that the claim — not a permission model — is what serializes it.
 - **Agent credential injection.** How a run's token (and LLM/dex creds) are wired
   into a container is the agent-runs spec; here only the mint/revoke contract.
-- **Roles, scopes, per-resource authorization, multi-user accounts.** Local-trust
-  is the design: tokens are identities, not principals with permissions, and
-  there is deliberately no RBAC, no per-repo ACL, and no scoped/expiring token.
+- **Roles, scopes, and per-resource authorization.** Local-trust is the design:
+  tokens are identities, and there is deliberately no RBAC matrix, no per-resource
+  ACL, and no scoped or expiring token.
+- **Accounts, repo visibility, and membership.** User accounts, password login,
+  and the coarse owner/write/read grants layered on top of this posture are the
+  access-control spec. This spec owns the token contract those checks consume —
+  minting, hashing, revocation, and the attribution stamp — not the grants.
 - **Transport encryption.** TLS/termination is an operator/deployment concern,
   not specified here.
 
@@ -78,6 +90,7 @@ git-hosting, issues, and pull-requests specs defer to it.
 - [x] Revocation takes effect immediately; debounced last-used updates
 - [x] whoami + full token list (active + revoked) to any authed caller
 - [x] Optional Basic gates git + web; `/api` bearer + open `/healthz` regardless
-- [x] Open data plane; claims + author-only deletes are the social locks
+- [x] Open data plane by default; claims + author-only deletes are the social locks
+- [x] Account (not token name) is the principal; unlinked tokens match by name
 - [x] Ephemeral per-run token, deterministic name, revoked on finalize
 - [ ] Verified against the code by the verify workflow (flip to `living`)

@@ -29,6 +29,30 @@ Rate limiting (per client IP, when `MOONGIT_RATE_LIMIT > 0`) wraps both the
 authed and public `/api` surfaces and answers `429` with the standard error
 envelope.
 
+### Repo access
+
+Every route under `/api/repos/{owner}/{repo}/…` passes through one access gate
+(`internal/server/access.go`) before it reaches its handler. The rules are
+coarse — see [specs/access-control.md](../specs/access-control.md):
+
+- A **public** repo (the default for every repo) is readable and writable by any
+  authenticated caller. This is the local-trust posture and is unchanged.
+- A **private** repo requires the caller to be its owner or to hold a member
+  row. `GET`/`HEAD`/`OPTIONS` need read access; every other method needs the
+  `write` role.
+
+Two status codes carry meaning here:
+
+| Status | Means |
+| --- | --- |
+| `404` | The repo does not exist **or** the caller has no read access. Deliberately indistinguishable — a `403` would confirm a private repo exists. |
+| `403` | The caller can read but not write. Existence is already no secret from them, so naming the missing grant is the useful answer. |
+
+The principal an access check resolves is the token's **account**, not the
+token's name — a session token named `alice-session` resolves to `alice`. Tokens
+with no linked account (admin-provisioned, and per-run agent tokens) match by
+name.
+
 ## Request and response conventions
 
 - Requests and responses are JSON (`Content-Type: application/json` on

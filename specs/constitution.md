@@ -23,8 +23,14 @@ one place is what lets the rest of the specs stay short.
   operate.
 - WHERE access is gated, the posture is local-trust: a valid token is the bar
   (authentication for attribution and a network gate), and the data plane is
-  intentionally open — coordination comes from the claim lock and author-only
+  open by default — coordination comes from the claim lock and author-only
   deletes, not from roles or per-resource authorization.
+- WHERE a team wants less than that openness, a repo may be marked private and
+  granted to named accounts with a coarse owner/write/read role, enforced
+  uniformly on both the API and the git transport (access-control). This is a
+  convenience layered on local-trust, not a replacement for it: it is opt-in,
+  every repo is public by default, and the vocabulary stops at three roles —
+  the *grid* of per-user, per-resource rules stays out.
 - WHEN any write occurs, it is attributed to the acting token's identity; agents
   act under distinct identities and coordinate claim-first, so concurrent actors
   serialize without a central scheduler.
@@ -53,10 +59,15 @@ one place is what lets the rest of the specs stay short.
 
 ## Non-goals
 
-- **A public, multi-tenant forge.** No per-user accounts, org/permission models,
-  forks, or abuse controls. moongit hosts a known fleet's repos on a trusted box.
-- **An authorization system.** Roles, scopes, per-repo ACLs, and expiring/scoped
-  tokens are deliberately absent under local-trust (see identity-and-tokens).
+- **A public, multi-tenant forge.** No org hierarchy, forks, or abuse controls.
+  moongit hosts a known fleet's repos on a trusted box. Named accounts exist, but
+  as identities and coarse grantees — not as tenants.
+- **A fine-grained authorization system.** Coarse repo access (owner/write/read)
+  is the ceiling; per-resource ACLs, custom roles, scopes, and expiring/scoped
+  tokens are deliberately absent (see access-control and identity-and-tokens).
+  The distinction that matters: a handful of optional, coarse grants is a
+  convenience, while a permission matrix would make authorization load-bearing,
+  which local-trust exists to avoid.
 - **Horizontal scale / high availability.** The single-binary, single-writer
   design targets one box; clustering, replication, and failover are out of scope
   (any such effort is a separate, explicitly-flagged design).
@@ -69,6 +80,7 @@ one place is what lets the rest of the specs stay short.
 
 - [x] Single binary serves /api + git smart-HTTP + SPA + in-process runner, one port
 - [x] Local-trust: valid token = the bar; open data plane; claims are the social lock
+- [x] Optional coarse repo access (private + owner/write/read), enforced on API and git
 - [x] Every write attributed to the acting identity; claim-first coordination
 - [x] Git as source of truth; worktree-free server ops; PR-advanced main; append-only
 - [x] Pull-based SSE feed; no outbound webhooks

@@ -184,5 +184,4 @@ container.
 
 ## License
 
-Copyright (c) 2026 Aleh Atsman. No `LICENSE` file is checked in yet —
-add one before distributing.
+MIT — see [`LICENSE`](LICENSE). Copyright (c) 2026 Aleh Atsman.
