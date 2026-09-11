@@ -6,6 +6,7 @@ covers:
   - "internal/server/ci.go"
   - "internal/server/ci_hook.go"
   - "cmd/moongitd/ci_runner.go"
+  - "cmd/moongitd/cron_scheduler.go"
   - "internal/ci/**"
   - "internal/storage/ci.go"
 ---
@@ -40,6 +41,24 @@ unbounded history. Agent runs reuse this same claim/lease/execute spine.
   loopback and carry the per-process CI secret; it lives off the Bearer `/api`
   surface, and the secret is injected into the push hook's environment, never
   written to disk.
+- WHILE the daemon runs, a scheduler ticks every 30 seconds — deliberately
+  sub-minute, since a minute-aligned tick that drifts by a second would step over
+  a one-minute cron window and silently skip a fire.
+- WHEN the scheduler ticks, it reconciles each CI-enabled repo's stored schedule
+  entries against the schedule declared by the pipeline at HEAD: entries the
+  pipeline no longer declares are dropped, new ones are added, and an entry that
+  survives keeps its last-fired time — so editing an unrelated schedule never
+  resets the others.
+- WHEN a schedule entry's next occurrence has come due, the daemon enqueues a run
+  for the repo's current HEAD commit with event `schedule`, recording which cron
+  expression fired it, and stamps the fire time so the same window cannot fire
+  twice. An entry that has never fired is measured from one tick ago, so adding a
+  schedule does not immediately backfire every missed occurrence.
+- WHERE a repo has CI disabled, has no commits, or declares no pipeline at HEAD,
+  nothing is scheduled — and a repo whose pipeline stopped declaring schedules has
+  its stored entries cleared. IF the pipeline at HEAD is unparseable, or a cron
+  expression is invalid, the scheduler leaves the stored entries alone and fires
+  nothing rather than guessing.
 - WHEN the runner picks up a queued run, it executes only if the repo is
   CI-enabled and a pipeline file exists at that commit; otherwise the run is
   marked canceled (not failed) — a commit carrying no pipeline is a no-op.
@@ -101,4 +120,8 @@ unbounded history. Agent runs reuse this same claim/lease/execute spine.
 - [x] Startup orphan reconcile + container reap; graceful shutdown drain
 - [x] Per-repo run retention pruning rows + on-disk logs
 - [x] Run list/get + resumable per-job SSE event stream
+- [x] 30-second scheduler tick (sub-minute so a cron window is never skipped)
+- [x] Per-repo schedule reconcile against the pipeline at HEAD; last-fired preserved
+- [x] Due entries enqueue a `schedule` run at HEAD, recording the firing expression
+- [x] CI-disabled / no-commit / no-pipeline / unparseable repos schedule nothing
 - [ ] Verified against the code by the verify workflow (flip to `living`)

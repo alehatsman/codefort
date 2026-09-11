@@ -8,6 +8,7 @@ covers:
   - "internal/server/code_comments.go"
   - "internal/storage/pulls.go"
   - "internal/storage/code_comments.go"
+  - "internal/storage/pr_reviews.go"
 ---
 # Pull Requests & Review
 
@@ -73,6 +74,19 @@ conflict rules, not from access gates.
   has since moved or vanished simply renders without a snippet.
 - WHILE a review comment exists, only its author may resolve/unresolve or delete
   it; listing can scope to open (default), resolved, or all.
+- WHEN a reviewer submits a verdict on a PR, it is either an approval or a
+  request for changes — no other value is accepted — and the reviewer identity is
+  stamped from the token, not the request body.
+- WHERE a reviewer has already reviewed a PR, submitting again replaces their
+  previous verdict rather than appending: one standing verdict per reviewer, so
+  the current review state is the set of reviewers and where each one landed, and
+  changing your mind is the normal path.
+- WHEN a PR is fetched, the response carries the current verdicts alongside the
+  compare and the anchored comments, so review state is read in one round-trip.
+- WHILE verdicts are recorded and emitted to the fleet feed, they do **not** gate
+  the merge endpoint: an outstanding changes-requested verdict, or no verdict at
+  all, still merges. Review state is advisory signal, consistent with the
+  local-trust posture — git ancestry and conflicts are the only hard gates.
 
 ## Non-goals
 
@@ -85,7 +99,8 @@ conflict rules, not from access gates.
 - **Diff/compare computation.** Producing the commit/file diff is the shared
   code-browse machinery (git-hosting); here the compare is consumed, not
   specified.
-- **Branch protection, required reviews, approvals.** No merge gating, no
+- **Branch protection and required reviews.** Approvals are recorded (above) but
+  enforce nothing: no merge gating, no required-approval count, no
   draft/auto-merge, no CODEOWNERS. Local-trust: the merge is allowed when git
   says it is mergeable, full stop.
 
@@ -104,4 +119,8 @@ conflict rules, not from access gates.
 - [ ] CI run + merge event enqueued on a server-side merge (#256)
 - [x] Merged base branch mirror-pushed to a configured `mirror` remote (best-effort, non-forced)
 - [ ] Server-side rebase of head onto base, worktree-free (#257)
+- [x] Approve / request-changes verdicts with token-stamped reviewer; invalid states rejected
+- [x] One standing verdict per reviewer — re-submitting replaces it
+- [x] Verdicts surfaced on the PR detail response and emitted to the feed
+- [ ] Review state is advisory only — the merge endpoint does not consult it (known gap)
 - [ ] Verified against the code by the verify workflow (flip to `living`)

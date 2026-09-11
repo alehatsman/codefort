@@ -7,6 +7,7 @@ covers:
   - "internal/server/comments.go"
   - "internal/storage/issues.go"
   - "internal/storage/dependencies.go"
+  - "cmd/moongit/main.go"
 ---
 # Issues & Claim-First Coordination
 
@@ -54,6 +55,27 @@ token may write); the claim is the social contract that keeps it orderly.
 - WHILE a request carries a valid token, any identity may create, update, delete,
   or claim issues — the claim, not per-issue ownership of the data, is what
   serializes work.
+
+### Labels
+
+Labels are the one piece of free-form taxonomy on an issue — cheap to add, with
+no registry to keep in sync.
+
+- WHEN a client creates an issue with labels, they are stored as given; an issue
+  with no labels reports an empty set, never a null one, so a client never has to
+  special-case "never labeled."
+- WHERE an update carries a label set, that set **replaces** the issue's labels
+  wholesale; omitting labels leaves them untouched, and an explicitly empty set
+  clears them. The difference between "not mentioned" and "cleared" is deliberate
+  — a partial edit of title or state can never silently drop an issue's labels.
+- WHEN a client lists issues filtered by a label, only issues carrying that exact
+  label (case-sensitive, one label per request) are returned; the filter composes
+  with state/assignee/author/query and applies to both a repo's backlog and the
+  cross-repo aggregate feed.
+- WHILE labels stay free-form strings, there is no per-repo label registry,
+  colour, or description to administer — a label exists because an issue carries
+  it. That is why the labels ride on the issue itself as a JSON array rather than
+  a join table: 0-N tags without a second entity and its own CRUD surface.
 
 ### Typed edges between issues
 
@@ -119,8 +141,10 @@ is never needed.
 - **Hard authorization & roles.** No per-repo permissions, no admin override on
   claims, no locking down delete. The open data plane is deliberate; the claim is
   advisory. Identity hardening lives in the auth/tokens spec.
-- **Labels, milestones, assignment to multiple users.** moongit issues are
+- **Milestones, multi-assignee, a managed label taxonomy.** moongit issues stay
   deliberately thin: one assignee (the claimant), four states, free-text body.
+  Labels exist (above) but only as free-form tags on the issue — no label
+  registry, colours, descriptions, or rename/merge operations.
 
 ## Checklist
 
@@ -135,4 +159,7 @@ is never needed.
 - [x] depends-on edges: add/remove, self + cycle rejection, edges in single-issue GET, cleared on delete
 - [x] Computed `ready` / `blocked` backlog views over the dependency graph; mutually exclusive
 - [x] Native epic rollup: child-completion progress on single GET + `epics` list view
+- [x] Free-form labels on create; replace-whole-set on update (nil = no change, empty = clear)
+- [x] Labels stored on the issue as a JSON array — no label table, no registry
+- [x] Exact-match label filter on both the per-repo and cross-repo issue lists
 - [ ] Verified against the code by the verify workflow (flip to `living`)
