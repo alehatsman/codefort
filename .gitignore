@@ -32,3 +32,7 @@ agent/mooncake
 # index (dex indexes nothing without an [index].include list).
 .dex/*
 !.dex/config.toml
+
+# Playwright run artifacts (root + web)
+test-results/
+.playwright-mcp/
