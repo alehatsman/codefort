@@ -131,12 +131,13 @@ func (k RunKind) IsAgent() bool {
 	return false
 }
 
-// Agent execution models (#110): the pluggable strategy an agent run uses
-// inside its container. Canonical here so storage (default), the server
-// (validation), and the runner (executor selection) share one vocabulary.
+// Agent execution model (#110): the strategy an agent run uses inside its
+// container. Canonical here so storage (default), the server (validation),
+// and the runner (executor selection) share one vocabulary. claude-edit is
+// currently the only model; the constant/type stayed pluggable in shape so a
+// future model can be added without a storage reshape.
 const (
-	ExecModelClaudeEdit    = "claude-edit"
-	ExecModelMooncakeAgent = "mooncake-agent"
+	ExecModelClaudeEdit = "claude-edit"
 	// DefaultExecutionModel seeds runs that don't specify one (and the
 	// column default for pre-#110 / CI rows).
 	DefaultExecutionModel = ExecModelClaudeEdit
@@ -192,14 +193,10 @@ type CIRun struct {
 	Number      int
 	Kind        RunKind // ci (default) | agent
 	IssueNumber *int    // the issue an agent run serves; nil for CI runs
-	// ExecutionModel is the agent run's pluggable execution model
-	// ('claude-edit' | 'mooncake-agent'); 'claude-edit' for CI rows by
-	// the column default, unused by CI (#110).
+	// ExecutionModel is the agent run's execution model ('claude-edit'
+	// today); 'claude-edit' for CI rows by the column default, unused by CI
+	// (#110).
 	ExecutionModel string
-	// MooncakeAllowShell, when set at spawn, drops the default shell/cmd denial
-	// from the mooncake-agent policy for this run only (#110). Ignored by
-	// claude-edit / CI.
-	MooncakeAllowShell bool
 	// ToolProfile names the mgit MCP toolset slice this agent run sees
 	// ('full' | 'review'); 'full' for CI rows by the column default (#184).
 	ToolProfile string
@@ -240,9 +237,6 @@ type NewRun struct {
 	// ExecutionModel is the agent execution model; empty falls back to the
 	// column default ('claude-edit'). Set only for agent runs (#110).
 	ExecutionModel string
-	// MooncakeAllowShell overrides the default shell/cmd denial for this
-	// mooncake-agent run (#110). Set only for agent runs.
-	MooncakeAllowShell bool
 	// ToolProfile names the mgit MCP toolset slice for this agent run
 	// ('full' | 'review'); empty falls back to the column default ('full').
 	// Set only for agent runs (#184).
@@ -282,19 +276,15 @@ func EnqueueRun(db *sql.DB, repoID int64, r NewRun) (CIRun, error) {
 	if execModel == "" {
 		execModel = DefaultExecutionModel
 	}
-	allowShell := 0
-	if r.MooncakeAllowShell {
-		allowShell = 1
-	}
 	profile := r.ToolProfile
 	if profile == "" {
 		profile = DefaultToolProfile
 	}
 	run, err := scanRun(tx.QueryRow(`
-		INSERT INTO ci_runs(repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, tool_profile, commit_sha, commit_msg, commit_author, ref, event, trigger, status, spec_path)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO ci_runs(repo_id, number, kind, issue_number, execution_model, tool_profile, commit_sha, commit_msg, commit_author, ref, event, trigger, status, spec_path)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING `+runColumns+`
-	`, repoID, next, string(kind), r.IssueNumber, execModel, allowShell, profile, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued), r.SpecPath))
+	`, repoID, next, string(kind), r.IssueNumber, execModel, profile, r.CommitSHA, r.CommitMsg, r.CommitAuthor, r.Ref, r.Event, r.Trigger, string(RunQueued), r.SpecPath))
 	if err != nil {
 		return CIRun{}, err
 	}
@@ -720,30 +710,28 @@ func affected(res sql.Result, err error) error {
 	return nil
 }
 
-const runColumns = "id, repo_id, number, kind, issue_number, execution_model, mooncake_allow_shell, tool_profile, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at, spec_path"
+const runColumns = "id, repo_id, number, kind, issue_number, execution_model, tool_profile, commit_sha, commit_msg, commit_author, ref, event, trigger, status, claimed_at, created_at, started_at, finished_at, spec_path"
 
 func scanRun(s scanner) (CIRun, error) {
 	var r CIRun
 	var kind, status string
 	var issueNum, claimed, started, finished sql.NullInt64
 	var created int64
-	var allowShell int
 	if err := s.Scan(
-		&r.ID, &r.RepoID, &r.Number, &kind, &issueNum, &r.ExecutionModel, &allowShell, &r.ToolProfile, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
+		&r.ID, &r.RepoID, &r.Number, &kind, &issueNum, &r.ExecutionModel, &r.ToolProfile, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
 		&r.Ref, &r.Event, &r.Trigger,
 		&status, &claimed, &created, &started, &finished, &r.SpecPath,
 	); err != nil {
 		return r, err
 	}
-	decodeRun(&r, kind, status, issueNum, claimed, started, finished, created, allowShell)
+	decodeRun(&r, kind, status, issueNum, claimed, started, finished, created)
 	return r, nil
 }
 
 // decodeRun fills a CIRun's typed/nullable fields from the raw column values,
 // shared by scanRun and the cross-repo aggregate scan so they never drift.
-func decodeRun(r *CIRun, kind, status string, issueNum, claimed, started, finished sql.NullInt64, created int64, allowShell int) {
+func decodeRun(r *CIRun, kind, status string, issueNum, claimed, started, finished sql.NullInt64, created int64) {
 	r.Kind = RunKind(kind)
-	r.MooncakeAllowShell = allowShell != 0
 	if issueNum.Valid {
 		n := int(issueNum.Int64)
 		r.IssueNumber = &n
@@ -775,7 +763,7 @@ func ListAllRuns(db *sql.DB, filter RunFilter) ([]RunWithRepo, error) {
 	// Qualify with ci_runs.: id/repo_id/created_at also exist on the joined
 	// repos/users tables, so a bare runColumns would be ambiguous. The filter
 	// clauses reference columns unique to ci_runs, so they stay unqualified.
-	q.WriteString(`SELECT ci_runs.id, ci_runs.repo_id, ci_runs.number, ci_runs.kind, ci_runs.issue_number, ci_runs.execution_model, ci_runs.mooncake_allow_shell, ci_runs.tool_profile, ci_runs.commit_sha, ci_runs.commit_msg, ci_runs.commit_author, ci_runs.ref, ci_runs.event, ci_runs.trigger, ci_runs.status, ci_runs.claimed_at, ci_runs.created_at, ci_runs.started_at, ci_runs.finished_at, users.name, repos.name
+	q.WriteString(`SELECT ci_runs.id, ci_runs.repo_id, ci_runs.number, ci_runs.kind, ci_runs.issue_number, ci_runs.execution_model, ci_runs.tool_profile, ci_runs.commit_sha, ci_runs.commit_msg, ci_runs.commit_author, ci_runs.ref, ci_runs.event, ci_runs.trigger, ci_runs.status, ci_runs.claimed_at, ci_runs.created_at, ci_runs.started_at, ci_runs.finished_at, users.name, repos.name
 		FROM ci_runs
 		JOIN repos ON repos.id = ci_runs.repo_id
 		JOIN users ON users.id = repos.owner_id
@@ -797,16 +785,15 @@ func ListAllRuns(db *sql.DB, filter RunFilter) ([]RunWithRepo, error) {
 		var kindCol, status string
 		var issueNum, claimed, started, finished sql.NullInt64
 		var created int64
-		var allowShell int
 		var owner, name string
 		if err := rows.Scan(
-			&r.ID, &r.RepoID, &r.Number, &kindCol, &issueNum, &r.ExecutionModel, &allowShell, &r.ToolProfile, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
+			&r.ID, &r.RepoID, &r.Number, &kindCol, &issueNum, &r.ExecutionModel, &r.ToolProfile, &r.CommitSHA, &r.CommitMsg, &r.CommitAuthor,
 			&r.Ref, &r.Event, &r.Trigger,
 			&status, &claimed, &created, &started, &finished, &owner, &name,
 		); err != nil {
 			return nil, err
 		}
-		decodeRun(&r, kindCol, status, issueNum, claimed, started, finished, created, allowShell)
+		decodeRun(&r, kindCol, status, issueNum, claimed, started, finished, created)
 		out = append(out, RunWithRepo{Run: r, Owner: owner, Name: name})
 	}
 	return out, rows.Err()

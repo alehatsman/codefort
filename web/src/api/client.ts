@@ -496,7 +496,6 @@ export const api = {
     opts?: {
       ref?: string
       model?: CIRunExecutionModel
-      allowShell?: boolean
       toolProfile?: CIRunToolProfile
     }
   ) =>
@@ -505,7 +504,6 @@ export const api = {
       body: {
         ...(opts?.ref ? { ref: opts.ref } : {}),
         ...(opts?.model ? { model: opts.model } : {}),
-        ...(opts?.allowShell ? { allow_shell: true } : {}),
         ...(opts?.toolProfile ? { tool_profile: opts.toolProfile } : {}),
       },
     }),

@@ -25,14 +25,12 @@ export function isAgentRun(kind: CIRunKind): boolean {
 }
 
 // executionModelLabel is the human label for an agent run's execution model
-// (#110). Falls back to the default model when the field is absent (older runs).
-export function executionModelLabel(model: CIRunExecutionModel | undefined): string {
-  switch (model) {
-    case "mooncake-agent":
-      return "Mooncake agent"
-    default:
-      return "Claude (edit)"
-  }
+// (#110). claude-edit is the only strategy now; the mooncake-agent
+// alternative was removed and old runs are backfilled to claude-edit, so this
+// always resolves to the same label — kept as a function (rather than a
+// literal) so call sites don't need to change if that ever stops being true.
+export function executionModelLabel(_model: CIRunExecutionModel | undefined): string {
+  return "Claude (edit)"
 }
 
 export function shortSHA(sha: string): string {

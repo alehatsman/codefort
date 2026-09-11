@@ -13,8 +13,8 @@ const (
 	SettingAgentClaudeToken = "agent.claude_oauth_token"
 
 	// SettingAgentExecutionModel is the operator-set default execution model
-	// for agent runs that don't pick one at spawn ("claude-edit" |
-	// "mooncake-agent"). Unset falls back to DefaultExecutionModel (#110).
+	// for agent runs that don't pick one at spawn ("claude-edit" is the only
+	// valid value today). Unset falls back to DefaultExecutionModel (#110).
 	SettingAgentExecutionModel = "agent.execution_model"
 
 	// SettingAgentLLMBaseURL is the operator-set LLM endpoint injected into
@@ -31,10 +31,10 @@ const (
 )
 
 // ValidExecutionModel reports whether m is a known agent execution model.
-// Shared by the spawn endpoint and the settings endpoint so both reject
-// the same bad values.
+// claude-edit is the only one today. Shared by the spawn endpoint and the
+// settings endpoint so both reject the same bad values.
 func ValidExecutionModel(m string) bool {
-	return m == ExecModelClaudeEdit || m == ExecModelMooncakeAgent
+	return m == ExecModelClaudeEdit
 }
 
 // GetSetting returns a setting's value, or ErrNotFound when unset.

@@ -5,11 +5,9 @@ import (
 	"testing"
 
 	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/config"
 )
 
 func TestNewAgentExecutorSelection(t *testing.T) {
-	cfg := &config.Config{}
 	cases := []struct {
 		model     string
 		wantModel string
@@ -17,11 +15,10 @@ func TestNewAgentExecutorSelection(t *testing.T) {
 	}{
 		{"", agentModelClaudeEdit, false}, // empty → default
 		{agentModelClaudeEdit, agentModelClaudeEdit, false},
-		{agentModelMooncakeAgent, agentModelMooncakeAgent, false},
 		{"bogus", "", true},
 	}
 	for _, c := range cases {
-		exec, err := newAgentExecutor(c.model, cfg, false)
+		exec, err := newAgentExecutor(c.model)
 		if c.wantErr {
 			if err == nil {
 				t.Errorf("newAgentExecutor(%q): want error, got %T", c.model, exec)

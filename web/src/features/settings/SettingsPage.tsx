@@ -11,7 +11,7 @@ import {
   useUpdateAgentSettings,
 } from "@/api/mutations"
 import { useAgentSettings, useRepos, useSSHKeys, useTokens, useWhoami } from "@/api/queries"
-import type { CIRunExecutionModel, CreatedToken, Repo, SSHKey, Token } from "@/api/types"
+import type { CreatedToken, Repo, SSHKey, Token } from "@/api/types"
 import ThemeSelect from "@/features/settings/ThemeSelect"
 import {
   Badge,
@@ -19,9 +19,7 @@ import {
   ConfirmDialog,
   EmptyState,
   ErrorMessage,
-  FormField,
   Input,
-  Select,
   Spinner,
   useToast,
 } from "@/ui"
@@ -366,8 +364,6 @@ function AgentSection() {
         onClear={clear}
       />
 
-      <DefaultModelField settingsQ={settingsQ} update={update} />
-
       <CustomEndpointFields
         settingsQ={settingsQ}
         update={update}
@@ -448,40 +444,6 @@ function ClaudeTokenFields({
         </div>
       </form>
     </>
-  )
-}
-
-function DefaultModelField({
-  settingsQ,
-  update,
-}: {
-  settingsQ: AgentSettingsQuery
-  update: AgentSettingsUpdate
-}) {
-  return (
-    <div className="agent-default-model">
-      <FormField
-        className="agent-default-model__label"
-        label="Default execution model"
-        hint="The model new agent runs use when “Spawn agent” doesn’t pick one. Per-run choices at spawn still win."
-      >
-        {({ controlId, describedBy }) => (
-          <Select
-            id={controlId}
-            aria-describedby={describedBy}
-            value={settingsQ.data?.execution_model ?? ""}
-            disabled={update.isPending || settingsQ.isLoading}
-            onChange={(e) =>
-              update.mutate({ execution_model: e.target.value as "" | CIRunExecutionModel })
-            }
-          >
-            <option value="">Server default (claude-edit)</option>
-            <option value="claude-edit">Claude (edit files)</option>
-            <option value="mooncake-agent">Mooncake agent (run actions)</option>
-          </Select>
-        )}
-      </FormField>
-    </div>
   )
 }
 

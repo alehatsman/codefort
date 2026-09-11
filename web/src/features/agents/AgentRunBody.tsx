@@ -103,8 +103,9 @@ function AgentTranscript({
 
   // A turn is in flight while its agent.turn.started has no matching
   // turn.completed. During that window the agent is busy but emits nothing
-  // while it plans (mooncake-agent runs Claude as a one-shot planner, then
-  // bursts the steps), so without a hint the silent gap reads as a hang.
+  // while it plans (the now-removed mooncake-agent model ran Claude as a
+  // one-shot planner, then bursted the steps — old runs replay that same
+  // pattern), so without a hint the silent gap reads as a hang.
   // "planning" until the turn produces its first entry, "working" once
   // steps/output begin. Gated on the run's terminal status (not the stream's
   // `done`, which also closes on error) so a parked awaiting_input run — turn
@@ -471,14 +472,18 @@ interface AgentEntry {
 
 // foldAgentEvents reduces the agent event stream into display entries. An
 // agent.message carries either a claude stream-json object under data.claude
-// (claude-edit runs) or a mooncake NDJSON event under data.mooncake
-// (mooncake-agent runs); we fold each into human-meaningful entries and fall
-// back to compact JSON for anything unrecognized, so the transcript stays
-// faithful even as either schema evolves.
+// (claude-edit runs — the only kind any run can produce today) or a mooncake
+// NDJSON event under data.mooncake (mooncake-agent runs — removed as a
+// spawnable option (#110), but old runs' stored transcript events still carry
+// this shape, so the fold stays to render their history correctly); we fold
+// each into human-meaningful entries and fall back to compact JSON for
+// anything unrecognized, so the transcript stays faithful even as either
+// schema evolves.
 function foldAgentEvents(events: CIEvent[]): AgentEntry[] {
   const out: AgentEntry[] = []
-  // mooncake-agent streams each step as separate started/stdout/completed
-  // events; accumulate per-step output to emit one entry per completed step.
+  // A historical mooncake-agent run streamed each step as separate
+  // started/stdout/completed events; accumulate per-step output to emit one
+  // entry per completed step.
   const mc: MooncakeState = { steps: new Map() }
 
   for (const ev of events) {
@@ -557,8 +562,10 @@ interface MooncakeState {
 }
 
 // foldMooncakeEvent turns one mooncake NDJSON event (data.mooncake on a
-// mooncake-agent run's agent.message) into transcript entries, mirroring
-// mooncake's own terminal renderer: each step is one line whose glyph flips
+// historical mooncake-agent run's agent.message — mooncake-agent can no
+// longer be spawned, but old runs' stored events still carry this shape) into
+// transcript entries, mirroring mooncake's own terminal renderer: each step
+// is one line whose glyph flips
 // ▶ → ✓/~/✗ in place. step.started pushes the live row into `out` and records
 // its index; the matching step.completed mutates that same row rather than
 // appending a second line. Output streams across step.stdout/file.* events and
@@ -734,10 +741,10 @@ function foldRunCompleted(data: Record<string, unknown>): AgentEntry[] {
   return [{ kind: "result", label: "RECAP", text: bits.join("  ") }]
 }
 
-// The mooncake agent wraps one or more plan/execute loops; status +
-// stop_reason already ride the "Turn complete" line, but the iteration count
-// is shown nowhere else. Surface it only when it actually re-planned (>1) or
-// stopped for a non-success reason — otherwise noise.
+// The (now-removed) mooncake agent wrapped one or more plan/execute loops;
+// status + stop_reason already ride the "Turn complete" line, but the
+// iteration count is shown nowhere else. Surface it only when it actually
+// re-planned (>1) or stopped for a non-success reason — otherwise noise.
 function foldAgentCompleted(data: Record<string, unknown>): AgentEntry[] {
   const iterations = typeof data["iterations"] === "number" ? data["iterations"] : 0
   const stop = typeof data["stop_reason"] === "string" ? data["stop_reason"] : ""

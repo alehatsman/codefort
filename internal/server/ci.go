@@ -459,22 +459,21 @@ func runNumberOrFail(w http.ResponseWriter, r *http.Request) (int, bool) {
 
 func toAPIRun(run storage.CIRun) api.CIRun {
 	return api.CIRun{
-		Number:             run.Number,
-		Kind:               string(run.Kind),
-		IssueNumber:        run.IssueNumber,
-		ExecutionModel:     run.ExecutionModel,
-		MooncakeAllowShell: run.MooncakeAllowShell,
-		ToolProfile:        run.ToolProfile,
-		CommitSHA:          run.CommitSHA,
-		CommitMsg:          run.CommitMsg,
-		CommitAuthor:       run.CommitAuthor,
-		Ref:                run.Ref,
-		Event:              run.Event,
-		Trigger:            run.Trigger,
-		Status:             string(run.Status),
-		CreatedAt:          run.CreatedAt,
-		StartedAt:          run.StartedAt,
-		FinishedAt:         run.FinishedAt,
+		Number:         run.Number,
+		Kind:           string(run.Kind),
+		IssueNumber:    run.IssueNumber,
+		ExecutionModel: run.ExecutionModel,
+		ToolProfile:    run.ToolProfile,
+		CommitSHA:      run.CommitSHA,
+		CommitMsg:      run.CommitMsg,
+		CommitAuthor:   run.CommitAuthor,
+		Ref:            run.Ref,
+		Event:          run.Event,
+		Trigger:        run.Trigger,
+		Status:         string(run.Status),
+		CreatedAt:      run.CreatedAt,
+		StartedAt:      run.StartedAt,
+		FinishedAt:     run.FinishedAt,
 	}
 }
 

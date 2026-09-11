@@ -19,7 +19,8 @@
 .agent-runs__sha {
   font-family: var(--font-mono);
 }
-/* Execution model under the run number (Claude edit / Mooncake agent). */
+/* Execution model under the run number (always "Claude (edit)" — the sole
+   execution model since mooncake-agent was removed (#110)). */
 .agent-runs__model {
   display: block;
 }
@@ -49,7 +50,9 @@
   background: var(--bg-canvas);
 }
 
-/* Spawn-agent: model picker sits inline with the spawn button (#110). */
+/* Spawn-agent: the tool-profile picker sits inline with the spawn button
+   (#110). claude-edit is the sole execution model, so there's no model
+   picker here. */
 .spawn-agent {
   display: flex;
   align-items: flex-end;
@@ -60,16 +63,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-}
-.spawn-agent__shell {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-  cursor: pointer;
-}
-.spawn-agent__shell input {
-  margin-top: 3px;
 }
 /* Agent run transcript — folded from the agent.* event stream and rendered
    like mooncake's terminal output: a tight monospace list, one line per step,

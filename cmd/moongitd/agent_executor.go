@@ -4,44 +4,36 @@ import (
 	"fmt"
 
 	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/config"
 	"github.com/alehatsman/moongit/internal/storage"
 )
 
-// Execution models an agent run can use. The model is chosen per run
-// (stored on the run; see migration 11) and decides what actually runs
-// inside the agent container for each turn — everything else (container,
-// workspace, token, dex, event log, parking, handoff) is shared. The
-// identifiers are canonical in storage so storage/server/runner agree.
-const (
-	// agentModelClaudeEdit runs `claude -p` directly. Claude edits files
-	// in /work with its file tools; its Bash/execution tools are
-	// policy-gated under subscription auth and not reliably unlockable
-	// headlessly (#110), so it can't run commands.
-	agentModelClaudeEdit = storage.ExecModelClaudeEdit
-	// agentModelMooncakeAgent runs `mooncake agent run`. Claude is used
-	// only as a planner (text completion → a mooncake plan); mooncake
-	// itself applies the actions, so commands (tests, git, shell) run
-	// under mooncake's control rather than claude's gated tool-use.
-	agentModelMooncakeAgent = storage.ExecModelMooncakeAgent
-)
+// agentModelClaudeEdit is the sole execution model an agent run can use. The
+// model is stored on the run (see migration 11) and decides what actually
+// runs inside the agent container for each turn — everything else
+// (container, workspace, token, dex, event log, parking, handoff) is shared.
+// The identifier is canonical in storage so storage/server/runner agree.
+//
+// agentModelClaudeEdit runs `claude -p` directly. Claude edits files in
+// /work with its file tools; its Bash/execution tools are policy-gated
+// under subscription auth and not reliably unlockable headlessly (#110), so
+// it can't run commands.
+const agentModelClaudeEdit = storage.ExecModelClaudeEdit
 
 // turnInput is the raw, model-agnostic context for one turn; the executor
 // composes its own command from it. The runner fills it with facts (whose
 // issue, which follow-up message, the session id) and stays out of prompt
 // composition — so a model-specific prompt never has to be computed for a
 // model that won't use it. claude-edit frames a system prompt and drives a
-// resumable session; mooncake-agent uses the goal text and ignores
-// sessionID/resume.
+// resumable session.
 type turnInput struct {
-	sessionID string    // claude session UUID (claude-edit; mooncake ignores)
+	sessionID string    // claude session UUID
 	owner     string    // repo identity, for an executor's framing
 	repo      string    // repo identity, for an executor's framing
 	issue     api.Issue // the run's issue — the task on the first turn
 	message   string    // the follow-up human message; empty on the first turn
 	firstTurn bool      // first turn works the issue; later turns work message
 	mcpPath   string    // dex MCP config path, "" to omit
-	resume    bool      // follow-up turn resumes the session (claude-edit; mooncake ignores)
+	resume    bool      // follow-up turn resumes the session
 	// verify marks a spec-verify run: a one-shot turn whose task is to classify
 	// the spec at specPath (its content carried verbatim) against the code.
 	verify      bool
@@ -64,12 +56,11 @@ func (in turnInput) goal() string {
 
 // turnResult is the model-agnostic outcome of one turn, distilled from
 // whatever terminal record the underlying CLI emits (claude's stream-json
-// "result" object, or mooncake's agent.completed event). Fields a given
-// model doesn't report stay zero.
+// "result" object). Fields the executor doesn't report stay zero.
 type turnResult struct {
 	IsError bool
 	Subtype string // "success" | error subtype; "" when not reported
-	// StopReason is mooncake's loop stop_reason (max_iterations / no_progress /
+	// StopReason carries a loop stop_reason (max_iterations / no_progress /
 	// success / failed / …) when the executor reports one; "" for claude, which
 	// has no equivalent. A "soft" stop (the agent ran out of road without a
 	// failed step) is surfaced as a "stalled" turn rather than a failure — see
@@ -101,14 +92,10 @@ type agentExecutor interface {
 // newAgentExecutor selects the executor for a run's model. An empty model
 // is the default (claude-edit); an unknown model is an error so a bad
 // value fails the run loudly rather than silently picking a default.
-// allowShell is the run's spawn-time override that drops the default
-// shell/cmd denial from the mooncake-agent policy (#110); claude-edit ignores it.
-func newAgentExecutor(model string, cfg *config.Config, allowShell bool) (agentExecutor, error) {
+func newAgentExecutor(model string) (agentExecutor, error) {
 	switch model {
 	case "", agentModelClaudeEdit:
 		return &claudeExecutor{}, nil
-	case agentModelMooncakeAgent:
-		return newMooncakeExecutor(cfg, allowShell), nil
 	default:
 		return nil, fmt.Errorf("unknown agent execution model %q", model)
 	}

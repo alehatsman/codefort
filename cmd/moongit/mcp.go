@@ -240,8 +240,8 @@ func (m *mcpServer) newServer() *sdk.Server {
 
 	// ── agents ───────────────────────────────────────────────────────────────
 	addTool(m, srv, &sdk.Tool{
-		Name: "agent_spawn",
-		Description: "Spawn an agent on an issue. Options: ref, model (claude-edit|mooncake-agent), allow_shell, tool_profile (full|review).",
+		Name:        "agent_spawn",
+		Description: "Spawn an agent on an issue. Options: ref, model (claude-edit), tool_profile (full|review).",
 	}, m.agentSpawn)
 	addTool(m, srv, &sdk.Tool{
 		Name: "agent_turn",
@@ -402,7 +402,7 @@ type mcpComment struct {
 	Body   string `json:"body"`
 }
 
-// mcpCIRun strips timestamps and internal fields (MooncakeAllowShell, CommitAuthor).
+// mcpCIRun strips timestamps and internal fields (CommitAuthor).
 type mcpCIRun struct {
 	Number         int    `json:"number"`
 	Kind           string `json:"kind"`
@@ -950,8 +950,7 @@ func (m *mcpServer) pipelineGet(_ context.Context, _ *sdk.CallToolRequest, in pi
 type agentSpawnInput struct {
 	IssueNumber int    `json:"issue_number" jsonschema:"issue number"`
 	Ref         string `json:"ref,omitempty" jsonschema:"defaults to repo HEAD"`
-	Model       string `json:"model,omitempty" jsonschema:"claude-edit|mooncake-agent"`
-	AllowShell  bool   `json:"allow_shell,omitempty" jsonschema:"mooncake-agent only"`
+	Model       string `json:"model,omitempty" jsonschema:"claude-edit"`
 	ToolProfile string `json:"tool_profile,omitempty" jsonschema:"full|review"`
 }
 
@@ -960,7 +959,7 @@ func (m *mcpServer) agentSpawn(_ context.Context, _ *sdk.CallToolRequest, in age
 		return nil, runOutput{Status: statusError, Error: "issue_number must be a positive issue number"}, nil
 	}
 	var run api.CIRun
-	req := api.SpawnAgentRequest{Ref: in.Ref, Model: in.Model, AllowShell: in.AllowShell, ToolProfile: in.ToolProfile}
+	req := api.SpawnAgentRequest{Ref: in.Ref, Model: in.Model, ToolProfile: in.ToolProfile}
 	if err := m.call(http.MethodPost, fmt.Sprintf("/issues/%d/agent", in.IssueNumber), req, http.StatusAccepted, &run); err != nil {
 		return nil, runOutput{Status: statusError, Error: err.Error()}, nil
 	}

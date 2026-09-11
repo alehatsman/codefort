@@ -259,7 +259,6 @@ export function useSpawnAgent(owner: string, repo: string, n: number) {
     mutationFn: (vars?: {
       ref?: string
       model?: CIRunExecutionModel
-      allowShell?: boolean
       toolProfile?: CIRunToolProfile
     }) => api.spawnAgent(owner, repo, n, vars),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) }),

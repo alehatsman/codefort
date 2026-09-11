@@ -47,17 +47,17 @@ func translateClaudeLine(line []byte) (eventType string, data map[string]any, re
 	return ci.EventAgentMessage, map[string]any{"claude": obj}, result
 }
 
-// softStopReasons are mooncake loop stop_reasons that end a run without a
+// softStopReasons are executor loop stop_reasons that end a run without a
 // verdict: the agent ran to completion but never converged — it hit its
 // iteration cap or kept re-planning without advancing — and no step actually
 // failed. They're surfaced as a "stalled" turn (neutral), distinct from a hard
-// failure. Mirrors mooncake/internal/agent.StopReason (moongit doesn't import
-// it); kept as literals like the "failed"/"success" checks elsewhere here.
+// failure. No executor sets these today (claude reports no StopReason), but
+// turnStatus stays model-agnostic so a future executor that reports a loop
+// stop_reason is handled without a turnStatus change.
 //
-// "canceled" and "aborted" are clean operator stops (ctx cancel / stdin abort
-// control message — mooncake #101/#103): the loop stopped before completing,
-// but no step failed. Without this entry both would fall through to "success",
-// misreporting a stopped run as successful.
+// "canceled" and "aborted" are clean operator stops: the loop stopped before
+// completing, but no step failed. Without this entry both would fall through
+// to "success", misreporting a stopped run as successful.
 var softStopReasons = map[string]bool{
 	"max_iterations": true,
 	"no_progress":    true,
@@ -72,8 +72,8 @@ var softStopReasons = map[string]bool{
 // is_error/non-clean result is a failure; a clean result that stopped on a soft
 // stop_reason is "stalled" (the agent gave up without failing — moongit #173);
 // otherwise success. A genuine failure outranks a soft stop. "success" and
-// "step_done" are mooncake's two clean (severity-0) statuses. Operates on the
-// model-agnostic turnResult so it serves every executor.
+// "step_done" are the two clean (severity-0) subtypes an executor may report.
+// Operates on the model-agnostic turnResult so it serves every executor.
 func turnStatus(result *turnResult, exitCode int, execErr error) string {
 	switch {
 	case execErr != nil || exitCode != 0 || result == nil:

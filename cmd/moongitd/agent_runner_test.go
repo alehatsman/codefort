@@ -444,8 +444,8 @@ func TestDispatchTurnErrorResultReparks(t *testing.T) {
 	}
 }
 
-// A failed turn whose tool wrote its diagnostics only to stderr (mooncake's
-// planner errors, a crash trace) must not render blank: the stderr is replayed
+// A failed turn whose tool wrote its diagnostics only to stderr (a crash
+// trace, a CLI startup error) must not render blank: the stderr is replayed
 // as agent.raw so the operator can see why it failed (#117).
 func TestAgentTurnSurfacesStderrOnFailure(t *testing.T) {
 	h := newAgentHarness(t, agentTestOpts{

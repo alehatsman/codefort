@@ -408,15 +408,7 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
         {isAgent && (
           <div>
             <dt>Model</dt>
-            <dd>
-              {executionModelLabel(run.execution_model)}
-              {run.execution_model === "mooncake-agent" && (
-                <span className="muted small">
-                  {" "}
-                  · shell {run.mooncake_allow_shell ? "allowed" : "denied"}
-                </span>
-              )}
-            </dd>
+            <dd>{executionModelLabel(run.execution_model)}</dd>
           </div>
         )}
         <div>

@@ -448,6 +448,16 @@ CREATE TABLE IF NOT EXISTS pr_reviews (
 );
 CREATE INDEX IF NOT EXISTS idx_pr_reviews_pr ON pr_reviews(repo_id, pr_number);
 	`,
+
+	// 29: remove the mooncake-agent execution model. claude-edit is now the
+	// only execution model an agent run can use (the mooncake-controlled
+	// executor is gone), so backfill any surviving 'mooncake-agent' rows to
+	// 'claude-edit' before dropping the now-dead mooncake_allow_shell column
+	// (native DROP COLUMN — SQLite 3.35+, which modernc.org/sqlite carries).
+	`
+	UPDATE ci_runs SET execution_model = 'claude-edit' WHERE execution_model = 'mooncake-agent';
+	ALTER TABLE ci_runs DROP COLUMN mooncake_allow_shell;
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

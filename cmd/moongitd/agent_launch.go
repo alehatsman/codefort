@@ -35,8 +35,8 @@ func agentSessionID(runID int64) string {
 // headlessly under subscription auth — neither this flag,
 // --dangerously-skip-permissions, --allowedTools, nor a settings.json allow
 // survives the session-id/system-prompt flags the agent needs (a managed/usage
-// policy re-gates them). So the agent edits files; running commands (git,
-// tests, mgit) belongs to a moongit/mooncake-controlled executor — see #110.
+// policy re-gates them). So the agent edits files; it cannot run commands
+// (git, tests, mgit) — see #110.
 func buildClaudeArgv(sessionID, prompt, systemPrompt, mcpConfigPath string, resume bool) []string {
 	argv := []string{
 		"claude", "-p", prompt,

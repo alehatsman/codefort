@@ -119,16 +119,6 @@ func materializeAgentBranch(ctx context.Context, runID int64, bareRepo, base, wo
 	if _, err := runGit(ctx, env, "read-tree", base); err != nil {
 		return "", false, fmt.Errorf("read-tree: %w", err)
 	}
-	// Drop the mooncake-agent scratch dir (.mooncake/agent/iterations etc.)
-	// before snapshotting — it's per-run executor bookkeeping, not part of the
-	// agent's change to the repo. Remove it from disk rather than excluding it
-	// via a `:(exclude).mooncake` pathspec: git treats the literal path in that
-	// pathspec as explicitly named, so when the repo's .gitignore lists
-	// .mooncake/ (moongit's own does), `git add` fails the ignored-path guard
-	// ("use -f") instead of skipping it (#201). The workspace is torn down right
-	// after handoff, so removing the scratch dir here is safe. (.git is skipped
-	// by git natively.)
-	_ = os.RemoveAll(filepath.Join(workDir, ".mooncake"))
 	if _, err := runGit(ctx, env, "add", "-A", "--", "."); err != nil {
 		return "", false, fmt.Errorf("add: %w", err)
 	}
@@ -228,17 +218,16 @@ func runGit(ctx context.Context, env []string, args ...string) (string, error) {
 //
 // The workspace is a `git clone --local` of the server-side bare repo
 // (gitCheckout), so it's already a real repo with history detached at the base
-// commit — the mooncake-agent model's git snapshot/diff/transaction steps work
-// against it as-is. But clone sets `origin` to the bare repo's local filesystem
-// path (e.g. /…/repos/o/r.git), which mgit's parseRemote can't read — it has no
+// commit. But clone sets `origin` to the bare repo's local filesystem path
+// (e.g. /…/repos/o/r.git), which mgit's parseRemote can't read — it has no
 // URL scheme, so every in-container mgit call failed with
 // `unsupported remote scheme ""` (#144). discoverTarget prefers a dedicated
 // `moongit` remote over `origin` (cmd/moongit/main.go), so adding one with the
 // server URL fixes resolution while leaving the clone's `origin` untouched.
 //
-// remoteURL empty → no-op (claude-edit doesn't run mgit and needs no remote).
-// Idempotent: a re-park/retry that re-enters here just re-points the remote.
-// Best-effort — only the mooncake/mgit path depends on it.
+// remoteURL empty → no-op. Idempotent: a re-park/retry that re-enters here
+// just re-points the remote. Best-effort — only the in-container mgit MCP
+// server depends on it.
 func wireAgentMoongitRemote(ctx context.Context, workDir, remoteURL string) error {
 	if remoteURL == "" {
 		return nil

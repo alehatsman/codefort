@@ -594,10 +594,13 @@ export type CIJobStatus =
 // spec-verify agent run (#219). Must list every kind the server can emit.
 export type CIRunKind = "ci" | "agent" | "spec-verify"
 
-// Agent execution model (#110): which strategy an agent run uses in its
-// container. claude-edit = Claude edits files directly; mooncake-agent =
-// mooncake plans+applies actions (so commands run).
-export type CIRunExecutionModel = "claude-edit" | "mooncake-agent"
+// Agent execution model (#110): claude-edit is the sole strategy an agent run
+// uses in its container — Claude edits files directly. (The mooncake-agent
+// alternative, where Claude planned and an external mooncake binary applied
+// actions, was removed; the server backfills old runs' execution_model to
+// claude-edit, though their stored transcript events still parse as mooncake
+// NDJSON — see the folding logic in features/agents/AgentRunBody.tsx.)
+export type CIRunExecutionModel = "claude-edit"
 
 // CIRunToolProfile scopes which mgit MCP tools an agent run sees (#184): full =
 // the whole toolset; review = read tools + review_* (the read-only review agent).
@@ -608,7 +611,6 @@ export interface CIRun {
   kind: CIRunKind
   issue_number?: number
   execution_model?: CIRunExecutionModel
-  mooncake_allow_shell?: boolean
   tool_profile?: CIRunToolProfile
   commit_sha: string
   commit_msg?: string
@@ -634,15 +636,14 @@ export interface CIJob {
 // AgentSettings mirrors api.AgentSettings — the Claude token is write-only (only
 // whether one is configured is returned); claude_token_env_fallback reports
 // whether a server-env credential (MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN /
-// _ANTHROPIC_API_KEY) backs runs when no Settings token is set; execution_model
-// is the default model new agent runs use ("" = server's built-in default).
-// llm_base_url is the operator-set ANTHROPIC_BASE_URL (not a secret — returned
-// as-is); anthropic_auth_token_set reports whether the write-only gateway
-// bearer (ANTHROPIC_AUTH_TOKEN) is configured.
+// _ANTHROPIC_API_KEY) backs runs when no Settings token is set. llm_base_url
+// is the operator-set ANTHROPIC_BASE_URL (not a secret — returned as-is);
+// anthropic_auth_token_set reports whether the write-only gateway bearer
+// (ANTHROPIC_AUTH_TOKEN) is configured. (execution_model was dropped (#110):
+// claude-edit is now the only strategy, so there's nothing left to choose.)
 export interface AgentSettings {
   claude_oauth_token_set: boolean
   claude_token_env_fallback: boolean
-  execution_model?: CIRunExecutionModel | ""
   llm_base_url?: string
   anthropic_auth_token_set: boolean
 }
@@ -651,7 +652,6 @@ export interface AgentSettings {
 // unchanged, "" to clear, a value to set.
 export interface UpdateAgentSettingsInput {
   claude_oauth_token?: string
-  execution_model?: CIRunExecutionModel | ""
   llm_base_url?: string
   anthropic_auth_token?: string
 }

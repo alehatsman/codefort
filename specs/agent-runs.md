@@ -27,9 +27,9 @@ lives in the image.
   an immutable commit (default the repo HEAD) and enqueues an agent-kind run
   bound to that issue, stamping the trigger from the token; an unknown issue is a
   404.
-- WHERE the spawn request sets a model, tool profile, or shell allowance, an
-  explicit valid value wins, else the operator default, else the built-in
-  default; an unknown model or profile is rejected.
+- WHERE the spawn request sets a model or tool profile, an explicit valid
+  value wins, else the operator default, else the built-in default; an
+  unknown model or profile is rejected.
 - WHILE an agent run executes, its progress streams over the same run/job event
   endpoints as a CI run (one job, "agent"), and it draws from the agent
   concurrency pool, separate from CI runs.
@@ -42,11 +42,8 @@ lives in the image.
 - WHEN a client posts a follow-up turn to a non-terminal agent run, it queues
   (behind any in-flight turn); the dispatcher resumes the same session, streams
   the response onto the run's event log, and re-parks in `awaiting_input`.
-- WHERE the execution model is `claude-edit`, a turn drives a resumable headless
-  Claude session that edits files; where it is `mooncake-agent`, a turn runs
-  mooncake with Claude as planner so shell/git/test commands execute under
-  mooncake's control. Container, workspace, token, dex wiring, event log,
-  parking, and handoff are identical across models.
+- WHERE the execution model is `claude-edit` — the only execution model — a
+  turn drives a resumable headless Claude session that edits files.
 - WHERE credentials are needed, they are injected per-run into the container and
   never baked into the image: a scoped LLM auth token (operator gateway bearer >
   operator OAuth > env OAuth > env API key), an ephemeral moongit token (revoked
@@ -75,26 +72,29 @@ lives in the image.
   spec covers only what differs for an LLM job (turns, parking, handoff, creds).
   The shared spine (claim/lease/concurrency/reconcile/retention/event stream) is
   specified there.
-- **The agent container image & mooncake internals.** What the image contains,
-  how it's built, and how mooncake/Claude plan internally live outside moongit
-  (mooncake task / the model). This spec stops at the env moongit injects and the
-  contract that a turn edits `/work`.
+- **The agent container image.** What the image contains, how it's built, and
+  how Claude plans internally live outside moongit. This spec stops at the env
+  moongit injects and the contract that a turn edits `/work`.
 - **The dex index itself.** Wiring the agent to a configured dex index is in
   scope; building/serving that index is the code-intel/dex domain.
 - **The events feed.** Run lifecycle may surface on the fleet feed, but the SSE
   feed's delivery and store are the events-feed spec's concern.
-- **Headless command execution under `claude-edit`.** Bash is not reliably
-  unlockable in a headless subscription-auth Claude session; running commands is
-  deliberately the `mooncake-agent` model's job, not a gap to close in
-  `claude-edit`.
+- **Headless command execution.** Bash is not reliably unlockable in a
+  headless subscription-auth Claude session, so `claude-edit` — now the only
+  execution model — cannot run commands (tests, git, mgit) inside a turn; it
+  only edits files. This was previously offset by the `mooncake-agent` model,
+  which ran commands under its own control; with that model gone, this is a
+  known capability gap, not a deliberate non-goal — closing it (e.g. a
+  reliable headless Bash unlock, or a different execution path) is future
+  work, tracked outside this spec.
 
 ## Checklist
 
 - [x] Spawn an agent run from an issue; immutable base commit; token-stamped trigger
-- [x] Per-run model / tool-profile / shell-allowance resolution with validation
+- [x] Per-run model / tool-profile resolution with validation
 - [x] Turn 1 in a fresh checked-out workspace + container; park in awaiting_input
 - [x] Follow-up turns queue, resume the session, stream, re-park
-- [x] claude-edit and mooncake-agent execution models over a shared spine
+- [x] claude-edit as the single execution model over a shared spine
 - [x] Per-run scoped credentials (LLM auth, ephemeral moongit token, dex) torn down on finalize
 - [x] Finish = server-side handoff to agent/issue-<n> + summary comment; parked-only
 - [x] Cancel/force-stop from any non-terminal state; discards the workspace
