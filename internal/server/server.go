@@ -85,12 +85,19 @@ func New(cfg *config.Config, db, rdb *sql.DB, logger *slog.Logger) *Server {
 // top-level prefix dispatcher keeps them apart, and also cleanly scopes
 // auth to the API mux.
 func (s *Server) Handler() http.Handler {
-	apiAuth := s.withRateLimit(s.withAuth(s.apiHandler()))
+	// withRepoAccess sits inside withAuth so the token (and therefore the
+	// principal) is already on the context when it runs, and outside the route
+	// mux so every repo-scoped endpoint is gated by construction — a new route
+	// cannot forget to check. See internal/server/access.go.
+	apiAuth := s.withRateLimit(s.withAuth(s.withRepoAccess(s.apiHandler())))
 	// Public API (register/login) — no bearer auth required, but still rate-limited.
 	pubAPI := s.withRateLimit(s.publicAPIHandler())
 	// Basic auth (when configured) gates the human/git-facing surfaces;
 	// /api keeps its Bearer-token auth and /healthz stays open.
-	gitMux := s.withBasicAuth(s.gitHandler())
+	// withGitRepoAccess is nested inside so the shared Basic gate (a deployment
+	// credential) runs first, then per-repo visibility resolves the individual
+	// caller from their own token. It is a no-op for public repos.
+	gitMux := s.withBasicAuth(s.withGitRepoAccess(s.gitHandler()))
 	web := s.webHandler() // nil when MOONGIT_WEB_DIR is unset
 	if web != nil {
 		web = s.withBasicAuth(web)

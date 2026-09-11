@@ -680,9 +680,20 @@ type Event struct {
 // is never returned over the API except once, in CreatedToken at creation
 // time — list/lookup never expose it.
 type Token struct {
-	ID         int64      `json:"id"`
-	Name       string     `json:"name"`
-	CreatedAt  time.Time  `json:"created_at"`
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	// UserName is the account this token belongs to, resolved through
+	// tokens.user_id. It is empty for tokens minted without a user context
+	// (the admin-provisioned `moongitd token create` path, and ephemeral
+	// per-run agent tokens), which is why it can't simply replace Name.
+	//
+	// Name and UserName are deliberately distinct: Name is the *attribution*
+	// identity stamped on writes, while UserName is the *principal* an access
+	// check resolves. They differ for session tokens, which LoginUser names
+	// "<user>-session" so a browser session is revocable independently of the
+	// account's primary token.
+	UserName   string     `json:"user_name,omitempty"`
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	RevokedAt  *time.Time `json:"revoked_at,omitempty"`
 }

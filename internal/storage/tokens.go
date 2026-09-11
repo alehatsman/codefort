@@ -75,10 +75,15 @@ func LookupToken(db *sql.DB, plaintext string) (api.Token, error) {
 	var t api.Token
 	var created int64
 	var lastUsed, revoked sql.NullInt64
+	// LEFT JOIN, not JOIN: tokens.user_id is nullable (admin-provisioned and
+	// per-run agent tokens have no account), and those must still authenticate.
+	var userName sql.NullString
 	err := db.QueryRow(`
-		SELECT id, name, created_at, last_used_at, revoked_at
-		FROM tokens WHERE hashed_token = ?
-	`, hashed).Scan(&t.ID, &t.Name, &created, &lastUsed, &revoked)
+		SELECT tokens.id, tokens.name, tokens.created_at,
+		       tokens.last_used_at, tokens.revoked_at, users.name
+		FROM tokens LEFT JOIN users ON users.id = tokens.user_id
+		WHERE tokens.hashed_token = ?
+	`, hashed).Scan(&t.ID, &t.Name, &created, &lastUsed, &revoked, &userName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return t, ErrNotFound
 	}
@@ -88,6 +93,7 @@ func LookupToken(db *sql.DB, plaintext string) (api.Token, error) {
 	if revoked.Valid {
 		return t, ErrNotFound
 	}
+	t.UserName = userName.String
 	t.CreatedAt = time.Unix(created, 0).UTC()
 	if lastUsed.Valid {
 		ts := time.Unix(lastUsed.Int64, 0).UTC()

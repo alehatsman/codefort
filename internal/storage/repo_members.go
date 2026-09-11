@@ -153,3 +153,19 @@ func IsRepoOwner(db *sql.DB, repoID int64, callerName string) (bool, error) {
 	}
 	return strings.EqualFold(ownerName, callerName), nil
 }
+
+// RepoIsPrivate reports whether a repo's visibility is 'private'. Split out
+// from CanAccessRepo because the git transport needs the cheap public-repo
+// short-circuit before it goes looking for a credential: a public clone must
+// stay open, and must not pay for an auth lookup it will ignore.
+func RepoIsPrivate(db *sql.DB, repoID int64) (bool, error) {
+	var vis string
+	err := db.QueryRow(`SELECT visibility FROM repos WHERE id = ?`, repoID).Scan(&vis)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrNotFound
+	}
+	if err != nil {
+		return false, err
+	}
+	return vis == "private", nil
+}
