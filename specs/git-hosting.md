@@ -7,7 +7,9 @@ covers:
   - "internal/server/repos.go"
   - "internal/server/tree.go"
   - "internal/server/commits.go"
+  - "internal/server/branches.go"
   - "internal/server/server.go"
+  - "internal/storage/repos.go"
 ---
 # Git Hosting
 

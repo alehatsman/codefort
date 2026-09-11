@@ -13,6 +13,10 @@ const baseURL = `http://localhost:${port}`
 
 export default defineConfig({
   testDir: "./tests",
+  // phase2-smoke.spec.ts needs a real moongitd on :8080 — it deliberately does
+  // not use mockApi, so it can never pass here and left the suite permanently
+  // 5-red. It has its own runner: playwright-smoke.config.ts (npm run test:smoke).
+  testIgnore: "**/phase2-smoke.spec.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

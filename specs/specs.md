@@ -5,6 +5,7 @@ owners: [aleh]
 covers:
   - "internal/specs/**"
   - "internal/server/specs.go"
+  - "internal/storage/verifications.go"
 ---
 # Specs
 

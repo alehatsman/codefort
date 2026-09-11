@@ -7,6 +7,8 @@ covers:
   - "internal/server/comments.go"
   - "internal/storage/issues.go"
   - "internal/storage/dependencies.go"
+  - "internal/storage/comments.go"
+  - "internal/server/aggregate.go"
   - "cmd/moongit/main.go"
 ---
 # Issues & Claim-First Coordination

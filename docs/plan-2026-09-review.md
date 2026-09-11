@@ -112,6 +112,25 @@ Shipped code with zero spec coverage, in descending order of risk:
 - `README.md` config table → point at `docs/config.md`.
 - `test-results/.last-run.json` is a tracked build artifact.
 
+### Phase 7 — defects and drift found while doing the above  `done`
+
+Not planned; surfaced by the reading each phase required, and small enough
+to fix in place rather than defer.
+
+- `/research` and `/summaries` redirected to `/:owner/:repo/explore`, a route
+  commented out in ce12340, so both landed on the catch-all not-found page. A
+  redirect implies somewhere to go; they now share Explore's fate.
+- `mgit issue comment`'s usage string advertised a `--author` flag that was
+  never registered, so following the usage produced a parse error. `printUsage`
+  had also drifted from the parser on labels, `pr close`/`reopen`,
+  `mcp --profile`, the `-y` shorthand, and target resolution (it named
+  `origin`, while the client tries the `moongit` remote first).
+- `web/CLAUDE.md` pointed at a top-bar theme switcher that lives in Settings,
+  conflated the github/monokai schemes with the separate light/dark axis, and
+  listed `explore` as live while omitting the routed `specs` feature. It is
+  read before every web change, so its errors propagate.
+- Four files carried pre-existing `gofmt` drift, fixed in its own commit.
+
 ## Deliberately not in scope
 
 - **Finishing the mooncake → provision migration.** `mgitci.yml` still execs

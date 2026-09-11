@@ -122,9 +122,19 @@ demote the rule; suppress a deliberate exception inline with a justified
 ## Tests: Playwright
 
 `npm test` runs the suite (`tests/*.spec.ts`). Add/extend a spec for new
-interactive UI. The `vimnav` h/l tab-switch test can flake under parallel load
-— re-run it isolated (`npx playwright test tests/vimnav.spec.ts:60`) before
-treating a single failure as a regression.
+interactive UI. Every spec mocks the API through `tests/mockApi.ts` — no real
+moongitd — which is what lets the suite boot a Vite dev server and stay
+hermetic.
+
+`tests/phase2-smoke.spec.ts` is the one exception: it hits a **real** moongitd
+on `:8080` and so is excluded from the default config. Run it with
+`npm run test:smoke` against a live server. Keep integration specs out of the
+default net for the same reason — a suite that cannot pass locally stops being
+read.
+
+The `vimnav` h/l tab-switch test can flake under parallel load — re-run it
+isolated (`npx playwright test tests/vimnav.spec.ts:60`) before treating a
+single failure as a regression.
 
 ## Worktree gotcha
 
