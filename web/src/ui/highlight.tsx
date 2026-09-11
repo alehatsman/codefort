@@ -1,6 +1,6 @@
-import type { ReactNode } from "react"
-import { common, createLowlight } from "lowlight"
 import type { Element, Root, RootContent } from "hast"
+import { common, createLowlight } from "lowlight"
+import type { ReactNode } from "react"
 
 // One highlighter for the whole app. `common` covers ~37 popular languages
 // (Go, TS/JS, Python, Rust, JSON, YAML, shell, …) without the bundle weight of
@@ -35,6 +35,7 @@ export function splitLines(tree: Root): ReactNode[][] {
       if (i > 0) lines.push([])
       if (part === "") return
       const current = lines[lines.length - 1]
+      if (!current) return
       current.push(
         className ? (
           <span key={key++} className={className}>
@@ -101,7 +102,7 @@ function walk(
 }
 
 function classNameOf(el: Element): string | undefined {
-  const cn = el.properties?.className
+  const cn = el.properties["className"]
   if (Array.isArray(cn)) return cn.join(" ")
   if (typeof cn === "string") return cn
   return undefined

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import { mockApi, seedToken } from "./mockApi"
 
 test.beforeEach(async ({ page }) => {
@@ -51,12 +51,21 @@ test("repo card shows the five metrics in order with deep-links", async ({ page 
   // Each tile deep-links to the matching repo sub-page; CI links to its run.
   await expect(metrics.locator("a.repo-metric").nth(0)).toHaveAttribute(
     "href",
-    "/alice/demo/pipelines/7",
+    "/alice/demo/pipelines/7"
   )
-  await expect(metrics.locator("a.repo-metric").nth(1)).toHaveAttribute("href", "/alice/demo/issues")
+  await expect(metrics.locator("a.repo-metric").nth(1)).toHaveAttribute(
+    "href",
+    "/alice/demo/issues"
+  )
   await expect(metrics.locator("a.repo-metric").nth(2)).toHaveAttribute("href", "/alice/demo/pulls")
-  await expect(metrics.locator("a.repo-metric").nth(3)).toHaveAttribute("href", "/alice/demo/review")
-  await expect(metrics.locator("a.repo-metric").nth(4)).toHaveAttribute("href", "/alice/demo/agents")
+  await expect(metrics.locator("a.repo-metric").nth(3)).toHaveAttribute(
+    "href",
+    "/alice/demo/review"
+  )
+  await expect(metrics.locator("a.repo-metric").nth(4)).toHaveAttribute(
+    "href",
+    "/alice/demo/agents"
+  )
 })
 
 // A repo with no runs links the CI tile to the pipelines index (no run number)
@@ -83,7 +92,7 @@ test("repo card with no activity links CI to the pipelines index", async ({ page
   const metrics = page.locator(".repo-metrics").first()
   await expect(metrics.locator("a.repo-metric").nth(0)).toHaveAttribute(
     "href",
-    "/alice/demo/pipelines",
+    "/alice/demo/pipelines"
   )
   // Zero counts carry the data-zero marker the dimmed style hangs off.
   await expect(metrics.locator('.repo-metric__value[data-zero="true"]')).toHaveCount(4)

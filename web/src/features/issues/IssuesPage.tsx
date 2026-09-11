@@ -3,11 +3,11 @@ import "./issues.css"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useIssuesPage } from "@/api/queries"
 import { ISSUE_STATES, type IssueState } from "@/api/types"
-import NewIssueForm from "@/features/issues/NewIssueForm"
-import OverviewCard from "@/shell/OverviewCard"
-import StateIcon from "@/features/issues/StateIcon"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
+import NewIssueForm from "@/features/issues/NewIssueForm"
+import StateIcon from "@/features/issues/StateIcon"
 import { useListNav } from "@/shell/keyboardNav"
+import OverviewCard from "@/shell/OverviewCard"
 import {
   EmptyState,
   ErrorMessage,
@@ -21,6 +21,33 @@ import {
 } from "@/ui"
 
 const PAGE_SIZE = 25
+
+// buildIssuesFilterQuery assembles the filter signature (everything except
+// pagination). Pulled out to module scope so the run of ifs doesn't stack
+// cognitive complexity on top of the component.
+function buildIssuesFilterQuery(f: {
+  activeStates: IssueState[]
+  assignee: string
+  author: string
+  label: string
+  committedQuery: string
+  sort: string
+  ready: boolean
+  blocked: boolean
+  epics: boolean
+}): URLSearchParams {
+  const q = new URLSearchParams()
+  if (f.activeStates.length > 0) q.set("state", f.activeStates.join(","))
+  if (f.assignee) q.set("assignee", f.assignee)
+  if (f.author) q.set("author", f.author)
+  if (f.label) q.set("label", f.label)
+  if (f.committedQuery) q.set("q", f.committedQuery)
+  if (f.sort !== "newest") q.set("sort", f.sort)
+  if (f.ready) q.set("ready", "1")
+  if (f.blocked) q.set("blocked", "1")
+  if (f.epics) q.set("epics", "1")
+  return q
+}
 
 export default function IssuesPage() {
   const { owner = "", repo = "" } = useParams()
@@ -75,17 +102,17 @@ export default function IssuesPage() {
   // The filter signature (everything except pagination). Page resets to 1
   // whenever it changes so a narrowed filter never strands you on a now-empty
   // page.
-  const filterQuery = new URLSearchParams()
-  if (activeStates.length > 0) filterQuery.set("state", activeStates.join(","))
-  if (assignee) filterQuery.set("assignee", assignee)
-  if (author) filterQuery.set("author", author)
-  if (label) filterQuery.set("label", label)
-  if (committedQuery) filterQuery.set("q", committedQuery)
-  if (sort !== "newest") filterQuery.set("sort", sort)
-  if (ready) filterQuery.set("ready", "1")
-  if (blocked) filterQuery.set("blocked", "1")
-  if (epics) filterQuery.set("epics", "1")
-  const filterKey = filterQuery.toString()
+  const filterKey = buildIssuesFilterQuery({
+    activeStates,
+    assignee,
+    author,
+    label,
+    committedQuery,
+    sort,
+    ready,
+    blocked,
+    epics,
+  }).toString()
 
   // Reset to page 1 when the filter changes (React's adjust-state-during-render
   // pattern — no effect needed for derived resets).
@@ -133,7 +160,7 @@ export default function IssuesPage() {
     count: issues.length,
     onActivate: (i) => {
       const iss = issues[i]
-      if (iss) navigate(`/${owner}/${repo}/issues/${iss.number}`)
+      if (iss) void navigate(`/${owner}/${repo}/issues/${iss.number}`)
     },
   })
 
@@ -147,7 +174,7 @@ export default function IssuesPage() {
     const m = search.trim().match(/^#?(\d+)$/)
     if (m) {
       e.preventDefault()
-      navigate(`/${owner}/${repo}/issues/${m[1]}`)
+      void navigate(`/${owner}/${repo}/issues/${m[1]}`)
     }
   }
 

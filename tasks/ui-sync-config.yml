@@ -1,0 +1,10 @@
+description: copy ts-quality's config into web/ and print the npm scripts + .npmrc block
+
+# tq/sync-config writes web/biome.base.json and web/tsconfig.base.json, then
+# prints package-scripts.json (paste into web/package.json) and the .npmrc
+# supply-chain defaults, which npm gives no include mechanism to copy. The
+# checkout is tasks/ui-tools.yml's job and the pin lives there.
+steps:
+  - name: shared config
+    use: "{{ home }}/.cache/provision/tools/ts-quality/sync-config.yml"
+    props: { dir: web }

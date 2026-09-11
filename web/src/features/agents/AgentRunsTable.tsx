@@ -1,13 +1,13 @@
+import { useVirtualizer } from "@tanstack/react-virtual"
 import { useRef } from "react"
 import { Link } from "react-router-dom"
-import { useVirtualizer } from "@tanstack/react-virtual"
 import type { CIRun } from "@/api/types"
+import { runTrigger } from "@/features/agents/agentHelpers"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
 import { executionModelLabel, runDuration, shortSHA } from "@/features/pipelines/runHelpers"
 import { repoHue } from "@/shell/repoColor"
 import { absoluteTime, timeAgo } from "@/shell/timeAgo"
 import { Table } from "@/ui"
-import { runTrigger } from "@/features/agents/agentHelpers"
 
 // AgentRunRow pairs a run with its owning repo so a single table serves both the
 // per-repo Agents tab and the cross-repo /agents view (owner/name come from the
@@ -39,9 +39,9 @@ export default function AgentRunsTable({
   })
 
   const vItems = virtualizer.getVirtualItems()
-  const paddingTop = vItems.length > 0 ? vItems[0].start : 0
+  const paddingTop = vItems.length > 0 ? (vItems[0]?.start ?? 0) : 0
   const paddingBottom =
-    vItems.length > 0 ? virtualizer.getTotalSize() - vItems[vItems.length - 1].end : 0
+    vItems.length > 0 ? virtualizer.getTotalSize() - (vItems[vItems.length - 1]?.end ?? 0) : 0
 
   return (
     <div ref={scrollRef} className="agent-runs-scroll">
@@ -64,7 +64,9 @@ export default function AgentRunsTable({
             </tr>
           )}
           {vItems.map((vItem) => {
-            const { owner, name, run } = rows[vItem.index]
+            const row = rows[vItem.index]
+            if (!row) return null
+            const { owner, name, run } = row
             const repoPath = `/${owner}/${name}`
             const trigger = runTrigger(run)
             return (

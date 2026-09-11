@@ -2,10 +2,11 @@ import clsx from "clsx"
 import "./pulls.css"
 import { lazy, Suspense, useMemo } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
-import { useBlob, useCodeComments, useWhoami } from "@/api/queries"
 import { useDeleteCodeComment, useSetCodeCommentResolved } from "@/api/mutations"
-import BranchSelector from "@/features/repo/BranchSelector"
+import { useBlob, useCodeComments, useWhoami } from "@/api/queries"
+import type { CodeComment, CodeCommentState } from "@/api/types"
 import DraftReviewButton from "@/features/pulls/DraftReviewButton"
+import BranchSelector from "@/features/repo/BranchSelector"
 import OverviewCard from "@/shell/OverviewCard"
 import {
   Avatar,
@@ -17,7 +18,6 @@ import {
   ErrorMessage,
   Spinner,
 } from "@/ui"
-import type { CodeComment, CodeCommentState } from "@/api/types"
 
 // Lines of context shown above and below each comment's annotated range, so a
 // snippet reads like a slice cut from the blob viewer rather than the bare
@@ -137,7 +137,7 @@ function ReviewFile({
   gitRef: string
   path: string
   comments: CodeComment[]
-  currentUser?: string
+  currentUser?: string | undefined
 }) {
   const blobQ = useBlob(owner, repo, path, gitRef)
 

@@ -18,7 +18,7 @@ export default function NewGlobalPullForm() {
   // "owner/name" of the chosen repo — empty until one is picked. Splitting it
   // back out keeps a single <select> value while feeding the per-repo hooks.
   const [repoKey, setRepoKey] = useState("")
-  const [owner, name] = repoKey ? repoKey.split("/") : ["", ""]
+  const [repoOwner = "", repoName = ""] = repoKey ? repoKey.split("/") : ["", ""]
 
   const [base, setBase] = useState("")
   const [head, setHead] = useState("")
@@ -28,11 +28,11 @@ export default function NewGlobalPullForm() {
   const reposQ = useRepos()
   const repos = reposQ.data ?? []
   // Branches load once a project is selected; useRefs is gated on owner+repo.
-  const refsQ = useRefs(owner, name)
+  const refsQ = useRefs(repoOwner, repoName)
   const branches = refsQ.data?.branches ?? []
   const def = refsQ.data?.default ?? ""
 
-  const createPull = useCreatePull(owner, name)
+  const createPull = useCreatePull(repoOwner, repoName)
 
   // base defaults to the repo's default branch the first time branches arrive;
   // the user can still override either picker.
@@ -77,7 +77,7 @@ export default function NewGlobalPullForm() {
       {
         onSuccess: (pr) => {
           close()
-          navigate(`/${owner}/${name}/pulls/${pr.number}`)
+          void navigate(`/${repoOwner}/${repoName}/pulls/${pr.number}`)
         },
       }
     )

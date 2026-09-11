@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import { mockApi } from "./mockApi"
 
 // The gate must validate a token against /api/whoami before persisting it, so
@@ -11,7 +11,7 @@ test("invalid token is rejected at the gate and never persisted", async ({ page 
       status: 401,
       contentType: "application/json",
       body: JSON.stringify({ error: "invalid token" }),
-    }),
+    })
   )
 
   await page.goto("/")

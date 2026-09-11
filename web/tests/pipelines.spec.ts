@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test"
-import { mockApi, seedToken, type State } from "./mockApi"
+import { expect, test } from "@playwright/test"
+import { mockApi, type State, seedToken } from "./mockApi"
 
 test.beforeEach(async ({ page }) => {
   await seedToken(page)
@@ -280,11 +280,18 @@ test("agent run renders the claude transcript instead of the job DAG", async ({ 
         created_at: iso,
         started_at: iso,
         finished_at: iso,
-        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        jobs: [
+          { name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso },
+        ],
         events: {
           agent: [
             { seq: 1, type: "run.started", time: 0, data: { total_steps: 1 } },
-            { seq: 2, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #5: do it" } },
+            {
+              seq: 2,
+              type: "agent.turn.started",
+              time: 0,
+              data: { turn: 1, prompt: "Issue #5: do it" },
+            },
             {
               seq: 3,
               type: "agent.message",
@@ -362,7 +369,9 @@ test("a spec-verify run renders the agent transcript, not the CI job view (#270)
         created_at: iso,
         started_at: iso,
         finished_at: iso,
-        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        jobs: [
+          { name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso },
+        ],
         events: {
           agent: [
             { seq: 1, type: "run.started", time: 0, data: { total_steps: 1 } },
@@ -379,7 +388,10 @@ test("a spec-verify run renders the agent transcript, not the CI job view (#270)
               data: {
                 claude: {
                   type: "assistant",
-                  message: { role: "assistant", content: [{ type: "text", text: "classifying spec" }] },
+                  message: {
+                    role: "assistant",
+                    content: [{ type: "text", text: "classifying spec" }],
+                  },
                 },
               },
             },
@@ -434,10 +446,17 @@ test("a mooncake-agent run renders its steps, not a blank transcript", async ({ 
         created_at: iso,
         started_at: iso,
         finished_at: iso,
-        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        jobs: [
+          { name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso },
+        ],
         events: {
           agent: [
-            { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #6: do it" } },
+            {
+              seq: 1,
+              type: "agent.turn.started",
+              time: 0,
+              data: { turn: 1, prompt: "Issue #6: do it" },
+            },
             // Mooncake events arrive under data.mooncake, not data.claude (#123).
             {
               seq: 2,
@@ -546,8 +565,12 @@ test("a mooncake-agent run renders its steps, not a blank transcript", async ({ 
   await expect(transcript).toBeVisible()
   // Each step is one compact line: just the name (both completed `changed`, so
   // a ~ glyph), no `🔧 action ·` label, no `$ command`, no success output.
-  await expect(transcript.locator(".agent-step--changed", { hasText: "create CHANGELOG.md" })).toBeVisible()
-  await expect(transcript.locator(".agent-step--changed", { hasText: "report progress" })).toBeVisible()
+  await expect(
+    transcript.locator(".agent-step--changed", { hasText: "create CHANGELOG.md" })
+  ).toBeVisible()
+  await expect(
+    transcript.locator(".agent-step--changed", { hasText: "report progress" })
+  ).toBeVisible()
   await expect(transcript).not.toContainText("🔧")
   await expect(transcript).not.toContainText("$ mgit issue comment 6 --body done")
   await expect(transcript).not.toContainText("commented on #6 by agent-run-9")
@@ -599,10 +622,17 @@ test("a stalled agent run reads neutral 'stalled', not red 'failed' (#173)", asy
         created_at: iso,
         started_at: iso,
         finished_at: iso,
-        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        jobs: [
+          { name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso },
+        ],
         events: {
           agent: [
-            { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #6: do it" } },
+            {
+              seq: 1,
+              type: "agent.turn.started",
+              time: 0,
+              data: { turn: 1, prompt: "Issue #6: do it" },
+            },
             {
               seq: 2,
               type: "agent.message",
@@ -672,18 +702,39 @@ test("a failed mooncake step shows a ✗ row with its command + error inline", a
         created_at: iso,
         started_at: iso,
         finished_at: iso,
-        jobs: [{ name: "agent", status: "failed", exit_code: 1, started_at: iso, finished_at: iso }],
+        jobs: [
+          { name: "agent", status: "failed", exit_code: 1, started_at: iso, finished_at: iso },
+        ],
         events: {
           agent: [
-            { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #6: do it" } },
+            {
+              seq: 1,
+              type: "agent.turn.started",
+              time: 0,
+              data: { turn: 1, prompt: "Issue #6: do it" },
+            },
             mooncake(2, "step.started", { step_id: "s1", action: "shell", name: "run the tests" }),
-            mooncake(3, "step.stdout", { step_id: "s1", stream: "stdout", line: "--- FAIL: TestThing" }),
+            mooncake(3, "step.stdout", {
+              step_id: "s1",
+              stream: "stdout",
+              line: "--- FAIL: TestThing",
+            }),
             mooncake(4, "step.completed", {
               step_id: "s1",
               duration_ms: 9,
-              result: { status: "failed", failed: true, target: "go test ./...", error: "exit status 1" },
+              result: {
+                status: "failed",
+                failed: true,
+                target: "go test ./...",
+                error: "exit status 1",
+              },
             }),
-            mooncake(5, "run.completed", { success_steps: 0, changed_steps: 0, failed_steps: 1, duration_ms: 9 }),
+            mooncake(5, "run.completed", {
+              success_steps: 0,
+              changed_steps: 0,
+              failed_steps: 1,
+              duration_ms: 9,
+            }),
             {
               seq: 6,
               type: "agent.turn.completed",
@@ -747,22 +798,50 @@ test("a mooncake-agent run streams the planner's live output during the plan pha
         created_at: iso,
         started_at: iso,
         finished_at: iso,
-        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        jobs: [
+          { name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso },
+        ],
         events: {
           agent: [
-            { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #6: do it" } },
-            mooncake(2, "plan.generating", { iteration: 1, provider: "anthropic-cli", model: "claude" }),
+            {
+              seq: 1,
+              type: "agent.turn.started",
+              time: 0,
+              data: { turn: 1, prompt: "Issue #6: do it" },
+            },
+            mooncake(2, "plan.generating", {
+              iteration: 1,
+              provider: "anthropic-cli",
+              model: "claude",
+            }),
             // A run of "thinking" deltas, then "text" deltas: each kind
             // coalesces into one row (mutated in place), kind flips open a new
             // row so the dim/normal styling tracks the kind.
             mooncake(3, "planner.delta", { iteration: 1, text: "I should ", kind: "thinking" }),
-            mooncake(4, "planner.delta", { iteration: 1, text: "edit the changelog.", kind: "thinking" }),
+            mooncake(4, "planner.delta", {
+              iteration: 1,
+              text: "edit the changelog.",
+              kind: "thinking",
+            }),
             mooncake(5, "planner.delta", { iteration: 1, text: "- write: ", kind: "text" }),
             mooncake(6, "planner.delta", { iteration: 1, text: "CHANGELOG.md", kind: "text" }),
             mooncake(7, "plan.loaded", { total_steps: 1 }),
-            mooncake(8, "step.started", { step_id: "s1", action: "file.write", name: "create CHANGELOG.md" }),
-            mooncake(9, "step.completed", { step_id: "s1", duration_ms: 1, result: { status: "changed" } }),
-            mooncake(10, "run.completed", { success_steps: 1, changed_steps: 1, failed_steps: 0, duration_ms: 5 }),
+            mooncake(8, "step.started", {
+              step_id: "s1",
+              action: "file.write",
+              name: "create CHANGELOG.md",
+            }),
+            mooncake(9, "step.completed", {
+              step_id: "s1",
+              duration_ms: 1,
+              result: { status: "changed" },
+            }),
+            mooncake(10, "run.completed", {
+              success_steps: 1,
+              changed_steps: 1,
+              failed_steps: 0,
+              duration_ms: 5,
+            }),
             {
               seq: 11,
               type: "agent.turn.completed",
@@ -782,22 +861,28 @@ test("a mooncake-agent run streams the planner's live output during the plan pha
   // "planning…"; the plan text coalesces into one full-strength row.
   const thinking = transcript.locator(".agent-entry--thinking")
   await expect(thinking).toContainText("I should edit the changelog.")
-  await expect(transcript.locator(".agent-entry--thinking .agent-entry__label")).toContainText("planning…")
+  await expect(transcript.locator(".agent-entry--thinking .agent-entry__label")).toContainText(
+    "planning…"
+  )
   await expect(transcript.locator(".agent-entry--planning")).toContainText("- write: CHANGELOG.md")
   // plan.loaded still closes the phase with the step card; the live planner
   // rows sit above it under the Turn card.
   await expect(
     transcript.locator(".agent-card .ci-step__head", { hasText: "plan · 1 steps" })
   ).toBeVisible()
-  await expect(transcript.locator(".agent-step--changed", { hasText: "create CHANGELOG.md" })).toBeVisible()
+  await expect(
+    transcript.locator(".agent-step--changed", { hasText: "create CHANGELOG.md" })
+  ).toBeVisible()
 })
 
-test("a long agent log virtualizes (windowed cards) and auto-follows the bottom", async ({ page }) => {
+test("a long agent log virtualizes (windowed cards) and auto-follows the bottom", async ({
+  page,
+}) => {
   // Many turns → many cards. Each turn is a "Turn N" card + a "plan · 1 steps"
   // card, so the transcript is a tall stack that must window + auto-follow.
   const N = 30
-  const mc = (seq: number, type: string, data: Record<string, unknown>) => ({
-    seq,
+  const mc = (mcSeq: number, type: string, data: Record<string, unknown>) => ({
+    seq: mcSeq,
     type: "agent.message",
     time: 0,
     data: { mooncake: { type, data } },
@@ -805,12 +890,37 @@ test("a long agent log virtualizes (windowed cards) and auto-follows the bottom"
   const evs: Array<{ seq: number; type: string; time: number; data?: Record<string, unknown> }> = []
   let seq = 1
   for (let t = 1; t <= N; t++) {
-    evs.push({ seq: seq++, type: "agent.turn.started", time: 0, data: { turn: t, prompt: `turn ${String(t).padStart(2, "0")} prompt` } })
+    evs.push({
+      seq: seq++,
+      type: "agent.turn.started",
+      time: 0,
+      data: { turn: t, prompt: `turn ${String(t).padStart(2, "0")} prompt` },
+    })
     evs.push(mc(seq++, "plan.loaded", { total_steps: 1 }))
-    evs.push(mc(seq++, "step.started", { step_id: `s${t}`, action: "file.write", name: `step in turn ${String(t).padStart(2, "0")}` }))
-    evs.push(mc(seq++, "step.completed", { step_id: `s${t}`, duration_ms: 1, result: { status: "ok" } }))
-    evs.push(mc(seq++, "run.completed", { success_steps: 1, changed_steps: 0, failed_steps: 0, duration_ms: 1 }))
-    evs.push({ seq: seq++, type: "agent.turn.completed", time: 0, data: { turn: t, status: "success", num_turns: 0, duration_ms: 0 } })
+    evs.push(
+      mc(seq++, "step.started", {
+        step_id: `s${t}`,
+        action: "file.write",
+        name: `step in turn ${String(t).padStart(2, "0")}`,
+      })
+    )
+    evs.push(
+      mc(seq++, "step.completed", { step_id: `s${t}`, duration_ms: 1, result: { status: "ok" } })
+    )
+    evs.push(
+      mc(seq++, "run.completed", {
+        success_steps: 1,
+        changed_steps: 0,
+        failed_steps: 0,
+        duration_ms: 1,
+      })
+    )
+    evs.push({
+      seq: seq++,
+      type: "agent.turn.completed",
+      time: 0,
+      data: { turn: t, status: "success", num_turns: 0, duration_ms: 0 },
+    })
   }
 
   await mockApi(page, {
@@ -839,7 +949,9 @@ test("a long agent log virtualizes (windowed cards) and auto-follows the bottom"
         created_at: iso,
         started_at: iso,
         finished_at: iso,
-        jobs: [{ name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso }],
+        jobs: [
+          { name: "agent", status: "success", exit_code: 0, started_at: iso, finished_at: iso },
+        ],
         events: { agent: evs },
       },
     ],
@@ -881,7 +993,9 @@ test("a long agent log virtualizes (windowed cards) and auto-follows the bottom"
   // …and clicking it scrolls back to the bottom and hides the control again.
   await jump.click()
   await expect(jump).toHaveCount(0)
-  const backAtBottom = await box.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight < 40)
+  const backAtBottom = await box.evaluate(
+    (el) => el.scrollHeight - el.scrollTop - el.clientHeight < 40
+  )
   expect(backAtBottom).toBe(true)
 })
 
@@ -929,7 +1043,9 @@ test("an in-flight agent turn shows a planning/working indicator; a parked run s
         number: 1,
         status: "running",
         finished_at: null,
-        jobs: [{ name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+        jobs: [
+          { name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null },
+        ],
         events: { agent: [turnStarted] },
       },
       // #2 running, a step has begun (no turn.completed) → "Working…"
@@ -938,7 +1054,9 @@ test("an in-flight agent turn shows a planning/working indicator; a parked run s
         number: 2,
         status: "running",
         finished_at: null,
-        jobs: [{ name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+        jobs: [
+          { name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null },
+        ],
         events: {
           agent: [
             turnStarted,
@@ -953,7 +1071,9 @@ test("an in-flight agent turn shows a planning/working indicator; a parked run s
         number: 3,
         status: "awaiting_input",
         finished_at: null,
-        jobs: [{ name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+        jobs: [
+          { name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null },
+        ],
         events: {
           agent: [
             turnStarted,
@@ -1006,10 +1126,17 @@ test("an awaiting-input agent run shows a message box and queues a follow-up", a
         created_at: iso,
         started_at: iso,
         finished_at: null,
-        jobs: [{ name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+        jobs: [
+          { name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null },
+        ],
         events: {
           agent: [
-            { seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #5: do it" } },
+            {
+              seq: 1,
+              type: "agent.turn.started",
+              time: 0,
+              data: { turn: 1, prompt: "Issue #5: do it" },
+            },
             { seq: 2, type: "agent.turn.completed", time: 0, data: { turn: 1, status: "success" } },
           ],
         },
@@ -1050,7 +1177,9 @@ test("an awaiting-input agent run shows a message box and queues a follow-up", a
   await expect(page.getByText(/This agent run has finished/)).toBeVisible()
 })
 
-test("a running agent run can be force-stopped while Finish is disabled (#146)", async ({ page }) => {
+test("a running agent run can be force-stopped while Finish is disabled (#146)", async ({
+  page,
+}) => {
   const state = await mockApi(page, {
     repos: [
       {
@@ -1076,9 +1205,18 @@ test("a running agent run can be force-stopped while Finish is disabled (#146)",
         created_at: iso,
         started_at: iso,
         finished_at: null,
-        jobs: [{ name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+        jobs: [
+          { name: "agent", status: "running", exit_code: null, started_at: iso, finished_at: null },
+        ],
         events: {
-          agent: [{ seq: 1, type: "agent.turn.started", time: 0, data: { turn: 1, prompt: "Issue #5: do it" } }],
+          agent: [
+            {
+              seq: 1,
+              type: "agent.turn.started",
+              time: 0,
+              data: { turn: 1, prompt: "Issue #5: do it" },
+            },
+          ],
         },
       },
     ],
@@ -1145,7 +1283,9 @@ test("a running CI run can be force-stopped from the run header (#296)", async (
         created_at: iso,
         started_at: iso,
         finished_at: null,
-        jobs: [{ name: "build", status: "running", exit_code: null, started_at: iso, finished_at: null }],
+        jobs: [
+          { name: "build", status: "running", exit_code: null, started_at: iso, finished_at: null },
+        ],
       },
     ],
   })

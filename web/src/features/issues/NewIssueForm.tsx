@@ -57,9 +57,8 @@ export default function NewIssueForm({ owner, repo, onCreated }: Props) {
 
   function open() {
     // Default the picker to the first repo so a submit is one field away.
-    if (needsPicker && !target && repos && repos.length > 0) {
-      setTarget(`${repos[0].owner}/${repos[0].name}`)
-    }
+    const first = needsPicker && !target ? repos?.[0] : undefined
+    if (first) setTarget(`${first.owner}/${first.name}`)
     dialogRef.current?.showModal()
     // Microtask so the dialog is rendered before we try to focus.
     queueMicrotask(() => titleRef.current?.focus())

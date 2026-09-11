@@ -1,8 +1,8 @@
 import { lazy, Suspense } from "react"
 import { useBlob } from "@/api/queries"
-import { isMarkdown } from "@/features/repo/readme"
 import type { TreeEntry } from "@/api/types"
 import FileIcon from "@/features/repo/FileIcon"
+import { isMarkdown } from "@/features/repo/readme"
 
 // The markdown renderer pulls in remark/rehype + the highlighter; load it only
 // when a README is actually shown.

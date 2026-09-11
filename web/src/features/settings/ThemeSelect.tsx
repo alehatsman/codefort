@@ -1,6 +1,6 @@
 import { useState } from "react"
 import "./settings.css"
-import { THEMES, getTheme, setTheme, type ThemeId } from "@/theme"
+import { getTheme, setTheme, THEMES, type ThemeId } from "@/theme"
 
 export default function ThemeSelect() {
   const [theme, setThemeState] = useState<ThemeId>(() => getTheme())

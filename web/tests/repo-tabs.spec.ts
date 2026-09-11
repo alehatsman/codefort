@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import { mockApi, seedToken } from "./mockApi"
 
 // RepoTabs renders a count pill of the work waiting on each tab. The counts are

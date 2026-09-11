@@ -1,8 +1,7 @@
 import clsx from "clsx"
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { useLocation } from "react-router-dom"
-import { highlight, langFromPath, splitLines } from "@/ui/highlight"
 import {
   useCreateCodeComment,
   useDeleteCodeComment,
@@ -10,6 +9,7 @@ import {
 } from "@/api/mutations"
 import type { CodeComment } from "@/api/types"
 import { Badge, Button, Comment, ErrorMessage, Textarea, Tooltip } from "@/ui"
+import { highlight, langFromPath, splitLines } from "@/ui/highlight"
 
 // The markdown renderer pulls in remark/rehype; load it lazily.
 const Markdown = lazy(() => import("@/shell/Markdown"))
@@ -27,7 +27,7 @@ interface Props {
   /** Existing comments for this file on this ref. */
   comments?: CodeComment[]
   /** Authenticated user's name, for author-only resolve/delete affordances. */
-  currentUser?: string
+  currentUser?: string | undefined
 }
 
 /**
@@ -343,5 +343,5 @@ function ComposeForm({
 function parseLineRange(hash: string): [number | null, number | null] {
   const m = /^#L(\d+)(?:-L?(\d+))?$/.exec(hash)
   if (!m) return [null, null]
-  return [parseInt(m[1], 10), m[2] ? parseInt(m[2], 10) : null]
+  return [parseInt(m[1] ?? "", 10), m[2] ? parseInt(m[2], 10) : null]
 }

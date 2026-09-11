@@ -7,7 +7,7 @@ export interface FieldSlot {
   /** Put this on the control's `id` so the label's `htmlFor` matches. */
   controlId: string
   /** Put this on the control's `aria-describedby` (hint + error ids). */
-  describedBy?: string
+  describedBy?: string | undefined
 }
 
 interface Props {

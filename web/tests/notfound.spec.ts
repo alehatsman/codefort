@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import { mockApi, seedToken } from "./mockApi"
 
 // Unmatched routes and 404s render a styled NotFound page with a link home —
@@ -33,7 +33,7 @@ test("an unregistered repo (404) shows NotFound, not a raw error string", async 
       status: 404,
       contentType: "application/json",
       body: JSON.stringify({ error: "repo not registered: alice/ghost" }),
-    }),
+    })
   )
   await page.goto("/alice/ghost")
 

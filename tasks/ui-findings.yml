@@ -1,0 +1,8 @@
+description: write every web/ gate finding to web/.gate/findings.jsonl for an agent to read
+
+# tq/findings. A pure producer: it never re-gates and never aborts, so a red
+# gate still yields a complete file. Enforcement stays with tasks/ui-ci.yml.
+steps:
+  - name: collect findings
+    use: "{{ home }}/.cache/provision/tools/ts-quality/findings.yml"
+    props: { dir: web }

@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
 import { api } from "@/api/client"
 import { useCIRun, useRepo, useSpec, useSpecsList } from "@/api/queries"
+import type { CIRun, SpecContent, SpecListItem, SpecVerification } from "@/api/types"
 import CommandPalette, { type Command } from "@/features/specs/CommandPalette"
 import QuickOpen from "@/features/specs/QuickOpen"
 import SpecEditor from "@/features/specs/SpecEditor"
@@ -11,7 +12,6 @@ import SpecSearch from "@/features/specs/SpecSearch"
 import Markdown from "@/shell/Markdown"
 import OverviewCard from "@/shell/OverviewCard"
 import { Button, EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
-import type { CIRun, SpecContent, SpecListItem, SpecVerification } from "@/api/types"
 
 /**
  * Specs tab: in-repo, human-authored specifications under specs/ — the dual of
@@ -416,8 +416,8 @@ function VerifyWatch({
   // biome-ignore lint/correctness/useExhaustiveDependencies: refresh once the watched run reaches a terminal state
   useEffect(() => {
     if (status && terminalStatuses.has(status)) {
-      qc.invalidateQueries({ queryKey: ["spec", owner, repo, path] })
-      qc.invalidateQueries({ queryKey: ["specs", owner, repo] })
+      void qc.invalidateQueries({ queryKey: ["spec", owner, repo, path] })
+      void qc.invalidateQueries({ queryKey: ["specs", owner, repo] })
       onDone()
     }
   }, [status])
@@ -441,7 +441,7 @@ function VerifyAllButton({ owner, repo }: { owner: string; repo: string }) {
       return stale.length
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["specs", owner, repo] })
+      void qc.invalidateQueries({ queryKey: ["specs", owner, repo] })
     },
   })
   return (
@@ -527,7 +527,7 @@ function newSpecTemplate(slug: string): string {
   const title = slug
     .split(/[-_/]/)
     .filter(Boolean)
-    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .map((w) => (w[0]?.toUpperCase() ?? "") + w.slice(1))
     .join(" ")
   return `---
 id: ${slug}
@@ -596,27 +596,35 @@ function useSpecKeyboardNav(
   onSelectRef.current = onSelect
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      const el = document.activeElement as HTMLElement | null
-      const tag = el?.tagName
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable) return
-      let delta = 0
-      if (e.key === "ArrowDown" || e.key === "j") delta = 1
-      else if (e.key === "ArrowUp" || e.key === "k") delta = -1
-      else return
-      const list = specsRef.current
-      if (list.length === 0) return
-      e.preventDefault()
-      const cur = list.findIndex((s) => s.path === selectedRef.current)
-      const next = Math.min(Math.max((cur === -1 ? 0 : cur) + delta, 0), list.length - 1)
-      if (list[next] && list[next].path !== selectedRef.current) {
-        onSelectRef.current(list[next].path)
-      }
-    }
+    const onKey = (e: KeyboardEvent) => handleSpecKeyboardNav(e, specsRef, selectedRef, onSelectRef)
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [])
+}
+
+// The keydown handler for useSpecKeyboardNav, pulled out to module scope so
+// its branches don't stack cognitive complexity on top of the effect's.
+function handleSpecKeyboardNav(
+  e: KeyboardEvent,
+  specsRef: { current: SpecListItem[] },
+  selectedRef: { current: string },
+  onSelectRef: { current: (path: string) => void }
+): void {
+  if (e.metaKey || e.ctrlKey || e.altKey) return
+  const el = document.activeElement as HTMLElement | null
+  const tag = el?.tagName
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable) return
+  let delta = 0
+  if (e.key === "ArrowDown" || e.key === "j") delta = 1
+  else if (e.key === "ArrowUp" || e.key === "k") delta = -1
+  else return
+  const list = specsRef.current
+  if (list.length === 0) return
+  e.preventDefault()
+  const cur = list.findIndex((s) => s.path === selectedRef.current)
+  const next = Math.min(Math.max((cur === -1 ? 0 : cur) + delta, 0), list.length - 1)
+  const target = list[next]
+  if (target && target.path !== selectedRef.current) onSelectRef.current(target.path)
 }
 
 // useSpecHotkeys wires the Specs tab's palette shortcuts, taking over the
@@ -638,22 +646,31 @@ function useSpecHotkeys({
   const commandRef = useRef(onCommand)
   commandRef.current = onCommand
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const mod = e.metaKey || e.ctrlKey
-      if (!mod || e.altKey) return
-      const key = e.key.toLowerCase()
-      if (key === "k" && !e.shiftKey) {
-        e.preventDefault()
-        commandRef.current()
-      } else if (key === "p" && !e.shiftKey) {
-        e.preventDefault()
-        jumpRef.current()
-      } else if (key === "f" && e.shiftKey) {
-        e.preventDefault()
-        searchRef.current()
-      }
-    }
+    const onKey = (e: KeyboardEvent) => handleSpecHotkey(e, jumpRef, searchRef, commandRef)
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [])
+}
+
+// The keydown handler for useSpecHotkeys, pulled out to module scope so its
+// branches don't stack cognitive complexity on top of the effect's.
+function handleSpecHotkey(
+  e: KeyboardEvent,
+  jumpRef: { current: () => void },
+  searchRef: { current: () => void },
+  commandRef: { current: () => void }
+): void {
+  const mod = e.metaKey || e.ctrlKey
+  if (!mod || e.altKey) return
+  const key = e.key.toLowerCase()
+  if (key === "k" && !e.shiftKey) {
+    e.preventDefault()
+    commandRef.current()
+  } else if (key === "p" && !e.shiftKey) {
+    e.preventDefault()
+    jumpRef.current()
+  } else if (key === "f" && e.shiftKey) {
+    e.preventDefault()
+    searchRef.current()
+  }
 }

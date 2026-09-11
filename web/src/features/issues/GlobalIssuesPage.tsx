@@ -6,6 +6,7 @@ import { ISSUE_STATES, type IssueState } from "@/api/types"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import NewIssueForm from "@/features/issues/NewIssueForm"
 import StateIcon from "@/features/issues/StateIcon"
+import { useListNav } from "@/shell/keyboardNav"
 import { repoHue } from "@/shell/repoColor"
 import { useRepoFilter } from "@/shell/useRepoFilter"
 import {
@@ -19,7 +20,6 @@ import {
   Pagination,
   SkeletonList,
 } from "@/ui"
-import { useListNav } from "@/shell/keyboardNav"
 
 const PAGE_SIZE = 25
 
@@ -92,7 +92,7 @@ export default function GlobalIssuesPage() {
     count: issues.length,
     onActivate: (i) => {
       const iss = issues[i]
-      if (iss) navigate(`/${iss.repo.owner}/${iss.repo.name}/issues/${iss.number}`)
+      if (iss) void navigate(`/${iss.repo.owner}/${iss.repo.name}/issues/${iss.number}`)
     },
   })
 

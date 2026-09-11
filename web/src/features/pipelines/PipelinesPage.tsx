@@ -1,13 +1,26 @@
 import { useRef, useState } from "react"
 import "./pipelines.css"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import clsx from "clsx"
 import { Link, useNavigate, useParams } from "react-router-dom"
-import { useVirtualizer } from "@tanstack/react-virtual"
-import { useCIRun, useCIRuns, useRefs, useRepo } from "@/api/queries"
 import { useCancelCIRun, useRerunCIRun, useSetCIEnabled, useTriggerCIRun } from "@/api/mutations"
-import { absoluteTime, timeAgo } from "@/shell/timeAgo"
-import type { Repo } from "@/api/types"
+import { useCIRun, useCIRuns, useRefs, useRepo } from "@/api/queries"
+import type { CIRun, CIRunDetail, Repo } from "@/api/types"
+import AgentRunBody from "@/features/agents/AgentRunBody"
+import CIRunBody from "@/features/pipelines/CIRunBody"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
+import {
+  executionModelLabel,
+  isAgentRun,
+  isRunActive,
+  type RunKind,
+  runDuration,
+  runsBasePath,
+  shortRef,
+  shortSHA,
+} from "@/features/pipelines/runHelpers"
+import OverviewCard from "@/shell/OverviewCard"
+import { absoluteTime, timeAgo } from "@/shell/timeAgo"
 import {
   Button,
   EmptyState,
@@ -18,19 +31,6 @@ import {
   Table,
   useToast,
 } from "@/ui"
-import AgentRunBody from "@/features/agents/AgentRunBody"
-import CIRunBody from "@/features/pipelines/CIRunBody"
-import OverviewCard from "@/shell/OverviewCard"
-import {
-  type RunKind,
-  executionModelLabel,
-  isAgentRun,
-  isRunActive,
-  runDuration,
-  runsBasePath,
-  shortRef,
-  shortSHA,
-} from "@/features/pipelines/runHelpers"
 
 // Pipelines tab. One component serves the runs list (/pipelines) and a single
 // run's detail (/pipelines/:number), distinguished by the URL — mirroring how
@@ -40,7 +40,7 @@ import {
 // AgentRunBody (transcript + message box).
 export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
   const { owner = "", repo = "" } = useParams()
-  const numberParam = useParams().number
+  const numberParam = useParams()["number"]
   const repoQ = useRepo(owner, repo)
 
   if (repoQ.isLoading) return <SkeletonText lines={4} />
@@ -118,51 +118,14 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
 
   return (
     <section className="pipelines">
-      <div className="pipelines__head">
-        <h2 className="pipelines__title">{isAgent ? "Agents" : "Pipelines"}</h2>
-        {!isAgent && (
-          <div className="pipelines__actions">
-            <form className="pipelines__run" onSubmit={runPipeline}>
-              <Input
-                className="pipelines__run-ref"
-                value={ref}
-                onChange={(e) => setRefInput(e.target.value)}
-                placeholder="branch, tag, or commit"
-                aria-label="Ref to run"
-              />
-              <Button
-                type="submit"
-                variant="primary"
-                size="small"
-                disabled={trigger.isPending || ref.trim() === ""}
-              >
-                {trigger.isPending ? "Running…" : "Run pipeline"}
-              </Button>
-            </form>
-            <Button
-              size="small"
-              onClick={() => setEnabled.mutate(false)}
-              disabled={setEnabled.isPending}
-              title="Disable CI for this repo"
-            >
-              Disable CI
-            </Button>
-          </div>
-        )}
-      </div>
-      <p className="muted small pipelines__lead">
-        {isAgent ? (
-          <>
-            Agent runs are spawned from an issue (the "Spawn agent" button); each works the issue in
-            an isolated container.
-          </>
-        ) : (
-          <>
-            Runs trigger on push when an <code>mgitci.yml</code> is present at the pushed commit, or
-            on demand for any ref above.
-          </>
-        )}
-      </p>
+      <RunListHead
+        isAgent={isAgent}
+        ref={ref}
+        setRefInput={setRefInput}
+        runPipeline={runPipeline}
+        trigger={trigger}
+        setEnabled={setEnabled}
+      />
       <ErrorMessage error={trigger.error} inline />
 
       {runsQ.isLoading && (
@@ -210,37 +173,16 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
               )}
               {virtualItems.map((vrow) => {
                 const run = runs[vrow.index]
+                if (!run) return null
                 return (
-                  <tr key={run.number}>
-                    <td>
-                      <Link className="ci-runs__num" to={`/${owner}/${repo}/${base}/${run.number}`}>
-                        #{run.number}
-                      </Link>
-                      {isAgent && (
-                        <span className="ci-runs__model muted small">
-                          {executionModelLabel(run.execution_model)}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <CIStatusBadge status={run.status} />
-                    </td>
-                    <td className="ci-runs__commit">
-                      <span className="ci-runs__msg" title={run.commit_msg || undefined}>
-                        {run.commit_msg || "(no commit message)"}
-                      </span>
-                      <span className="ci-runs__sha muted small" title={run.commit_sha}>
-                        {shortSHA(run.commit_sha)}
-                        {run.commit_author ? ` · ${run.commit_author}` : ""}
-                      </span>
-                    </td>
-                    {!isAgent && <td className="muted">{shortRef(run.ref)}</td>}
-                    <td className="muted">{run.trigger || "—"}</td>
-                    <td className="muted">{runDuration(run)}</td>
-                    <td className="muted" title={absoluteTime(run.created_at)}>
-                      {timeAgo(run.created_at)}
-                    </td>
-                  </tr>
+                  <RunRow
+                    key={run.number}
+                    run={run}
+                    owner={owner}
+                    repo={repo}
+                    base={base}
+                    isAgent={isAgent}
+                  />
                 )
               })}
               {paddingBottom > 0 && (
@@ -253,6 +195,119 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
         </div>
       )}
     </section>
+  )
+}
+
+function RunListHead({
+  isAgent,
+  ref,
+  setRefInput,
+  runPipeline,
+  trigger,
+  setEnabled,
+}: {
+  isAgent: boolean
+  ref: string
+  setRefInput: (v: string) => void
+  runPipeline: (e: React.FormEvent) => void
+  trigger: ReturnType<typeof useTriggerCIRun>
+  setEnabled: ReturnType<typeof useSetCIEnabled>
+}) {
+  return (
+    <>
+      <div className="pipelines__head">
+        <h2 className="pipelines__title">{isAgent ? "Agents" : "Pipelines"}</h2>
+        {!isAgent && (
+          <div className="pipelines__actions">
+            <form className="pipelines__run" onSubmit={runPipeline}>
+              <Input
+                className="pipelines__run-ref"
+                value={ref}
+                onChange={(e) => setRefInput(e.target.value)}
+                placeholder="branch, tag, or commit"
+                aria-label="Ref to run"
+              />
+              <Button
+                type="submit"
+                variant="primary"
+                size="small"
+                disabled={trigger.isPending || ref.trim() === ""}
+              >
+                {trigger.isPending ? "Running…" : "Run pipeline"}
+              </Button>
+            </form>
+            <Button
+              size="small"
+              onClick={() => setEnabled.mutate(false)}
+              disabled={setEnabled.isPending}
+              title="Disable CI for this repo"
+            >
+              Disable CI
+            </Button>
+          </div>
+        )}
+      </div>
+      <p className="muted small pipelines__lead">
+        {isAgent ? (
+          <>
+            Agent runs are spawned from an issue (the "Spawn agent" button); each works the issue in
+            an isolated container.
+          </>
+        ) : (
+          <>
+            Runs trigger on push when an <code>mgitci.yml</code> is present at the pushed commit, or
+            on demand for any ref above.
+          </>
+        )}
+      </p>
+    </>
+  )
+}
+
+function RunRow({
+  run,
+  owner,
+  repo,
+  base,
+  isAgent,
+}: {
+  run: CIRun
+  owner: string
+  repo: string
+  base: string
+  isAgent: boolean
+}) {
+  return (
+    <tr>
+      <td>
+        <Link className="ci-runs__num" to={`/${owner}/${repo}/${base}/${run.number}`}>
+          #{run.number}
+        </Link>
+        {isAgent && (
+          <span className="ci-runs__model muted small">
+            {executionModelLabel(run.execution_model)}
+          </span>
+        )}
+      </td>
+      <td>
+        <CIStatusBadge status={run.status} />
+      </td>
+      <td className="ci-runs__commit">
+        <span className="ci-runs__msg" title={run.commit_msg || undefined}>
+          {run.commit_msg || "(no commit message)"}
+        </span>
+        <span className="ci-runs__sha muted small" title={run.commit_sha}>
+          {shortSHA(run.commit_sha)}
+          {run.commit_author ? ` · ${run.commit_author}` : ""}
+        </span>
+      </td>
+      {!isAgent && <td className="muted">{shortRef(run.ref)}</td>}
+      <td className="muted">{run.trigger || "—"}</td>
+      <td className="muted">{runDuration(run)}</td>
+      <td className="muted" title={absoluteTime(run.created_at)}>
+        {timeAgo(run.created_at)}
+      </td>
+    </tr>
   )
 }
 
@@ -308,42 +363,25 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
     rerun.mutate(runNumber, {
       onSuccess: (created) => {
         toast(`Re-run started as #${created.number}`, { variant: "success" })
-        navigate(`/${owner}/${repo}/${base}/${created.number}`)
+        void navigate(`/${owner}/${repo}/${base}/${created.number}`)
       },
     })
   }
 
   return (
     <section className={clsx("pipelines", { "pipelines--agent-run": isAgent })}>
-      <div className="ci-run-head">
-        <Link className="ci-run-head__back" to={`/${owner}/${repo}/${base}`}>
-          ← {isAgent ? "Agents" : "Pipelines"}
-        </Link>
-        <h2 className="pipelines__title">
-          Run #{run.number} <CIStatusBadge status={run.status} />
-        </h2>
-        {/* Re-run re-enqueues a CI run, which is meaningless for an agent run. */}
-        {!isAgent && (
-          <Button size="small" onClick={doRerun} disabled={rerun.isPending}>
-            {rerun.isPending ? "Re-running…" : "Re-run"}
-          </Button>
-        )}
-        {canStopCI && (
-          <Button
-            size="small"
-            variant="danger"
-            onClick={() =>
-              cancel.mutate(undefined, {
-                onSuccess: () => toast(`Run #${runNumber} canceled`, { variant: "success" }),
-              })
-            }
-            disabled={cancel.isPending}
-            title="Force-stop the run now: interrupt its jobs and discard the workspace"
-          >
-            {cancel.isPending ? "Stopping…" : "Stop"}
-          </Button>
-        )}
-      </div>
+      <RunDetailHead
+        owner={owner}
+        repo={repo}
+        base={base}
+        run={run}
+        isAgent={isAgent}
+        canStopCI={canStopCI}
+        doRerun={doRerun}
+        rerun={rerun}
+        cancel={cancel}
+        toast={toast}
+      />
       <ErrorMessage error={rerun.error} inline />
       <ErrorMessage error={cancel.error} inline />
 
@@ -403,5 +441,61 @@ function RunDetail({ owner, repo, runNumber }: { owner: string; repo: string; ru
         <CIRunBody owner={owner} repo={repo} runNumber={runNumber} jobs={run.jobs} />
       )}
     </section>
+  )
+}
+
+function RunDetailHead({
+  owner,
+  repo,
+  base,
+  run,
+  isAgent,
+  canStopCI,
+  doRerun,
+  rerun,
+  cancel,
+  toast,
+}: {
+  owner: string
+  repo: string
+  base: string
+  run: CIRunDetail
+  isAgent: boolean
+  canStopCI: boolean
+  doRerun: () => void
+  rerun: ReturnType<typeof useRerunCIRun>
+  cancel: ReturnType<typeof useCancelCIRun>
+  toast: ReturnType<typeof useToast>
+}) {
+  return (
+    <div className="ci-run-head">
+      <Link className="ci-run-head__back" to={`/${owner}/${repo}/${base}`}>
+        ← {isAgent ? "Agents" : "Pipelines"}
+      </Link>
+      <h2 className="pipelines__title">
+        Run #{run.number} <CIStatusBadge status={run.status} />
+      </h2>
+      {/* Re-run re-enqueues a CI run, which is meaningless for an agent run. */}
+      {!isAgent && (
+        <Button size="small" onClick={doRerun} disabled={rerun.isPending}>
+          {rerun.isPending ? "Re-running…" : "Re-run"}
+        </Button>
+      )}
+      {canStopCI && (
+        <Button
+          size="small"
+          variant="danger"
+          onClick={() =>
+            cancel.mutate(undefined, {
+              onSuccess: () => toast(`Run #${run.number} canceled`, { variant: "success" }),
+            })
+          }
+          disabled={cancel.isPending}
+          title="Force-stop the run now: interrupt its jobs and discard the workspace"
+        >
+          {cancel.isPending ? "Stopping…" : "Stop"}
+        </Button>
+      )}
+    </div>
   )
 }

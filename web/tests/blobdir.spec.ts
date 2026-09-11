@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import { mockApi, seedToken } from "./mockApi"
 
 // A relative link in a rendered README (e.g. `examples/`) can aim a /blob/ URL
@@ -25,7 +25,14 @@ test("a /blob/ URL pointing at a directory redirects to the tree view", async ({
     return route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ ref: "main", path, size: 5, binary: false, too_large: false, content: "# Hi\n" }),
+      body: JSON.stringify({
+        ref: "main",
+        path,
+        size: 5,
+        binary: false,
+        too_large: false,
+        content: "# Hi\n",
+      }),
     })
   })
 
@@ -41,7 +48,7 @@ test("a /blob/ URL pointing at a directory redirects to the tree view", async ({
           { name: "README.md", path: "examples/README.md", type: "blob", size: 5 },
         ],
       }),
-    }),
+    })
   )
 
   await page.goto("/alice/demo/blob/examples")

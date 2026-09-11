@@ -77,29 +77,39 @@ export default function CommandPalette({ open, commands, onClose }: Props) {
     onClose()
   }
 
-  function onKeyDown(e: React.KeyboardEvent) {
-    if (prompting) {
-      if (e.key === "Enter") {
-        e.preventDefault()
-        const v = query.trim()
-        if (v) {
-          prompting.prompt?.onSubmit(v)
-          onClose()
-        }
-      }
-      return
-    }
+  function onPromptKeyDown(e: React.KeyboardEvent, cmd: Command) {
+    if (e.key !== "Enter") return
+    e.preventDefault()
+    const v = query.trim()
+    if (!v) return
+    cmd.prompt?.onSubmit(v)
+    onClose()
+  }
+
+  function onListKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault()
       setActive((i) => Math.min(i + 1, matches.length - 1))
-    } else if (e.key === "ArrowUp") {
+      return
+    }
+    if (e.key === "ArrowUp") {
       e.preventDefault()
       setActive((i) => Math.max(i - 1, 0))
-    } else if (e.key === "Enter") {
+      return
+    }
+    if (e.key === "Enter") {
       e.preventDefault()
       const cmd = matches[active]
       if (cmd) choose(cmd)
     }
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (prompting) {
+      onPromptKeyDown(e, prompting)
+      return
+    }
+    onListKeyDown(e)
   }
 
   function onBackdropClick(e: React.MouseEvent<HTMLDialogElement>) {

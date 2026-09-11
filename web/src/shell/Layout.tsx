@@ -31,8 +31,10 @@ const TOP_LEVEL_SEGMENTS = new Set([
 function repoFromPath(pathname: string): { owner: string; repo: string } | null {
   const segs = pathname.split("/").filter(Boolean)
   if (segs.length < 2) return null
-  if (TOP_LEVEL_SEGMENTS.has(segs[0])) return null
-  return { owner: segs[0], repo: segs[1] }
+  const owner = segs[0]
+  const repo = segs[1]
+  if (!owner || !repo || TOP_LEVEL_SEGMENTS.has(owner)) return null
+  return { owner, repo }
 }
 
 export default function Layout({ children, onSignOut }: Props) {

@@ -15,17 +15,17 @@ export type AnsiColor = "black" | "red" | "green" | "yellow" | "blue" | "magenta
 
 export interface AnsiSegment {
   text: string
-  fg?: AnsiColor
-  bold?: boolean
-  dim?: boolean
-  underline?: boolean
+  fg?: AnsiColor | undefined
+  bold?: boolean | undefined
+  dim?: boolean | undefined
+  underline?: boolean | undefined
 }
 
 interface SgrState {
-  fg?: AnsiColor
-  bold?: boolean
-  dim?: boolean
-  underline?: boolean
+  fg?: AnsiColor | undefined
+  bold?: boolean | undefined
+  dim?: boolean | undefined
+  underline?: boolean | undefined
 }
 
 const FG: Record<number, AnsiColor> = {
@@ -58,7 +58,7 @@ export function parseAnsi(line: string): AnsiSegment[] {
     last = CSI.lastIndex
     // Only SGR ("m") changes style; every other final byte is a control
     // sequence we strip without rendering.
-    if (m[2] === "m") applySgr(state, m[1])
+    if (m[2] === "m") applySgr(state, m[1] ?? "")
   }
 
   const tail = line.slice(last)
@@ -70,26 +70,48 @@ export function parseAnsi(line: string): AnsiSegment[] {
 // parameter list (`\x1b[m`) is a reset, matching the terminal convention.
 function applySgr(state: SgrState, params: string): void {
   const codes = params === "" ? [0] : params.split(";").map((p) => Number(p) || 0)
-  for (const code of codes) {
-    if (code === 0) {
+  for (const code of codes) applySgrCode(state, code)
+}
+
+// applySgrCode folds one SGR code into the running style. A switch, not an
+// if/else-if chain, so the code-by-code dispatch doesn't stack cognitive
+// complexity on top of the caller's loop.
+function applySgrCode(state: SgrState, code: number): void {
+  switch (code) {
+    case 0:
       state.fg = undefined
       state.bold = undefined
       state.dim = undefined
       state.underline = undefined
-    } else if (code === 1) state.bold = true
-    else if (code === 2) state.dim = true
-    else if (code === 4) state.underline = true
-    else if (code === 22) {
+      return
+    case 1:
+      state.bold = true
+      return
+    case 2:
+      state.dim = true
+      return
+    case 4:
+      state.underline = true
+      return
+    case 22:
       state.bold = undefined
       state.dim = undefined
-    } else if (code === 24) state.underline = undefined
-    else if (code === 39) state.fg = undefined
-    else if (code in FG) state.fg = FG[code]
-    // Bright foregrounds (90–97) share the base color; brightness reads as bold.
-    else if (code >= 90 && code <= 97) {
-      state.fg = FG[code - 60]
-      state.bold = true
-    }
-    // Everything else (backgrounds, 256/truecolor, blink, …) is ignored.
+      return
+    case 24:
+      state.underline = undefined
+      return
+    case 39:
+      state.fg = undefined
+      return
   }
+  if (code in FG) {
+    state.fg = FG[code]
+    return
+  }
+  // Bright foregrounds (90–97) share the base color; brightness reads as bold.
+  if (code >= 90 && code <= 97) {
+    state.fg = FG[code - 60]
+    state.bold = true
+  }
+  // Everything else (backgrounds, 256/truecolor, blink, …) is ignored.
 }

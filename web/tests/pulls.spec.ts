@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import { mockApi, type PullRequest, seedToken } from "./mockApi"
 
 // Pull-request workflow (#70): compare two branches, open a PR, review the
@@ -63,7 +63,13 @@ test("pull request list filters by state", async ({ page }) => {
     branches: ["main", "feature"],
     pulls: [
       openPR({ id: 1, number: 1, title: "Open one" }),
-      openPR({ id: 2, number: 2, title: "Merged one", state: "merged", merged_at: new Date().toISOString() }),
+      openPR({
+        id: 2,
+        number: 2,
+        title: "Merged one",
+        state: "merged",
+        merged_at: new Date().toISOString(),
+      }),
     ],
   })
   await routeIntelOff(page)

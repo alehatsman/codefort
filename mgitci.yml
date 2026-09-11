@@ -29,6 +29,15 @@
 # The CI checkout is now a real working tree with .git (ci_runner.go), which the
 # gate's git-aware scripts (full.sh's `git rev-parse`) require.
 #
+# `web` runs the shared ts-quality gate (tasks/ui-tools.yml then
+# tasks/ui-ci.yml — provision-native, unlike goq which is still mooncake;
+# see docs/ops-provisioning.md's "Quality gate — ts-quality" section).
+# ui-tools.yml clones ts-quality (github.com over https, same posture as
+# go-quality) and installs web/'s npm deps; ui-ci.yml runs the full
+# biome+typecheck+config-drift+build+test+supply-chain+audit+ai-lint gate.
+# Previously this job only ran `npm ci && npm run build` — lint, typecheck
+# and the Playwright suite never ran in CI at all.
+#
 # `build-images` rebuilds moongit-ci-dev:latest + moongit-agent:latest via the
 # host Docker daemon (docker_socket: true mounts /var/run/docker.sock). Runs in
 # parallel with deploy on main — both need quality + web to pass first.
@@ -69,7 +78,8 @@ jobs:
   web:
     image: moongit-ci-dev:latest
     steps:
-      - run: cd web && npm ci && npm run build
+      - run: provision apply tasks/ui-tools.yml
+      - run: provision apply tasks/ui-ci.yml
 
   # build-images:
   #   image: moongit-ci-dev:latest

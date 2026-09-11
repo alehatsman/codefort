@@ -1,11 +1,11 @@
 import clsx from "clsx"
 import { Fragment, useMemo, useState } from "react"
-import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
 import type { CIEvent, CIJob } from "@/api/types"
 import { parseAnsi } from "@/features/pipelines/ansi"
-import { EmptyState, ErrorMessage, Spinner } from "@/ui"
+import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
 import { useJobEventStream } from "@/features/pipelines/ciEvents"
 import { formatDuration } from "@/features/pipelines/runHelpers"
+import { EmptyState, ErrorMessage, Spinner } from "@/ui"
 
 // CIRunBody renders a CI run's jobs: the dependency DAG and the selected job's
 // live log. It owns the job-selection state (CI-only); the shared run header
@@ -59,7 +59,7 @@ function JobDag({
   onSelect,
 }: {
   jobs: CIJob[]
-  active?: string
+  active?: string | undefined
   onSelect: (name: string) => void
 }) {
   const stages = useMemo(() => jobStages(jobs), [jobs])
@@ -116,7 +116,7 @@ function jobStages(jobs: CIJob[]): CIJob[][] {
   for (const j of jobs) calc(j.name)
   const maxDepth = jobs.reduce((m, j) => Math.max(m, depth.get(j.name) ?? 0), 0)
   const stages: CIJob[][] = Array.from({ length: maxDepth + 1 }, () => [])
-  for (const j of jobs) stages[depth.get(j.name) ?? 0].push(j)
+  for (const j of jobs) stages[depth.get(j.name) ?? 0]?.push(j)
   return stages
 }
 
@@ -184,8 +184,9 @@ function JobLog({
 // bare text node.
 function LogLine({ text }: { text: string }) {
   const segments = parseAnsi(text)
-  if (segments.length === 1 && !segments[0].fg && !segments[0].bold && !segments[0].underline) {
-    return <>{segments[0].text}</>
+  const only = segments.length === 1 ? segments[0] : undefined
+  if (only && !only.fg && !only.bold && !only.underline) {
+    return <>{only.text}</>
   }
   return (
     <>
@@ -222,7 +223,6 @@ interface StepView {
 function foldSteps(events: CIEvent[]): StepView[] {
   const byID = new Map<string, StepView>()
   const order: StepView[] = []
-
   const ensure = (id: string): StepView => {
     let s = byID.get(id)
     if (!s) {
@@ -233,34 +233,43 @@ function foldSteps(events: CIEvent[]): StepView[] {
     return s
   }
 
-  for (const ev of events) {
-    const d = ev.data ?? {}
-    const id = typeof d.step_id === "string" ? d.step_id : ""
-    switch (ev.type) {
-      case "step.started": {
-        const s = ensure(id)
-        if (typeof d.action === "string") s.action = d.action
-        if (typeof d.name === "string") s.label = d.name
-        break
-      }
-      case "step.stdout":
-      case "step.stderr": {
-        if (!id) break
-        const s = ensure(id)
-        s.lines.push({
-          stream: ev.type === "step.stderr" ? "stderr" : "stdout",
-          text: typeof d.line === "string" ? d.line : "",
-        })
-        break
-      }
-      case "step.completed": {
-        const s = ensure(id)
-        if (typeof d.duration_ms === "number") s.durationMs = d.duration_ms
-        const result = d.result as { status?: string } | undefined
-        if (result && typeof result.status === "string") s.status = result.status
-        break
-      }
-    }
-  }
+  for (const ev of events) foldOneStepEvent(ev, ensure)
   return order
+}
+
+// foldOneStepEvent dispatches one event into the step it belongs to, pulled
+// out to module scope so the switch doesn't stack cognitive complexity on
+// top of the fold loop.
+function foldOneStepEvent(ev: CIEvent, ensure: (id: string) => StepView): void {
+  const d = ev.data ?? {}
+  const id = typeof d["step_id"] === "string" ? d["step_id"] : ""
+  switch (ev.type) {
+    case "step.started":
+      foldStepStartedView(ensure(id), d)
+      return
+    case "step.stdout":
+    case "step.stderr":
+      if (id) foldStepOutputView(ensure(id), ev.type, d)
+      return
+    case "step.completed":
+      foldStepCompletedView(ensure(id), d)
+  }
+}
+
+function foldStepStartedView(s: StepView, d: Record<string, unknown>): void {
+  if (typeof d["action"] === "string") s.action = d["action"]
+  if (typeof d["name"] === "string") s.label = d["name"]
+}
+
+function foldStepOutputView(s: StepView, type: string, d: Record<string, unknown>): void {
+  s.lines.push({
+    stream: type === "step.stderr" ? "stderr" : "stdout",
+    text: typeof d["line"] === "string" ? d["line"] : "",
+  })
+}
+
+function foldStepCompletedView(s: StepView, d: Record<string, unknown>): void {
+  if (typeof d["duration_ms"] === "number") s.durationMs = d["duration_ms"]
+  const result = d["result"] as { status?: string } | undefined
+  if (result && typeof result.status === "string") s.status = result.status
 }

@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useDraftReviewAgent } from "@/api/mutations"
 import {
-  type ReviewTarget,
   draftReviewIssue,
+  type ReviewTarget,
   reviewTargetNeedsBase,
   reviewTargetNeedsPath,
 } from "@/features/pulls/reviewTemplates"

@@ -1,18 +1,25 @@
 # Ops provisioning — mooncake → provision
 
 Tracks the mooncake → provision migration (`~/projects/futurumlab/provision`)
-in two parts:
+in three parts:
 
 - **Dev loop (#410, done).** moongit's local dev-loop tasks moved from
   mooncake (`tasks.yml`) to provision's `tasks/` directory of plan/component
   files. See "Layout" through "Validation — done" below.
-- **CI runner (#411, this section).** `mgitci.yml` jobs execute under
-  provision instead of mooncake inside `cmd/moongitd/ci_runner.go`. See
-  "CI runner" below. The goq/tq quality-gate rewrite itself (native
-  provision plans replacing `mooncake task ci`) is explicitly excluded from
-  #411 and stays a separate, larger, deferred follow-up — `quality`'s job
-  keeps shelling out to `mooncake task ci` as one step inside the
-  (now provision-run) job.
+- **CI runner (#411, done).** `mgitci.yml` jobs execute under provision
+  instead of mooncake inside `cmd/moongitd/ci_runner.go`. See "CI runner"
+  below. The goq/tq quality-gate rewrite itself was explicitly excluded from
+  #411 and deferred — `quality`'s job still shells out to `mooncake task ci`
+  (go-quality stays mooncake-only, see below); the `web` job's half of that
+  deferral is done, in the next part.
+- **Quality gate — ts-quality (this section).** web/'s quality gate moved
+  off mooncake's `tasks.yml` (`tq/*`) onto provision's `tasks/ui-*.yml`,
+  because upstream ts-quality's own provision migration dropped
+  mooncake-module compatibility outright (no more `name:`/`version:` keys —
+  provision now *rejects* `name:`). go-quality has not made that jump yet
+  (`goq/*` in `tasks.yml` still has `name:`/`version:` and works fine under
+  mooncake), so `quality`'s job is untouched — this is ts-quality-specific,
+  not a "web gate ports, Go gate doesn't" policy choice.
 
 ## Layout
 
@@ -579,3 +586,198 @@ failing step's actual UI rendering (the storage/event-log data it renders
 from is proven correct above; the UI component itself wasn't opened).
 Neither blocks merging on its own judgment, but flagging both rather than
 claiming a clean sweep.
+
+## Quality gate — ts-quality
+
+Replaces `tasks.yml`'s mooncake `tq:` module binding (`ts-quality@v0.1.0`,
+`ui-lint`/`ui-build`/`ui-typecheck`/`ui-vuln`/`ui-test`/`ui-ci`/`ui-ci-fast`/
+`ui-sync-config`) with six provision task files under `tasks/`
+(`ui-tools.yml`, `ui-sync-config.yml`, `ui-config-check.yml`,
+`ui-findings.yml`, `ui-fast.yml`, `ui-ci.yml`), and wires `mgitci.yml`'s
+`web` job to the real gate instead of a bare `npm ci && npm run build`.
+
+### Why now, not deferred further
+
+Upstream `alehatsman/ts-quality` shipped a `feat!: provision migration +
+2026 toolchain review` commit (`6cf4279`) that rewrites every component
+file from mooncake's shape (`name:`/`version:` keys, `props.fix`-style
+templated shell strings) to provision's (`changed_when:`, `timeout:`, typed
+`props` with a `description:` per field — and provision *rejects* a
+`name:` key outright). No tag past `v0.1.0` exists yet, so the pin below is
+to that commit SHA, re-pin to a tag once one lands. The six single-check
+mooncake components (`lint.yml`/`format.yml`/`typecheck.yml`/`build.yml`/
+`vuln.yml`/`test.yml`) are gone too, folded into `package-scripts.json` npm
+scripts — the new module ships only multi-step gates (`ci`/`fast`) plus
+config-sync/drift/findings (`sync-config`/`config-check`/`findings`) and
+the tools installer (`tools`). Net effect: the old mooncake wiring simply
+cannot consume the new module at all, version bump or not.
+
+### Layout
+
+```
+tasks/
+  ui-tools.yml         checks out ts-quality, npm ci + Playwright browsers
+  ui-sync-config.yml   copies biome.base.json + tsconfig.base.json into web/
+  ui-config-check.yml  asserts web/ didn't quietly weaken the baseline
+  ui-findings.yml      writes web/.gate/findings.jsonl for agents
+  ui-fast.yml          pre-commit gate (lockfile, biome staged, typecheck, ai-lint staged)
+  ui-ci.yml            full pre-push gate (biome, typecheck, config drift, build, test, supply chain, audit, ai-lint tracked)
+```
+
+Mirrors the real precedent already in the fleet for rust-quality
+(`isayes`/`teleport`'s `tasks/tools.yml` + `tasks/ci.yml` etc — moongit is
+the *first* ts-quality/provision consumer, no prior art in this repo to
+copy from directly). The pin lives in `tasks/ui-tools.yml`'s `vars:` step,
+nowhere else:
+
+```yaml
+- vars:
+    tq_ref: 6cf4279755c1bd5b697e94427e3001338252f026
+    tq_dir: "{{ home }}/.cache/provision/tools/ts-quality"
+- name: "ts-quality at {{ tq_ref }}"
+  git:
+    repo: https://github.com/alehatsman/ts-quality.git
+    dest: "{{ tq_dir }}"
+    ref: "{{ tq_ref }}"
+```
+
+`ui-tools.yml` does **not** `use:` ts-quality's own `tools.yml` component —
+a `use:` target is resolved when the plan is parsed, before any step has
+run, so it can't point at a file the git step just cloned in the same plan
+(same reason isayes/teleport's `tasks/tools.yml` calls rust-quality's
+`scripts/tools.sh` directly instead of `use:`-ing `rq/tools`). Every other
+task file (`ui-ci.yml`, `ui-fast.yml`, `ui-sync-config.yml`,
+`ui-config-check.yml`, `ui-findings.yml`) is a plain `use:` of the
+already-cloned checkout, since by the time those run, `ui-tools.yml` has
+already put it on disk.
+
+`web`'s own quality knobs — the `noUnresolvedImports`/`noBaseToString`
+overrides, the `tests/**` complexity threshold, `src/ui/index.ts`'s barrel
+exemption — live in `web/biome.json`, not in these task files; see
+"Findings, and what turned out to be real bugs" below.
+
+### Invocation table
+
+| today | after |
+|---|---|
+| `mooncake task ui-lint` | *(gone — `cd web && npm run lint`)* |
+| `mooncake task ui-build` | *(gone — `cd web && npm run build`)* |
+| `mooncake task ui-typecheck` | *(gone — `cd web && npm run typecheck`)* |
+| `mooncake task ui-test` | *(gone — `cd web && npm test`)* |
+| `mooncake task ui-ci` | `provision apply tasks/ui-tools.yml && provision apply tasks/ui-ci.yml` |
+| `mooncake task ui-ci-fast` | `provision apply tasks/ui-fast.yml` |
+| `mooncake task ui-sync-config` | `provision apply tasks/ui-sync-config.yml` |
+| — | `provision apply tasks/ui-config-check.yml` (new) |
+| — | `provision apply tasks/ui-findings.yml` (new) |
+
+The single-check tasks (`ui-lint`, `ui-build`, `ui-typecheck`, `ui-vuln`,
+`ui-test`) aren't provision task files at all now — per ts-quality's own
+design ("one invocation is an npm script, not a component"), they're
+`web/package.json` scripts, run directly from a terminal with no provision
+needed. `ui-vuln` specifically folded into `ui-ci`'s supply-chain +
+`npm audit` steps; there's no standalone equivalent.
+
+### A real Biome footgun, found the hard way
+
+`biome.json` (the CLI's own config file) is **strict JSON — no `//`
+comments** — unlike `tsconfig.base.json`, which Biome happily lints as
+JSONC *content*. Adding explanatory `//` comments to `web/biome.json`
+silently corrupted config resolution: `biome check .` gave no parse error
+at all (only `--config-path biome.json` surfaces the real "Expected a
+property" errors), and the effective config quietly fell back to hardcoded
+defaults for the fields after the comment — formatter settings reverted to
+tabs + forced semicolons while `linter.rules` kept inheriting correctly
+from `biome.base.json` (an odd partial-failure split, not a clean "config
+ignored"). Cost real time twice in this migration (once diagnosing the
+formatter drift, once again when a second comment block was added later
+for `files.includes`' rationale). Worth an issue against Biome upstream:
+either warn loudly on `//` in `biome.json` specifically, or fail loudly
+rather than silently partial-defaulting.
+
+### `extends` does not merge `files.includes`
+
+A second, related footgun: `web/biome.json`'s `extends: ["./biome.base.json"]`
+does **not** merge `files.includes` arrays — a child that declares its own
+`includes` **replaces** the base's outright. `linter.rules` *does* merge
+(confirmed: base's new rules like `noConsole`/`noSecrets` applied
+correctly even before this was fixed). Consequence: once `web/biome.json`
+needed its own `includes` (to exclude `biome.base.json`/`tsconfig.base.json`
+themselves, and the `.grit` plugin source, from being linted as content),
+the base's own `!**/node_modules/**`/`!**/dist/**`/etc. excludes were
+silently dropped — invisible until a stray `npm run build` left a 900KB
+minified `dist/assets/*.js` in the tree, which the gate then tried to lint
+(6.5GB RSS, minutes to complete, one false-positive rules-of-hooks
+finding from the minified code). Fix: `web/biome.json`'s `files.includes`
+repeats the base's six excludes verbatim, then adds moongit-local ones
+(`test-results/`, `playwright-report/`, `.vite/`, `*.tsbuildinfo`, `*.log`,
+`.playwright-mcp/` — `web/.gitignore`'s entries, since the base's
+`vcs.useIgnoreFile: false` means `.gitignore` isn't consulted either).
+
+### Findings, and what turned out to be real bugs
+
+The new baseline (`biome.json` `preset: "recommended"` + the fleet's
+targeted additions, `tsconfig.base.json`'s `noUncheckedIndexedAccess` /
+`exactOptionalPropertyTypes` / `noPropertyAccessFromIndexSignature` /
+`erasableSyntaxOnly`) surfaced ~440 findings against web/'s pre-existing
+code (230 typecheck errors, ~210 lint findings before biome's own
+`--write` cleared most mechanically). All fixed — gate is green (0 biome
+errors/warnings, 0 tsc errors) — full breakdown and file list in the PR;
+notable non-mechanical ones:
+
+- **Biome 2.5.13's `noUnresolvedImports`** (nursery) false-positives
+  "react has no export named Suspense/Fragment/StrictMode" on every named
+  import from react 19 — react's own `.d.ts` plainly exports all three.
+  Disabled locally (`web/biome.json`), not fleet-wide — it's a Biome
+  version/rule-maturity issue, not a react-19 incompatibility inherent to
+  the baseline.
+- **`noBaseToString`** (nursery) false-positives on `Date.prototype.
+  toLocaleString()` — a real, typed, string-returning method. Same
+  disposition: disabled locally, flagged as nursery-rule noise.
+- **A real, pre-existing bug found by `exactOptionalPropertyTypes`:**
+  `useCommitCIStatus` and `useCIRuns` (`web/src/api/queries.ts`) shared one
+  `refetchInterval` callback (`ciRunsRefetchInterval`) typed for
+  `data: CIRun[]`, even though `useCommitCIStatus`'s own `select` maps that
+  array to a `Map<string, CIRun>`. TypeScript's inference, anchored by the
+  shared callback's explicit param type, silently widened
+  `useCommitCIStatus`'s resolved type back to `CIRun[]` — masking real
+  `.get()`-does-not-exist-on-`CIRun[]` errors at every call site
+  (`RepoPage.tsx`, `PullPage.tsx`) until this pass's strict typecheck
+  actually ran clean. Fixed by giving each query its own typed
+  `refetchInterval`, sharing only the `anyRunLive()` predicate.
+- **`noExcessiveCognitiveComplexity`** (max 15) flagged 30 functions
+  (up to score 78) — mostly SSE reconnect-loop hooks (`ciEvents.ts`,
+  `useFleetEvents.ts`) and large page components. Genuinely refactored
+  (module-scope extraction of nested closures, switch-per-case dispatch
+  helpers, JSX sub-component extraction) rather than raising the
+  threshold — the one exception is `tests/mockApi.ts` (a mock HTTP router;
+  threshold raised to 20 for `tests/**` only, in `web/biome.json`'s
+  `overrides`), where the complexity is inherent to being a router, not a
+  smell.
+
+### Validation — done
+
+- `provision validate --strict` clean on all six `tasks/ui-*.yml` files.
+- `provision apply tasks/ui-tools.yml` run for real: clones ts-quality to
+  `~/.cache/provision/tools/ts-quality`, `npm ci` + Playwright browsers.
+- `provision apply tasks/ui-sync-config.yml` run for real: wrote
+  `web/biome.base.json` (updated) and `web/tsconfig.base.json` (new).
+- `provision apply tasks/ui-ci.yml` (the full gate) run for real, clean:
+  `npx biome check --error-on-warnings --max-diagnostics=none .` → 0
+  errors, 0 warnings (99 `info`-level `useLiteralKeys` suggestions, which
+  don't fail the gate); `npx tsc -b` → 0 errors; `npm run build` → succeeds
+  (Vite production build); `npx playwright test` → 126 passed, 18 failed —
+  **the same 18**, byte-for-byte matching test names, confirmed by running
+  the identical suite against unmodified `main` via `git stash`. Zero
+  regressions from this migration; the 18 are pre-existing flakiness/gaps
+  unrelated to it.
+- `tasks.yml`'s mooncake `tq:` module binding and all `ui-*` task entries
+  removed; `mooncake task` (Go gate only) still lists cleanly.
+- `mgitci.yml`'s `web` job updated to `provision apply tasks/ui-tools.yml`
+  then `provision apply tasks/ui-ci.yml` — **not yet run for real in CI**
+  (would require a push through the live pipeline); the component-level
+  validation above exercises the identical steps the job now runs, just
+  not inside the `moongit-ci-dev:latest` container via `ci_runner.go`.
+  Flagging as the one piece not end-to-end proven, matching this doc's own
+  standard elsewhere (the CI-runner section flags its own not-yet-done
+  items rather than claiming a clean sweep).
+

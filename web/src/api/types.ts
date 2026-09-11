@@ -139,8 +139,8 @@ export interface CreateRepoInput {
 
 export interface CreateIssueInput {
   title: string
-  body?: string
-  labels?: string[]
+  body?: string | undefined
+  labels?: string[] | undefined
 }
 
 export interface CreateCommentInput {
@@ -200,7 +200,7 @@ export interface SSHKey {
 
 export interface CreateSSHKeyInput {
   public_key: string
-  comment?: string
+  comment?: string | undefined
 }
 
 // --- Code browser ---
@@ -399,7 +399,7 @@ export interface CreatePullRequestInput {
   base: string
   head: string
   title: string
-  body?: string
+  body?: string | undefined
 }
 
 export interface UpdatePullRequestInput {

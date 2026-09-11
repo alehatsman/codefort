@@ -32,13 +32,7 @@ export default function DataList<T>({
   children,
 }: Props<T>) {
   return (
-    <DataState
-      data={data}
-      isLoading={isLoading}
-      error={error}
-      skeleton={skeleton}
-      empty={empty}
-    >
+    <DataState data={data} isLoading={isLoading} error={error} skeleton={skeleton} empty={empty}>
       {(items) => <ul className="issue-list">{children(items)}</ul>}
     </DataState>
   )

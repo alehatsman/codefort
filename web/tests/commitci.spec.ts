@@ -1,6 +1,6 @@
-import { test, expect } from "@playwright/test"
 import type { Page } from "@playwright/test"
-import { mockApi, seedToken, type State } from "./mockApi"
+import { expect, test } from "@playwright/test"
+import { mockApi, type State, seedToken } from "./mockApi"
 
 // CI status badges beside commits (issue #87): the history list, the
 // last-commit bars, each link to the commit's run.

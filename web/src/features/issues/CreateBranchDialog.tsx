@@ -11,7 +11,13 @@ interface Props {
   onCreated?: (name: string) => void
 }
 
-export default function CreateBranchDialog({ owner, repo, issueNumber, defaultBase, onCreated }: Props) {
+export default function CreateBranchDialog({
+  owner,
+  repo,
+  issueNumber,
+  defaultBase,
+  onCreated,
+}: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [name, setName] = useState(`issue-${issueNumber}`)
   const [base, setBase] = useState(defaultBase ?? "")
@@ -41,7 +47,7 @@ export default function CreateBranchDialog({ owner, repo, issueNumber, defaultBa
           setCreated(result)
           onCreated?.(result.name)
         },
-      },
+      }
     )
   }
 

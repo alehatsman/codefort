@@ -2,14 +2,14 @@ import type { ReactNode } from "react"
 
 interface Props {
   /** Forwarded to the underlying `<dialog>` so callers drive `showModal()`/`close()`. */
-  ref?: React.Ref<HTMLDialogElement>
+  ref?: React.Ref<HTMLDialogElement> | undefined
   title: ReactNode
   /** Fired by the close button and a backdrop click. */
   onClose: () => void
   /** Submit handler for the wrapping `<form>` the dialog renders. */
-  onSubmit?: (e: React.FormEvent) => void
+  onSubmit?: ((e: React.FormEvent) => void) | undefined
   /** Footer content — typically the Cancel + submit buttons. */
-  footer?: ReactNode
+  footer?: ReactNode | undefined
   /** The form body (Fields, ErrorMessage, helper copy). */
   children: ReactNode
 }

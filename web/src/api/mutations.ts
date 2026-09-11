@@ -2,10 +2,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/api/client"
 import { keys } from "@/api/queries"
 import type {
+  AddMemberInput,
   CIRunExecutionModel,
   CIRunToolProfile,
   ClaimIssueInput,
-  UpdateAgentSettingsInput,
   CreateCodeCommentInput,
   CreateCommentInput,
   CreateIssueInput,
@@ -13,13 +13,13 @@ import type {
   CreateRepoInput,
   CreateSSHKeyInput,
   CreateTokenInput,
+  LoginInput,
   MergeRequestInput,
+  RegisterInput,
+  UpdateAgentSettingsInput,
   UpdateIssueInput,
   UpdatePullRequestInput,
   UpdateRepoInput,
-  RegisterInput,
-  LoginInput,
-  AddMemberInput,
 } from "@/api/types"
 
 export function useCreateRepo() {
@@ -142,7 +142,7 @@ export function useCreateComment(owner: string, repo: string, n: number) {
   return useMutation({
     mutationFn: (input: CreateCommentInput) => api.createComment(owner, repo, n, input),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.comments(owner, repo, n) })
+      void qc.invalidateQueries({ queryKey: keys.comments(owner, repo, n) })
     },
   })
 }
@@ -152,7 +152,7 @@ export function useDeleteComment(owner: string, repo: string, n: number) {
   return useMutation({
     mutationFn: (commentID: number) => api.deleteComment(owner, repo, n, commentID),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.comments(owner, repo, n) })
+      void qc.invalidateQueries({ queryKey: keys.comments(owner, repo, n) })
     },
   })
 }
@@ -233,8 +233,8 @@ export function useMergePull(owner: string, repo: string, n: number) {
     mutationFn: (input: MergeRequestInput) => api.mergePull(owner, repo, n, input),
     onSuccess: () => {
       invalidatePullWrites(qc, owner, repo, n)
-      qc.invalidateQueries({ queryKey: ["commits", owner, repo] })
-      qc.invalidateQueries({ queryKey: ["compare", owner, repo] })
+      void qc.invalidateQueries({ queryKey: ["commits", owner, repo] })
+      void qc.invalidateQueries({ queryKey: ["compare", owner, repo] })
     },
   })
 }
@@ -285,7 +285,7 @@ export function useDraftReviewAgent(owner: string, repo: string) {
     },
     onSuccess: () => {
       invalidateIssueWrites(qc, owner, repo)
-      qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) })
+      void qc.invalidateQueries({ queryKey: keys.ciRuns(owner, repo) })
     },
   })
 }
@@ -358,8 +358,8 @@ export function useSetCIEnabled(owner: string, repo: string) {
     mutationFn: (enabled: boolean) =>
       api.updateRepo(owner, repo, { ci_enabled: enabled } as UpdateRepoInput),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.repo(owner, repo) })
-      qc.invalidateQueries({ queryKey: keys.repos() })
+      void qc.invalidateQueries({ queryKey: keys.repo(owner, repo) })
+      void qc.invalidateQueries({ queryKey: keys.repos() })
     },
   })
 }
@@ -371,8 +371,8 @@ export function useSetRepoVisibility(owner: string, repo: string) {
     mutationFn: (visibility: "public" | "private") =>
       api.updateRepo(owner, repo, { visibility } as UpdateRepoInput),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.repo(owner, repo) })
-      qc.invalidateQueries({ queryKey: keys.repos() })
+      void qc.invalidateQueries({ queryKey: keys.repo(owner, repo) })
+      void qc.invalidateQueries({ queryKey: keys.repos() })
     },
   })
 }
@@ -420,7 +420,8 @@ export function useSubmitReview(owner: string, repo: string, n: number) {
 
 export function useCreateBranch(owner: string, repo: string) {
   return useMutation({
-    mutationFn: (body: { name: string; base?: string }) => api.createBranch(owner, repo, body),
+    mutationFn: (body: { name: string; base?: string | undefined }) =>
+      api.createBranch(owner, repo, body),
   })
 }
 

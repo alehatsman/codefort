@@ -4,21 +4,21 @@ import "./pipelines.css"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useAllRuns } from "@/api/queries"
 import RunFilters from "@/features/agents/RunFilters"
-import { useRunFilters } from "@/features/agents/useRunFilters"
 import { AGENT_CHIPS, CI_RUN_CHIPS } from "@/features/agents/runChips"
+import { useRunFilters } from "@/features/agents/useRunFilters"
 import CIStatusBadge from "@/features/pipelines/CIStatusBadge"
-import { repoHue } from "@/shell/repoColor"
-import { absoluteTime, timeAgo } from "@/shell/timeAgo"
-import { useRepoFilter } from "@/shell/useRepoFilter"
-import { EmptyState, ErrorMessage, SkeletonTable, Table } from "@/ui"
 import {
-  type RunKind,
   executionModelLabel,
+  type RunKind,
   runDuration,
   runsBasePath,
   shortRef,
   shortSHA,
 } from "@/features/pipelines/runHelpers"
+import { repoHue } from "@/shell/repoColor"
+import { absoluteTime, timeAgo } from "@/shell/timeAgo"
+import { useRepoFilter } from "@/shell/useRepoFilter"
+import { EmptyState, ErrorMessage, SkeletonTable, Table } from "@/ui"
 
 // Fleet-wide runs view: every repo's CI runs (kind="ci", the Pipelines tab) or
 // agent runs (kind="agent", the Agents tab) in one table, newest-created first.
@@ -119,6 +119,7 @@ export default function GlobalRunsPage({ kind }: { kind: RunKind }) {
               )}
               {virtualItems.map((vrow) => {
                 const run = rows[vrow.index]
+                if (!run) return null
                 const repoPath = `/${run.repo.owner}/${run.repo.name}`
                 return (
                   <tr key={`${run.repo.owner}/${run.repo.name}#${run.number}`}>

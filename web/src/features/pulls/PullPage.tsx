@@ -4,11 +4,21 @@ import { Link, useParams } from "react-router-dom"
 import { ApiError } from "@/api/client"
 import { useCreateCodeComment, useMergePull, useSubmitReview, useUpdatePull } from "@/api/mutations"
 import { useCommitCIStatus, usePull, useWhoami } from "@/api/queries"
-import type { MergeConflictResponse, PRReview } from "@/api/types"
+import type { CIRun, MergeConflictResponse, PRReview } from "@/api/types"
 import CommitCIStatus from "@/features/commits/CommitCIStatus"
 import CompareView from "@/features/pulls/CompareView"
 import OverviewCard from "@/shell/OverviewCard"
-import { Avatar, Badge, Button, DetailLayout, EmptyState, ErrorMessage, SidebarSection, SkeletonText, useToast } from "@/ui"
+import {
+  Avatar,
+  Badge,
+  Button,
+  DetailLayout,
+  EmptyState,
+  ErrorMessage,
+  SidebarSection,
+  SkeletonText,
+  useToast,
+} from "@/ui"
 
 const Markdown = lazy(() => import("@/shell/Markdown"))
 
@@ -54,8 +64,8 @@ export default function PullPage() {
   const pr = pullQ.data
   const headRun = pr ? ciStatusQ.data?.get(pr.compare.head) : undefined
   const closingRefs = useMemo(
-    () => parseClosingRefs((pr?.title ?? "") + " " + (pr?.body ?? "")),
-    [pr?.title, pr?.body],
+    () => parseClosingRefs(`${pr?.title ?? ""} ${pr?.body ?? ""}`),
+    [pr?.title, pr?.body]
   )
   const myReview = pr?.reviews?.find((rv) => rv.author === whoami.data?.name)
   const conflicts = conflictsFrom(mergePull.error)
@@ -112,102 +122,21 @@ export default function PullPage() {
             </>
           }
         >
-          <header className="pull-head">
-            <h2 className="pull-head__title">
-              {pr.title} <span className="pull-head__number">#{pr.number}</span>
-            </h2>
-            <div className="pull-head__meta muted small">
-              <span className={`pr-state pr-state--${pr.state}`}>{pr.state}</span>
-              <span className="pull-head__refs">
-                {pr.head_ref} → {pr.base_ref}
-              </span>
-              {" · opened by "}
-              {pr.author} on {new Date(pr.created_at).toLocaleDateString()}
-              {pr.merged_at && <> · merged {new Date(pr.merged_at).toLocaleDateString()}</>}
-              {headRun && <CommitCIStatus owner={owner} repo={repo} run={headRun} />}
-            </div>
-            <div className="pull-head__body">
-              <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
-                <Markdown content={pr.body ?? ""} owner={owner} repo={repo} basePath="" />
-              </Suspense>
-            </div>
-          </header>
+          <PullHead owner={owner} repo={repo} pr={pr} headRun={headRun} />
 
-          {pr.state === "open" && (
-            <div className="pull-merge">
-              <div className="pull-merge__actions">
-                {headRun && <CommitCIStatus owner={owner} repo={repo} run={headRun} />}
-                <Button
-                  variant="primary"
-                  disabled={!mergeable || mergePull.isPending}
-                  onClick={() =>
-                    mergePull.mutate(
-                      { method: "ff-only" },
-                      {
-                        onSuccess: () => toast(`Pull req #${n} merged`, { variant: "success" }),
-                      },
-                    )
-                  }
-                >
-                  {mergePull.isPending ? "Merging…" : "Merge pull request"}
-                </Button>
-                {notFastForwardable && (
-                  <Button
-                    disabled={mergePull.isPending}
-                    onClick={() =>
-                      mergePull.mutate(
-                        { method: "merge" },
-                        {
-                          onSuccess: () =>
-                            toast(`Pull req #${n} merged`, { variant: "success" }),
-                        },
-                      )
-                    }
-                  >
-                    Merge with commit
-                  </Button>
-                )}
-                <Button
-                  variant="danger"
-                  disabled={updatePull.isPending}
-                  onClick={() => updatePull.mutate({ state: "closed" })}
-                >
-                  Close
-                </Button>
-              </div>
-              {!mergeable && pr.compare.ahead === 0 && (
-                <EmptyState>Nothing to merge — head is already in base.</EmptyState>
-              )}
-              {conflicts.length > 0 ? (
-                <div className="error inline">
-                  Merge conflict — resolve locally and push, then retry. Conflicting files:
-                  <ul className="pull-merge__conflicts">
-                    {conflicts.map((p) => (
-                      <li key={p}>{p}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : notFastForwardable ? (
-                <div className="pull-merge__warn">
-                  Branches have diverged — fast-forward not possible. Use "Merge with commit" to
-                  create a merge commit, or rebase the head branch onto base and push.
-                </div>
-              ) : (
-                mergePull.error && <ErrorMessage error={mergePull.error} inline />
-              )}
-            </div>
-          )}
-
-          {pr.state === "closed" && (
-            <div className="pull-merge">
-              <Button
-                disabled={updatePull.isPending}
-                onClick={() => updatePull.mutate({ state: "open" })}
-              >
-                Reopen
-              </Button>
-            </div>
-          )}
+          <PullMergePanel
+            owner={owner}
+            repo={repo}
+            pr={pr}
+            n={n}
+            headRun={headRun}
+            mergeable={mergeable}
+            conflicts={conflicts}
+            notFastForwardable={notFastForwardable}
+            mergePull={mergePull}
+            updatePull={updatePull}
+            toast={toast}
+          />
 
           <CompareView
             compare={pr.compare}
@@ -220,6 +149,164 @@ export default function PullPage() {
   )
 }
 
+type Pull = NonNullable<ReturnType<typeof usePull>["data"]>
+type CIRunSummary = CIRun
+
+function PullHead({
+  owner,
+  repo,
+  pr,
+  headRun,
+}: {
+  owner: string
+  repo: string
+  pr: Pull
+  headRun: CIRunSummary | undefined
+}) {
+  return (
+    <header className="pull-head">
+      <h2 className="pull-head__title">
+        {pr.title} <span className="pull-head__number">#{pr.number}</span>
+      </h2>
+      <div className="pull-head__meta muted small">
+        <span className={`pr-state pr-state--${pr.state}`}>{pr.state}</span>
+        <span className="pull-head__refs">
+          {pr.head_ref} → {pr.base_ref}
+        </span>
+        {" · opened by "}
+        {pr.author} on {new Date(pr.created_at).toLocaleDateString()}
+        {pr.merged_at && <> · merged {new Date(pr.merged_at).toLocaleDateString()}</>}
+        {headRun && <CommitCIStatus owner={owner} repo={repo} run={headRun} />}
+      </div>
+      <div className="pull-head__body">
+        <Suspense fallback={<div className="markdown-body loading">Loading…</div>}>
+          <Markdown content={pr.body ?? ""} owner={owner} repo={repo} basePath="" />
+        </Suspense>
+      </div>
+    </header>
+  )
+}
+
+function PullMergePanel({
+  owner,
+  repo,
+  pr,
+  n,
+  headRun,
+  mergeable,
+  conflicts,
+  notFastForwardable,
+  mergePull,
+  updatePull,
+  toast,
+}: {
+  owner: string
+  repo: string
+  pr: Pull
+  n: number
+  headRun: CIRunSummary | undefined
+  mergeable: boolean
+  conflicts: string[]
+  notFastForwardable: boolean
+  mergePull: ReturnType<typeof useMergePull>
+  updatePull: ReturnType<typeof useUpdatePull>
+  toast: ReturnType<typeof useToast>
+}) {
+  if (pr.state === "closed") {
+    return (
+      <div className="pull-merge">
+        <Button
+          disabled={updatePull.isPending}
+          onClick={() => updatePull.mutate({ state: "open" })}
+        >
+          Reopen
+        </Button>
+      </div>
+    )
+  }
+  if (pr.state !== "open") return null
+
+  return (
+    <div className="pull-merge">
+      <div className="pull-merge__actions">
+        {headRun && <CommitCIStatus owner={owner} repo={repo} run={headRun} />}
+        <Button
+          variant="primary"
+          disabled={!mergeable || mergePull.isPending}
+          onClick={() =>
+            mergePull.mutate(
+              { method: "ff-only" },
+              { onSuccess: () => toast(`Pull req #${n} merged`, { variant: "success" }) }
+            )
+          }
+        >
+          {mergePull.isPending ? "Merging…" : "Merge pull request"}
+        </Button>
+        {notFastForwardable && (
+          <Button
+            disabled={mergePull.isPending}
+            onClick={() =>
+              mergePull.mutate(
+                { method: "merge" },
+                { onSuccess: () => toast(`Pull req #${n} merged`, { variant: "success" }) }
+              )
+            }
+          >
+            Merge with commit
+          </Button>
+        )}
+        <Button
+          variant="danger"
+          disabled={updatePull.isPending}
+          onClick={() => updatePull.mutate({ state: "closed" })}
+        >
+          Close
+        </Button>
+      </div>
+      {!mergeable && pr.compare.ahead === 0 && (
+        <EmptyState>Nothing to merge — head is already in base.</EmptyState>
+      )}
+      <PullMergeStatus
+        conflicts={conflicts}
+        notFastForwardable={notFastForwardable}
+        mergePull={mergePull}
+      />
+    </div>
+  )
+}
+
+function PullMergeStatus({
+  conflicts,
+  notFastForwardable,
+  mergePull,
+}: {
+  conflicts: string[]
+  notFastForwardable: boolean
+  mergePull: ReturnType<typeof useMergePull>
+}) {
+  if (conflicts.length > 0) {
+    return (
+      <div className="error inline">
+        Merge conflict — resolve locally and push, then retry. Conflicting files:
+        <ul className="pull-merge__conflicts">
+          {conflicts.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+  if (notFastForwardable) {
+    return (
+      <div className="pull-merge__warn">
+        Branches have diverged — fast-forward not possible. Use "Merge with commit" to create a
+        merge commit, or rebase the head branch onto base and push.
+      </div>
+    )
+  }
+  return mergePull.error ? <ErrorMessage error={mergePull.error} inline /> : null
+}
+
 function ReviewSidebar({
   reviews,
   myReview,
@@ -228,7 +315,7 @@ function ReviewSidebar({
   isPending,
 }: {
   reviews: PRReview[]
-  myReview?: PRReview
+  myReview?: PRReview | undefined
   isOpen: boolean
   onReview: (state: import("@/api/types").PRReviewState) => void
   isPending: boolean

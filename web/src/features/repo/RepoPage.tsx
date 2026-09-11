@@ -14,16 +14,16 @@ import {
   useTreeCommits,
   useWhoami,
 } from "@/api/queries"
+import CommitMeta from "@/features/commits/CommitMeta"
+import BranchSelector from "@/features/repo/BranchSelector"
 import FileTree from "@/features/repo/FileTree"
 import LatestCommitBar from "@/features/repo/LatestCommitBar"
-import CommitMeta from "@/features/commits/CommitMeta"
 import ReadmeCard from "@/features/repo/ReadmeCard"
-import OverviewCard from "@/shell/OverviewCard"
-import NotFound from "@/shell/NotFound"
-import { EmptyState, ErrorMessage, SkeletonText, Spinner } from "@/ui"
 import { findReadme } from "@/features/repo/readme"
 import { useListNav } from "@/shell/keyboardNav"
-import BranchSelector from "@/features/repo/BranchSelector"
+import NotFound from "@/shell/NotFound"
+import OverviewCard from "@/shell/OverviewCard"
+import { EmptyState, ErrorMessage, SkeletonText, Spinner } from "@/ui"
 
 // The highlighter grammars are heavy; load them only when a file is viewed.
 const CodeView = lazy(() => import("@/features/repo/CodeView"))
@@ -108,7 +108,7 @@ function TreeView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
       const e = entries[i]
       if (!e) return
       const kind = e.type === "tree" ? "tree" : "blob"
-      navigate(`/${owner}/${repo}/${kind}/${e.path}`)
+      void navigate(`/${owner}/${repo}/${kind}/${e.path}`)
     },
   })
 
@@ -184,17 +184,8 @@ function BlobView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
   const whoamiQ = useWhoami()
 
   if (blobQ.isLoading) return <SkeletonText heading={false} lines={8} />
-  if (blobQ.error) {
-    const err = blobQ.error
-    // A relative link in a rendered README (e.g. `examples/`) can point a
-    // /blob/ URL at a directory; the backend 400s with "path is a directory".
-    // Send the viewer to the tree view instead of showing a raw error.
-    if (err instanceof ApiError && err.status === 400 && /is a directory/.test(err.message)) {
-      const suffix = gitRef ? `?ref=${encodeURIComponent(gitRef)}` : ""
-      return <Navigate to={`/${owner}/${repo}/tree/${path}${suffix}`} replace />
-    }
-    return <ErrorMessage error={err} />
-  }
+  if (blobQ.error)
+    return <BlobError error={blobQ.error} owner={owner} repo={repo} path={path} gitRef={gitRef} />
   if (!blobQ.data) return null
 
   const b = blobQ.data
@@ -219,25 +210,72 @@ function BlobView({ owner, repo, path, gitRef, ciEnabled }: ViewProps) {
             {lineCount(b.content)} lines · {formatSize(b.size)}
           </span>
         </div>
-        {b.too_large ? (
-          <EmptyState>File too large to display ({formatSize(b.size)}).</EmptyState>
-        ) : b.binary ? (
-          <EmptyState>Binary file not shown.</EmptyState>
-        ) : (
-          <Suspense fallback={<Spinner />}>
-            <CodeView
-              content={b.content}
-              path={path}
-              owner={owner}
-              repo={repo}
-              codeRef={b.ref}
-              comments={commentsQ.data ?? []}
-              currentUser={whoamiQ.data?.name}
-            />
-          </Suspense>
-        )}
+        <BlobBody
+          blob={b}
+          path={path}
+          owner={owner}
+          repo={repo}
+          comments={commentsQ.data ?? []}
+          currentUser={whoamiQ.data?.name}
+        />
       </div>
     </>
+  )
+}
+
+function BlobError({
+  error,
+  owner,
+  repo,
+  path,
+  gitRef,
+}: {
+  error: unknown
+  owner: string
+  repo: string
+  path: string
+  gitRef: string
+}) {
+  // A relative link in a rendered README (e.g. `examples/`) can point a
+  // /blob/ URL at a directory; the backend 400s with "path is a directory".
+  // Send the viewer to the tree view instead of showing a raw error.
+  if (error instanceof ApiError && error.status === 400 && /is a directory/.test(error.message)) {
+    const suffix = gitRef ? `?ref=${encodeURIComponent(gitRef)}` : ""
+    return <Navigate to={`/${owner}/${repo}/tree/${path}${suffix}`} replace />
+  }
+  return <ErrorMessage error={error} />
+}
+
+function BlobBody({
+  blob,
+  path,
+  owner,
+  repo,
+  comments,
+  currentUser,
+}: {
+  blob: NonNullable<ReturnType<typeof useBlob>["data"]>
+  path: string
+  owner: string
+  repo: string
+  comments: NonNullable<ReturnType<typeof useCodeComments>["data"]>
+  currentUser: string | undefined
+}) {
+  if (blob.too_large)
+    return <EmptyState>File too large to display ({formatSize(blob.size)}).</EmptyState>
+  if (blob.binary) return <EmptyState>Binary file not shown.</EmptyState>
+  return (
+    <Suspense fallback={<Spinner />}>
+      <CodeView
+        content={blob.content}
+        path={path}
+        owner={owner}
+        repo={repo}
+        codeRef={blob.ref}
+        comments={comments}
+        currentUser={currentUser}
+      />
+    </Suspense>
   )
 }
 

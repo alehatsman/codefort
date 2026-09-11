@@ -1,7 +1,7 @@
-import { test, expect } from "@playwright/test"
 import type { Page } from "@playwright/test"
-import { mockApi, seedToken } from "./mockApi"
+import { expect, test } from "@playwright/test"
 import type { CodeComment } from "./mockApi"
+import { mockApi, seedToken } from "./mockApi"
 
 // Code review comments anchored to file blocks on a branch (issue #55): select
 // lines in the blob viewer, leave a comment, and triage them on the Review tab.
@@ -256,9 +256,7 @@ test("review comment bodies render as markdown", async ({ page }) => {
   await expect(page.getByText("**guard**")).toHaveCount(0)
 })
 
-test("draft review issue spawns a read-only review agent from the Review tab", async ({
-  page,
-}) => {
+test("draft review issue spawns a read-only review agent from the Review tab", async ({ page }) => {
   const state = await mockApi(page)
   await routeIntelOff(page)
 

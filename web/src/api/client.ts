@@ -1,21 +1,22 @@
 import type {
+  AddMemberInput,
   AgentSettings,
   AgentTurn,
+  AuthResponse,
   Blob,
-  UpdateAgentSettingsInput,
   CIRun,
   CIRunDetail,
   CIRunExecutionModel,
   CIRunToolProfile,
+  CIRunWithRepo,
   ClaimIssueInput,
   CodeComment,
   CodeCommentState,
   Comment,
   Commit,
-  Compare,
   CommitDetail,
   CommitList,
-  TreeCommits,
+  Compare,
   CreateCodeCommentInput,
   CreateCommentInput,
   CreatedToken,
@@ -24,43 +25,42 @@ import type {
   CreateRepoInput,
   CreateSSHKeyInput,
   CreateTokenInput,
-  MergeRequestInput,
-  MergeResult,
-  PullRequest,
-  PullRequestDetail,
-  RefList,
-  UpdateCodeCommentInput,
-  UpdatePullRequestInput,
   Intel,
   IntelFileSummary,
   IntelOverview,
   IntelPackageGraph,
-  IntelSummaries,
   IntelSearchInput,
   IntelSearchResult,
+  IntelSummaries,
   Issue,
   IssueWithRepo,
+  LoginInput,
+  MergeRequestInput,
+  MergeResult,
+  PullRequest,
+  PullRequestDetail,
   PullRequestWithRepo,
-  CIRunWithRepo,
+  RefList,
+  RegisterInput,
   Repo,
+  RepoMember,
   SpecContent,
   SpecDriftReport,
   SpecList,
   SpecSearchResult,
   SSHKey,
-  WriteSpecInput,
-  WriteSpecResult,
   Token,
   Tree,
+  TreeCommits,
+  UpdateAgentSettingsInput,
+  UpdateCodeCommentInput,
   UpdateIssueInput,
+  UpdatePullRequestInput,
   UpdateRepoInput,
-  Whoami,
-  RegisterInput,
-  LoginInput,
-  AuthResponse,
   User,
-  RepoMember,
-  AddMemberInput,
+  Whoami,
+  WriteSpecInput,
+  WriteSpecResult,
 } from "@/api/types"
 
 const TOKEN_KEY = "moongit_token"
@@ -129,7 +129,7 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   const resp = await fetch(path, {
     method: opts.method ?? "GET",
     headers,
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
   })
 
   const raw = await resp.text()
@@ -162,7 +162,7 @@ async function requestPublic<T>(path: string, opts: RequestOpts = {}): Promise<T
   const resp = await fetch(path, {
     method: opts.method ?? "GET",
     headers,
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
   })
 
   const raw = await resp.text()
@@ -295,7 +295,12 @@ export const api = {
   getCommits: (
     owner: string,
     repo: string,
-    opts: { path?: string; page?: number; perPage?: number; ref?: string } = {}
+    opts: {
+      path?: string | undefined
+      page?: number | undefined
+      perPage?: number | undefined
+      ref?: string | undefined
+    } = {}
   ) => {
     const q = new URLSearchParams()
     if (opts.path) q.set("path", opts.path)
@@ -457,7 +462,12 @@ export const api = {
   listCIRuns: (
     owner: string,
     repo: string,
-    opts: { limit?: number; kind?: string; state?: string; q?: string } = {}
+    opts: {
+      limit?: number | undefined
+      kind?: string | undefined
+      state?: string | undefined
+      q?: string | undefined
+    } = {}
   ) => {
     const p = new URLSearchParams()
     if (opts.limit) p.set("limit", String(opts.limit))
@@ -540,7 +550,7 @@ export const api = {
     request<void>(`/api/repos/${owner}/${repo}/members/${username}`, { method: "DELETE" }),
 
   // Branches.
-  createBranch: (owner: string, repo: string, body: { name: string; base?: string }) =>
+  createBranch: (owner: string, repo: string, body: { name: string; base?: string | undefined }) =>
     request<{ name: string; sha: string }>(`/api/repos/${owner}/${repo}/branches`, {
       method: "POST",
       body,

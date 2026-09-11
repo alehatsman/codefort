@@ -9,7 +9,7 @@ interface Props {
   repo: string
   path: string
   latest: Commit | null | undefined
-  ciRun?: CIRun
+  ciRun?: CIRun | undefined
   total: number
   loading: boolean
 }

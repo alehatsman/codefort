@@ -8,10 +8,10 @@ interface Props {
    */
   error: unknown
   /** Inline variant (`.error.inline`) — sits within a form/section body. */
-  inline?: boolean
-  className?: string
+  inline?: boolean | undefined
+  className?: string | undefined
   /** Optional id, e.g. so a control can reference it via `aria-describedby`. */
-  id?: string
+  id?: string | undefined
 }
 
 /**

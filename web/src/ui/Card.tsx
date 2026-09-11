@@ -15,16 +15,8 @@ interface Props extends HTMLAttributes<HTMLDivElement> {
  *
  * forwardRef so drag-and-drop libraries (dnd-kit) can attach their node refs.
  */
-const Card = forwardRef<HTMLDivElement, Props>(function Card(
-  { selected, className, ...rest },
-  ref
-) {
-  return (
-    <div
-      ref={ref}
-      className={clsx("card", { "is-vim-selected": selected }, className)}
-      {...rest}
-    />
-  )
-})
+const Card = forwardRef<HTMLDivElement, Props>(({ selected, className, ...rest }, ref) => (
+  <div ref={ref} className={clsx("card", { "is-vim-selected": selected }, className)} {...rest} />
+))
+Card.displayName = "Card"
 export default Card

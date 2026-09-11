@@ -34,7 +34,12 @@ const CONTENT: Record<string, { title: string; status: string; body: string; met
     title: "SSH Transport",
     status: "living",
     body: "## Intent\nGit over SSH as an opt-in second port.\n## Behavior\nWHEN pushed THEN verify.",
-    meta: { owners: ["aleh"], covers: ["internal/ssh/**"], last_verified: "2026-06-02", alignment: 0.91 },
+    meta: {
+      owners: ["aleh"],
+      covers: ["internal/ssh/**"],
+      last_verified: "2026-06-02",
+      alignment: 0.91,
+    },
   },
 }
 
@@ -217,12 +222,16 @@ test("Specs: ⌘P quick-open lists every spec and a click selects", async ({ pag
 
   await page.goto("/alice/demo/specs")
   await page.keyboard.press("Control+p")
-  await expect(page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")).toBeVisible()
+  await expect(
+    page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")
+  ).toBeVisible()
 
   // Empty query lists every spec; clicking one opens it.
   await expect(page.locator(".quickopen__item")).toHaveCount(2)
   await page.locator(".quickopen__item", { hasText: "CI Pipeline" }).click()
-  await expect(page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")).toBeHidden()
+  await expect(
+    page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")
+  ).toBeHidden()
   await expect(page.locator(".spec-view__title")).toHaveText("CI Pipeline")
 })
 
@@ -253,7 +262,6 @@ test("Specs: ⌘⇧F semantic search lists hits and deep-links to a section", as
   // The targeted section heading is present in the rendered spec.
   await expect(page.locator(".spec-view h2", { hasText: "Behavior" })).toBeVisible()
 })
-
 
 test("Specs: edit a spec — live preview, save to a branch, PR link", async ({ page }) => {
   await seedToken(page)
@@ -311,7 +319,9 @@ test("Specs: ⌘K command palette lists workflows and runs one", async ({ page }
   await expect(page.locator(".cmdk__item")).toHaveCount(1)
   await page.keyboard.press("Enter")
   await expect(page.locator(".cmdk .quickopen__input")).toBeHidden()
-  await expect(page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")).toBeVisible()
+  await expect(
+    page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")
+  ).toBeVisible()
 })
 
 test("Specs: ⌘K → New spec prompts for a name and opens a templated draft", async ({ page }) => {
@@ -420,10 +430,18 @@ test("Specs: Verify triggers a run and links to the SSE run viewer", async ({ pa
   // The trigger returns a running run; the run detail keeps reporting running so
   // the watcher's link stays put for the assertion.
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/specs\/verify$/, (route) =>
-    route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify(verifyRun(7, "running")) })
+    route.fulfill({
+      status: 202,
+      contentType: "application/json",
+      body: JSON.stringify(verifyRun(7, "running")),
+    })
   )
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/runs\/7$/, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(verifyRun(7, "running")) })
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(verifyRun(7, "running")),
+    })
   )
 
   await page.goto("/alice/demo/specs")

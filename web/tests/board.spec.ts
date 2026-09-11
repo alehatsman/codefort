@@ -1,4 +1,4 @@
-import { test, expect, type Locator, type Page } from "@playwright/test"
+import { expect, type Locator, type Page, test } from "@playwright/test"
 import { mockApi, seedToken } from "./mockApi"
 
 // dnd-kit needs real pointer movement, not a single jump. Press on the card,
@@ -24,8 +24,14 @@ test("drag a card from todo to in_progress; state is PATCHed", async ({ page }) 
   const state = await mockApi(page, {
     issues: [
       {
-        id: 1, number: 1, title: "Movable task", author: "alice", state: "todo",
-        assignee: null, created_at: now, updated_at: now,
+        id: 1,
+        number: 1,
+        title: "Movable task",
+        author: "alice",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
       },
     ],
   })
@@ -61,8 +67,14 @@ test("drag a card to done and back to todo; no crash, state PATCHes both ways", 
   const state = await mockApi(page, {
     issues: [
       {
-        id: 1, number: 1, title: "Round trip", author: "alice", state: "todo",
-        assignee: null, created_at: now, updated_at: now,
+        id: 1,
+        number: 1,
+        title: "Round trip",
+        author: "alice",
+        state: "todo",
+        assignee: null,
+        created_at: now,
+        updated_at: now,
       },
     ],
   })
@@ -96,8 +108,14 @@ test("done column collapses past COL_VISIBLE=30 and expands on demand", async ({
   const issues = Array.from({ length: 33 }, (_, i) => {
     const ts = new Date(base + i * 1000).toISOString()
     return {
-      id: i + 1, number: i + 1, title: `Done ${i + 1}`, author: "alice",
-      state: "done" as const, assignee: null, created_at: ts, updated_at: ts,
+      id: i + 1,
+      number: i + 1,
+      title: `Done ${i + 1}`,
+      author: "alice",
+      state: "done" as const,
+      assignee: null,
+      created_at: ts,
+      updated_at: ts,
     }
   })
   await mockApi(page, { issues })
@@ -118,7 +136,9 @@ test("done column collapses past COL_VISIBLE=30 and expands on demand", async ({
   // then use a JS click to bypass any remaining pointer-interception from the
   // virtualiser rows.
   const moreBtn = done.getByRole("button", { name: "Show 3 more" })
-  await done.locator(".board-col__body").evaluate((el) => { el.scrollTop = el.scrollHeight })
+  await done.locator(".board-col__body").evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
   await moreBtn.evaluate((btn) => (btn as HTMLButtonElement).click())
   await expect(done.getByRole("button", { name: "Show less" })).toBeVisible()
 })
@@ -131,13 +151,27 @@ test("global board groups every repo's issues into state columns", async ({ page
       contentType: "application/json",
       body: JSON.stringify([
         {
-          id: 1, number: 7, title: "alice todo", author: "alice", state: "todo",
-          assignee: null, labels: [], created_at: now, updated_at: now,
+          id: 1,
+          number: 7,
+          title: "alice todo",
+          author: "alice",
+          state: "todo",
+          assignee: null,
+          labels: [],
+          created_at: now,
+          updated_at: now,
           repo: { owner: "alice", name: "demo" },
         },
         {
-          id: 2, number: 3, title: "bob doing", author: "bob", state: "in_progress",
-          assignee: "bob", labels: [], created_at: now, updated_at: now,
+          id: 2,
+          number: 3,
+          title: "bob doing",
+          author: "bob",
+          state: "in_progress",
+          assignee: "bob",
+          labels: [],
+          created_at: now,
+          updated_at: now,
           repo: { owner: "bob", name: "api" },
         },
       ]),

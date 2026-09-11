@@ -1,0 +1,30 @@
+description: check out ts-quality and install the web gate's tools (npm ci + Playwright browsers)
+
+steps:
+  # The pin lives here and nowhere else in this repo. Bump it in one place.
+  # No tag past v0.1.0 exists upstream yet (v0.1.0 predates the provision
+  # migration and is mooncake-only); pinned to main HEAD until a v0.2.0-style
+  # tag lands. Re-pin to a tag then.
+  - vars:
+      tq_ref: 6cf4279755c1bd5b697e94427e3001338252f026
+      tq_dir: "{{ home }}/.cache/provision/tools/ts-quality"
+
+  - name: "ts-quality at {{ tq_ref }}"
+    git:
+      repo: https://github.com/alehatsman/ts-quality.git
+      dest: "{{ tq_dir }}"
+      ref: "{{ tq_ref }}"
+
+  # Not a `use:` of tq/tools: a `use:` target is resolved when the plan is
+  # parsed, before any step has run, so it can't point at a file the git
+  # step above just cloned in the same plan (same reason isayes/teleport's
+  # tasks/tools.yml calls rust-quality's scripts.sh directly instead of
+  # `use:`-ing rq/tools).
+  - name: install (npm ci + Playwright browsers)
+    shell: cd web && bash "{{ tq_dir }}/scripts/tools.sh" install
+    creates: web/node_modules/.package-lock.json
+    timeout: 30m
+
+  - name: verify
+    shell: cd web && bash "{{ tq_dir }}/scripts/tools.sh" check
+    changed_when: "false"

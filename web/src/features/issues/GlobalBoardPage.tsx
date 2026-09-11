@@ -1,25 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import "./issues.css"
-import { useNavigate } from "react-router-dom"
 import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
   closestCenter,
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+  PointerSensor,
   useSensor,
   useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
 } from "@dnd-kit/core"
 import { useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "react-router-dom"
 import { api } from "@/api/client"
 import { keys, useAllIssues } from "@/api/queries"
 import { ISSUE_STATES, type IssueState, type IssueWithRepo } from "@/api/types"
-import BoardColumn, { type BoardItem } from "@/features/issues/BoardColumn"
 import { BoardCardDisplay } from "@/features/issues/BoardCard"
-import StateIcon from "@/features/issues/StateIcon"
+import BoardColumn, { type BoardItem } from "@/features/issues/BoardColumn"
 import IssuesViewSwitch from "@/features/issues/IssuesViewSwitch"
 import NewIssueForm from "@/features/issues/NewIssueForm"
+import StateIcon from "@/features/issues/StateIcon"
 import { repoHue } from "@/shell/repoColor"
 import { useRepoFilter } from "@/shell/useRepoFilter"
 import { ErrorMessage, FilterBar, FilterChip, FilterRow, PageHeader, Spinner } from "@/ui"
@@ -92,6 +92,7 @@ export default function GlobalBoardPage() {
   const justDraggedRef = useRef(false)
   useEffect(() => {
     function swallowPostDragClick(e: MouseEvent) {
+      // biome-ignore lint/suspicious/noUnnecessaryConditions: false positive — the ref is mutated in onDragStart, a different closure the analyzer doesn't see
       if (justDraggedRef.current) {
         justDraggedRef.current = false
         e.preventDefault()
@@ -121,11 +122,11 @@ export default function GlobalBoardPage() {
     setActiveItem(null)
     const { active, over } = event
     if (!over) return
-    const targetState = over.data.current?.state as IssueState | undefined
-    const currentState = active.data.current?.currentState as IssueState | undefined
-    const issueNumber = active.data.current?.issueNumber as number | undefined
-    const owner = active.data.current?.owner as string | undefined
-    const repo = active.data.current?.repo as string | undefined
+    const targetState = over.data.current?.["state"] as IssueState | undefined
+    const currentState = active.data.current?.["currentState"] as IssueState | undefined
+    const issueNumber = active.data.current?.["issueNumber"] as number | undefined
+    const owner = active.data.current?.["owner"] as string | undefined
+    const repo = active.data.current?.["repo"] as string | undefined
     if (!targetState || !issueNumber || !currentState || !owner || !repo) return
     if (targetState === currentState) return
 
