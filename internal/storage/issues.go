@@ -356,6 +356,55 @@ func likeEscape(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
+// maxSearchTerms bounds how many words one query turns into LIKE clauses. Each
+// term costs two more predicates on the scan plus one in the ranking, and a
+// query pasted from a stack trace would otherwise be unbounded. Surplus terms
+// are dropped rather than rejected: a query that narrows further than the
+// server ranks is still a usable search, where a 400 is not.
+const maxSearchTerms = 8
+
+// searchTerms splits a free-text query into the terms a match must satisfy.
+// Whitespace separates them and every term must appear, so "protect branch"
+// finds an issue titled "Branch protection" that a single-substring match would
+// miss. Deliberately no quoting syntax: a phrase search is a second grammar to
+// learn and to escape, and AND-of-words is what a one-line box is read as.
+func searchTerms(query string) []string {
+	terms := strings.Fields(query)
+	if len(terms) > maxSearchTerms {
+		terms = terms[:maxSearchTerms]
+	}
+	return terms
+}
+
+// relevanceOrder builds a leading ORDER BY fragment that ranks rows by how many
+// query terms hit the title, descending. A title hit is what a human means by
+// relevant; the body is where a word tends to appear in passing. SQLite yields
+// 1/0 from a comparison, so the hits sum directly in the same query — no index,
+// no score column, nothing to keep in sync.
+//
+// Returns "" when there is nothing to rank, so the caller falls straight
+// through to its normal ordering. Appends its binds to args, which is why the
+// caller must call it after the WHERE clause's binds and before LIMIT's.
+func relevanceOrder(query, titleCol string, args *[]any) string {
+	terms := searchTerms(query)
+	if len(terms) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("(")
+	for i, term := range terms {
+		if i > 0 {
+			b.WriteString(" + ")
+		}
+		b.WriteString("(")
+		b.WriteString(titleCol)
+		b.WriteString(` LIKE ? ESCAPE '\')`)
+		*args = append(*args, "%"+likeEscape(term)+"%")
+	}
+	b.WriteString(") DESC, ")
+	return b.String()
+}
+
 func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error) {
 	q := strings.Builder{}
 	q.WriteString(`SELECT ` + issueColumns + ` FROM issues WHERE repo_id = ?`)
@@ -370,15 +419,22 @@ func ListIssues(db *sql.DB, repoID int64, filter ListFilter) ([]api.Issue, error
 	if limit > 1000 {
 		limit = 1000
 	}
+	// Relevance only leads when the caller expressed no preference. Asking for
+	// `newest` and getting title-matches first would be the server overruling
+	// an explicit sort, which is worse than an unranked list.
+	q.WriteString(" ORDER BY ")
+	if filter.Sort == "" {
+		q.WriteString(relevanceOrder(filter.Query, "title", &args))
+	}
 	switch filter.Sort {
 	case api.IssueSortOldest:
-		q.WriteString(" ORDER BY number ASC")
+		q.WriteString("number ASC")
 	case api.IssueSortRecentlyUpdated:
 		// number DESC tie-breaks issues sharing an updated_at (e.g. created in
 		// the same instant) so the order is stable.
-		q.WriteString(" ORDER BY updated_at DESC, number DESC")
+		q.WriteString("updated_at DESC, number DESC")
 	default: // IssueSortNewest and the unset zero value
-		q.WriteString(" ORDER BY number DESC")
+		q.WriteString("number DESC")
 	}
 	q.WriteString(" LIMIT ?")
 	args = append(args, limit)
@@ -489,11 +545,13 @@ func appendIssueFilters(q *strings.Builder, args *[]any, filter ListFilter) {
 		q.WriteString(" AND author = ?")
 		*args = append(*args, filter.Author)
 	}
-	if filter.Query != "" {
+	for _, term := range searchTerms(filter.Query) {
 		// LIKE is case-insensitive for ASCII in SQLite by default, which is
 		// fine for a keyword search. Match the same %term% against title and
 		// body; wildcards in the term are escaped so they're taken literally.
-		pat := "%" + likeEscape(filter.Query) + "%"
+		// Terms are ANDed — each one gets its own clause — so word order and
+		// adjacency don't matter.
+		pat := "%" + likeEscape(term) + "%"
 		q.WriteString(` AND (title LIKE ? ESCAPE '\' OR body LIKE ? ESCAPE '\')`)
 		*args = append(*args, pat, pat)
 	}
@@ -604,7 +662,11 @@ func ListAllIssues(db *sql.DB, filter ListFilter) ([]api.IssueWithRepo, error) {
 	if limit > 1000 {
 		limit = 1000
 	}
-	q.WriteString(" ORDER BY issues.updated_at DESC, issues.id DESC LIMIT ?")
+	// The aggregate takes no sort parameter, so relevance always leads when a
+	// query is present — there is no caller preference for it to overrule.
+	q.WriteString(" ORDER BY ")
+	q.WriteString(relevanceOrder(filter.Query, "issues.title", &args))
+	q.WriteString("issues.updated_at DESC, issues.id DESC LIMIT ?")
 	args = append(args, limit)
 	if filter.Offset > 0 {
 		q.WriteString(" OFFSET ?")

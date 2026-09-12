@@ -209,8 +209,16 @@ closed out.
   `core.hooksPath` next to the hooks; `ci install-hooks` backfills it. This was
   not on any list — it only showed up because a *hard*-failing hook made the
   silence audible.
+- **Issue search** — the last unblocked small. Was a single `LIKE %q%` over
+  title and body, so a two-word query only matched the words adjacent and in
+  order. Now the query splits on whitespace and every term must hit title or
+  body, and an unsorted search is ranked by how many terms land in the *title*
+  before the newest-first default. No FTS5 table, no shadow index: the ranking
+  is a sum of comparisons in the same query, so there is no second store to
+  keep in sync. An explicitly requested sort is never reordered.
 
 What remains on the roadmap is either an ops step (run the spec verify loop,
 needs a live moongitd with agent credentials), blocked upstream (mooncake →
 provision, waiting on the `go-quality` rewrite), or a genuine judgment call
-about scope (issue-search ranking, milestones).
+about scope (milestones, which the roadmap already gates on epics proving
+insufficient in practice).

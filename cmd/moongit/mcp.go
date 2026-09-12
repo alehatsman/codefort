@@ -272,7 +272,7 @@ type issueListInput struct {
 	State    string `json:"state,omitempty" jsonschema:"todo,in_progress,done,closed"`
 	Assignee string `json:"assignee,omitempty" jsonschema:"null for unassigned"`
 	Label    string `json:"label,omitempty" jsonschema:"exact label match"`
-	Query    string `json:"query,omitempty" jsonschema:"keyword in title or body"`
+	Query    string `json:"query,omitempty" jsonschema:"keywords in title or body; every word must match, title hits rank first"`
 	Limit    int    `json:"limit,omitempty" jsonschema:"max results"`
 	Ready    bool   `json:"ready,omitempty" jsonschema:"unclaimed todos with deps met"`
 	Blocked  bool   `json:"blocked,omitempty" jsonschema:"todos with unmet deps"`

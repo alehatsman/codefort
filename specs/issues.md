@@ -34,6 +34,18 @@ token may write); the claim is the social contract that keeps it orderly.
   or `closed`; any other value is rejected.
 - WHEN a client lists issues, the server filters by state (comma-separated),
   assignee, author, and a free-text query, and honors sort and limit.
+- WHEN a free-text query carries more than one whitespace-separated term, every
+  term must appear in the issue's title or body — the terms are ANDed, not
+  matched as one adjacent phrase, and their order does not matter. Matching is
+  case-insensitive substring; there is no stemming, no phrase quoting, and no
+  field-scoped syntax.
+- WHERE a query carries more terms than the server ranks (8), the surplus terms
+  are dropped rather than the request refused — a pasted paragraph narrows the
+  search instead of erroring or scanning unboundedly.
+- WHILE a free-text query is present and the caller has not asked for an
+  explicit sort, results are ordered by how many query terms hit the title,
+  descending, before the default newest-first order. An explicitly requested
+  sort is honored as given and is never reordered by relevance.
 - WHEN an issue's state changes, the server emits a state-change event to the
   fleet feed; a title/body-only edit emits a plainer update event.
 - WHEN a client claims an unclaimed issue (or one whose claim has expired, or one
@@ -143,6 +155,12 @@ is never needed.
 - **Hard authorization & roles.** No per-repo permissions, no admin override on
   claims, no locking down delete. The open data plane is deliberate; the claim is
   advisory. Identity hardening lives in the auth/tokens spec.
+- **A search index.** Matching stays `LIKE` over the issues table — no FTS5
+  virtual table, no trigger-maintained shadow copy, no stemming or fuzzy
+  matching. A fleet's backlog is thousands of rows, not millions, so an index
+  would buy latency nobody can perceive at the cost of a second store that can
+  fall out of sync. Ranking is the one nuance, and it is computed in the same
+  query.
 - **Milestones, multi-assignee, a managed label taxonomy.** moongit issues stay
   deliberately thin: one assignee (the claimant), four states, free-text body.
   Labels exist (above) but only as free-form tags on the issue — no label
@@ -153,6 +171,8 @@ is never needed.
 - [x] Create/list/get/update/delete issues with token-stamped author
 - [x] Four-state lifecycle (todo/in_progress/done/closed) with validation
 - [x] List filtering by state/assignee/author/query + sort + limit
+- [x] Multi-term AND search over title/body, capped at 8 terms
+- [x] Title-hit relevance ranking when a query is present and no sort is asked for
 - [x] Claim as compare-and-set lock; 409 when held by another within lease
 - [x] Lease expiry + re-claim heartbeat renewal
 - [x] Owner-only unclaim; already-unclaimed is a no-op

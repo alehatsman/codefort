@@ -16,6 +16,7 @@ the thing, not the task list.
 | Git smart-HTTP: clone / push / fetch, tree, blob, raw, commits, compare | [git-hosting](specs/git-hosting.md) |
 | Git over SSH, opt-in, publickey → token identity | [ssh-transport](specs/ssh-transport.md) |
 | Issues: CRUD, four-state lifecycle, claim-as-lock with lease, comments, labels | [issues](specs/issues.md) |
+| Issue search: multi-term AND over title/body, title-hit ranking, no index | [issues](specs/issues.md) |
 | Epics (parent edge) + `depends-on` graph with computed ready/blocked views | [issues](specs/issues.md) |
 | Pull requests: open, merge (ff-only / merge-commit / rebase), CAS ref guard, mirror push | [pull-requests](specs/pull-requests.md) |
 | PR approvals / review state, opt-in as a merge gate; line-anchored review comments, resolve/reopen | [pull-requests](specs/pull-requests.md) |
@@ -66,7 +67,6 @@ rewrite in `alehatsman/go-quality`. Background in
 
 ### 3. Smaller, unblocked
 
-- Issue search is substring-only over title/body; no ranking.
 - No milestones. Labels + epics cover most of what they'd do — this only earns
   a slot if the epic rollup proves insufficient in practice.
 

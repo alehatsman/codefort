@@ -202,7 +202,7 @@ func runIssueList(args []string) error {
 	blocked := fs.Bool("blocked", false, "only todo leaves with at least one unmet dependency")
 	epics := fs.Bool("epics", false, "only epics (issues with children), each with a done/total rollup")
 	var query string
-	fs.StringVar(&query, "query", "", "filter by keyword in title or body")
+	fs.StringVar(&query, "query", "", "filter by keywords in title or body (all words must match)")
 	fs.StringVar(&query, "q", "", "shorthand for --query")
 	if err := fs.Parse(args); err != nil {
 		return err

@@ -290,6 +290,11 @@ Create a branch from a base ref.
   `closed`), `assignee`, `author`, `q` (keyword), `label`, `sort`
   (`newest` default | `oldest` | `recently-updated`), `limit`, `offset`,
   and the flags `ready`, `blocked`, `epics` (bare flag = true; `false`/`0` off)
+- `q` is a case-insensitive substring search over title and body. Whitespace
+  separates terms and every term must match (order and adjacency are ignored);
+  terms past the eighth are dropped, not rejected. With `q` set and `sort`
+  omitted, rows are ranked by how many terms hit the *title* before falling back
+  to newest-first; passing `sort` explicitly disables the ranking.
 - `ready` and `blocked` are mutually exclusive; `epics` cannot be combined with
   either — both are `400`
 - `200` → `[Issue]`, plus an `X-Total-Count` header with the unpaged total.
@@ -644,7 +649,8 @@ with its owning `repo` (`{owner, name}`); `number` stays per-repo.
 
 ### GET /api/issues
 Issues across every repo, newest-updated first. `sort` is ignored here — the
-cross-repo feed is always by recency.
+cross-repo feed is always by recency, behind the same title-hit ranking the
+per-repo list applies when `q` is set.
 - Query: same as the per-repo issue list (`state`, `assignee`, `author`, `q`,
   `label`, `limit`, `offset`, `ready`, `blocked`, `epics`)
 - `200` → `[IssueWithRepo]`, plus `X-Total-Count`; `400` invalid filter

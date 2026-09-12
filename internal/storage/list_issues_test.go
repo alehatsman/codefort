@@ -221,3 +221,73 @@ func TestCountIssuesIgnoresLimitOffset(t *testing.T) {
 		t.Fatalf("filtered count = %d, want 2", n)
 	}
 }
+
+// Multi-word queries AND their terms across title and body, in any order — the
+// old single-substring match required the words be adjacent and in order.
+func TestListIssuesQueryAndsItsTerms(t *testing.T) {
+	db, repoID := seedRepo(t)
+	mustCreate(t, db, repoID, "Branch protection", "")             // #1: both, reordered
+	mustCreate(t, db, repoID, "Protect the release", "branch tip") // #2: split across fields
+	mustCreate(t, db, repoID, "Protect the tag", "")               // #3: only one term
+
+	got, err := ListIssues(db, repoID, ListFilter{Query: "protect branch"})
+	if err != nil {
+		t.Fatalf("ListIssues: %v", err)
+	}
+	have := numbers(got)
+	if !have[1] || !have[2] {
+		t.Fatalf("query 'protect branch' = %v, want #1 and #2", have)
+	}
+	if have[3] {
+		t.Fatalf("query 'protect branch' matched #3, which lacks 'branch'")
+	}
+}
+
+// Terms past the cap are dropped, not rejected — the search narrows as far as
+// the server ranks and still returns something usable.
+func TestListIssuesQueryCapsTermCount(t *testing.T) {
+	db, repoID := seedRepo(t)
+	mustCreate(t, db, repoID, "a b c d e f g h", "")
+
+	got, err := ListIssues(db, repoID, ListFilter{Query: "a b c d e f g h zzz"})
+	if err != nil {
+		t.Fatalf("ListIssues: %v", err)
+	}
+	// 'zzz' is the 9th term and appears nowhere; dropping it is what lets the
+	// issue match at all.
+	if len(got) != 1 {
+		t.Fatalf("over-cap query = %d issues, want 1 (surplus term dropped)", len(got))
+	}
+}
+
+// A title hit outranks a body hit, ahead of the newest-first default. #2 is the
+// newer issue, so plain newest-first would put it first.
+func TestListIssuesRanksTitleHitsFirst(t *testing.T) {
+	db, repoID := seedRepo(t)
+	mustCreate(t, db, repoID, "Rewrite the scheduler", "") // #1: title hit
+	mustCreate(t, db, repoID, "Unrelated work", "the scheduler is slow")
+
+	got, err := ListIssues(db, repoID, ListFilter{Query: "scheduler"})
+	if err != nil {
+		t.Fatalf("ListIssues: %v", err)
+	}
+	if want := []int{1, 2}; !slices.Equal(order(got), want) {
+		t.Fatalf("ranked order = %v, want %v (title hit first)", order(got), want)
+	}
+}
+
+// An explicit sort is the caller's word on ordering; relevance must not
+// override it.
+func TestListIssuesExplicitSortBeatsRelevance(t *testing.T) {
+	db, repoID := seedRepo(t)
+	mustCreate(t, db, repoID, "Rewrite the scheduler", "") // #1: title hit
+	mustCreate(t, db, repoID, "Unrelated work", "the scheduler is slow")
+
+	got, err := ListIssues(db, repoID, ListFilter{Query: "scheduler", Sort: api.IssueSortNewest})
+	if err != nil {
+		t.Fatalf("ListIssues: %v", err)
+	}
+	if want := []int{2, 1}; !slices.Equal(order(got), want) {
+		t.Fatalf("sort=newest order = %v, want %v (unranked)", order(got), want)
+	}
+}
