@@ -88,6 +88,17 @@ conflict rules, not from access gates.
   all, still merges. Review state is advisory signal, consistent with the
   local-trust posture — git ancestry and conflicts are the only hard gates.
 
+- WHEN a merge moves the base ref, a CI run is enqueued for the base branch at
+  the new tip, under the `merge` event and the merging identity. The merge
+  advances the ref with `update-ref` rather than `receive-pack`, so the
+  post-receive hook never fires — without this explicit enqueue the canonical
+  branch would accept merges and never build them, which is the one branch
+  where a red build matters most. The enqueue applies the same gates a push
+  does (CI enabled, the pipeline's branch filter) and is best-effort: the refs
+  have already moved, so a bookkeeping failure is logged, never returned.
+- WHERE the head was already an ancestor of base, the base ref does not move
+  and no run is enqueued — there is nothing new to build.
+
 ## Non-goals
 
 - **Issues.** Issues and their claim-first coordination are a separate spec; a PR
@@ -116,7 +127,7 @@ conflict rules, not from access gates.
 - [x] CAS ref update guards against a concurrent push moving base
 - [x] Review comments anchored to a line range, with source snippets
 - [x] Author-only resolve/unresolve and delete; open/resolved/all listing
-- [ ] CI run + merge event enqueued on a server-side merge (#256)
+- [x] CI run + merge event enqueued on a server-side merge (#256)
 - [x] Merged base branch mirror-pushed to a configured `mirror` remote (best-effort, non-forced)
 - [ ] Server-side rebase of head onto base, worktree-free (#257)
 - [x] Approve / request-changes verdicts with token-stamped reviewer; invalid states rejected

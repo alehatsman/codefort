@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -172,32 +173,56 @@ func (s *Server) handleCIEvents(w http.ResponseWriter, r *http.Request) {
 		s.autoCloseMergedPRs(r.Context(), repoID, bareRepo, branch, req.Old, req.New)
 	}
 
-	enabled, err := storage.RepoCIEnabled(s.db, repoID)
+	run, queued, err := s.enqueueRefRun(repoID, owner, name, req.Ref, req.New, "push", req.Pusher)
 	if err != nil {
-		s.logger.Error("ci events: enabled check", "err", err)
+		s.logger.Error("ci events: enqueue", "err", err)
 		http.Error(w, "error", http.StatusInternalServerError)
 		return
 	}
-	if !enabled {
-		// CI off for this repo: accept the notification, enqueue nothing.
+	if !queued {
+		// CI off for this repo, or the branch is filtered out: accept the
+		// notification, enqueue nothing.
 		w.WriteHeader(http.StatusNoContent)
 		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	_ = json.NewEncoder(w).Encode(map[string]any{"run": run.Number})
+}
+
+// enqueueRefRun queues a CI run for ref, now pointing at sha, applying every
+// gate a push applies. queued is false when CI is off for the repo or the
+// pipeline's branch filter excludes the ref — both are ordinary outcomes, not
+// errors, so callers report "nothing to build" rather than failing.
+//
+// It is shared by the push hook and the pull-request merge endpoint. A
+// server-side merge advances the base ref with update-ref rather than
+// receive-pack, so the post-receive hook never fires; without this the
+// canonical branch would land merges with no CI at all, which is the one place
+// it matters most.
+func (s *Server) enqueueRefRun(repoID int64, owner, name, ref, sha, event, trigger string) (storage.CIRun, bool, error) {
+	enabled, err := storage.RepoCIEnabled(s.db, repoID)
+	if err != nil {
+		return storage.CIRun{}, false, fmt.Errorf("ci enabled check: %w", err)
+	}
+	if !enabled {
+		return storage.CIRun{}, false, nil
 	}
 
 	bareRepo := filepath.Join(s.cfg.ReposDir, owner, name+".git")
 
 	// Honor the pipeline's on.push.branches filter at enqueue, mirroring the
-	// CI-disabled path above: a push to a branch the pipeline doesn't list
-	// enqueues nothing, so filtered branches don't accumulate canceled runs. We
-	// only skip when the pipeline parses cleanly AND its filter excludes the
-	// branch; an unreadable / unparseable / absent pipeline still enqueues so
-	// the runner surfaces the real outcome (parse error → errored run, no
-	// pipeline → gated/canceled), exactly as before.
-	if raw, ok := readPipelineAt(bareRepo, req.New); ok {
-		if p, perr := ci.Parse(raw); perr == nil && !p.On.Matches(req.Ref) {
-			s.logger.Info("ci run skipped (branch filter)", "repo", req.Repo, "ref", req.Ref)
-			w.WriteHeader(http.StatusNoContent)
-			return
+	// CI-disabled path above: a ref the pipeline doesn't list enqueues nothing,
+	// so filtered branches don't accumulate canceled runs. We only skip when
+	// the pipeline parses cleanly AND its filter excludes the ref; an
+	// unreadable / unparseable / absent pipeline still enqueues so the runner
+	// surfaces the real outcome (parse error → errored run, no pipeline →
+	// gated/canceled).
+	if raw, ok := readPipelineAt(bareRepo, sha); ok {
+		if p, perr := ci.Parse(raw); perr == nil && !p.On.Matches(ref) {
+			s.logger.Info("ci run skipped (branch filter)", "repo", owner+"/"+name, "ref", ref)
+			return storage.CIRun{}, false, nil
 		}
 	}
 
@@ -205,32 +230,27 @@ func (s *Server) handleCIEvents(w http.ResponseWriter, r *http.Request) {
 	// pointless. Best-effort — a query failure or nil canceler doesn't block
 	// the new enqueue.
 	if s.agentCanceler != nil {
-		if stale, qerr := storage.ActiveCIRunIDsForRef(s.db, repoID, req.Ref); qerr != nil {
-			s.logger.Error("ci events: supersede query", "err", qerr)
+		if stale, qerr := storage.ActiveCIRunIDsForRef(s.db, repoID, ref); qerr != nil {
+			s.logger.Error("ci: supersede query", "err", qerr)
 		} else {
 			for _, id := range stale {
 				s.agentCanceler.CancelCIRun(id)
-				s.logger.Info("ci run superseded", "run_id", id, "ref", req.Ref, "new_sha", req.New)
+				s.logger.Info("ci run superseded", "run_id", id, "ref", ref, "new_sha", sha)
 			}
 		}
 	}
 
-	msg, author := gitCommitMeta(bareRepo, req.New)
+	msg, author := gitCommitMeta(bareRepo, sha)
 	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
-		CommitSHA: req.New, CommitMsg: msg, CommitAuthor: author,
-		Ref: req.Ref, Event: "push", Trigger: req.Pusher,
+		CommitSHA: sha, CommitMsg: msg, CommitAuthor: author,
+		Ref: ref, Event: event, Trigger: trigger,
 	})
 	if err != nil {
-		s.logger.Error("ci events: enqueue", "err", err)
-		http.Error(w, "error", http.StatusInternalServerError)
-		return
+		return storage.CIRun{}, false, fmt.Errorf("enqueue: %w", err)
 	}
 	s.emitRunQueued(repoID, run)
-	s.logger.Info("ci run enqueued", "repo", req.Repo, "run", run.Number, "ref", req.Ref)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	_ = json.NewEncoder(w).Encode(map[string]any{"run": run.Number})
+	s.logger.Info("ci run enqueued", "repo", owner+"/"+name, "run", run.Number, "ref", ref, "event", event)
+	return run, true, nil
 }
 
 // isZeroSHA reports whether a git SHA is the all-zeros sentinel (a ref delete),

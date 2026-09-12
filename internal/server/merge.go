@@ -152,12 +152,33 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 	// mirror in sync. Best-effort and async — the merge already succeeded.
 	s.mirrorMergedBranch(repoDir, pr.BaseRef)
 	s.closeLinkedIssues(repoID, pr)
+	s.enqueueMergeRun(r, repoID, pr.BaseRef, newTip)
 	s.emitPull("pull.merged", repoID, identityFromContext(r), updated)
 	writeJSON(w, http.StatusOK, api.MergeResult{
 		PullRequest: updated,
 		MergeCommit: newTip,
 		FastForward: ff,
 	})
+}
+
+// enqueueMergeRun builds the base branch at its new tip after a server-side
+// merge. The merge moves the ref with update-ref rather than receive-pack, so
+// the post-receive hook never fires — without this the canonical branch would
+// accept merges and never build them, which is the one branch where a red
+// build matters most.
+//
+// Best-effort, like the mirror push and the linked-issue close above: the
+// merge already succeeded and its refs are already moved, so a bookkeeping
+// failure is logged, never returned. CI being disabled or the branch being
+// filtered out is a normal outcome, not an error.
+func (s *Server) enqueueMergeRun(r *http.Request, repoID int64, baseRef, newTip string) {
+	owner := r.PathValue("owner")
+	name := strings.TrimSuffix(r.PathValue("repo"), ".git")
+	if _, _, err := s.enqueueRefRun(
+		repoID, owner, name, "refs/heads/"+baseRef, newTip, "merge", identityFromContext(r),
+	); err != nil {
+		s.logger.Error("merge: enqueue ci run", "repo", owner+"/"+name, "ref", baseRef, "err", err)
+	}
 }
 
 // mirrorMergedBranch best-effort pushes branch to the repo's "mirror" remote,

@@ -383,3 +383,75 @@ func TestUpdateRefCAS(t *testing.T) {
 		t.Errorf("main = %s, want %s after valid CAS", got, featureTip)
 	}
 }
+
+// A server-side merge moves the base ref with update-ref, not receive-pack, so
+// the post-receive hook never fires. Without an explicit enqueue the canonical
+// branch would accept merges and never build them (#256).
+func TestMergeEnqueuesCIRunOnBase(t *testing.T) {
+	s, _ := newMergeTestServer(t)
+	repoID, err := storage.LookupRepo(s.rdb, cOwner, cRepo)
+	if err != nil {
+		t.Fatalf("LookupRepo: %v", err)
+	}
+	if err := storage.SetRepoCIEnabled(s.db, repoID, true); err != nil {
+		t.Fatalf("SetRepoCIEnabled: %v", err)
+	}
+	openPull(t, s, "main", "feature", "add feature")
+
+	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{Method: api.MergeCommitMethod})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("merge status = %d (body=%s)", rr.Code, rr.Body.String())
+	}
+	res := mergeResult(t, rr.Result())
+
+	runs, err := storage.ListRuns(s.rdb, repoID, storage.RunFilter{})
+	if err != nil {
+		t.Fatalf("ListRuns: %v", err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("runs = %d, want exactly one queued by the merge", len(runs))
+	}
+	got := runs[0]
+	if got.Ref != "refs/heads/main" {
+		t.Errorf("run ref = %q, want refs/heads/main (the base branch, not the head)", got.Ref)
+	}
+	// The run must build the *merge result*, not either pre-merge tip —
+	// building the head commit would test code that was never on main.
+	if got.CommitSHA != res.MergeCommit {
+		t.Errorf("run commit = %s, want the merge commit %s", got.CommitSHA, res.MergeCommit)
+	}
+	if got.Event != "merge" {
+		t.Errorf("run event = %q, want %q so the UI can tell it from a push", got.Event, "merge")
+	}
+	if got.Trigger != "agent#7" {
+		t.Errorf("run trigger = %q, want the merging identity", got.Trigger)
+	}
+}
+
+// CI disabled is an ordinary outcome, not a merge failure.
+func TestMergeWithCIDisabledStillMerges(t *testing.T) {
+	s, bare := newMergeTestServer(t)
+	repoID, err := storage.LookupRepo(s.rdb, cOwner, cRepo)
+	if err != nil {
+		t.Fatalf("LookupRepo: %v", err)
+	}
+	openPull(t, s, "main", "feature", "add feature")
+
+	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{Method: api.MergeCommitMethod})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("merge status = %d (body=%s)", rr.Code, rr.Body.String())
+	}
+	res := mergeResult(t, rr.Result())
+	if got := bareRev(t, bare, "refs/heads/main"); got != res.MergeCommit {
+		t.Errorf("main = %s, want the merge commit %s", got, res.MergeCommit)
+	}
+	runs, err := storage.ListRuns(s.rdb, repoID, storage.RunFilter{})
+	if err != nil {
+		t.Fatalf("ListRuns: %v", err)
+	}
+	if len(runs) != 0 {
+		t.Errorf("runs = %d, want none when CI is off for the repo", len(runs))
+	}
+}
