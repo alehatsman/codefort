@@ -32,6 +32,10 @@ let the operator hand an agent only the tools its job needs.
 - WHEN a tool's underlying request fails (non-success status or transport error),
   the handler returns a structured error carrying the server's message rather
   than crashing the session.
+- WHEN the repo target cannot be resolved at startup (no checkout, no
+  resolvable remote), the server still comes up and advertises its full
+  toolset; every tool call fails with that diagnosis as its structured error
+  instead of the process exiting before the transport is up (#3).
 - WHERE the toolset is concerned, it covers four groups over the data plane:
   issue (list/show/create/comment/claim/unclaim/set-state), review (list/create/
   resolve/reopen code comments), pipeline (trigger/list/get runs), and agent
@@ -68,6 +72,8 @@ let the operator hand an agent only the tools its job needs.
 - [x] Stateless stdio↔REST proxy; tools wrap the same /api endpoints as the CLI
 - [x] Repo from git remotes / CODEFORT_SERVER; auth via CODEFORT_TOKEN; single-repo scope
 - [x] Tool errors surfaced as structured output with the server's message
+- [x] Startup target-discovery failure doesn't abort the process; it degrades
+      to per-call structured errors so the transport stays up (#3)
 - [x] 16 tools across issue / review / pipeline / agent groups
 - [x] `full` (default) and `review` profiles; review = read + review_* + issue_comment
 - [x] Profile enforced at registration (disallowed tools never advertised)
