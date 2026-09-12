@@ -29,7 +29,7 @@ func TestIssueStateValid(t *testing.T) {
 	}
 }
 
-// TestCompareJSON pins the wire contract the web client and mgit depend on:
+// TestCompareJSON pins the wire contract the web client and cf depend on:
 // the documented snake_case keys are present, and the Commits/Files slices
 // render as JSON arrays (the handler initializes them so they are never null).
 func TestCompareJSON(t *testing.T) {

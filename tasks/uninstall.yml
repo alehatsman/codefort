@@ -5,15 +5,15 @@ steps:
   # value from a file never gets a second render pass (provision spec
   # §3.3). An inline `vars:` step's values ARE rendered, so home-anchored
   # paths live here, not in a shared vars_file (confirmed with Provision
-  # master mind, moongit issue #410).
+  # master mind, codefort issue #410).
   - vars:
-      unit_path: "{{ home }}/.config/systemd/user/moongit.service"
-      binary_path: "{{ home }}/.local/bin/moongitd"
-      client_path: "{{ home }}/.local/bin/moongit"
-      data_dir: "{{ home }}/.local/share/moongit"
+      unit_path: "{{ home }}/.config/systemd/user/codefort.service"
+      binary_path: "{{ home }}/.local/bin/codefortd"
+      client_path: "{{ home }}/.local/bin/codefort"
+      data_dir: "{{ home }}/.local/share/codefort"
 
   - name: disable + stop service
-    shell: systemctl --user disable --now moongit.service || true
+    shell: systemctl --user disable --now codefort.service || true
     changed_when: "false"
 
   - name: remove unit + binaries
@@ -25,5 +25,5 @@ steps:
     changed_when: "false"
 
   - name: done
-    shell: echo "moongit uninstalled (data dir {{ data_dir }} preserved)"
+    shell: echo "codefort uninstalled (data dir {{ data_dir }} preserved)"
     changed_when: "false"

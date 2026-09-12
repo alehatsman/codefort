@@ -9,7 +9,7 @@ func TestParseFrontmatter(t *testing.T) {
 id: ssh-transport
 status: living
 owners: [aleh, agent#1]
-covers: ["internal/ssh/**", "cmd/moongitd/**"]
+covers: ["internal/ssh/**", "cmd/codefortd/**"]
 last_verified: 2026-06-02
 alignment: 0.91
 ---

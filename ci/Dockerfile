@@ -1,13 +1,13 @@
-# moongit CI base image.
+# codefort CI base image.
 #
-# moongitd runs each CI job in a throwaway container and execs `provision
+# codefortd runs each CI job in a throwaway container and execs `provision
 # apply <plan> --json` inside it (see cmd/codefortd/ci_runner.go, #411), so
 # every image used for CI must carry `provision` and `git` on PATH. `mooncake`
 # stays too, as long as the `quality` job's `mooncake task ci` shell-out is in
 # scope (#411 explicitly excludes the goq/tq rewrite — that's a separate,
 # larger, deferred follow-up). This is the default image
-# (CODEFORT_CI_DEFAULT_IMAGE=moongit-ci:latest); per-job `image:` overrides in
-# mgitci.yml should derive from it (FROM moongit-ci:latest) or bundle both
+# (CODEFORT_CI_DEFAULT_IMAGE=codefort-ci:latest); per-job `image:` overrides in
+# mgitci.yml should derive from it (FROM codefort-ci:latest) or bundle both
 # binaries the same way.
 #
 # `curl` is baked in too: mooncake's `assert: {http: {...}}` (no provision
@@ -22,10 +22,10 @@
 # repo that needs Go/node/etc. authors a per-job `image:` pointing at a
 # toolchain image that also carries provision.
 #
-# Build (from the moongit repo root):
+# Build (from the codefort repo root):
 #   1. produce a static mooncake binary into ci/mooncake (see ci/README.md)
 #   2. produce a provision binary into ci/provision (see ci/README.md)
-#   3. docker build -t moongit-ci:latest ci/
+#   3. docker build -t codefort-ci:latest ci/
 FROM debian:stable-slim
 
 RUN apt-get update \
@@ -42,6 +42,6 @@ RUN chmod +x /usr/local/bin/mooncake && mooncake --version
 COPY provision /usr/local/bin/provision
 RUN chmod +x /usr/local/bin/provision && provision --version
 
-# Jobs run as the moongitd uid:gid (injected via `docker run --user` at exec
+# Jobs run as the codefortd uid:gid (injected via `docker run --user` at exec
 # time) with the checked-out workspace bind-mounted at /work.
 WORKDIR /work

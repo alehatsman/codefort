@@ -22,7 +22,7 @@ func TestGetSpecIncludesLatestVerification(t *testing.T) {
 		RepoID: repoID, SpecID: "ssh-transport", SpecPath: "specs/ssh-transport.md",
 		CommitSHA: "deadbeef", Alignment: 0.75,
 		Result:   `{"alignment":0.75,"markers":[{"line":6,"text":"WHEN x THEN y.","marker":"drifted","note":"server.go changed"}],"conflicts":["behavior drifted"]}`,
-		Verifier: "moongit-agent",
+		Verifier: "codefort-agent",
 	}); err != nil {
 		t.Fatalf("RecordVerification: %v", err)
 	}

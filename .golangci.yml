@@ -57,7 +57,7 @@ linters:
         - G302  # file perms — config/lockfile use 0644 by design
         - G304  # path from variable — every config-reading codepath
         - G306  # bad write perms
-        # moongit additions:
+        # codefort additions:
         - G202  # SQL string concat — query strings built from controlled internal inputs (column/op names), not user data
         - G702  # command injection via taint analysis — git plumbing args are server-controlled
         - G704  # SSRF via taint analysis — high false-positive on internal HTTP plumbing
@@ -102,7 +102,7 @@ linters:
     staticcheck:
       # Keep SA* (the real-bug checks); drop QF/ST/S style suggestions.
       # ST1020/ST1005/S1008/S1017/S1034 are style preferences, not bugs.
-      # -ST1000: moongit packages don't (yet) all carry package comments; that's
+      # -ST1000: codefort packages don't (yet) all carry package comments; that's
       # a doc backlog, not a bug. Relaxed here pending incremental package docs.
       checks: ["all", "-QF*", "-ST1005", "-ST1020", "-ST1000", "-S1008", "-S1017", "-S1034"]
 
@@ -119,7 +119,7 @@ linters:
       - linters: [errcheck]
         text: 'Error return value of `fmt\.F'
 
-      # bodyclose in the moongit CLI client: short-lived process that reads the
+      # bodyclose in the codefort CLI client: short-lived process that reads the
       # response then exits, so an unclosed body is process-scoped and benign.
       # (The daemon side does close its bodies.)
       - path: cmd/cf/

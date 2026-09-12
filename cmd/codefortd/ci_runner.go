@@ -171,7 +171,7 @@ func newCIRunner(db *sql.DB, cfg *config.Config, logger *slog.Logger) *ciRunner 
 		readPipeline: gitReadPipeline,
 	}
 	if cfg.CIIsolation == "none" {
-		// Legacy path: steps run on the host as the moongitd user.
+		// Legacy path: steps run on the host as the codefortd user.
 		r.newSession = func(_ context.Context, _, workDir, _ string, _ []string) (jobSession, error) {
 			return &hostSession{workDir: workDir, exec: runProvisionPlanHost, stream: runClaudeStreamHost}, nil
 		}
@@ -960,14 +960,14 @@ type dockerSession struct {
 }
 
 // openDockerSession starts the per-job container. The workspace is bind-mounted
-// at /work and the container runs as the moongitd uid:gid so files it writes
-// stay owned by moongitd (root-owned files would break workspace cleanup). The
+// at /work and the container runs as the codefortd uid:gid so files it writes
+// stay owned by codefortd (root-owned files would break workspace cleanup). The
 // image must be glibc-based and carry `provision` on PATH (see ci/Dockerfile);
 // `mooncake` stays on PATH too as long as the `quality` job's `mooncake task
 // ci` shell-out is in scope (#411 explicitly excludes the goq/tq rewrite).
 //
 // Host reachability (host.docker.internal -> the host gateway, same mapping the
-// agent path uses) lets a job reach this moongit — needed by the `smoke` job's
+// agent path uses) lets a job reach this codefort — needed by the `smoke` job's
 // (translated) http asserts, which hit host.docker.internal:8080 directly.
 func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, image string, extraVols []string) (jobSession, error) {
 	args := []string{
@@ -1002,7 +1002,7 @@ func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, 
 // openAgentDockerSession starts the agent's container like openDockerSession but
 // injects the per-run env (creds, scoped token) and gives it host
 // reachability (host.docker.internal -> the host gateway), so the in-container
-// claude/mgit shim can reach moongitd and the LLM endpoint. The container
+// claude/cf shim can reach codefortd and the LLM endpoint. The container
 // stays alive (sleep infinity) across turns; teardown is
 // explicit (it is not removed when a turn's session handle is dropped).
 func openAgentDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, image string, env []string) (jobSession, error) {
@@ -1012,11 +1012,11 @@ func openAgentDockerSession(ctx context.Context, logger *slog.Logger, name, work
 		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		"-v", workDir + ":/work",
 		"-w", "/work",
-		// Reach the host's moongitd / LLM endpoint. WSL2 maps
+		// Reach the host's codefortd / LLM endpoint. WSL2 maps
 		// host-gateway to the host, same as Docker Desktop.
 		"--add-host", "host.docker.internal:host-gateway",
 	}
-	// Pass the per-run secrets (Claude/LLM tokens, the ephemeral moongit token,
+	// Pass the per-run secrets (Claude/LLM tokens, the ephemeral codefort token,
 	// LLM bearer) via --env-file rather than `-e KEY=VALUE`: the latter puts every
 	// value on the docker-run argv (visible in `ps`/proc) and bakes it into
 	// `docker inspect`.Config.Env for the container's whole lifetime. The 0600
@@ -1043,7 +1043,7 @@ func openAgentDockerSession(ctx context.Context, logger *slog.Logger, name, work
 // caller removes it once `docker run` has consumed it. Values are single-line
 // (tokens, URLs), which the KEY=VALUE-per-line format requires.
 func writeAgentEnvFile(env []string) (string, error) {
-	f, err := os.CreateTemp("", "moongit-agent-env-*")
+	f, err := os.CreateTemp("", "codefort-agent-env-*")
 	if err != nil {
 		return "", err
 	}
@@ -1249,13 +1249,13 @@ func runClaudeStreamHost(ctx context.Context, workDir string, argv []string, onL
 	return streamCommand(ctx, cmd, onLine, onStderr)
 }
 
-// sweepOrphanContainers removes any moongit-ci-* or moongit-agent-* containers
+// sweepOrphanContainers removes any codefort-ci-* or codefort-agent-* containers
 // left behind by a crashed runner. The two name filters are OR'd by docker, so
 // both CI job containers and agent containers are reaped. Best-effort:
 // failures are logged, not fatal.
 func sweepOrphanContainers(ctx context.Context, logger *slog.Logger) {
 	out, err := exec.CommandContext(ctx, "docker", "ps", "-aq",
-		"--filter", "name=moongit-ci-", "--filter", "name=moongit-agent-").Output()
+		"--filter", "name=codefort-ci-", "--filter", "name=codefort-agent-").Output()
 	if err != nil {
 		logger.Warn("ci orphan container scan", "err", err)
 		return
@@ -1275,7 +1275,7 @@ func sweepOrphanContainers(ctx context.Context, logger *slog.Logger) {
 // container. jobID (a unique PK) guarantees uniqueness; the sanitized job name
 // is appended for readability in `docker ps`.
 func containerName(jobID int64, jobName string) string {
-	return fmt.Sprintf("moongit-ci-%d-%s", jobID, sanitizeContainerName(jobName))
+	return fmt.Sprintf("codefort-ci-%d-%s", jobID, sanitizeContainerName(jobName))
 }
 
 // sanitizeContainerName maps any character outside docker's name charset
@@ -1294,11 +1294,11 @@ func sanitizeContainerName(s string) string {
 }
 
 // hostPath translates a container-side path under DataDir to the corresponding
-// host-side path under HostDataDir. When moongitd runs inside Docker, DataDir
+// host-side path under HostDataDir. When codefortd runs inside Docker, DataDir
 // is the in-container mount point (e.g. /data) but sibling CI/agent containers
 // are launched by the host Docker daemon, which resolves bind-mount sources on
 // the HOST filesystem. HostDataDir holds the host-side path (e.g.
-// /home/user/.local/share/moongit); the substitution makes the workspace
+// /home/user/.local/share/codefort); the substitution makes the workspace
 // visible inside sibling containers. No-op when the two dirs are identical
 // (non-containerised deployments).
 func (r *ciRunner) hostPath(containerPath string) string {

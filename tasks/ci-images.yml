@@ -1,18 +1,18 @@
-# moongitd runs every CI/agent job in a throwaway container (see
+# codefortd runs every CI/agent job in a throwaway container (see
 # cmd/codefortd/ci_runner.go), so these images must exist locally. They are
 # local-only (never pushed to a registry) and not auto-built, so a fresh box
 # or a `docker image prune` leaves them missing and the runner fails with
 # `docker run … exit status 125 (pull access denied)`. This task rebuilds
 # them from ci/ + agent/, compiling the git-ignored binary build inputs first.
 # See ci/README.md and agent/README.md.
-description: build the CI container images (moongit-ci + moongit-ci-dev) the runner needs
+description: build the CI container images (codefort-ci + codefort-ci-dev) the runner needs
 
 steps:
   # vars_file loads values raw (unrendered) — a `{{ home }}`-containing
   # value from a file never gets a second render pass (provision spec
   # §3.3). An inline `vars:` step's values ARE rendered, so home-anchored
   # paths live here, not in a shared vars_file (confirmed with Provision
-  # master mind, moongit issue #410).
+  # master mind, codefort issue #410).
   # Override per-box with --var mooncake_src=/other/path (--var wins over
   # a vars: step per spec §3.3's precedence order).
   - vars:
@@ -28,14 +28,14 @@ steps:
       echo "built ci/mooncake"
     changed_when: "false"
 
-  - name: build moongit-ci image
-    cmd: [docker, build, -t, "moongit-ci:latest", "ci/"]
+  - name: build codefort-ci image
+    cmd: [docker, build, -t, "codefort-ci:latest", "ci/"]
     changed_when: "false"
 
-  - name: build moongit-ci-dev image
-    cmd: [docker, build, -t, "moongit-ci-dev:latest", -f, "ci/Dockerfile.dev", "ci/"]
+  - name: build codefort-ci-dev image
+    cmd: [docker, build, -t, "codefort-ci-dev:latest", -f, "ci/Dockerfile.dev", "ci/"]
     changed_when: "false"
 
   - name: done
-    shell: echo "built moongit-ci:latest + moongit-ci-dev:latest"
+    shell: echo "built codefort-ci:latest + codefort-ci-dev:latest"
     changed_when: "false"

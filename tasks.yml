@@ -2,12 +2,12 @@
 # List all tasks: `mooncake task`.
 #
 # Host/server provisioning is NOT here — it lives in the dotfiles repo
-# (~/dotfiles/components/moongit), applied with `mooncake apply -c
-# ~/dotfiles/main_pc.yml -t moongit`.
+# (~/dotfiles/components/codefort), applied with `mooncake apply -c
+# ~/dotfiles/main_pc.yml -t codefort`.
 #
 # The dev-loop tasks (build/install/deploy/backup/gc/restore/uninstall/
 # create-repo/run/ui/clean/ci-images/agent-image) moved to tasks/
-# (provision) — see docs/ops-provisioning.md and moongit issue #410. The
+# (provision) — see docs/ops-provisioning.md and codefort issue #410. The
 # web/ quality gate (ts-quality) moved there too, in the same pass that
 # picked up ts-quality's provision-migration rewrite (upstream dropped
 # mooncake-module compatibility outright — see docs/ops-provisioning.md's
@@ -22,12 +22,12 @@ version: "1.0"
 
 # The Go quality gate (lint/vuln/scan/ai-lint/arch-snapshot/budget-status/dupl
 # + the fast/full CI gates) comes from the shared **go-quality** module
-# (alehatsman/go-quality), keeping moongit in lockstep with the fleet.
-# moongit has no build tags and no bespoke CI stages, so `ci` is just goq/ci.
+# (alehatsman/go-quality), keeping codefort in lockstep with the fleet.
+# codefort has no build tags and no bespoke CI stages, so `ci` is just goq/ci.
 #
 # go-quality is fetched from github.com over https (alehatsman/go-quality), so
-# no host trust or local moongit is needed — module resolution works on any
-# machine, including a fresh PC while this moongit host is down. moongit keeps a
+# no host trust or local codefort is needed — module resolution works on any
+# machine, including a fresh PC while this codefort host is down. codefort keeps a
 # mirror of the repo, but github is the source consumers pin.
 # (first run clones to ~/.cache/mooncake/modules/...; later runs hit cache.)
 #

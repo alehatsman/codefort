@@ -15,7 +15,7 @@ import (
 
 // agentCommentAuthor is the identity the agent's handoff/failure comments are
 // posted under.
-const agentCommentAuthor = "moongit-agent"
+const agentCommentAuthor = "codefort-agent"
 
 // agentBranchRef is the *first* ref in the series an agent run's work lands on.
 // A second run on the same issue takes agent/issue-<n>-2, and so on — see
@@ -26,7 +26,7 @@ func agentBranchRef(issueNumber int) string {
 
 // finishAgentRun performs handoff for a claimed finishing run: materialize the
 // workspace as a commit on the agent/issue-<n> series in the bare repo
-// (server-side — no push, since moongitd owns the repo), post a summary
+// (server-side — no push, since codefortd owns the repo), post a summary
 // comment on the issue naming the branch it actually took,
 // tear down the container/workspace/token, and finalize the run. A handoff
 // failure finalizes the run errored with a failure comment; the branch ref is
@@ -62,7 +62,7 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 	// it so it doesn't land in the branch.
 	_ = os.Remove(filepath.Join(workDir, agentMCPConfigName))
 
-	msg := fmt.Sprintf("agent: %s\n\nWorked issue #%d via moongit agent run #%d.\n",
+	msg := fmt.Sprintf("agent: %s\n\nWorked issue #%d via codefort agent run #%d.\n",
 		issue.Title, issue.Number, run.Number)
 	ref, commit, changed, err := materializeAgentBranch(parent, run.ID, bareRepo, run.CommitSHA, workDir, refBase, agentCommentAuthor, msg)
 	branch := strings.TrimPrefix(ref, "refs/heads/")
@@ -112,7 +112,7 @@ func materializeAgentBranch(ctx context.Context, runID int64, bareRepo, base, wo
 	// the ref is a pure function of the issue number, so two concurrent
 	// handoffs for the same issue would otherwise share one GIT_INDEX_FILE and
 	// corrupt each other.
-	idx := filepath.Join(os.TempDir(), fmt.Sprintf("moongit-agent-index-%d-%d", os.Getpid(), runID))
+	idx := filepath.Join(os.TempDir(), fmt.Sprintf("codefort-agent-index-%d-%d", os.Getpid(), runID))
 	defer func() { _ = os.Remove(idx) }()
 
 	base = strings.TrimSpace(base)
@@ -139,8 +139,8 @@ func materializeAgentBranch(ctx context.Context, runID int64, bareRepo, base, wo
 		return "", "", false, nil // agent changed nothing
 	}
 	commitEnv := append(env,
-		"GIT_AUTHOR_NAME="+author, "GIT_AUTHOR_EMAIL=agent@moongit.local",
-		"GIT_COMMITTER_NAME="+author, "GIT_COMMITTER_EMAIL=agent@moongit.local",
+		"GIT_AUTHOR_NAME="+author, "GIT_AUTHOR_EMAIL=agent@codefort.local",
+		"GIT_COMMITTER_NAME="+author, "GIT_COMMITTER_EMAIL=agent@codefort.local",
 	)
 	commit, err = runGit(ctx, commitEnv, "commit-tree", tree, "-p", base, "-m", msg)
 	if err != nil {
@@ -258,21 +258,21 @@ func runGit(ctx context.Context, env []string, args ...string) (string, error) {
 	return strings.TrimSpace(stdout.String()), nil
 }
 
-// wireAgentMoongitRemote adds a `moongit` remote to the agent workspace so
-// in-container `mgit` can resolve owner/repo and claim/comment/set-state on its
+// wireAgentMoongitRemote adds a `codefort` remote to the agent workspace so
+// in-container `cf` can resolve owner/repo and claim/comment/set-state on its
 // issue exactly like a human checkout.
 //
 // The workspace is a `git clone --local` of the server-side bare repo
 // (gitCheckout), so it's already a real repo with history detached at the base
 // commit. But clone sets `origin` to the bare repo's local filesystem path
-// (e.g. /…/repos/o/r.git), which mgit's parseRemote can't read — it has no
-// URL scheme, so every in-container mgit call failed with
+// (e.g. /…/repos/o/r.git), which cf's parseRemote can't read — it has no
+// URL scheme, so every in-container cf call failed with
 // `unsupported remote scheme ""` (#144). discoverTarget prefers a dedicated
-// `moongit` remote over `origin` (cmd/moongit/main.go), so adding one with the
+// `codefort` remote over `origin` (cmd/codefort/main.go), so adding one with the
 // server URL fixes resolution while leaving the clone's `origin` untouched.
 //
 // remoteURL empty → no-op. Idempotent: a re-park/retry that re-enters here
-// just re-points the remote. Best-effort — only the in-container mgit MCP
+// just re-points the remote. Best-effort — only the in-container cf MCP
 // server depends on it.
 func wireAgentMoongitRemote(ctx context.Context, workDir, remoteURL string) error {
 	if remoteURL == "" {
@@ -282,9 +282,9 @@ func wireAgentMoongitRemote(ctx context.Context, workDir, remoteURL string) erro
 		"GIT_DIR="+filepath.Join(workDir, ".git"),
 		"GIT_WORK_TREE="+workDir,
 	)
-	if _, err := runGit(ctx, env, "remote", "add", "moongit", remoteURL); err != nil {
+	if _, err := runGit(ctx, env, "remote", "add", "codefort", remoteURL); err != nil {
 		// Already present (re-park/retry): point it at the current URL instead.
-		if _, err2 := runGit(ctx, env, "remote", "set-url", "moongit", remoteURL); err2 != nil {
+		if _, err2 := runGit(ctx, env, "remote", "set-url", "codefort", remoteURL); err2 != nil {
 			return err
 		}
 	}

@@ -13,9 +13,9 @@ import (
 
 // agentMCPConfigName is the MCP config file written into the workspace (so it's
 // reachable at /work/<name> inside the container).
-const agentMCPConfigName = ".moongit-agent-mcp.json"
+const agentMCPConfigName = ".codefort-agent-mcp.json"
 
-// agentTokenName is the deterministic name of a run's ephemeral moongit token,
+// agentTokenName is the deterministic name of a run's ephemeral codefort token,
 // so it can be revoked on finalize without persisting anything extra.
 func agentTokenName(runID int64) string {
 	return fmt.Sprintf("agent-run-%d", runID)
@@ -23,7 +23,7 @@ func agentTokenName(runID int64) string {
 
 // agentSettingsOverride carries the operator-set agent config (the Settings
 // store, #106) that overrides the server-env config per run — applied without a
-// moongitd restart. Empty fields fall back to the env config.
+// codefortd restart. Empty fields fall back to the env config.
 type agentSettingsOverride struct {
 	claudeToken        string // -> CLAUDE_CODE_OAUTH_TOKEN
 	llmBaseURL         string // -> ANTHROPIC_BASE_URL
@@ -35,10 +35,10 @@ type agentSettingsOverride struct {
 // Auth precedence: an operator-set gateway bearer (ANTHROPIC_AUTH_TOKEN) wins
 // and claims the auth slot alone; else the operator-set OAuth token, then the
 // OAuth-token env, then the API-key env. ANTHROPIC_BASE_URL is the operator-set
-// value when present, else the env. The ephemeral moongit token + server URL
-// let the in-container git/mgit talk to moongitd. Order is stable for
+// value when present, else the env. The ephemeral codefort token + server URL
+// let the in-container git/cf talk to codefortd. Order is stable for
 // testability.
-func agentContainerEnv(cfg *config.Config, o agentSettingsOverride, moongitToken, serverURL string) []string {
+func agentContainerEnv(cfg *config.Config, o agentSettingsOverride, codefortToken, serverURL string) []string {
 	var env []string
 	switch {
 	case o.anthropicAuthToken != "":
@@ -57,8 +57,8 @@ func agentContainerEnv(cfg *config.Config, o agentSettingsOverride, moongitToken
 	if baseURL != "" {
 		env = append(env, "ANTHROPIC_BASE_URL="+baseURL)
 	}
-	if moongitToken != "" {
-		env = append(env, "CODEFORT_TOKEN="+moongitToken)
+	if codefortToken != "" {
+		env = append(env, "CODEFORT_TOKEN="+codefortToken)
 	}
 	if serverURL != "" {
 		env = append(env, "CODEFORT_SERVER="+serverURL)
@@ -66,8 +66,8 @@ func agentContainerEnv(cfg *config.Config, o agentSettingsOverride, moongitToken
 	return env
 }
 
-// agentServerURL is how the in-container agent reaches moongitd: the configured
-// override, else host.docker.internal at moongitd's listen port.
+// agentServerURL is how the in-container agent reaches codefortd: the configured
+// override, else host.docker.internal at codefortd's listen port.
 func agentServerURL(cfg *config.Config) string {
 	if cfg.AgentServerURL != "" {
 		return cfg.AgentServerURL
@@ -86,14 +86,14 @@ func agentServerURL(cfg *config.Config) string {
 // registering the stdio MCP servers the agent gets (reachable at /work and run
 // under --strict-mcp-config, so this file is the agent's whole MCP surface):
 //
-//   - mgit: the moongit issue/review/pipeline/agent toolset (`mgit mcp`, #158).
+//   - cf: the codefort issue/review/pipeline/agent toolset (`cf mcp`, #158).
 //     Always registered — the per-run CODEFORT_TOKEN + CODEFORT_SERVER ride in the
 //     container env (agentContainerEnv), so the shim resolves its target and
 //     identity without anything in this file. The run's tool profile (#184) is
 //     passed as `--profile <p>`, so the shim only registers the tools that
 //     profile permits (shim-side enforcement, robust headless — #110).
 //
-// mgit is currently the only server; the map shape is kept because the config
+// cf is currently the only server; the map shape is kept because the config
 // format is a map and a second server would slot in without restructuring.
 //
 // The file therefore always exists for an agent run and carries no secret. It
@@ -103,8 +103,8 @@ func writeAgentMCPConfig(hostWorkDir, toolProfile string) (containerPath string,
 		toolProfile = storage.DefaultToolProfile
 	}
 	servers := map[string]any{
-		"mgit": map[string]any{
-			"command": "mgit",
+		"cf": map[string]any{
+			"command": "cf",
 			"args":    []string{"mcp", "--profile", toolProfile},
 		},
 	}

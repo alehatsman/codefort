@@ -1,27 +1,27 @@
-description: "build the agent container image (moongit-agent:latest). Requires moongit-ci:latest — run `provision apply tasks/ci-images.yml` first."
+description: "build the agent container image (codefort-agent:latest). Requires codefort-ci:latest — run `provision apply tasks/ci-images.yml` first."
 
 steps:
   # vars_file loads values raw (unrendered) — a `{{ home }}`-containing
   # value from a file never gets a second render pass (provision spec
   # §3.3). An inline `vars:` step's values ARE rendered, so home-anchored
   # paths live here, not in a shared vars_file (confirmed with Provision
-  # master mind, moongit issue #410).
+  # master mind, codefort issue #410).
 
-  # agent/mgit (a git-ignored build input, per agent/README.md): the runner
-  # execs mgit inside the agent container; the agent image derives FROM
-  # moongit-ci:latest, so that base must already exist.
-  - name: build agent/mgit
+  # agent/cf (a git-ignored build input, per agent/README.md): the runner
+  # execs cf inside the agent container; the agent image derives FROM
+  # codefort-ci:latest, so that base must already exist.
+  - name: build agent/cf
     shell: |
       set -eu
-      docker image inspect moongit-ci:latest >/dev/null 2>&1 || { echo "moongit-ci:latest missing — run 'provision apply tasks/ci-images.yml' first (the agent image is FROM it)"; exit 1; }
-      CGO_ENABLED=0 go build -o "$(pwd)/agent/mgit" ./cmd/cf
-      echo "built the agent/mgit build input"
+      docker image inspect codefort-ci:latest >/dev/null 2>&1 || { echo "codefort-ci:latest missing — run 'provision apply tasks/ci-images.yml' first (the agent image is FROM it)"; exit 1; }
+      CGO_ENABLED=0 go build -o "$(pwd)/agent/cf" ./cmd/cf
+      echo "built the agent/cf build input"
     changed_when: "false"
 
-  - name: build moongit-agent image
-    cmd: [docker, build, -t, "moongit-agent:latest", "agent/"]
+  - name: build codefort-agent image
+    cmd: [docker, build, -t, "codefort-agent:latest", "agent/"]
     changed_when: "false"
 
   - name: done
-    shell: echo "built moongit-agent:latest"
+    shell: echo "built codefort-agent:latest"
     changed_when: "false"

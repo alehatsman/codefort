@@ -25,12 +25,12 @@ import (
 // back when running the git service so the push identity matches the Bearer
 // path.
 const (
-	extTokenName   = "moongit-token-name"
-	extFingerprint = "moongit-fingerprint"
+	extTokenName   = "codefort-token-name"
+	extFingerprint = "codefort-fingerprint"
 )
 
 // ServeSSH runs the git SSH transport on addr until ctx is cancelled. It is
-// opt-in: cmd/moongitd only calls it when CODEFORT_SSH_ADDR is set, so the
+// opt-in: cmd/codefortd only calls it when CODEFORT_SSH_ADDR is set, so the
 // default deployment stays a single HTTP port. Authentication is publickey
 // only — every connection must present a registered key (HTTP remains the open
 // path); there is no anonymous SSH. Blocks until the listener closes.
@@ -188,16 +188,16 @@ func (s *Server) handleSSHSession(ctx context.Context, ch ssh.Channel, reqs <-ch
 func (s *Server) runGitOverSSH(ctx context.Context, ch ssh.Channel, command, identity, gitProtocol string) uint32 {
 	service, owner, repo, err := parseGitSSHCommand(command)
 	if err != nil {
-		fmt.Fprintf(ch.Stderr(), "moongit: %s\n", err)
+		fmt.Fprintf(ch.Stderr(), "codefort: %s\n", err)
 		return 1
 	}
 	repoDir, err := repoPath(s.cfg.ReposDir, owner, repo)
 	if err != nil {
-		fmt.Fprintf(ch.Stderr(), "moongit: %s\n", err)
+		fmt.Fprintf(ch.Stderr(), "codefort: %s\n", err)
 		return 1
 	}
 	if _, err := os.Stat(repoDir); err != nil {
-		fmt.Fprintf(ch.Stderr(), "moongit: repository not found\n")
+		fmt.Fprintf(ch.Stderr(), "codefort: repository not found\n")
 		return 1
 	}
 
@@ -215,7 +215,7 @@ func (s *Server) runGitOverSSH(ctx context.Context, ch ssh.Channel, command, ide
 		env, err := s.pushEnv(owner, strings.TrimSuffix(repo, ".git"), identity)
 		if err != nil {
 			s.logger.Error("ssh: push env", "repo", repoDir, "err", err)
-			fmt.Fprintf(ch.Stderr(), "moongit: cannot verify this repo's branch protection; push refused\n")
+			fmt.Fprintf(ch.Stderr(), "codefort: cannot verify this repo's branch protection; push refused\n")
 			return 1
 		}
 		cmd.Env = append(cmd.Env, env...)

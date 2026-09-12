@@ -80,7 +80,7 @@ func (s *Server) withBasicAuth(next http.Handler) http.Handler {
 		userOK := subtle.ConstantTimeCompare([]byte(u), wantUser) == 1
 		passOK := subtle.ConstantTimeCompare([]byte(p), wantPass) == 1
 		if !ok || !userOK || !passOK {
-			w.Header().Set("WWW-Authenticate", `Basic realm="moongit"`)
+			w.Header().Set("WWW-Authenticate", `Basic realm="codefort"`)
 			writeError(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}

@@ -5,8 +5,8 @@
 
 # Go build artifacts
 /bin/
-/moongitd
-/moongit
+/codefortd
+/cf
 *.test
 *.out
 
@@ -20,7 +20,7 @@
 .claude/
 
 # Agent image build inputs (binaries, not source) — see agent/README.md
-agent/mgit
+agent/cf
 
 .playwright-mcp
 

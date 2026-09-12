@@ -1,7 +1,7 @@
-// Package ci parses and validates moongit's per-repo CI spec (codefort.yml) and
-// translates each job into a provision plan so moongitd can execute it.
+// Package ci parses and validates codefort's per-repo CI spec (codefort.yml) and
+// translates each job into a provision plan so codefortd can execute it.
 //
-// codefort.yml describes a pipeline of jobs wired into a DAG by `needs`; moongit
+// codefort.yml describes a pipeline of jobs wired into a DAG by `needs`; codefort
 // owns that DAG. provision itself is flat — it executes a top-level *list of
 // steps* (a mapping root is a component, not a plan — provision spec §3). So
 // translation is per-job: one job's steps become one provision plan file.
@@ -77,7 +77,7 @@ func (o On) Matches(ref string) bool {
 }
 
 // Job is one unit in the pipeline DAG: a list of steps plus the jobs it
-// depends on. Needs builds the DAG moongit's runner topo-orders; an empty
+// depends on. Needs builds the DAG codefort's runner topo-orders; an empty
 // Needs means the job has no dependencies and may run first / in parallel.
 type Job struct {
 	Needs []string `yaml:"needs"`
@@ -198,7 +198,7 @@ func (p Pipeline) TopoOrder() ([]string, error) {
 }
 
 // findCycle returns a job sequence forming a `needs` cycle, or nil if the DAG
-// is acyclic. moongit's runner relies on topo-ordering, so a cycle is fatal.
+// is acyclic. codefort's runner relies on topo-ordering, so a cycle is fatal.
 func (p Pipeline) findCycle() []string {
 	const (
 		white = 0 // unvisited

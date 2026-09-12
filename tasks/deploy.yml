@@ -1,5 +1,5 @@
 # Fast dev-loop deploy of the CURRENT working tree — bypasses the
-# HEAD-gated `mooncake apply -t moongit` in dotfiles. Rebuilds both
+# HEAD-gated `mooncake apply -t codefort` in dotfiles. Rebuilds both
 # binaries + the web UI (served from web/dist via CODEFORT_WEB_DIR),
 # reinstalls to ~/.local/bin, and restarts the live service. Does not
 # touch the .sha sidecar, so a later `apply` still reconciles to HEAD.
@@ -11,18 +11,18 @@
 #      checkout that is level with canonical main may deploy.
 #   2. Sync the freshly-built bundle into the served {{ web_dir }}, so a
 #      deploy from a worktree can't leave web behind the new binary.
-description: rebuild daemon + client + web UI, reinstall to ~/.local/bin, restart moongit.service
+description: rebuild daemon + client + web UI, reinstall to ~/.local/bin, restart codefort.service
 
 steps:
   # vars_file loads values raw (unrendered) — a `{{ home }}`-containing
   # value from a file never gets a second render pass (provision spec
   # §3.3). An inline `vars:` step's values ARE rendered, so home-anchored
   # paths live here, not in a shared vars_file (confirmed with Provision
-  # master mind, moongit issue #410).
+  # master mind, codefort issue #410).
   - vars:
-      binary_path: "{{ home }}/.local/bin/moongitd"
-      client_path: "{{ home }}/.local/bin/moongit"
-      web_dir: "{{ home }}/projects/moongit/web/dist"
+      binary_path: "{{ home }}/.local/bin/codefortd"
+      client_path: "{{ home }}/.local/bin/codefort"
+      web_dir: "{{ home }}/projects/codefort/web/dist"
 
   - name: deploy guard (#300)
     shell: |
@@ -38,7 +38,7 @@ steps:
       if [ "$head" != "$tip" ]; then
         echo "REFUSING DEPLOY (#300): HEAD ($head) != $upstream ($tip)." >&2
         echo "This checkout is not level with canonical main; deploying would silently regress shared prod." >&2
-        echo "Reconcile (git pull --ff-only / git push), or run the HEAD-gated 'mooncake apply -t moongit' from dotfiles." >&2
+        echo "Reconcile (git pull --ff-only / git push), or run the HEAD-gated 'mooncake apply -t codefort' from dotfiles." >&2
         exit 1
       fi
       echo "deploy guard ok: HEAD == $upstream ($tip)"
@@ -47,19 +47,19 @@ steps:
   - name: "~/.local/bin directory"
     file: { path: "{{ home }}/.local/bin", state: dir }
 
-  - name: build moongitd
+  - name: build codefortd
     cmd: [go, build, -trimpath, -ldflags, "-s -w", -o, "{{ binary_path }}", ./cmd/codefortd]
     changed_when: "false"
 
-  - name: build moongit
+  - name: build codefort
     cmd: [go, build, -trimpath, -ldflags, "-s -w", -o, "{{ client_path }}", ./cmd/cf]
     changed_when: "false"
 
-  - name: mgitd alias
-    file: { path: "{{ home }}/.local/bin/mgitd", src: "{{ binary_path }}", state: link }
+  - name: codefortd alias
+    file: { path: "{{ home }}/.local/bin/codefortd", src: "{{ binary_path }}", state: link }
 
-  - name: mgit alias
-    file: { path: "{{ home }}/.local/bin/mgit", src: "{{ client_path }}", state: link }
+  - name: cf alias
+    file: { path: "{{ home }}/.local/bin/cf", src: "{{ client_path }}", state: link }
 
   - name: npm install (web)
     shell: npm install
@@ -71,7 +71,7 @@ steps:
     cwd: web
     changed_when: "false"
 
-  # Land the just-built bundle in the dir moongitd serves. No-op when the
+  # Land the just-built bundle in the dir codefortd serves. No-op when the
   # invocation CWD already IS the canonical checkout (source == dest);
   # required when deploying from a worktree so binary+web can't split (#300).
   - name: sync web bundle to served dir
@@ -88,10 +88,10 @@ steps:
       fi
     changed_when: "false"
 
-  - name: restart moongit.service
-    shell: systemctl --user restart moongit.service
+  - name: restart codefort.service
+    shell: systemctl --user restart codefort.service
     changed_when: "false"
 
   - name: done
-    shell: 'echo "deployed: rebuilt + reinstalled binaries, rebuilt web UI (synced to served dir), restarted moongit.service"'
+    shell: 'echo "deployed: rebuilt + reinstalled binaries, rebuilt web UI (synced to served dir), restarted codefort.service"'
     changed_when: "false"

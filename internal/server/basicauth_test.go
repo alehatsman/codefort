@@ -32,7 +32,7 @@ func TestWithBasicAuth(t *testing.T) {
 		if rec.Code != http.StatusUnauthorized {
 			t.Fatalf("status = %d, want 401", rec.Code)
 		}
-		if got := rec.Header().Get("WWW-Authenticate"); got != `Basic realm="moongit"` {
+		if got := rec.Header().Get("WWW-Authenticate"); got != `Basic realm="codefort"` {
 			t.Fatalf("WWW-Authenticate = %q", got)
 		}
 	})

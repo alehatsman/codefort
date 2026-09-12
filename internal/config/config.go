@@ -18,12 +18,12 @@ type Config struct {
 	ReposDir string
 
 	// HostDataDir is the host-side path that corresponds to DataDir when
-	// moongitd runs inside a Docker container. The CI and agent runners
+	// codefortd runs inside a Docker container. The CI and agent runners
 	// bind-mount workspace directories into sibling containers via the host
 	// Docker daemon, which resolves bind-mount sources on the HOST filesystem.
-	// When moongitd is containerised, DataDir is the in-container path (e.g.
+	// When codefortd is containerised, DataDir is the in-container path (e.g.
 	// /data), while the host has the same tree at a different path (e.g.
-	// /home/user/.local/share/moongit). Set CODEFORT_HOST_DATA_DIR to that
+	// /home/user/.local/share/codefort). Set CODEFORT_HOST_DATA_DIR to that
 	// host path; leave it empty (or equal to DataDir) for non-containerised
 	// deployments. Set via CODEFORT_HOST_DATA_DIR.
 	HostDataDir string
@@ -79,7 +79,7 @@ type Config struct {
 	// CIIsolation selects how the runner executes a job's steps. "docker"
 	// (default) runs each job in a throwaway container so repo-authored
 	// commands never touch the host; "none" runs them on the host as the
-	// moongitd user (the legacy path — RCE by design, use only when you trust
+	// codefortd user (the legacy path — RCE by design, use only when you trust
 	// every CI-enabled repo). Set via CODEFORT_CI_ISOLATION.
 	CIIsolation string
 
@@ -126,8 +126,8 @@ type Config struct {
 	AgentAnthropicAPIKey  string
 	AgentLLMBaseURL       string
 
-	// AgentServerURL is how the in-container agent reaches this moongitd (for
-	// mgit / git over the host gateway). Empty defaults to
+	// AgentServerURL is how the in-container agent reaches this codefortd (for
+	// cf / git over the host gateway). Empty defaults to
 	// http://host.docker.internal:<port-of-Addr>. Set via CODEFORT_AGENT_SERVER_URL.
 	AgentServerURL string
 
@@ -145,7 +145,7 @@ type Config struct {
 	EventRetain int
 
 	// WebDir is the directory holding the built web UI (web/dist). When
-	// set, moongitd serves it as a single-page app with history-API
+	// set, codefortd serves it as a single-page app with history-API
 	// fallback. Empty disables web serving (API + git only).
 	WebDir string
 
@@ -156,8 +156,8 @@ type Config struct {
 	BasicPass string
 
 	// SSHAddr is the listen address for the opt-in git SSH transport (e.g.
-	// ":2222"). Empty (default) disables SSH entirely, keeping moongitd a
-	// single HTTP port. When set, moongitd serves git over SSH with publickey
+	// ":2222"). Empty (default) disables SSH entirely, keeping codefortd a
+	// single HTTP port. When set, codefortd serves git over SSH with publickey
 	// auth against registered keys. Set via CODEFORT_SSH_ADDR.
 	SSHAddr string
 
@@ -186,6 +186,9 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.DataDir = dataDir
+	// moongit.db keeps its pre-rename name deliberately. Renaming it would mean
+	// moving live data on every existing deployment for no functional gain; an
+	// operator who wants the new name renames the file and sets CODEFORT_DB_PATH.
 	cfg.DBPath = envOr("CODEFORT_DB_PATH", filepath.Join(dataDir, "moongit.db"))
 	cfg.ReposDir = envOr("CODEFORT_REPOS_DIR", filepath.Join(dataDir, "repos"))
 	cfg.HostDataDir = envOr("CODEFORT_HOST_DATA_DIR", dataDir)
@@ -263,7 +266,7 @@ func Load() (*Config, error) {
 	default:
 		return nil, fmt.Errorf("CODEFORT_CI_ISOLATION: want \"docker\" or \"none\", got %q", cfg.CIIsolation)
 	}
-	cfg.CIDefaultImage = envOr("CODEFORT_CI_DEFAULT_IMAGE", "moongit-ci:latest")
+	cfg.CIDefaultImage = envOr("CODEFORT_CI_DEFAULT_IMAGE", "codefort-ci:latest")
 
 	agentReserved, err := strconv.Atoi(envOr("CODEFORT_AGENT_RESERVED", "2"))
 	if err != nil {
@@ -277,7 +280,7 @@ func Load() (*Config, error) {
 	}
 	cfg.AgentRunTimeout = agentTimeout
 
-	cfg.AgentDefaultImage = envOr("CODEFORT_AGENT_DEFAULT_IMAGE", "moongit-agent:latest")
+	cfg.AgentDefaultImage = envOr("CODEFORT_AGENT_DEFAULT_IMAGE", "codefort-agent:latest")
 	cfg.AgentClaudeOAuthToken = envOr("CODEFORT_AGENT_CLAUDE_OAUTH_TOKEN", "")
 	cfg.AgentAnthropicAPIKey = envOr("CODEFORT_AGENT_ANTHROPIC_API_KEY", "")
 	cfg.AgentLLMBaseURL = envOr("CODEFORT_AGENT_LLM_BASE_URL", "")

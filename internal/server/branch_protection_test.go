@@ -52,7 +52,7 @@ func commit(t *testing.T, work, msg string) {
 }
 
 // push runs `git push` with the protection patterns in the environment, the
-// way moongitd injects them into receive-pack. A local-path push runs
+// way codefortd injects them into receive-pack. A local-path push runs
 // receive-pack as a child of push, so it inherits this environment exactly as
 // the hook does on the server.
 func push(t *testing.T, work, patterns string, args ...string) (string, error) {

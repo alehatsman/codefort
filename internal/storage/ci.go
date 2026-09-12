@@ -42,7 +42,7 @@ const (
 	// neutral, not red, and rerunnable; unlike it, the run wasn't cut short from
 	// outside — the agent gave up on its own. Distinct from RunFailed (a step
 	// errored) so an operator can tell "couldn't make progress" from "crashed".
-	// CI runs never enter it. See moongit #173 / mooncake #77.
+	// CI runs never enter it. See codefort #173 / mooncake #77.
 	RunStalled RunStatus = "stalled"
 )
 
@@ -143,14 +143,14 @@ const (
 	DefaultExecutionModel = ExecModelClaudeEdit
 )
 
-// Agent tool profiles (#184): which slice of the mgit MCP toolset an agent run
-// is allowed to see. Enforcement is shim-side — `mgit mcp --profile <p>` only
+// Agent tool profiles (#184): which slice of the cf MCP toolset an agent run
+// is allowed to see. Enforcement is shim-side — `cf mcp --profile <p>` only
 // registers the tools the profile permits — so the restriction holds even
 // though claude's --allowedTools is unreliable headlessly (#110). The canonical
-// tool→profile mapping lives in the shim (mgit owns its own toolset); storage
+// tool→profile mapping lives in the shim (cf owns its own toolset); storage
 // only carries the profile name, defaults it, and validates it.
 const (
-	// ToolProfileFull exposes the entire mgit tool surface (current behavior).
+	// ToolProfileFull exposes the entire cf tool surface (current behavior).
 	ToolProfileFull = "full"
 	// ToolProfileReview restricts a run to read tools + review_* (+ issue_comment):
 	// the read-only review agent. No issue_claim/set_state/create, no
@@ -197,7 +197,7 @@ type CIRun struct {
 	// today); 'claude-edit' for CI rows by the column default, unused by CI
 	// (#110).
 	ExecutionModel string
-	// ToolProfile names the mgit MCP toolset slice this agent run sees
+	// ToolProfile names the cf MCP toolset slice this agent run sees
 	// ('full' | 'review'); 'full' for CI rows by the column default (#184).
 	ToolProfile string
 	// SpecPath is the repo-relative spec a spec-verify run targets; "" otherwise.
@@ -237,7 +237,7 @@ type NewRun struct {
 	// ExecutionModel is the agent execution model; empty falls back to the
 	// column default ('claude-edit'). Set only for agent runs (#110).
 	ExecutionModel string
-	// ToolProfile names the mgit MCP toolset slice for this agent run
+	// ToolProfile names the cf MCP toolset slice for this agent run
 	// ('full' | 'review'); empty falls back to the column default ('full').
 	// Set only for agent runs (#184).
 	ToolProfile string
@@ -474,7 +474,7 @@ func FinishRun(db *sql.DB, runID int64, status RunStatus) error {
 }
 
 // ReconcileOrphanRuns finalizes runs left in flight with no live runner — the
-// classic orphan a moongitd restart strands (the in-flight goroutine dies
+// classic orphan a codefortd restart strands (the in-flight goroutine dies
 // before its status writes commit; an agent run's detached container is swept
 // at startup too). It must be called at startup, before the runner takes new
 // work, when no run can legitimately be in flight: every 'running' run — and

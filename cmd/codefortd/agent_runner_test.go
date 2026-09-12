@@ -130,13 +130,13 @@ func newAgentHarness(t *testing.T, opts agentTestOpts) agentHarness {
 			ReposDir:              filepath.Join(dir, "repos"),
 			AgentRunTimeout:       time.Minute,
 			AgentTurnTimeout:      time.Minute,
-			AgentDefaultImage:     "moongit-agent:latest",
+			AgentDefaultImage:     "codefort-agent:latest",
 			AgentClaudeOAuthToken: "oauth-tok",
 		},
 		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		newAgentSession: func(_ context.Context, _, _, image string, env []string) (jobSession, error) {
-			if image != "moongit-agent:latest" {
-				t.Errorf("agent image = %q, want moongit-agent:latest", image)
+			if image != "codefort-agent:latest" {
+				t.Errorf("agent image = %q, want codefort-agent:latest", image)
 			}
 			if opts.sessionErr != nil {
 				return nil, opts.sessionErr
@@ -218,7 +218,7 @@ func TestExecuteAgentRunParksAfterTurn1(t *testing.T) {
 }
 
 // The run injects scoped per-run credentials into the container env, mints a
-// real ephemeral moongit token (revoked on teardown), and wires the MCP config.
+// real ephemeral codefort token (revoked on teardown), and wires the MCP config.
 func TestAgentRunInjectsCredentials(t *testing.T) {
 	h := newAgentHarness(t, agentTestOpts{lines: successTurn})
 	h.r.executeAgentRun(context.Background(), h.run)
@@ -237,7 +237,7 @@ func TestAgentRunInjectsCredentials(t *testing.T) {
 	if mgitTok == "" {
 		t.Fatal("CODEFORT_TOKEN not injected")
 	}
-	// The injected token is a real, active moongit token while parked.
+	// The injected token is a real, active codefort token while parked.
 	tok, err := storage.LookupToken(h.r.db, mgitTok)
 	if err != nil {
 		t.Fatalf("injected token not valid: %v", err)
@@ -246,7 +246,7 @@ func TestAgentRunInjectsCredentials(t *testing.T) {
 		t.Errorf("token name = %q, want %q", tok.Name, agentTokenName(h.run.ID))
 	}
 
-	// The agent MCP config (mgit) is wired into the launch.
+	// The agent MCP config (cf) is wired into the launch.
 	if !argvHas(*h.gotArgv, "--mcp-config", "/work/"+agentMCPConfigName) || !argvContains(*h.gotArgv, "--strict-mcp-config") {
 		t.Errorf("argv missing agent MCP config: %v", *h.gotArgv)
 	}

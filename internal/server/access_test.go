@@ -58,7 +58,7 @@ func newAccessFixture(t *testing.T) accessFixture {
 	}
 
 	// Membership is an account concept: AddRepoMember resolves a users row, so
-	// a token alone is not a member candidate. EnsureUser is what `moongitd
+	// a token alone is not a member candidate. EnsureUser is what `codefortd
 	// repo create` already does for an owner.
 	for _, u := range []string{"bob", "carol", "dave"} {
 		if _, err := storage.EnsureUser(db, u); err != nil {

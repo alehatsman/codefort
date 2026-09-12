@@ -12,7 +12,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// recordedReq captures what the mock moongit API saw, so a test can assert the
+// recordedReq captures what the mock codefort API saw, so a test can assert the
 // wrapper hit the right endpoint with the right method and body.
 type recordedReq struct {
 	method string

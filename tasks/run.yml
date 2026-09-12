@@ -1,9 +1,9 @@
-description: run moongitd in the foreground against ./data/ (dev mode)
+description: run codefortd in the foreground against ./data/ (dev mode)
 
 steps:
   - name: data/repos directory
     file: { path: data/repos, state: dir }
 
-  - name: run moongitd
+  - name: run codefortd
     cmd: [go, run, ./cmd/codefortd]
     changed_when: "false"

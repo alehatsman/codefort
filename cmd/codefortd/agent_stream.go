@@ -70,7 +70,7 @@ var softStopReasons = map[string]bool{
 // turn.completed event and run finalization. A missing result (the CLI died
 // before emitting a terminal record) or a non-zero exit is an error; an
 // is_error/non-clean result is a failure; a clean result that stopped on a soft
-// stop_reason is "stalled" (the agent gave up without failing — moongit #173);
+// stop_reason is "stalled" (the agent gave up without failing — codefort #173);
 // otherwise success. A genuine failure outranks a soft stop. "success" and
 // "step_done" are the two clean (severity-0) subtypes an executor may report.
 // Operates on the model-agnostic turnResult so it serves every executor.

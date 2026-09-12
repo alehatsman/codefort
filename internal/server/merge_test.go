@@ -522,8 +522,8 @@ func TestMergeRebasePreservesAuthor(t *testing.T) {
 	if got := bareShow(t, bare, "refs/heads/main", "%an"); got != "Alice" {
 		t.Errorf("author = %q, want the original author Alice", got)
 	}
-	if got := bareShow(t, bare, "refs/heads/main", "%cn"); got != "moongit" {
-		t.Errorf("committer = %q, want moongit (the server did the replay)", got)
+	if got := bareShow(t, bare, "refs/heads/main", "%cn"); got != "codefort" {
+		t.Errorf("committer = %q, want codefort (the server did the replay)", got)
 	}
 	if got := bareShow(t, bare, "refs/heads/main", "%s"); got != "feature work" {
 		t.Errorf("subject = %q, want the original message preserved", got)

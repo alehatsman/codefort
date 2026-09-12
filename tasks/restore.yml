@@ -5,12 +5,12 @@ steps:
   # value from a file never gets a second render pass (provision spec
   # §3.3). An inline `vars:` step's values ARE rendered, so home-anchored
   # paths live here, not in a shared vars_file (confirmed with Provision
-  # master mind, moongit issue #410).
+  # master mind, codefort issue #410).
   - vars:
-      data_dir: "{{ home }}/.local/share/moongit"
+      data_dir: "{{ home }}/.local/share/codefort"
 
-  - name: stop moongit.service
-    shell: systemctl --user stop moongit.service || true
+  - name: stop codefort.service
+    shell: systemctl --user stop codefort.service || true
     changed_when: "false"
 
   - name: restore from tarball
@@ -22,6 +22,6 @@ steps:
       echo "restored from {{ tarball }}"
     changed_when: "false"
 
-  - name: start moongit.service
-    shell: systemctl --user start moongit.service || true
+  - name: start codefort.service
+    shell: systemctl --user start codefort.service || true
     changed_when: "false"

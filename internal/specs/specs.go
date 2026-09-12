@@ -1,4 +1,4 @@
-// Package specs parses moongit's in-repo specifications: human-authored,
+// Package specs parses codefort's in-repo specifications: human-authored,
 // high-altitude markdown documents stored under specs/ that describe what the
 // code *should* do — the dual of the code itself, which is what the code *is*.
 //

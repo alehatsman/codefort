@@ -1,5 +1,5 @@
-// Package api defines the JSON wire types shared by the moongitd server and
-// the moongit client. Anything serialized over HTTP between them lives here.
+// Package api defines the JSON wire types shared by the codefortd server and
+// the codefort client. Anything serialized over HTTP between them lives here.
 package api
 
 import "time"
@@ -552,7 +552,7 @@ type CIRun struct {
 	Kind           string     `json:"kind"`                      // "ci" | "agent"
 	IssueNumber    *int       `json:"issue_number,omitempty"`    // the issue an agent run serves
 	ExecutionModel string     `json:"execution_model,omitempty"` // agent model: "claude-edit"
-	ToolProfile    string     `json:"tool_profile,omitempty"`    // mgit MCP toolset slice: "full" | "review" (#184)
+	ToolProfile    string     `json:"tool_profile,omitempty"`    // cf MCP toolset slice: "full" | "review" (#184)
 	CommitSHA      string     `json:"commit_sha"`
 	CommitMsg      string     `json:"commit_msg,omitempty"`
 	CommitAuthor   string     `json:"commit_author,omitempty"`
@@ -572,7 +572,7 @@ type CIRun struct {
 type SpawnAgentRequest struct {
 	Ref   string `json:"ref,omitempty"`
 	Model string `json:"model,omitempty"`
-	// ToolProfile scopes which mgit MCP tools the run sees ("full" | "review");
+	// ToolProfile scopes which cf MCP tools the run sees ("full" | "review");
 	// empty defaults to "full". "review" yields a read-only review agent (#184).
 	ToolProfile string `json:"tool_profile,omitempty"`
 }
@@ -702,7 +702,7 @@ type Token struct {
 	CreatedAt time.Time `json:"created_at"`
 	// UserName is the account this token belongs to, resolved through
 	// tokens.user_id. It is empty for tokens minted without a user context
-	// (the admin-provisioned `moongitd token create` path, and ephemeral
+	// (the admin-provisioned `codefortd token create` path, and ephemeral
 	// per-run agent tokens), which is why it can't simply replace Name.
 	//
 	// Name and UserName are deliberately distinct: Name is the *attribution*
@@ -723,7 +723,7 @@ type CreateTokenRequest struct {
 
 // CreatedToken is returned once, by POST /api/tokens. It carries the
 // plaintext Secret alongside the metadata — this is the only time the
-// plaintext is ever sent over the wire, mirroring the `moongitd token`
+// plaintext is ever sent over the wire, mirroring the `codefortd token`
 // CLI. The caller must surface it immediately; it's unrecoverable after.
 type CreatedToken struct {
 	Token

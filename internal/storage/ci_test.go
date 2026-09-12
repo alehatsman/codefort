@@ -232,7 +232,7 @@ func TestReconcileOrphanRuns(t *testing.T) {
 	db, repoID := seedRepo(t)
 
 	// An orphaned run: stuck 'running' with a running job and two queued jobs,
-	// the state a moongitd restart strands mid-run.
+	// the state a codefortd restart strands mid-run.
 	orphan, _ := EnqueueRun(db, repoID, NewRun{CommitSHA: "a", Ref: "r", Event: "push"})
 	if _, err := ClaimNextRun(db, time.Hour); err != nil {
 		t.Fatalf("ClaimNextRun: %v", err)

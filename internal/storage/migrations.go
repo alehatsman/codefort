@@ -81,7 +81,7 @@ var migrations = []string{
 	UPDATE issues SET claimed_at = updated_at WHERE assignee IS NOT NULL;
 	`,
 
-	// 5: moongitci — per-repo CI opt-in plus run/job tracking. ci_enabled
+	// 5: codefortci — per-repo CI opt-in plus run/job tracking. ci_enabled
 	// gates execution (off by default; CI runs untrusted repo code, so it's
 	// strictly opt-in). ci_runs.number is per-repo and monotonic like issues.
 	// status mirrors the runner lifecycle; claimed_at is the runner lease
@@ -309,7 +309,7 @@ var migrations = []string{
 	ALTER TABLE ci_runs RENAME COLUMN pilot_allow_shell TO mooncake_allow_shell;
 	`,
 
-	// 18: per-run agent tool profile (#184). Names the slice of the mgit MCP
+	// 18: per-run agent tool profile (#184). Names the slice of the cf MCP
 	// toolset a run may see ('full' | 'review'); the shim enforces it. 'full'
 	// is the column default so existing agent runs and CI rows keep the
 	// current full surface.

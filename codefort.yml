@@ -2,10 +2,10 @@
 # every 5 minutes. No container spin-up — mooncake steps run directly on
 # the CI host, which IS the prod server, so 127.0.0.1:8080 is always local.
 # Checks: /healthz (no auth), SPA root, and three API endpoints (Bearer token
-# from CODEFORT_TOKEN in the service env — mint via: mgit token create smoke-ci).
+# from CODEFORT_TOKEN in the service env — mint via: cf token create smoke-ci).
 # A failed assertion fails the step; provision aborts on the first failure.
 #
-# moongit CI — moongit's own pipeline (dogfooding the moongitci stack).
+# codefort CI — codefort's own pipeline (dogfooding the codefortci stack).
 #
 # Schema: version "1", jobs wired into a DAG via `needs`; `run:` is sugar for a
 # shell step. Every job runs in a throwaway container off `image:` (see
@@ -38,14 +38,14 @@
 # Previously this job only ran `npm ci && npm run build` — lint, typecheck
 # and the Playwright suite never ran in CI at all.
 #
-# `build-images` rebuilds moongit-ci-dev:latest + moongit-agent:latest via the
+# `build-images` rebuilds codefort-ci-dev:latest + codefort-agent:latest via the
 # host Docker daemon (docker_socket: true mounts /var/run/docker.sock). Runs in
 # parallel with deploy on main — both need quality + web to pass first.
 #
-# Deploy is intentionally NOT automated via CI. moongitd runs the pipeline —
+# Deploy is intentionally NOT automated via CI. codefortd runs the pipeline —
 # a self-deploy would interrupt the very run that triggered it. Deploy manually:
 # `provision apply tasks/deploy.yml` (#410) or
-# `mooncake apply -c ~/dotfiles/main_pc.yml -t moongit`.
+# `mooncake apply -c ~/dotfiles/main_pc.yml -t codefort`.
 version: "1"
 on:
   schedule:
@@ -70,24 +70,24 @@ on:
       ]
 jobs:
   quality:
-    image: moongit-ci-dev:latest
+    image: codefort-ci-dev:latest
     steps:
       - shell:
           cmd: mooncake task ci
 
   web:
-    image: moongit-ci-dev:latest
+    image: codefort-ci-dev:latest
     steps:
       - run: provision apply tasks/ui-tools.yml
       - run: provision apply tasks/ui-ci.yml
 
   # build-images:
-  #   image: moongit-ci-dev:latest
+  #   image: codefort-ci-dev:latest
   #   docker_socket: true
   #   needs: [quality, web]
   #   steps:
   #     - shell:
-  #         # Clone sibling repos from the moongit server (anonymous HTTP).
+  #         # Clone sibling repos from the codefort server (anonymous HTTP).
   #         # --vars overrides the default host paths that tasks.yml defaults to
   #         # ("{{ home }}/projects/..."), which don't exist inside the container.
   #         cmd: |
@@ -100,14 +100,14 @@ jobs:
   #       env:
   #         MOONCAKE_MODULE_INSECURE: host.docker.internal:8080
 
-  # smoke: runs in the default CI container (moongit-ci:latest) on a cron
-  # schedule. Uses host.docker.internal:8080 to reach the prod moongitd from
+  # smoke: runs in the default CI container (codefort-ci:latest) on a cron
+  # schedule. Uses host.docker.internal:8080 to reach the prod codefortd from
   # inside the container (127.0.0.1 is the container's own loopback).
   # /healthz probes both process liveness AND the DB writer pool — sufficient
   # smoke coverage without needing a Bearer token in the container env.
   # Authenticated API checks require env passthrough to CI containers (TODO).
   smoke:
-    image: moongit-ci:latest
+    image: codefort-ci:latest
     steps:
       - assert:
           http:

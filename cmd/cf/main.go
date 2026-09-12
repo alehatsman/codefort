@@ -1,6 +1,6 @@
-// Command moongit is the client CLI for the moongit server. It infers the
+// Command codefort is the client CLI for the codefort server. It infers the
 // target repo from the local git remote, so users run it from inside a working
-// copy: `moongit issue create --title "..."`.
+// copy: `codefort issue create --title "..."`.
 package main
 
 import (
@@ -24,7 +24,7 @@ import (
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "moongit:", err)
+		fmt.Fprintln(os.Stderr, "codefort:", err)
 		os.Exit(1)
 	}
 }
@@ -53,57 +53,57 @@ func run(args []string) error {
 		printUsage(os.Stdout)
 		return nil
 	default:
-		return fmt.Errorf("unknown command %q (try `moongit help`)", args[0])
+		return fmt.Errorf("unknown command %q (try `codefort help`)", args[0])
 	}
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprint(w, `moongit — client for the moongit server
+	fmt.Fprint(w, `codefort — client for the codefort server
 
 USAGE:
-    moongit issue create  --title <t> [--body <b>] [--parent <n>] [--labels <a,b>]
-    moongit issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--label <l>]
+    codefort issue create  --title <t> [--body <b>] [--parent <n>] [--labels <a,b>]
+    codefort issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--label <l>]
                           [--limit n] [--ready|--blocked|--epics]
-    moongit issue show    <number>
-    moongit issue edit    <number> [--title <t>] [--body <b>] [--state <s>] [--parent <n>|0]
+    codefort issue show    <number>
+    codefort issue edit    <number> [--title <t>] [--body <b>] [--state <s>] [--parent <n>|0]
                                    [--labels <a,b>]
                                    [--depends-on <m,...>] [--remove-depends-on <m,...>]
-    moongit issue set-state <number> <todo|in_progress|done|closed>
-    moongit issue claim   <number> [--state s]
-    moongit issue unclaim <number>
-    moongit issue delete  <number> [--yes|-y]
-    moongit issue comment <number> --body <b>
+    codefort issue set-state <number> <todo|in_progress|done|closed>
+    codefort issue claim   <number> [--state s]
+    codefort issue unclaim <number>
+    codefort issue delete  <number> [--yes|-y]
+    codefort issue comment <number> --body <b>
 
-    moongit review list    [--ref <branch>] [--path <p>] [--state open|resolved|all] [--json]
-    moongit review create  --path <p> --lines <n|a-b> --body <b> [--ref <branch>]
-    moongit review resolve <id>
-    moongit review reopen  <id>
-    moongit review delete  <id>
+    codefort review list    [--ref <branch>] [--path <p>] [--state open|resolved|all] [--json]
+    codefort review create  --path <p> --lines <n|a-b> --body <b> [--ref <branch>]
+    codefort review resolve <id>
+    codefort review reopen  <id>
+    codefort review delete  <id>
 
-    moongit pr create  --base <ref> --head <ref> --title <t> [--body <b>]
-    moongit pr list    [--state open|merged|closed|all]
-    moongit pr show    <number>
-    moongit pr merge   <number> [--ff-only | --rebase]
-    moongit pr close   <number>
-    moongit pr reopen  <number>
+    codefort pr create  --base <ref> --head <ref> --title <t> [--body <b>]
+    codefort pr list    [--state open|merged|closed|all]
+    codefort pr show    <number>
+    codefort pr merge   <number> [--ff-only | --rebase]
+    codefort pr close   <number>
+    codefort pr reopen  <number>
 
-    moongit ci validate  [path]   (defaults to ./codefort.yml)
-    moongit ci run       <ref>    (trigger a run for a branch/tag/sha)
+    codefort ci validate  [path]   (defaults to ./codefort.yml)
+    codefort ci run       <ref>    (trigger a run for a branch/tag/sha)
 
-    moongit repo delete  <owner>/<name> [--yes|-y]   (irreversible)
+    codefort repo delete  <owner>/<name> [--yes|-y]   (irreversible)
 
-    moongit events                (tail the fleet event feed; Ctrl-C to stop)
+    codefort events                (tail the fleet event feed; Ctrl-C to stop)
         [--repo owner/name] [--types a,b] [--since <seq>] [--once]
 
-    moongit mcp [--profile full|review]
+    codefort mcp [--profile full|review]
                                   (serve the toolset over stdio as an MCP server)
 
 Identity: the server stamps author/assignee from the name of the token
-in CODEFORT_TOKEN. Mint a token with "moongitd token create <name>" and
+in CODEFORT_TOKEN. Mint a token with "codefortd token create <name>" and
 export CODEFORT_TOKEN=mgt_... before running the client.
 
 Run inside a git checkout of the target repo. owner/repo is parsed from
-the 'moongit' remote, falling back to 'origin'. CODEFORT_SERVER overrides
+the 'codefort' remote, falling back to 'origin'. CODEFORT_SERVER overrides
 only the server host — owner/repo always comes from the remote, so a
 checkout is required even when it is set.
 `)
@@ -111,7 +111,7 @@ checkout is required even when it is set.
 
 func runIssue(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit issue <create|list|show|edit|set-state|claim|unclaim|delete|comment>")
+		return errors.New("usage: codefort issue <create|list|show|edit|set-state|claim|unclaim|delete|comment>")
 	}
 	switch args[0] {
 	case "create":
@@ -280,7 +280,7 @@ func runIssueList(args []string) error {
 
 func runIssueShow(args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: moongit issue show <number>")
+		return errors.New("usage: codefort issue show <number>")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -362,7 +362,7 @@ func runIssueShow(args []string) error {
 
 func runIssueSetState(args []string) error {
 	if len(args) != 2 {
-		return errors.New("usage: moongit issue set-state <number> <todo|in_progress|done|closed>")
+		return errors.New("usage: codefort issue set-state <number> <todo|in_progress|done|closed>")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -405,7 +405,7 @@ func runIssueSetState(args []string) error {
 // clobbers the body and vice versa.
 func runIssueEdit(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: moongit issue edit <number> [--title <t>] [--body <b>] [--state <s>] [--labels <a,b>] [--parent <n>|0] [--depends-on <m,...>] [--remove-depends-on <m,...>]")
+		return errors.New("usage: codefort issue edit <number> [--title <t>] [--body <b>] [--state <s>] [--labels <a,b>] [--parent <n>|0] [--depends-on <m,...>] [--remove-depends-on <m,...>]")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -578,7 +578,7 @@ func parseIssueNums(s string) ([]int, error) {
 
 func runIssueClaim(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: moongit issue claim <number> [--state <s>]")
+		return errors.New("usage: codefort issue claim <number> [--state <s>]")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -627,7 +627,7 @@ func runIssueClaim(args []string) error {
 
 func runIssueUnclaim(args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: moongit issue unclaim <number>")
+		return errors.New("usage: codefort issue unclaim <number>")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -651,7 +651,7 @@ func runIssueUnclaim(args []string) error {
 
 func runIssueDelete(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: moongit issue delete <number> [--yes]")
+		return errors.New("usage: codefort issue delete <number> [--yes]")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -697,7 +697,7 @@ func runIssueDelete(args []string) error {
 
 func runIssueComment(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: moongit issue comment <number> --body <b>")
+		return errors.New("usage: codefort issue comment <number> --body <b>")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -740,11 +740,11 @@ func runIssueComment(args []string) error {
 	return nil
 }
 
-// runReview dispatches `moongit review <subcommand>` — the read/triage side of
+// runReview dispatches `codefort review <subcommand>` — the read/triage side of
 // the code-review comments anchored to file blocks on a branch.
 func runReview(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit review <list|create|resolve|reopen|delete>")
+		return errors.New("usage: codefort review <list|create|resolve|reopen|delete>")
 	}
 	switch args[0] {
 	case "list":
@@ -794,7 +794,7 @@ func runReviewCreate(args []string) error {
 		return err
 	}
 	if *path == "" || *lines == "" || strings.TrimSpace(*body) == "" {
-		return errors.New("usage: moongit review create --path <p> --lines <n|a-b> --body <b> [--ref <branch>]")
+		return errors.New("usage: codefort review create --path <p> --lines <n|a-b> --body <b> [--ref <branch>]")
 	}
 	start, end, err := parseLineSpec(*lines)
 	if err != nil {
@@ -913,7 +913,7 @@ func runReviewSetResolved(args []string, resolved bool) error {
 		verb, past = "reopen", "reopened"
 	}
 	if len(args) != 1 {
-		return fmt.Errorf("usage: moongit review %s <id>", verb)
+		return fmt.Errorf("usage: codefort review %s <id>", verb)
 	}
 	id, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil || id <= 0 {
@@ -941,7 +941,7 @@ func runReviewSetResolved(args []string, resolved bool) error {
 
 func runReviewDelete(args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: moongit review delete <id>")
+		return errors.New("usage: codefort review delete <id>")
 	}
 	id, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil || id <= 0 {
@@ -963,12 +963,12 @@ func runReviewDelete(args []string) error {
 	return nil
 }
 
-// runCI dispatches `moongit ci <subcommand>`. `validate` is local-only — it
+// runCI dispatches `codefort ci <subcommand>`. `validate` is local-only — it
 // parses the codefort.yml in the working copy and never touches the server.
 // `run` does round-trip: it POSTs a run for a ref.
 func runCI(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit ci <validate|run>")
+		return errors.New("usage: codefort ci <validate|run>")
 	}
 	switch args[0] {
 	case "validate":
@@ -989,7 +989,7 @@ func runCITrigger(args []string) error {
 		return err
 	}
 	if fs.NArg() != 1 {
-		return errors.New("usage: moongit ci run <ref>")
+		return errors.New("usage: codefort ci run <ref>")
 	}
 	ref := fs.Arg(0)
 
@@ -1065,12 +1065,12 @@ func runCIValidate(args []string) error {
 	return nil
 }
 
-// runRepo dispatches `moongit repo <subcommand>`. Repo-level operations target
+// runRepo dispatches `codefort repo <subcommand>`. Repo-level operations target
 // a repo by its explicit <owner>/<name>, not the current checkout's remote —
 // you typically delete a repo other than the one you're standing in.
 func runRepo(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit repo <delete>")
+		return errors.New("usage: codefort repo <delete>")
 	}
 	switch args[0] {
 	case "delete":
@@ -1090,7 +1090,7 @@ func runRepoDelete(args []string) error {
 	// follows it. (Go's flag package stops at the first non-flag arg, so a
 	// trailing --yes would otherwise be left unparsed.)
 	if len(args) < 1 {
-		return errors.New("usage: moongit repo delete <owner>/<name> [--yes]")
+		return errors.New("usage: codefort repo delete <owner>/<name> [--yes]")
 	}
 	owner, repo, err := splitOwnerRepo(args[0])
 	if err != nil {
@@ -1142,25 +1142,25 @@ func runRepoDelete(args []string) error {
 	return nil
 }
 
-// target describes the moongit server + repo derived from `git remote`.
+// target describes the codefort server + repo derived from `git remote`.
 type target struct {
 	server string // scheme://host[:port]
 	owner  string
 	repo   string
 }
 
-// discoverTarget derives the moongit server URL and owner/repo from the
-// current git checkout's remotes. It prefers a dedicated `moongit` remote
+// discoverTarget derives the codefort server URL and owner/repo from the
+// current git checkout's remotes. It prefers a dedicated `codefort` remote
 // (the code mirror) so the server URL + owner/repo come straight from it,
 // and falls back to `origin` for checkouts that only have their upstream
 // configured. CODEFORT_SERVER overrides the derived server host — required
 // when the chosen remote is SSH (no http base URL to derive).
 func discoverTarget() (target, error) {
-	remote, err := gitRemoteURL("moongit")
+	remote, err := gitRemoteURL("codefort")
 	if err != nil {
 		remote, err = gitRemoteURL("origin")
 		if err != nil {
-			return target{}, fmt.Errorf("read git remote 'moongit' or 'origin': %w (run inside a checkout of the target repo)", err)
+			return target{}, fmt.Errorf("read git remote 'codefort' or 'origin': %w (run inside a checkout of the target repo)", err)
 		}
 	}
 	t, err := parseRemote(remote)
@@ -1171,7 +1171,7 @@ func discoverTarget() (target, error) {
 		t.server = strings.TrimRight(override, "/")
 	}
 	if t.server == "" {
-		return target{}, fmt.Errorf("remote %q has no http(s) host; add a `moongit` http remote or set CODEFORT_SERVER", remote)
+		return target{}, fmt.Errorf("remote %q has no http(s) host; add a `codefort` http remote or set CODEFORT_SERVER", remote)
 	}
 	return t, nil
 }

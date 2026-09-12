@@ -420,7 +420,7 @@ func hashObject(ctx context.Context, repoDir string, content []byte) (string, er
 // blobOID, using a throwaway index (no worktree touched). Returns the new tree
 // OID — equal to baseTree when the blob already matched (no change).
 func writeTreeWithBlob(ctx context.Context, repoDir, baseTree, blobOID, path string) (string, error) {
-	idx, err := os.CreateTemp("", "moongit-index-*")
+	idx, err := os.CreateTemp("", "codefort-index-*")
 	if err != nil {
 		return "", err
 	}

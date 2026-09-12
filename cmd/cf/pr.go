@@ -15,11 +15,11 @@ import (
 	"github.com/alehatsman/codefort/internal/api"
 )
 
-// runPR dispatches `moongit pr <subcommand>` — a thin client over the PR data
-// plane and merge endpoint, mirroring `moongit issue` / `moongit review`.
+// runPR dispatches `codefort pr <subcommand>` — a thin client over the PR data
+// plane and merge endpoint, mirroring `codefort issue` / `codefort review`.
 func runPR(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongit pr <create|list|show|merge|close|reopen>")
+		return errors.New("usage: codefort pr <create|list|show|merge|close|reopen>")
 	}
 	switch args[0] {
 	case "create":
@@ -49,7 +49,7 @@ func runPRCreate(args []string) error {
 		return err
 	}
 	if *base == "" || *head == "" || strings.TrimSpace(*title) == "" {
-		return errors.New("usage: moongit pr create --base <ref> --head <ref> --title <t> [--body <b>]")
+		return errors.New("usage: codefort pr create --base <ref> --head <ref> --title <t> [--body <b>]")
 	}
 
 	target, err := discoverTarget()
@@ -128,7 +128,7 @@ func runPRList(args []string) error {
 
 func runPRShow(args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: moongit pr show <number>")
+		return errors.New("usage: codefort pr show <number>")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -194,7 +194,7 @@ func runPRShow(args []string) error {
 
 func runPRMerge(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: moongit pr merge <number> [--ff-only | --rebase]")
+		return errors.New("usage: codefort pr merge <number> [--ff-only | --rebase]")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -274,7 +274,7 @@ func runPRSetState(args []string, state api.PRState) error {
 		verb = "reopen"
 	}
 	if len(args) < 1 {
-		return fmt.Errorf("usage: moongit pr %s <number>", verb)
+		return fmt.Errorf("usage: codefort pr %s <number>", verb)
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {

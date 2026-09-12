@@ -8,7 +8,7 @@ func TestValidRepoComponent(t *testing.T) {
 		in   string
 		want bool
 	}{
-		{name: "simple", in: "moongit", want: true},
+		{name: "simple", in: "codefort", want: true},
 		{name: "with dash", in: "my-repo", want: true},
 		{name: "with underscore", in: "my_repo", want: true},
 		{name: "with dot", in: "repo.v2", want: true},

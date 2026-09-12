@@ -114,20 +114,20 @@ func TestRunPRDispatch(t *testing.T) {
 		args      []string
 		errSubstr string
 	}{
-		{"no subcommand", []string{}, "usage: moongit pr"},
+		{"no subcommand", []string{}, "usage: codefort pr"},
 		{"unknown subcommand", []string{"frobnicate"}, "unknown pr subcommand"},
-		{"create missing flags", []string{"create", "--title", "t"}, "usage: moongit pr create"},
-		{"create missing title", []string{"create", "--base", "main", "--head", "f"}, "usage: moongit pr create"},
+		{"create missing flags", []string{"create", "--title", "t"}, "usage: codefort pr create"},
+		{"create missing title", []string{"create", "--base", "main", "--head", "f"}, "usage: codefort pr create"},
 		{"list invalid state", []string{"list", "--state", "bogus"}, "invalid --state"},
-		{"show no arg", []string{"show"}, "usage: moongit pr show"},
+		{"show no arg", []string{"show"}, "usage: codefort pr show"},
 		{"show bad number", []string{"show", "abc"}, "invalid pull request number"},
-		{"merge no arg", []string{"merge"}, "usage: moongit pr merge"},
+		{"merge no arg", []string{"merge"}, "usage: codefort pr merge"},
 		{"merge bad number", []string{"merge", "0"}, "invalid pull request number"},
 		{"merge extra args", []string{"merge", "1", "extra"}, "unexpected extra args"},
-		{"close no arg", []string{"close"}, "usage: moongit pr close"},
+		{"close no arg", []string{"close"}, "usage: codefort pr close"},
 		{"close bad number", []string{"close", "abc"}, "invalid pull request number"},
 		{"close extra args", []string{"close", "1", "extra"}, "unexpected extra args"},
-		{"reopen no arg", []string{"reopen"}, "usage: moongit pr reopen"},
+		{"reopen no arg", []string{"reopen"}, "usage: codefort pr reopen"},
 		{"reopen bad number", []string{"reopen", "0"}, "invalid pull request number"},
 	}
 	for _, tt := range tests {
@@ -153,9 +153,9 @@ func TestRunRepoDispatch(t *testing.T) {
 		args      []string
 		errSubstr string
 	}{
-		{"no subcommand", []string{}, "usage: moongit repo"},
+		{"no subcommand", []string{}, "usage: codefort repo"},
 		{"unknown subcommand", []string{"frobnicate"}, "unknown repo subcommand"},
-		{"delete no arg", []string{"delete"}, "usage: moongit repo delete"},
+		{"delete no arg", []string{"delete"}, "usage: codefort repo delete"},
 		{"delete extra args", []string{"delete", "a/b", "c"}, "unexpected extra args"},
 		{"delete not owner/repo", []string{"delete", "justname"}, "is not <owner>/<repo>"},
 	}

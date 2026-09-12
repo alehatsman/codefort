@@ -17,8 +17,8 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// runMCP serves the moongit toolset over stdio as an MCP server — the
-// `mgit mcp` entrypoint: a pure stdio<->REST
+// runMCP serves the codefort toolset over stdio as an MCP server — the
+// `cf mcp` entrypoint: a pure stdio<->REST
 // proxy that carries no local state. Every tool is a thin wrapper over the same
 // endpoints the CLI subcommands call, so an agent gets issue/review/pipeline
 // primitives without a shell — the channel that works under claude's headless
@@ -53,7 +53,7 @@ func runMCP(args []string) error {
 }
 
 // Tool profiles (#184) scope which tools the shim registers. The mapping is
-// owned here — mgit owns its own toolset — and the server only names the
+// owned here — cf owns its own toolset — and the server only names the
 // profile over the wire; these strings are that contract (mirror of
 // storage.ToolProfile{Full,Review}).
 const (
@@ -150,7 +150,7 @@ func (m *mcpServer) run(ctx context.Context) error {
 // Split out from run so tests can drive it over an in-memory transport.
 func (m *mcpServer) newServer() *sdk.Server {
 	srv := sdk.NewServer(&sdk.Implementation{
-		Name:    "moongit",
+		Name:    "codefort",
 		Version: mcpVersion,
 	}, nil)
 

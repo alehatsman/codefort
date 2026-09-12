@@ -97,14 +97,14 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 
 	// gitCheckout cloned the bare repo into /work, so it's already a real repo
 	// (history detached at the base commit). Clone's `origin` is the bare
-	// repo's local path, which mgit can't parse, so wire a `moongit` remote at
-	// the server URL — mgit prefers it over origin — letting the in-container
-	// mgit MCP server resolve owner/repo and claim/comment/set-state on the
+	// repo's local path, which cf can't parse, so wire a `codefort` remote at
+	// the server URL — cf prefers it over origin — letting the in-container
+	// cf MCP server resolve owner/repo and claim/comment/set-state on the
 	// issue (#144). Best-effort: a failure here only matters for that path,
 	// which surfaces its own error.
-	moongitURL := agentServerURL(r.cfg) + "/" + owner + "/" + name + ".git"
-	if err := wireAgentMoongitRemote(parent, workDir, moongitURL); err != nil {
-		log.Warn("agent wire moongit remote", "err", err)
+	codefortURL := agentServerURL(r.cfg) + "/" + owner + "/" + name + ".git"
+	if err := wireAgentMoongitRemote(parent, workDir, codefortURL); err != nil {
+		log.Warn("agent wire codefort remote", "err", err)
 	}
 
 	// For a spec-verify run, read the target spec from the checkout — it's the
@@ -144,11 +144,11 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 	r.emit(elog, ci.EventRunStarted, map[string]any{"total_steps": 1})
 
-	// Mint the ephemeral, per-run moongit token and compose the container env
+	// Mint the ephemeral, per-run codefort token and compose the container env
 	// (creds, scoped token). The token is revoked on teardown.
-	moongitToken, err := storage.GenerateTokenString()
+	codefortToken, err := storage.GenerateTokenString()
 	if err == nil {
-		_, err = storage.CreateToken(r.db, agentTokenName(run.ID), moongitToken)
+		_, err = storage.CreateToken(r.db, agentTokenName(run.ID), codefortToken)
 	}
 	if err != nil {
 		r.emit(elog, ci.EventRunFailed, map[string]any{"error": "mint agent token: " + err.Error()})
@@ -158,16 +158,16 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 		return
 	}
 	// Operator-set Settings values win over the env (#106), so spawning works
-	// without a moongitd restart — the Claude token, the LLM base URL, and the
+	// without a codefortd restart — the Claude token, the LLM base URL, and the
 	// gateway auth token all override their CODEFORT_AGENT_* env counterparts.
 	override := agentSettingsOverride{
 		claudeToken:        storage.SettingValue(r.db, storage.SettingAgentClaudeToken),
 		llmBaseURL:         storage.SettingValue(r.db, storage.SettingAgentLLMBaseURL),
 		anthropicAuthToken: storage.SettingValue(r.db, storage.SettingAgentAnthropicAuthToken),
 	}
-	env := agentContainerEnv(r.cfg, override, moongitToken, agentServerURL(r.cfg))
+	env := agentContainerEnv(r.cfg, override, codefortToken, agentServerURL(r.cfg))
 
-	// Generate the agent MCP config (mgit) into the
+	// Generate the agent MCP config (cf) into the
 	// workspace.
 	mcpPath, err := writeAgentMCPConfig(workDir, run.ToolProfile)
 	if err != nil {
@@ -534,7 +534,7 @@ func (r *ciRunner) CancelCIRun(runID int64) bool {
 }
 
 // tearDownAgent releases a finished agent run's resources: remove the container
-// (best-effort), revoke its ephemeral moongit token, and delete the workspace.
+// (best-effort), revoke its ephemeral codefort token, and delete the workspace.
 func (r *ciRunner) tearDownAgent(runID, jobID int64, workDir string) {
 	if jobID != 0 && r.teardownContainer != nil {
 		r.teardownContainer(agentContainerName(jobID))
@@ -569,8 +569,8 @@ func agentWorkDir(dataDir string, runID int64) string {
 }
 
 // agentContainerName builds a docker-safe, collision-free name for an agent
-// run's container, distinct from CI's "moongit-ci-" prefix so the orphan sweep
+// run's container, distinct from CI's "codefort-ci-" prefix so the orphan sweep
 // can tell them apart while still reaping both.
 func agentContainerName(jobID int64) string {
-	return fmt.Sprintf("moongit-agent-%d", jobID)
+	return fmt.Sprintf("codefort-agent-%d", jobID)
 }

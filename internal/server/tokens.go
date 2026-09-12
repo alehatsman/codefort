@@ -13,7 +13,7 @@ import (
 
 // handleListTokens returns metadata for every token (active and revoked).
 // The plaintext is never recoverable, so this is safe to expose to any
-// authenticated caller — same posture as the `moongitd token list` CLI.
+// authenticated caller — same posture as the `codefortd token list` CLI.
 // Tokens aren't owned by a user, so this is the full set, not a per-caller
 // view.
 func (s *Server) handleListTokens(w http.ResponseWriter, _ *http.Request) {
@@ -29,7 +29,7 @@ func (s *Server) handleListTokens(w http.ResponseWriter, _ *http.Request) {
 // handleCreateToken mints a new token and returns the plaintext exactly
 // once, in the response body. The database only ever stores the hash, so a
 // missed/closed response is unrecoverable — the UI must surface the secret
-// immediately. Mirrors `moongitd token create`.
+// immediately. Mirrors `codefortd token create`.
 func (s *Server) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	var req api.CreateTokenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

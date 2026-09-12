@@ -1,8 +1,8 @@
-# moongit CI *dev* image — the toolchain image moongit's own mgitci.yml runs on.
+# codefort CI *dev* image — the toolchain image codefort's own mgitci.yml runs on.
 #
-# The base image (ci/Dockerfile, moongit-ci:latest) is deliberately
+# The base image (ci/Dockerfile, codefort-ci:latest) is deliberately
 # toolchain-free; this derives from it and adds the Go + Node toolchains
-# moongit's pipeline needs (go build/test/vet/fmt, web build) plus the
+# codefort's pipeline needs (go build/test/vet/fmt, web build) plus the
 # static-analysis toolchain the go-quality gate shells out to. It still
 # carries provision + mooncake + git from the base — provision is what the
 # runner execs inside the container (#411); mooncake stays for the `quality`
@@ -12,15 +12,15 @@
 # dupl, so those are baked here at pinned versions; dupl-report.sh pipes through
 # python3, so python3 is installed too. goda is optional (the gate skips it).
 #
-# Pin toolchains via official tarballs (apt's Go lags moongit's go.mod). Jobs
-# run as the moongitd uid:gid with no home dir, so HOME/GOCACHE/GOPATH point at
+# Pin toolchains via official tarballs (apt's Go lags codefort's go.mod). Jobs
+# run as the codefortd uid:gid with no home dir, so HOME/GOCACHE/GOPATH point at
 # world-writable /tmp — otherwise go/npm can't write their caches. The
 # build-time module/build caches are wiped after `go install` so runtime jobs
 # recreate them under their own uid (root-owned cache dirs would be unwritable).
 #
-# Build (from the moongit repo root, after moongit-ci:latest exists):
-#   docker build -t moongit-ci-dev:latest -f ci/Dockerfile.dev ci/
-FROM moongit-ci:latest
+# Build (from the codefort repo root, after codefort-ci:latest exists):
+#   docker build -t codefort-ci-dev:latest -f ci/Dockerfile.dev ci/
+FROM codefort-ci:latest
 
 ARG GO_VERSION=1.26.4
 ARG NODE_VERSION=22.21.0
@@ -55,7 +55,7 @@ ENV PATH=/usr/local/go/bin:$PATH \
     GOPROXY=https://proxy.golang.org,https://goproxy.io,direct
 
 # Install the static-analysis toolchain onto PATH, then wipe the build-time
-# caches so runtime jobs (moongitd uid) own the cache dirs they recreate.
+# caches so runtime jobs (codefortd uid) own the cache dirs they recreate.
 # CGO_ENABLED=0: these tools are pure Go; no C deps needed at install time.
 RUN CGO_ENABLED=0 GOBIN=/usr/local/bin go install \
       "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}" \

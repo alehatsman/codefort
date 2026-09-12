@@ -64,7 +64,7 @@ type turnResult struct {
 	// success / failed / …) when the executor reports one; "" for claude, which
 	// has no equivalent. A "soft" stop (the agent ran out of road without a
 	// failed step) is surfaced as a "stalled" turn rather than a failure — see
-	// turnStatus and moongit #173.
+	// turnStatus and codefort #173.
 	StopReason   string
 	NumTurns     int     // claude only
 	DurationMS   int     // claude only
@@ -102,7 +102,7 @@ func newAgentExecutor(model string) (agentExecutor, error) {
 }
 
 // claudeExecutor is the claude-edit model: it composes the claude invocation
-// (issue/message as the user turn, a moongit-authored system prompt on the
+// (issue/message as the user turn, a codefort-authored system prompt on the
 // first turn) and translates its stream-json output behind the executor seam.
 type claudeExecutor struct{}
 

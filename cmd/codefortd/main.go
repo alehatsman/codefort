@@ -65,16 +65,16 @@ func main() {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprint(w, `moongitd — moongit server daemon
+	fmt.Fprint(w, `codefortd — codefort server daemon
 
 USAGE:
-    moongitd [serve]                       run the HTTP server (default)
-    moongitd repo create <owner>/<name>    register a repo in the database
-    moongitd token create <name>           mint a new API token (shown once)
-    moongitd token list                    list all tokens (no plaintext)
-    moongitd token revoke <name>           disable a token
-    moongitd ci install-hooks              (re)install CI post-receive hooks
-    moongitd help                          show this message
+    codefortd [serve]                       run the HTTP server (default)
+    codefortd repo create <owner>/<name>    register a repo in the database
+    codefortd token create <name>           mint a new API token (shown once)
+    codefortd token list                    list all tokens (no plaintext)
+    codefortd token revoke <name>           disable a token
+    codefortd ci install-hooks              (re)install CI post-receive hooks
+    codefortd help                          show this message
 
 Environment:
     CODEFORT_ADDR        listen address (default ":8080")
@@ -128,7 +128,7 @@ func runServe(logger *slog.Logger) error {
 	}
 	if n == 0 {
 		logger.Warn("no active API tokens configured — all /api/* requests will be rejected. " +
-			"Run `moongitd token create <name>` to bootstrap.")
+			"Run `codefortd token create <name>` to bootstrap.")
 	}
 
 	srv := server.New(cfg, db, rdb, logger)
@@ -399,7 +399,7 @@ func sweepEventRetention(db *sql.DB, cfg *config.Config, logger *slog.Logger) {
 
 func runRepo(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongitd repo <create>")
+		return errors.New("usage: codefortd repo <create>")
 	}
 	switch args[0] {
 	case "create":
@@ -411,7 +411,7 @@ func runRepo(args []string) error {
 
 func runCIAdmin(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongitd ci install-hooks")
+		return errors.New("usage: codefortd ci install-hooks")
 	}
 	switch args[0] {
 	case "install-hooks":
@@ -425,7 +425,7 @@ func runCIAdmin(args []string) error {
 // repo's bare directory — for repos created before the hook existed.
 func runCIInstallHooks(args []string) error {
 	if len(args) != 0 {
-		return errors.New("usage: moongitd ci install-hooks")
+		return errors.New("usage: codefortd ci install-hooks")
 	}
 	cfg, db, err := openDB()
 	if err != nil {
@@ -456,7 +456,7 @@ func runCIInstallHooks(args []string) error {
 
 func runToken(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: moongitd token <create|list|revoke>")
+		return errors.New("usage: codefortd token <create|list|revoke>")
 	}
 	switch args[0] {
 	case "create":
@@ -472,7 +472,7 @@ func runToken(args []string) error {
 
 func runTokenCreate(args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: moongitd token create <name>")
+		return errors.New("usage: codefortd token create <name>")
 	}
 	_, db, err := openDB()
 	if err != nil {
@@ -499,7 +499,7 @@ func runTokenCreate(args []string) error {
 
 func runTokenList(args []string) error {
 	if len(args) != 0 {
-		return errors.New("usage: moongitd token list")
+		return errors.New("usage: codefortd token list")
 	}
 	_, db, err := openDB()
 	if err != nil {
@@ -532,7 +532,7 @@ func runTokenList(args []string) error {
 
 func runTokenRevoke(args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: moongitd token revoke <name>")
+		return errors.New("usage: codefortd token revoke <name>")
 	}
 	_, db, err := openDB()
 	if err != nil {
@@ -573,7 +573,7 @@ func openDB() (*config.Config, *sql.DB, error) {
 
 func runRepoCreate(args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: moongitd repo create <owner>/<name>")
+		return errors.New("usage: codefortd repo create <owner>/<name>")
 	}
 	owner, name, ok := strings.Cut(args[0], "/")
 	if !ok || owner == "" || name == "" {

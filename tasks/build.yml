@@ -4,10 +4,10 @@ steps:
   - name: bin directory
     file: { path: bin, state: dir }
 
-  - name: build moongitd
-    cmd: [go, build, -o, bin/moongitd, ./cmd/codefortd]
+  - name: build codefortd
+    cmd: [go, build, -o, bin/codefortd, ./cmd/codefortd]
     changed_when: "false"
 
-  - name: build moongit
-    cmd: [go, build, -o, bin/moongit, ./cmd/cf]
+  - name: build codefort
+    cmd: [go, build, -o, bin/codefort, ./cmd/cf]
     changed_when: "false"

@@ -49,14 +49,14 @@ func readPipelineAt(bareRepo, sha string) (raw []byte, ok bool) {
 }
 
 // postReceiveHook is the generic hook installed into every bare repo. It
-// notifies the local moongitd of each pushed ref so the daemon can enqueue a
+// notifies the local codefortd of each pushed ref so the daemon can enqueue a
 // CI run. It is identical across repos: the per-repo identity and the secret
-// arrive via environment variables that moongitd injects into the
+// arrive via environment variables that codefortd injects into the
 // `git receive-pack` process at push time (the hook inherits them), so no
 // secret is ever written to disk. It soft-fails — a CI notification problem
 // must never block a push.
 const postReceiveHook = `#!/bin/sh
-# moongit CI post-receive hook — managed by moongitd; do not edit.
+# codefort CI post-receive hook — managed by codefortd; do not edit.
 [ -n "$CODEFORT_CI_URL" ] || exit 0
 [ -n "$CODEFORT_CI_SECRET" ] || exit 0
 [ -n "$CODEFORT_CI_REPO" ] || exit 0
@@ -87,7 +87,7 @@ func WritePostReceiveHook(bareRepo string) error {
 
 // preReceiveHook enforces branch protection at push time. Like the
 // post-receive hook it is identical across repos and carries no state: the
-// repo's patterns arrive as CODEFORT_PROTECTED_REFS, which moongitd injects
+// repo's patterns arrive as CODEFORT_PROTECTED_REFS, which codefortd injects
 // into the receive-pack process it spawns. That keeps the hook free of any
 // network call or database read, so a push neither waits on the daemon nor
 // slips past protection when the daemon is unwell.
@@ -95,7 +95,7 @@ func WritePostReceiveHook(bareRepo string) error {
 // Unlike post-receive it hard-fails: a non-zero exit rejects the whole push
 // before any ref moves, which is the point.
 const preReceiveHook = `#!/bin/sh
-# moongit branch-protection hook — managed by moongitd; do not edit.
+# codefort branch-protection hook — managed by codefortd; do not edit.
 [ -n "$CODEFORT_PROTECTED_REFS" ] || exit 0
 
 # A ref's "null" value is all-zeros, 40 hex digits under sha1 and 64 under
@@ -124,7 +124,7 @@ while read -r old new ref; do
 	[ "$protected" = 1 ] || continue
 
 	if is_null "$new"; then
-		echo "moongit: '$branch' is protected — refusing to delete it" >&2
+		echo "codefort: '$branch' is protected — refusing to delete it" >&2
 		rc=1
 		continue
 	fi
@@ -133,8 +133,8 @@ while read -r old new ref; do
 	# Fast-forward: the old tip is still reachable from the new one.
 	git merge-base --is-ancestor "$old" "$new" 2>/dev/null && continue
 
-	echo "moongit: '$branch' is protected — refusing a non-fast-forward push" >&2
-	echo "moongit: clear the protection pattern in repo settings to rewrite it" >&2
+	echo "codefort: '$branch' is protected — refusing a non-fast-forward push" >&2
+	echo "codefort: clear the protection pattern in repo settings to rewrite it" >&2
 	rc=1
 done
 exit $rc
@@ -153,8 +153,8 @@ func WritePreReceiveHook(bareRepo string) error {
 // pinHooksPath sets the repo's own `core.hooksPath`, which is not redundant:
 // git resolves that setting from the global config too, so a server whose git
 // user has `core.hooksPath` set in ~/.gitconfig silently runs *those* hooks
-// and none of moongit's — no CI on push, no branch protection, no error
-// anywhere. Writing it per-repo pins the lookup to the directory moongitd
+// and none of codefort's — no CI on push, no branch protection, no error
+// anywhere. Writing it per-repo pins the lookup to the directory codefortd
 // manages.
 func pinHooksPath(bareRepo string) error {
 	hooksDir := filepath.Join(bareRepo, "hooks")
@@ -165,7 +165,7 @@ func pinHooksPath(bareRepo string) error {
 	return nil
 }
 
-// WriteManagedHooks installs every hook moongitd owns and pins the repo's hook
+// WriteManagedHooks installs every hook codefortd owns and pins the repo's hook
 // path at them. Idempotent — called on every repo creation and by the
 // install-hooks backfill, so an existing repo picks up new or changed hooks.
 func WriteManagedHooks(bareRepo string) error {

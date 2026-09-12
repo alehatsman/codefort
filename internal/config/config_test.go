@@ -92,8 +92,8 @@ func TestLoadDefaults(t *testing.T) {
 		{"HostDataDir", cfg.HostDataDir, dataDir},
 		{"SSHHostKey", cfg.SSHHostKey, filepath.Join(dataDir, "ssh_host_ed25519_key")},
 		{"CIIsolation", cfg.CIIsolation, "docker"},
-		{"CIDefaultImage", cfg.CIDefaultImage, "moongit-ci:latest"},
-		{"AgentDefaultImage", cfg.AgentDefaultImage, "moongit-agent:latest"},
+		{"CIDefaultImage", cfg.CIDefaultImage, "codefort-ci:latest"},
+		{"AgentDefaultImage", cfg.AgentDefaultImage, "codefort-agent:latest"},
 		// Everything below defaults to empty: each empty default is a feature
 		// that stays off unless explicitly turned on (web UI, basic auth, SSH,
 		// agent credentials).
@@ -237,15 +237,15 @@ func TestLoadPathOverridesBeatDerivation(t *testing.T) {
 }
 
 func TestLoadHostDataDirOverride(t *testing.T) {
-	// Containerised moongitd: DataDir is the in-container path, HostDataDir is
+	// Containerised codefortd: DataDir is the in-container path, HostDataDir is
 	// where the host Docker daemon must resolve bind-mount sources. Getting
 	// this wrong makes sibling containers mount paths that don't exist.
 	dataDir := t.TempDir()
 	cfg := load(t,
 		"CODEFORT_DATA_DIR", dataDir,
-		"CODEFORT_HOST_DATA_DIR", "/home/ops/.local/share/moongit",
+		"CODEFORT_HOST_DATA_DIR", "/home/ops/.local/share/codefort",
 	)
-	if cfg.HostDataDir != "/home/ops/.local/share/moongit" {
+	if cfg.HostDataDir != "/home/ops/.local/share/codefort" {
 		t.Errorf("HostDataDir = %q, want the host path", cfg.HostDataDir)
 	}
 	if cfg.DataDir != dataDir {
@@ -279,7 +279,7 @@ func TestLoadEmptyStringIsUnset(t *testing.T) {
 	if cfg.MaxConcurrency != runtime.NumCPU() {
 		t.Errorf("MaxConcurrency = %d, want NumCPU %d", cfg.MaxConcurrency, runtime.NumCPU())
 	}
-	if cfg.CIDefaultImage != "moongit-ci:latest" {
+	if cfg.CIDefaultImage != "codefort-ci:latest" {
 		t.Errorf("CIDefaultImage = %q, want the default", cfg.CIDefaultImage)
 	}
 	// Same rule applies to the path derivation: DB_PATH="" still derives.
@@ -441,7 +441,7 @@ func TestLoadDisableSentinels(t *testing.T) {
 func TestLoadConcurrencyIsNotClampedAtLoad(t *testing.T) {
 	// Load is deliberately a dumb reader: the documented clamps
 	// (MaxConcurrency/CIJobConcurrency floor of 1, AgentReserved into
-	// [0, MaxConcurrency]) happen at the point of use — cmd/moongitd's
+	// [0, MaxConcurrency]) happen at the point of use — cmd/codefortd's
 	// run loop and newWorkBudget — not here. Pinning that keeps anyone
 	// from "fixing" Load and double-clamping, and documents that a Config
 	// value read straight out of Load may still be out of range.
@@ -512,33 +512,33 @@ func TestLoadPassthroughStrings(t *testing.T) {
 	// a trimmed or lowercased token authenticates against nothing.
 	cfg := load(t,
 		"CODEFORT_ADDR", "127.0.0.1:9999",
-		"CODEFORT_WEB_DIR", "/opt/moongit/web/dist",
+		"CODEFORT_WEB_DIR", "/opt/codefort/web/dist",
 		"CODEFORT_BASIC_USER", "Ops",
 		"CODEFORT_BASIC_PASS", " p@ss word ",
 		"CODEFORT_SSH_ADDR", ":2222",
-		"CODEFORT_SSH_HOST_KEY", "/etc/moongit/hostkey",
+		"CODEFORT_SSH_HOST_KEY", "/etc/codefort/hostkey",
 		"CODEFORT_CI_SECRET", "s3cr3t",
 		"CODEFORT_CI_DEFAULT_IMAGE", "ghcr.io/x/ci:v2",
 		"CODEFORT_AGENT_DEFAULT_IMAGE", "ghcr.io/x/agent:v2",
 		"CODEFORT_AGENT_CLAUDE_OAUTH_TOKEN", "sk-oauth",
 		"CODEFORT_AGENT_ANTHROPIC_API_KEY", "sk-ant",
 		"CODEFORT_AGENT_LLM_BASE_URL", "http://gw.local/v1",
-		"CODEFORT_AGENT_SERVER_URL", "http://moongit.local:8080",
+		"CODEFORT_AGENT_SERVER_URL", "http://codefort.local:8080",
 	)
 	for _, c := range []struct{ field, got, want string }{
 		{"Addr", cfg.Addr, "127.0.0.1:9999"},
-		{"WebDir", cfg.WebDir, "/opt/moongit/web/dist"},
+		{"WebDir", cfg.WebDir, "/opt/codefort/web/dist"},
 		{"BasicUser", cfg.BasicUser, "Ops"},
 		{"BasicPass", cfg.BasicPass, " p@ss word "},
 		{"SSHAddr", cfg.SSHAddr, ":2222"},
-		{"SSHHostKey", cfg.SSHHostKey, "/etc/moongit/hostkey"},
+		{"SSHHostKey", cfg.SSHHostKey, "/etc/codefort/hostkey"},
 		{"CISecret", cfg.CISecret, "s3cr3t"},
 		{"CIDefaultImage", cfg.CIDefaultImage, "ghcr.io/x/ci:v2"},
 		{"AgentDefaultImage", cfg.AgentDefaultImage, "ghcr.io/x/agent:v2"},
 		{"AgentClaudeOAuthToken", cfg.AgentClaudeOAuthToken, "sk-oauth"},
 		{"AgentAnthropicAPIKey", cfg.AgentAnthropicAPIKey, "sk-ant"},
 		{"AgentLLMBaseURL", cfg.AgentLLMBaseURL, "http://gw.local/v1"},
-		{"AgentServerURL", cfg.AgentServerURL, "http://moongit.local:8080"},
+		{"AgentServerURL", cfg.AgentServerURL, "http://codefort.local:8080"},
 	} {
 		if c.got != c.want {
 			t.Errorf("%s = %q, want %q", c.field, c.got, c.want)

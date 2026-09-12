@@ -166,7 +166,7 @@ func pktLine(payload string) []byte {
 	return fmt.Appendf(nil, "%04x%s", n, payload)
 }
 
-// pushEnv builds the environment moongitd injects into `git receive-pack`.
+// pushEnv builds the environment codefortd injects into `git receive-pack`.
 // Two managed hooks read it: post-receive needs the loopback URL, the
 // per-process CI secret, the repo identity, and the pusher; pre-receive needs
 // the repo's branch-protection patterns. Passing the patterns in rather than

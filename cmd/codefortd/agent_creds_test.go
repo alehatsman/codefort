@@ -143,14 +143,14 @@ func TestWriteAgentMCPConfig(t *testing.T) {
 	}
 	servers := readConf(t, dir)
 	if len(servers) != 1 {
-		t.Errorf("mgit should be the only MCP server: %+v", servers)
+		t.Errorf("cf should be the only MCP server: %+v", servers)
 	}
-	mgit, ok := servers["mgit"]
-	if !ok || mgit.Command != "mgit" || !sliceContains(mgit.Args, "mcp") {
-		t.Errorf("mgit server config wrong: %+v", servers)
+	cf, ok := servers["cf"]
+	if !ok || cf.Command != "cf" || !sliceContains(cf.Args, "mcp") {
+		t.Errorf("cf server config wrong: %+v", servers)
 	}
-	if !sliceContains(mgit.Args, "--profile") || !sliceContains(mgit.Args, storage.ToolProfileFull) {
-		t.Errorf("mgit args should carry the default profile: %+v", mgit.Args)
+	if !sliceContains(cf.Args, "--profile") || !sliceContains(cf.Args, storage.ToolProfileFull) {
+		t.Errorf("cf args should carry the default profile: %+v", cf.Args)
 	}
 
 	// An explicit profile rides through to the shim argv.
@@ -158,12 +158,12 @@ func TestWriteAgentMCPConfig(t *testing.T) {
 	if _, err := writeAgentMCPConfig(dir, storage.ToolProfileReview); err != nil {
 		t.Fatalf("writeAgentMCPConfig (review profile): %v", err)
 	}
-	mgit, ok = readConf(t, dir)["mgit"]
+	cf, ok = readConf(t, dir)["cf"]
 	if !ok {
-		t.Fatal("mgit server missing")
+		t.Fatal("cf server missing")
 	}
-	if !sliceContains(mgit.Args, "--profile") || !sliceContains(mgit.Args, storage.ToolProfileReview) {
-		t.Errorf("mgit args should carry the review profile: %+v", mgit.Args)
+	if !sliceContains(cf.Args, "--profile") || !sliceContains(cf.Args, storage.ToolProfileReview) {
+		t.Errorf("cf args should carry the review profile: %+v", cf.Args)
 	}
 }
 

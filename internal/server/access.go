@@ -32,7 +32,7 @@ import (
 // private repo the moment they signed in through the web UI.
 //
 // Falls back to the token name for tokens with no linked account: the
-// admin-provisioned `moongitd token create alice` path and per-run agent
+// admin-provisioned `codefortd token create alice` path and per-run agent
 // tokens. Those are matched by name, which is how repo ownership resolved
 // before accounts existed.
 func principalFromContext(r *http.Request) string {
@@ -134,7 +134,7 @@ func (s *Server) withRepoAccess(next http.Handler) http.Handler {
 //
 // A private repo needs a per-caller identity, which the shared Basic credential
 // cannot provide (it names a deployment, not a person). So identity here comes
-// from a moongit token presented either as a Bearer header or — the way git
+// from a codefort token presented either as a Bearer header or — the way git
 // clients actually authenticate — as the *password* of a Basic credential, with
 // any username. That is the same token-over-git-HTTP pattern as a forge PAT.
 func (s *Server) withGitRepoAccess(next http.Handler) http.Handler {
@@ -170,7 +170,7 @@ func (s *Server) withGitRepoAccess(next http.Handler) http.Handler {
 			// No usable credential at all. 401 + a Basic challenge is what
 			// makes `git clone` prompt for a username/password instead of
 			// failing outright.
-			w.Header().Set("WWW-Authenticate", `Basic realm="moongit"`)
+			w.Header().Set("WWW-Authenticate", `Basic realm="codefort"`)
 			http.Error(w, "authentication required", http.StatusUnauthorized)
 			return
 		}
@@ -214,7 +214,7 @@ func isGitWrite(r *http.Request) bool {
 		r.URL.Query().Get("service") == "git-receive-pack"
 }
 
-// gitIdentity resolves the principal behind a git request from a moongit
+// gitIdentity resolves the principal behind a git request from a codefort
 // token, accepted as a Bearer header or as the password half of Basic auth
 // (git's only native credential shape). The Basic *username* is ignored: the
 // token already names its identity, and git clients send arbitrary usernames.

@@ -53,7 +53,7 @@ func newTestRunner(t *testing.T, pipeline string, enabled bool, exec planExecuto
 		db: db,
 		cfg: &config.Config{
 			DataDir: dir,
-			// Matches DataDir, as a non-containerized moongitd (this test
+			// Matches DataDir, as a non-containerized codefortd (this test
 			// harness's shape) always has it: r.hostPath is then a no-op, so
 			// the plan file runJob writes under the real workDir and the one
 			// the fakes below read back from agree. Leaving this unset (both
@@ -636,7 +636,7 @@ func TestContainerName(t *testing.T) {
 	// jobID makes the name collision-free; the job name is sanitized to
 	// docker's [a-zA-Z0-9_.-] charset and the prefix stays a valid leading char.
 	got := containerName(42, "build/test step")
-	if want := "moongit-ci-42-build-test-step"; got != want {
+	if want := "codefort-ci-42-build-test-step"; got != want {
 		t.Errorf("containerName = %q, want %q", got, want)
 	}
 	if got := sanitizeContainerName("ok_.-9AZ"); got != "ok_.-9AZ" {

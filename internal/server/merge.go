@@ -261,7 +261,7 @@ func (s *Server) mirrorMergedBranch(repoDir, branch string) {
 
 // hasMirrorRemote reports whether the bare repo has a remote named "mirror" —
 // the opt-in signal for mirroring. Config lives in the repo's git config (set
-// with `git -C <repo> remote add mirror <url>`), so there's no moongit-side
+// with `git -C <repo> remote add mirror <url>`), so there's no codefort-side
 // schema or secret to manage. Any error (git missing, not a repo) reads as "no
 // mirror", so mirroring stays silent rather than noisy on a misconfigured repo.
 func hasMirrorRemote(repoDir string) bool {
@@ -475,7 +475,7 @@ func commitTreeAs(ctx context.Context, repoDir, tree string, c rebaseCommit, ont
 	// local `git rebase` records.
 	cmd.Env = append(cmd.Environ(),
 		"GIT_AUTHOR_NAME="+name, "GIT_AUTHOR_EMAIL="+email, "GIT_AUTHOR_DATE="+date,
-		"GIT_COMMITTER_NAME=moongit", "GIT_COMMITTER_EMAIL=moongit@moongit.local",
+		"GIT_COMMITTER_NAME=codefort", "GIT_COMMITTER_EMAIL=codefort@codefort.local",
 	)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -540,15 +540,15 @@ func commitTree(ctx context.Context, repoDir, tree, msg, identity string, parent
 
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = repoDir
-	// Stamp the merging identity; the email is synthetic (moongit is local-trust
+	// Stamp the merging identity; the email is synthetic (codefort is local-trust
 	// and identifies by token name, not email).
 	name := identity
 	if name == "" {
-		name = "moongit"
+		name = "codefort"
 	}
 	cmd.Env = append(cmd.Environ(),
-		"GIT_AUTHOR_NAME="+name, "GIT_AUTHOR_EMAIL="+name+"@moongit.local",
-		"GIT_COMMITTER_NAME="+name, "GIT_COMMITTER_EMAIL="+name+"@moongit.local",
+		"GIT_AUTHOR_NAME="+name, "GIT_AUTHOR_EMAIL="+name+"@codefort.local",
+		"GIT_COMMITTER_NAME="+name, "GIT_COMMITTER_EMAIL="+name+"@codefort.local",
 	)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

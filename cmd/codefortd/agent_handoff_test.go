@@ -176,10 +176,10 @@ func TestFinishAgentRunNoChanges(t *testing.T) {
 	}
 }
 
-// wireAgentMoongitRemote adds a `moongit` remote (the server URL) to the
-// already-cloned agent workspace so in-container mgit can resolve owner/repo,
+// wireAgentMoongitRemote adds a `codefort` remote (the server URL) to the
+// already-cloned agent workspace so in-container cf can resolve owner/repo,
 // without disturbing the clone's local-path `origin` (#144). An empty URL is a
-// no-op; a re-entry re-points an existing `moongit` remote.
+// no-op; a re-entry re-points an existing `codefort` remote.
 func TestWireAgentMoongitRemote(t *testing.T) {
 	remoteURL := func(t *testing.T, workDir, name string) (string, error) {
 		t.Helper()
@@ -190,7 +190,7 @@ func TestWireAgentMoongitRemote(t *testing.T) {
 	}
 
 	// clonedWorkspace mimics gitCheckout: a real repo whose `origin` is the bare
-	// repo's local filesystem path (no URL scheme — the thing mgit chokes on).
+	// repo's local filesystem path (no URL scheme — the thing cf chokes on).
 	clonedWorkspace := func(t *testing.T) (workDir, originPath string) {
 		t.Helper()
 		bare := t.TempDir()
@@ -216,14 +216,14 @@ func TestWireAgentMoongitRemote(t *testing.T) {
 		return workDir, bare
 	}
 
-	t.Run("adds moongit remote, leaves origin untouched", func(t *testing.T) {
+	t.Run("adds codefort remote, leaves origin untouched", func(t *testing.T) {
 		workDir, originPath := clonedWorkspace(t)
 		want := "http://host.docker.internal:8080/alice/repo.git"
 		if err := wireAgentMoongitRemote(context.Background(), workDir, want); err != nil {
 			t.Fatalf("wireAgentMoongitRemote: %v", err)
 		}
-		if got, err := remoteURL(t, workDir, "moongit"); err != nil || got != want {
-			t.Errorf("moongit = %q, %v; want %q", got, err, want)
+		if got, err := remoteURL(t, workDir, "codefort"); err != nil || got != want {
+			t.Errorf("codefort = %q, %v; want %q", got, err, want)
 		}
 		// The clone's local-path origin is preserved (and is still scheme-less,
 		// which is exactly why we don't rely on it).
@@ -232,7 +232,7 @@ func TestWireAgentMoongitRemote(t *testing.T) {
 		}
 	})
 
-	t.Run("idempotent — re-entry re-points moongit", func(t *testing.T) {
+	t.Run("idempotent — re-entry re-points codefort", func(t *testing.T) {
 		workDir, _ := clonedWorkspace(t)
 		first := "http://host.docker.internal:8080/alice/repo.git"
 		second := "http://host.docker.internal:9090/alice/repo.git"
@@ -242,8 +242,8 @@ func TestWireAgentMoongitRemote(t *testing.T) {
 		if err := wireAgentMoongitRemote(context.Background(), workDir, second); err != nil {
 			t.Fatalf("second: %v", err)
 		}
-		if got, err := remoteURL(t, workDir, "moongit"); err != nil || got != second {
-			t.Errorf("moongit = %q, %v; want %q", got, err, second)
+		if got, err := remoteURL(t, workDir, "codefort"); err != nil || got != second {
+			t.Errorf("codefort = %q, %v; want %q", got, err, second)
 		}
 	})
 
@@ -252,8 +252,8 @@ func TestWireAgentMoongitRemote(t *testing.T) {
 		if err := wireAgentMoongitRemote(context.Background(), workDir, ""); err != nil {
 			t.Fatalf("wireAgentMoongitRemote: %v", err)
 		}
-		if got, err := remoteURL(t, workDir, "moongit"); err == nil {
-			t.Errorf("expected no moongit remote, got %q", got)
+		if got, err := remoteURL(t, workDir, "codefort"); err == nil {
+			t.Errorf("expected no codefort remote, got %q", got)
 		}
 	})
 }
