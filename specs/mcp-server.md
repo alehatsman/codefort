@@ -3,7 +3,7 @@ id: mcp-server
 status: draft
 owners: [aleh]
 covers:
-  - "cmd/moongit/mcp.go"
+  - "cmd/cf/mcp.go"
 ---
 # MCP Server (mgit mcp)
 

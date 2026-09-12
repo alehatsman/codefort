@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/alehatsman/moongit/internal/config"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/config"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // agentMCPConfigName is the MCP config file written into the workspace (so it's

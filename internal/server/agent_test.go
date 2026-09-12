@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // spawnAgent drives handleSpawnAgent directly for issue `num`, with an optional

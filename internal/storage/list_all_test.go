@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // seedTwoRepos returns a migrated DB plus two repos owned by different users,

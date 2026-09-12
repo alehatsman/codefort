@@ -1,4 +1,4 @@
-module github.com/alehatsman/moongit
+module github.com/alehatsman/codefort
 
 go 1.26.4
 

@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/ci"
+	"github.com/alehatsman/codefort/internal/ci"
 )
 
 func TestTranslateClaudeLine(t *testing.T) {

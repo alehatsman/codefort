@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // seedNIssues creates n issues in one repo and returns the db, repoID, and the

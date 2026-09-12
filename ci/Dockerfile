@@ -1,7 +1,7 @@
 # moongit CI base image.
 #
 # moongitd runs each CI job in a throwaway container and execs `provision
-# apply <plan> --json` inside it (see cmd/moongitd/ci_runner.go, #411), so
+# apply <plan> --json` inside it (see cmd/codefortd/ci_runner.go, #411), so
 # every image used for CI must carry `provision` and `git` on PATH. `mooncake`
 # stays too, as long as the `quality` job's `mooncake task ci` shell-out is in
 # scope (#411 explicitly excludes the goq/tq rewrite — that's a separate,

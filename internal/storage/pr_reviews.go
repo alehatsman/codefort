@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // UpsertReview inserts or replaces the caller's review state for a PR.

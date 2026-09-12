@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // nums returns the issue numbers from a ListIssues result, for set comparisons.

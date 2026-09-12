@@ -42,8 +42,8 @@ concept.
 ## Quick start
 
 ```bash
-go install github.com/alehatsman/moongit/cmd/moongitd@latest
-go install github.com/alehatsman/moongit/cmd/moongit@latest   # the `mgit` client
+go install github.com/alehatsman/moongit/cmd/codefortd@latest
+go install github.com/alehatsman/moongit/cmd/cf@latest   # the `mgit` client
 
 # Mint a token (shown once) and register a repo.
 moongitd token create alice
@@ -170,7 +170,7 @@ The client honors `MOONGIT_TOKEN` (identity) and `MOONGIT_SERVER`
 git clone https://github.com/alehatsman/moongit.git
 cd moongit
 
-go run ./cmd/moongitd serve        # run the server
+go run ./cmd/codefortd serve        # run the server
 go test ./...                      # Go tests
 
 cd web && npm ci && npm run build  # build the SPA into web/dist

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // CreateComment appends a comment to an issue. issueID is the row id,

@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/alehatsman/moongit/internal/ci"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/ci"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // gitCommitMeta reads a commit's subject line and author name from a bare repo,

@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 func newTokenTestServer(t *testing.T) *Server {

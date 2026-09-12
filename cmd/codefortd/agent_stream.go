@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"github.com/alehatsman/moongit/internal/ci"
+	"github.com/alehatsman/codefort/internal/ci"
 )
 
 // claudeResult is the subset of claude's terminal stream-json "result" object

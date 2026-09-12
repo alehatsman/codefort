@@ -38,7 +38,7 @@ A spec is plain markdown with an **optional** YAML frontmatter block:
 id: ssh-transport
 status: living
 owners: [aleh]
-covers: ["internal/ssh/**", "cmd/moongitd/**"]
+covers: ["internal/ssh/**", "cmd/codefortd/**"]
 last_verified: 2026-06-02
 alignment: 0.91
 ---

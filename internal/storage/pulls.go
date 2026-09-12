@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // pullColumns is the canonical select list, used everywhere so scanPull stays

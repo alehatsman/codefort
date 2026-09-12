@@ -4,7 +4,7 @@ status: draft
 owners: [aleh]
 covers:
   - "internal/server/agent.go"
-  - "cmd/moongitd/agent_*.go"
+  - "cmd/codefortd/agent_*.go"
   - "internal/storage/agent_turns.go"
   - "internal/server/settings.go"
   - "internal/storage/settings.go"

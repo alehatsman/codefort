@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // handleSpawnAgent starts an agent run for an issue: it enqueues a kind=agent

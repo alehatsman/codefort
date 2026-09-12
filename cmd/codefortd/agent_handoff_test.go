@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/config"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/config"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // initBareRepo builds a real bare repo with one commit on main (file f.txt),

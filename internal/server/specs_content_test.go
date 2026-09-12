@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // getSpec calls handleGetSpec for the spec at relPath (relative to specs/) and

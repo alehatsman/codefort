@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // Access control is enforced in exactly two places — the two middlewares in

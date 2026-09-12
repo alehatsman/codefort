@@ -122,7 +122,7 @@ linters:
       # bodyclose in the moongit CLI client: short-lived process that reads the
       # response then exits, so an unclosed body is process-scoped and benign.
       # (The daemon side does close its bodies.)
-      - path: cmd/moongit/
+      - path: cmd/cf/
         linters: [bodyclose]
 
       # revive package-comments overlaps the relaxed staticcheck ST1000 — same

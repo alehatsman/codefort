@@ -3,15 +3,15 @@ id: cli
 status: draft
 owners: [aleh]
 covers:
-  - "cmd/moongit/main.go"
-  - "cmd/moongit/pr.go"
-  - "cmd/moongit/events.go"
+  - "cmd/cf/main.go"
+  - "cmd/cf/pr.go"
+  - "cmd/cf/events.go"
 ---
 # mgit — the human-facing client
 
 ## Intent
 
-`mgit` (built from `cmd/moongit`) is the hand-driven front door to a moongit
+`mgit` (built from `cmd/cf`) is the hand-driven front door to a moongit
 server: a thin, stateless REST client that infers *where to talk* from the git
 checkout you are standing in, so the common case is a bare verb — `mgit issue
 claim 42` — with no host, repo, or user to type. It holds no config file, no

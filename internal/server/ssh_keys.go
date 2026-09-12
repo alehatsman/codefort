@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // handleListSSHKeys returns the requesting token's registered SSH keys. Keys

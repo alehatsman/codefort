@@ -5,8 +5,8 @@ owners: [aleh]
 covers:
   - "internal/server/ci.go"
   - "internal/server/ci_hook.go"
-  - "cmd/moongitd/ci_runner.go"
-  - "cmd/moongitd/cron_scheduler.go"
+  - "cmd/codefortd/ci_runner.go"
+  - "cmd/codefortd/cron_scheduler.go"
   - "internal/ci/**"
   - "internal/storage/ci.go"
 ---

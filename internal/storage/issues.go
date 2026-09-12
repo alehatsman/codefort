@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // ErrAlreadyClaimed is returned by Claim when the target issue already has

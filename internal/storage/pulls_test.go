@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 func mustCreatePull(t *testing.T, db *sql.DB, repoID int64, base, head, title string) api.PullRequest {

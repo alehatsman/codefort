@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // agentModelClaudeEdit is the sole execution model an agent run can use. The

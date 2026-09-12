@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // handleListMembers returns all collaborators on a repo.

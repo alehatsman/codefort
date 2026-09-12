@@ -3,7 +3,7 @@
 An **agent run** (the "Spawn agent" button on an issue) executes a containerized
 Claude session to work the issue. moongitd opens this image exactly like a CI
 container — `docker run --user <uid:gid> -v <workspace>:/work … sleep infinity`,
-then `docker exec` (see `cmd/moongitd/agent_runner.go`) — so it derives `FROM
+then `docker exec` (see `cmd/codefortd/agent_runner.go`) — so it derives `FROM
 moongit-ci:latest` to inherit the `provision`/`git` contract and the uid:gid
 bind-mount convention, and adds the `claude` CLI plus `mgit` on PATH. This
 directory builds the default agent image, `moongit-agent:latest`.
@@ -20,7 +20,7 @@ directory builds the default agent image, `moongit-agent:latest`.
 
    ```sh
    # from the moongit repo root
-   CGO_ENABLED=0 go build -o agent/mgit ./cmd/moongit
+   CGO_ENABLED=0 go build -o agent/mgit ./cmd/cf
    ```
 
 2. **Build the image** from the moongit repo root, once `moongit-ci:latest`
@@ -85,7 +85,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
   injected per run), exposed to Claude via the MCP shim rather than as a raw
   CLI — Claude itself can't invoke it directly (headless Bash is
   policy-gated, #110). Drop a static `mgit` into `agent/mgit` (git-ignored
-  build input): `CGO_ENABLED=0 go build -o agent/mgit ./cmd/moongit`.
+  build input): `CGO_ENABLED=0 go build -o agent/mgit ./cmd/cf`.
 - `git` — inherited from `moongit-ci:latest`; also used to init the workspace
   repo the agent needs.
 

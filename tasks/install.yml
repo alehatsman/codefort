@@ -14,11 +14,11 @@ steps:
     file: { path: "{{ home }}/.local/bin", state: dir }
 
   - name: build moongitd
-    cmd: [go, build, -o, "{{ binary_path }}", ./cmd/moongitd]
+    cmd: [go, build, -o, "{{ binary_path }}", ./cmd/codefortd]
     changed_when: "false"
 
   - name: build moongit
-    cmd: [go, build, -o, "{{ client_path }}", ./cmd/moongit]
+    cmd: [go, build, -o, "{{ client_path }}", ./cmd/cf]
     changed_when: "false"
 
   - name: mgitd alias

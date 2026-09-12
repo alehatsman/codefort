@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // commitFormat lays out one commit per `git log` record using control-byte

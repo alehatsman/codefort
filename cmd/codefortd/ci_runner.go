@@ -21,9 +21,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/ci"
-	"github.com/alehatsman/moongit/internal/config"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/ci"
+	"github.com/alehatsman/codefort/internal/config"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // provisionEvent is one line of `provision apply <plan> --json` output —

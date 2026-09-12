@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/config"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/config"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // newSpecsTestServer builds a server backed by a bare repo whose working tree

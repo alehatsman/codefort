@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/specs"
+	"github.com/alehatsman/codefort/internal/specs"
 )
 
 func TestParseVerifyResultFencedBlock(t *testing.T) {

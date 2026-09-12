@@ -14,9 +14,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/config"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/config"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // newCodeCommentTestServer builds a bare repo with two branches:

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // runPR dispatches `moongit pr <subcommand>` — a thin client over the PR data

@@ -1,7 +1,7 @@
 # moongit agent base image.
 #
 # An agent run (the "Spawn agent" button / `mgit`) executes a containerized
-# Claude session to work an issue — see cmd/moongitd/agent_runner.go. moongitd
+# Claude session to work an issue — see cmd/codefortd/agent_runner.go. moongitd
 # opens this image exactly like a CI container (`docker run --user <uid:gid>
 # -v <workspace>:/work … sleep infinity`, then `docker exec`), so it derives
 # FROM the CI base to inherit the provision/git contract and the uid:gid

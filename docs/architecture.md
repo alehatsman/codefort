@@ -15,11 +15,11 @@ substrate, boring mechanisms).
 
 ## Process layout
 
-`moongitd` is also a small admin CLI; `cmd/moongitd/main.go` dispatches
+`moongitd` is also a small admin CLI; `cmd/codefortd/main.go` dispatches
 `serve` (the default with no args), `repo create`, `token create|list|revoke`,
 and `ci install-hooks`. Only `serve` starts the system.
 
-`runServe` (`cmd/moongitd/main.go:94`) does, in order:
+`runServe` (`cmd/codefortd/main.go:94`) does, in order:
 
 1. `config.Load()` — every knob is a `MOONGIT_*` env var (`internal/config`).
    `EnsureDirs()` creates the data dir, repos dir.
@@ -286,7 +286,7 @@ Bare repos on disk are the source of truth; SQLite holds coordination metadata
   `handleMergePull` or when someone pushes.
 - **The CI checkout is the one place that materializes a tree**, and it does so
   *beside* the bare repo, never in it: `gitCheckout`
-  (`cmd/moongitd/ci_runner.go:1308`) does `git clone --local --no-checkout`
+  (`cmd/codefortd/ci_runner.go:1308`) does `git clone --local --no-checkout`
   (hardlinked objects, no copy, no network) then a detached checkout of the
   exact SHA. A `git archive | tar` extract would be lighter but leaves no `.git`,
   which breaks quality gates that shell out to `git rev-parse --show-toplevel`.
@@ -323,7 +323,7 @@ Then it polls. Each tick drains, in order: CI runs, each kind in
 new agent kind needs no edit here), expired parked agent sessions, queued
 follow-up turns, and accepted handoffs.
 
-**One budget, two claims** (`cmd/moongitd/budget.go`). CI and agent-family runs
+**One budget, two claims** (`cmd/codefortd/budget.go`). CI and agent-family runs
 draw from a single pool of `MaxConcurrency` slots (default `NumCPU`), with
 `AgentReserved` slots (default 2) that only agents may take:
 
@@ -389,12 +389,12 @@ here.
 | **Add an API endpoint** | Register the pattern in `apiHandler()` (`internal/server/server.go:143`) — or `publicAPIHandler()` if it must work without a token. Add the handler in the matching `internal/server/<domain>.go`. Reads take `s.rdb`, writes take `s.db`. Request/response structs go in `internal/api/types.go`. A repo-scoped route is gated automatically by `withRepoAccess` (`internal/server/access.go`) — don't re-check in the handler. Test next to the handler (`internal/server/<domain>_test.go`). |
 | **Add a table or column** | Append a new string to `migrations` in `internal/storage/migrations.go` — never edit an existing one. Add the query functions in `internal/storage/<domain>.go` taking `*sql.DB` as the first arg so the caller picks the pool. Cover it in `internal/storage/migrations_test.go` plus a domain test. |
 | **Change git behavior (clone/push/merge)** | Transport: `internal/server/git.go`. Route matching: `isGitRequest` in `internal/server/web.go`. Merge/ref movement: `internal/server/merge.go` (stay worktree-free). Repo creation + hook install: `internal/server/repos.go`, `internal/server/ci_hook.go`. SSH transport: `internal/server/ssh.go`. |
-| **Add a CI feature** | Pipeline schema + parsing: `internal/ci/ci.go`, `internal/ci/translate.go`. Event log format: `internal/ci/events.go`. Execution/orchestration: `cmd/moongitd/ci_runner.go`. Enqueue-on-push: `internal/server/ci_hook.go`. Run/job rows: `internal/storage/ci.go`. HTTP surface: `internal/server/ci.go`. |
-| **Change agent-run behavior** | Spawn: `handleSpawnAgent` in `internal/server/issues.go`. Turn loop + executor: `cmd/moongitd/agent_runner.go`, `agent_executor.go`, `agent_launch.go`, `agent_stream.go`. Credentials: `agent_creds.go`. Handoff/finish: `agent_handoff.go`. Turn rows: `internal/storage/agent_turns.go`. Cancel path: `AgentCanceler` in `internal/server/server.go`. |
-| **Change scheduling / concurrency** | Slot policy: `cmd/moongitd/budget.go` (+ `budget_test.go`). Drain order and poll cadence: `ciRunner.run` in `cmd/moongitd/ci_runner.go`. Cron: `cmd/moongitd/cron_scheduler.go`. |
+| **Add a CI feature** | Pipeline schema + parsing: `internal/ci/ci.go`, `internal/ci/translate.go`. Event log format: `internal/ci/events.go`. Execution/orchestration: `cmd/codefortd/ci_runner.go`. Enqueue-on-push: `internal/server/ci_hook.go`. Run/job rows: `internal/storage/ci.go`. HTTP surface: `internal/server/ci.go`. |
+| **Change agent-run behavior** | Spawn: `handleSpawnAgent` in `internal/server/issues.go`. Turn loop + executor: `cmd/codefortd/agent_runner.go`, `agent_executor.go`, `agent_launch.go`, `agent_stream.go`. Credentials: `agent_creds.go`. Handoff/finish: `agent_handoff.go`. Turn rows: `internal/storage/agent_turns.go`. Cancel path: `AgentCanceler` in `internal/server/server.go`. |
+| **Change scheduling / concurrency** | Slot policy: `cmd/codefortd/budget.go` (+ `budget_test.go`). Drain order and poll cadence: `ciRunner.run` in `cmd/codefortd/ci_runner.go`. Cron: `cmd/codefortd/cron_scheduler.go`. |
 | **Add a UI page** | Add the component under `web/src/features/<feature>/`, register the route in `web/src/App.tsx` (static routes before `/:owner/:repo`), wire data through `web/src/api/queries.ts` / `mutations.ts` and types in `web/src/api/types.ts`. Feature CSS in `web/src/features/<feature>/<feature>.css`. New shared primitive → `web/src/ui/` **and** a `/dev/ui` gallery row. Follow `web/CLAUDE.md`. |
 | **Add a UI primitive** | `web/src/ui/` + barrel export + a section in `DevGalleryPage.tsx`; base styles in `web/src/styles.css`. |
-| **Add a config knob** | `internal/config/config.go` (`MOONGIT_*`, with a default), document it in the `printUsage` block in `cmd/moongitd/main.go` if it's operator-facing. |
-| **Add a background loop** | A `run…` function in `cmd/moongitd/main.go` following the reaper shape (ticker, `ctx.Done()`, writer pool, no-op when disabled), started with the others in `runServe`. If it can be mid-work at shutdown, it needs a drain before `db.Close()`. |
+| **Add a config knob** | `internal/config/config.go` (`MOONGIT_*`, with a default), document it in the `printUsage` block in `cmd/codefortd/main.go` if it's operator-facing. |
+| **Add a background loop** | A `run…` function in `cmd/codefortd/main.go` following the reaper shape (ticker, `ctx.Done()`, writer pool, no-op when disabled), started with the others in `runServe`. If it can be mid-work at shutdown, it needs a drain before `db.Close()`. |
 | **Add an event type** | Emit through `internal/storage/events.go`; consumers are `GET /api/events` (`internal/server/events.go`) and the SPA's feed. |
-| **Add an admin CLI subcommand** | The `switch` in `main()` (`cmd/moongitd/main.go:37`), a `run…` function, `printUsage`, and `openDB()` if it needs the database. |
+| **Add an admin CLI subcommand** | The `switch` in `main()` (`cmd/codefortd/main.go:37`), a `run…` function, `printUsage`, and `openDB()` if it needs the database. |

@@ -1,5 +1,5 @@
 # moongitd runs every CI/agent job in a throwaway container (see
-# cmd/moongitd/ci_runner.go), so these images must exist locally. They are
+# cmd/codefortd/ci_runner.go), so these images must exist locally. They are
 # local-only (never pushed to a registry) and not auto-built, so a fresh box
 # or a `docker image prune` leaves them missing and the runner fails with
 # `docker run … exit status 125 (pull access denied)`. This task rebuilds

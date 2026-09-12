@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 func TestComposeVerifyTurnPrompt(t *testing.T) {

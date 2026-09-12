@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // parseSSEEvents pulls the api.Event payloads out of an SSE response body. Only

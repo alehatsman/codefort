@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/ci"
-	"github.com/alehatsman/moongit/internal/config"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/ci"
+	"github.com/alehatsman/codefort/internal/config"
+	"github.com/alehatsman/codefort/internal/storage"
 	"gopkg.in/yaml.v3"
 )
 

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/ci"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/ci"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // newCIReadServer extends the CI hook test server with a read pool (handlers

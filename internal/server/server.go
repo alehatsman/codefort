@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/config"
+	"github.com/alehatsman/codefort/internal/config"
 )
 
 type Server struct {

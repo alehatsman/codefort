@@ -7,7 +7,7 @@ in three parts:
   mooncake (`tasks.yml`) to provision's `tasks/` directory of plan/component
   files. See "Layout" through "Validation — done" below.
 - **CI runner (#411, done).** `mgitci.yml` jobs execute under provision
-  instead of mooncake inside `cmd/moongitd/ci_runner.go`. See "CI runner"
+  instead of mooncake inside `cmd/codefortd/ci_runner.go`. See "CI runner"
   below. The goq/tq quality-gate rewrite itself was explicitly excluded from
   #411 and deferred — `quality`'s job still shells out to `mooncake task ci`
   (go-quality stays mooncake-only, see below); the `web` job's half of that
@@ -248,7 +248,7 @@ thing to type is not worth a translation layer (explicit > magic).
 
 ## CI runner (#411)
 
-Replaces mooncake as `cmd/moongitd/ci_runner.go`'s exec target. This is a
+Replaces mooncake as `cmd/codefortd/ci_runner.go`'s exec target. This is a
 model change, not a binary swap — see moongit issue #411 for the full
 before/after and why. This section is the code gate: no code lands until
 this holds.
@@ -495,7 +495,7 @@ the `--add-host` flag, don't remove it.
 **Done:**
 
 - `go build ./...`, `go vet ./...`, and the full `go test ./...` suite pass
-  (every package, not just `internal/ci`/`cmd/moongitd`) — no regression
+  (every package, not just `internal/ci`/`cmd/codefortd`) — no regression
   anywhere else in the module.
 - `internal/ci`'s translator, run for real against the actual `mgitci.yml`
   (all three live jobs — `quality`, `web`, `smoke`): `TranslateJobPlan`'s

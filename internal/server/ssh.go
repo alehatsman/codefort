@@ -17,7 +17,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // extTokenName and extFingerprint key the authenticated identity into the SSH

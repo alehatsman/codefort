@@ -5,7 +5,7 @@ owners: [aleh]
 covers:
   - "internal/server/events.go"
   - "internal/storage/events.go"
-  - "cmd/moongit/events.go"
+  - "cmd/cf/events.go"
 ---
 # Events Feed
 

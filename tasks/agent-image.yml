@@ -14,7 +14,7 @@ steps:
     shell: |
       set -eu
       docker image inspect moongit-ci:latest >/dev/null 2>&1 || { echo "moongit-ci:latest missing — run 'provision apply tasks/ci-images.yml' first (the agent image is FROM it)"; exit 1; }
-      CGO_ENABLED=0 go build -o "$(pwd)/agent/mgit" ./cmd/moongit
+      CGO_ENABLED=0 go build -o "$(pwd)/agent/mgit" ./cmd/cf
       echo "built the agent/mgit build input"
     changed_when: "false"
 

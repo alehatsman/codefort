@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // ErrSSHKeyExists is returned by AddSSHKey when the same public key (by

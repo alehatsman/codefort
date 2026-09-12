@@ -3,7 +3,7 @@ package storage
 import (
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // The repos summary surfaces three at-a-glance metric counts: open PRs,

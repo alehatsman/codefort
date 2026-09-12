@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // runEvents tails the server's outbound event feed (#73) — the SSE counterpart

@@ -31,7 +31,7 @@ Go — the everyday loop, no tooling required:
 go build ./...          # compile everything
 go test ./...           # Go tests
 gofmt -w .              # format (same as the `fmt` task)
-go run ./cmd/moongitd   # run the server against ./data/
+go run ./cmd/codefortd   # run the server against ./data/
 ```
 
 **Go quality gate:** `mooncake task ci` — the full lint/vuln/scan/ai-lint/

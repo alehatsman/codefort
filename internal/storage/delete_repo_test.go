@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // Deleting a repo must cascade to every child row — issues (and their

@@ -18,8 +18,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/alehatsman/moongit/internal/config"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/config"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 func TestParseGitSSHCommand(t *testing.T) {

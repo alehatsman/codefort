@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // CreateCodeComment anchors a new comment to a file line range on a branch.

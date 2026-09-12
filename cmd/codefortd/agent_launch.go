@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // agentSessionID derives a stable RFC-4122 UUID for a run's claude session from

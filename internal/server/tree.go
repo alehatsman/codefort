@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // maxBlobBytes caps the size of a file we'll return inline for the code

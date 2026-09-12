@@ -9,7 +9,7 @@ covers:
   - "internal/storage/dependencies.go"
   - "internal/storage/comments.go"
   - "internal/server/aggregate.go"
-  - "cmd/moongit/main.go"
+  - "cmd/cf/main.go"
 ---
 # Issues & Claim-First Coordination
 

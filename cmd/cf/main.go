@@ -18,8 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/ci"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/ci"
 )
 
 func main() {

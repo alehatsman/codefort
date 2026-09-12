@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/specs"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/specs"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // specsDir is the conventional in-repo directory holding markdown specs.

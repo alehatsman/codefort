@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // AddRepoMember grants the user named by username a role on the given repo.

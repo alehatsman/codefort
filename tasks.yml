@@ -13,7 +13,7 @@
 # mooncake-module compatibility outright — see docs/ops-provisioning.md's
 # "Quality gate — ts-quality" section). This file now holds only the
 # goq-backed Go quality-gate tasks, plus `tidy`, which #410 didn't scope
-# out. The CI runner (mgitci.yml, cmd/moongitd/ci_runner.go) still execs
+# out. The CI runner (mgitci.yml, cmd/codefortd/ci_runner.go) still execs
 # `mooncake task ci` for the Go gate in-container — tracked separately in
 # #411 as explicitly deferred; the `web` CI job now runs the provision-native
 # ts-quality gate instead (tasks/ui-ci.yml).

@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // validServices lists the git smart-HTTP services we accept on /info/refs.

@@ -5,5 +5,5 @@ steps:
     file: { path: data/repos, state: dir }
 
   - name: run moongitd
-    cmd: [go, run, ./cmd/moongitd]
+    cmd: [go, run, ./cmd/codefortd]
     changed_when: "false"

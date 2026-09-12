@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 func TestGetSpecIncludesLatestVerification(t *testing.T) {

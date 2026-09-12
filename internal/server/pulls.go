@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alehatsman/moongit/internal/api"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/api"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // handleCreatePull opens a PR from head into base. Both must name existing

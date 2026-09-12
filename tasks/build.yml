@@ -5,9 +5,9 @@ steps:
     file: { path: bin, state: dir }
 
   - name: build moongitd
-    cmd: [go, build, -o, bin/moongitd, ./cmd/moongitd]
+    cmd: [go, build, -o, bin/moongitd, ./cmd/codefortd]
     changed_when: "false"
 
   - name: build moongit
-    cmd: [go, build, -o, bin/moongit, ./cmd/moongit]
+    cmd: [go, build, -o, bin/moongit, ./cmd/cf]
     changed_when: "false"

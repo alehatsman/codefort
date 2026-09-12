@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/config"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/config"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 func TestAgentContainerEnvOAuth(t *testing.T) {

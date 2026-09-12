@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alehatsman/moongit/internal/ci"
-	"github.com/alehatsman/moongit/internal/specs"
-	"github.com/alehatsman/moongit/internal/storage"
+	"github.com/alehatsman/codefort/internal/ci"
+	"github.com/alehatsman/codefort/internal/specs"
+	"github.com/alehatsman/codefort/internal/storage"
 )
 
 // verifyFinalize bundles what finalizeVerifyRun needs to close out a spec-verify

@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/alehatsman/moongit/internal/api"
+	"github.com/alehatsman/codefort/internal/api"
 )
 
 // seedRepo (a migrated temp DB + one repo, no issues) lives in ci_test.go.

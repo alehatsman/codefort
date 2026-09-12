@@ -96,7 +96,7 @@ Shipped code with zero spec coverage, in descending order of risk:
 - Extend `specs/pull-requests.md` with approvals / review state (migration 28,
   #401, `internal/storage/pr_reviews.go`).
 - Extend `specs/ci-pipelines.md` with cron-scheduled runs
-  (`cmd/moongitd/cron_scheduler.go`, migration 22, #344).
+  (`cmd/codefortd/cron_scheduler.go`, migration 22, #344).
 
 ### Phase 6 — cleanup: stale docs and dead build inputs  `done`
 
