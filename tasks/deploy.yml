@@ -21,7 +21,7 @@ steps:
   # master mind, cf issue #410).
   - vars:
       binary_path: "{{ home }}/.local/bin/codefortd"
-      client_path: "{{ home }}/.local/bin/codefort"
+      client_path: "{{ home }}/.local/bin/cf"
       web_dir: "{{ home }}/projects/codefort/web/dist"
 
   - name: deploy guard (#300)
@@ -51,15 +51,9 @@ steps:
     cmd: [go, build, -trimpath, -ldflags, "-s -w", -o, "{{ binary_path }}", ./cmd/codefortd]
     changed_when: "false"
 
-  - name: build codefort
+  - name: build cf
     cmd: [go, build, -trimpath, -ldflags, "-s -w", -o, "{{ client_path }}", ./cmd/cf]
     changed_when: "false"
-
-  - name: codefortd alias
-    file: { path: "{{ home }}/.local/bin/codefortd", src: "{{ binary_path }}", state: link }
-
-  - name: cf alias
-    file: { path: "{{ home }}/.local/bin/cf", src: "{{ client_path }}", state: link }
 
   - name: npm install (web)
     shell: npm install

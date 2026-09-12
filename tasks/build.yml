@@ -8,6 +8,6 @@ steps:
     cmd: [go, build, -o, bin/codefortd, ./cmd/codefortd]
     changed_when: "false"
 
-  - name: build codefort
-    cmd: [go, build, -o, bin/codefort, ./cmd/cf]
+  - name: build cf
+    cmd: [go, build, -o, bin/cf, ./cmd/cf]
     changed_when: "false"

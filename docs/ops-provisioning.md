@@ -105,7 +105,7 @@ home-relative var now has its own inline `- vars:` step, e.g.
 steps:
   - vars:
       binary_path: "{{ home }}/.local/bin/codefortd"
-      client_path: "{{ home }}/.local/bin/codefort"
+      client_path: "{{ home }}/.local/bin/cf"
   - name: "~/.local/bin directory"
     file: { path: "{{ home }}/.local/bin", state: dir }
   ...
@@ -223,7 +223,7 @@ thing to type is not worth a translation layer (explicit > magic).
   - `backup` — first real run hit the vars_file bug (above) and failed
     safe; re-run after the fix wrote a real 63 MB tarball to
     `~/.local/share/codefort/backups/`. Correct.
-  - `install` — rebuilt + reinstalled `codefortd`/`codefort` + aliases.
+  - `install` — rebuilt + reinstalled `codefortd`/`cf`.
     Correct.
   - `create-repo` — created `alehatsman/provision-smoke-test` against the
     live data dir. Correct.

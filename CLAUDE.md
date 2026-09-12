@@ -57,7 +57,7 @@ provision plans in `tasks/`.
 ```bash
 provision list tasks/                # discover every task + its description
 provision apply tasks/build.yml      # both binaries into ./bin/
-provision apply tasks/install.yml    # binaries into ~/.local/bin + cf/codefortd links
+provision apply tasks/install.yml    # codefortd + cf into ~/.local/bin
 provision apply tasks/run.yml        # codefortd in the foreground against ./data/
 ```
 

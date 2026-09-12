@@ -1,4 +1,4 @@
-description: build both binaries into ~/.local/bin + create codefortd/cf aliases (no systemd changes)
+description: build both binaries into ~/.local/bin (no systemd changes)
 
 steps:
   # vars_file loads values raw (unrendered) — a `{{ home }}`-containing
@@ -8,7 +8,7 @@ steps:
   # master mind, cf issue #410).
   - vars:
       binary_path: "{{ home }}/.local/bin/codefortd"
-      client_path: "{{ home }}/.local/bin/codefort"
+      client_path: "{{ home }}/.local/bin/cf"
 
   - name: "~/.local/bin directory"
     file: { path: "{{ home }}/.local/bin", state: dir }
@@ -17,16 +17,10 @@ steps:
     cmd: [go, build, -o, "{{ binary_path }}", ./cmd/codefortd]
     changed_when: "false"
 
-  - name: build codefort
+  - name: build cf
     cmd: [go, build, -o, "{{ client_path }}", ./cmd/cf]
     changed_when: "false"
 
-  - name: codefortd alias
-    file: { path: "{{ home }}/.local/bin/codefortd", src: "{{ binary_path }}", state: link }
-
-  - name: cf alias
-    file: { path: "{{ home }}/.local/bin/cf", src: "{{ client_path }}", state: link }
-
   - name: done
-    shell: 'echo "installed codefortd + codefort to {{ home }}/.local/bin (aliases: codefortd, cf)"'
+    shell: 'echo "installed codefortd + cf to {{ home }}/.local/bin"'
     changed_when: "false"

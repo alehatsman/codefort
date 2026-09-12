@@ -9,8 +9,8 @@ steps:
   - vars:
       unit_path: "{{ home }}/.config/systemd/user/codefort.service"
       binary_path: "{{ home }}/.local/bin/codefortd"
-      client_path: "{{ home }}/.local/bin/codefort"
-      data_dir: "{{ home }}/.local/share/codefort"
+      client_path: "{{ home }}/.local/bin/cf"
+      data_dir: "{{ home }}/.local/share/moongit"
 
   - name: disable + stop service
     shell: systemctl --user disable --now codefort.service || true
