@@ -1,12 +1,12 @@
-// Package ci parses and validates moongit's per-repo CI spec (mgitci.yml) and
+// Package ci parses and validates moongit's per-repo CI spec (codefort.yml) and
 // translates each job into a provision plan so moongitd can execute it.
 //
-// mgitci.yml describes a pipeline of jobs wired into a DAG by `needs`; moongit
+// codefort.yml describes a pipeline of jobs wired into a DAG by `needs`; moongit
 // owns that DAG. provision itself is flat — it executes a top-level *list of
 // steps* (a mapping root is a component, not a plan — provision spec §3). So
 // translation is per-job: one job's steps become one provision plan file.
 // `run: "<cmd>"` is sugar for a shell step; mooncake's own raw shell/cmd/
-// assert-http shapes (mgitci.yml's legacy authoring surface) are rewritten to
+// assert-http shapes (codefort.yml's legacy authoring surface) are rewritten to
 // provision's native syntax; any other raw step passes through untouched.
 package ci
 
@@ -20,10 +20,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// SchemaVersion is the only mgitci.yml version this parser accepts.
+// SchemaVersion is the only codefort.yml version this parser accepts.
 const SchemaVersion = "1"
 
-// Pipeline is a parsed mgitci.yml.
+// Pipeline is a parsed codefort.yml.
 type Pipeline struct {
 	Version string         `yaml:"version"`
 	On      On             `yaml:"on"`
@@ -96,7 +96,7 @@ type Job struct {
 	Steps []yaml.Node `yaml:"steps"`
 }
 
-// Parse decodes and validates an mgitci.yml document. Unknown top-level and
+// Parse decodes and validates an codefort.yml document. Unknown top-level and
 // per-job keys are rejected so authoring typos (e.g. `step:` for `steps:`)
 // fail loudly rather than silently doing nothing.
 func Parse(data []byte) (Pipeline, error) {
@@ -104,7 +104,7 @@ func Parse(data []byte) (Pipeline, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&p); err != nil {
-		return Pipeline{}, fmt.Errorf("parse mgitci.yml: %w", err)
+		return Pipeline{}, fmt.Errorf("parse codefort.yml: %w", err)
 	}
 	if err := p.Validate(); err != nil {
 		return Pipeline{}, err

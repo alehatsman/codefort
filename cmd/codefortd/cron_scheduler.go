@@ -70,7 +70,7 @@ func processRepoCron(ctx context.Context, db *sql.DB, cfg *config.Config, log *s
 		return err
 	}
 	if !ok {
-		// No mgitci.yml at HEAD — clear any stale schedules and move on.
+		// No codefort.yml at HEAD — clear any stale schedules and move on.
 		return storage.UpsertCronSchedules(db, repo.ID, nil)
 	}
 

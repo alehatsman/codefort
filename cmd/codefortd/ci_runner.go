@@ -74,7 +74,7 @@ type (
 	planExecutor func(ctx context.Context, workDir, planFile string, onEvent func(provisionEvent)) (provisionEvent, error)
 	// checkoutFunc materializes the repo tree at commitSHA into workDir.
 	checkoutFunc func(ctx context.Context, bareRepo, commitSHA, workDir string) error
-	// pipelineReader reads mgitci.yml at commitSHA; ok=false means absent.
+	// pipelineReader reads codefort.yml at commitSHA; ok=false means absent.
 	pipelineReader func(ctx context.Context, bareRepo, commitSHA string) (raw []byte, ok bool, err error)
 )
 
@@ -434,7 +434,7 @@ func (r *ciRunner) turnLease() time.Duration {
 func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	// An agent run reuses this same claim/lease/drain spine but executes a
 	// containerized Claude session against an issue instead of a translated
-	// mgitci.yml. Branch here so everything upstream (claiming, concurrency,
+	// codefort.yml. Branch here so everything upstream (claiming, concurrency,
 	// reconcile, retention) stays shared.
 	if run.Kind.IsAgent() {
 		r.executeAgentRun(parent, run)
@@ -451,7 +451,7 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	}
 	log = log.With("repo", owner+"/"+name)
 
-	// Gate: repo must be CI-enabled AND mgitci.yml must exist at the commit.
+	// Gate: repo must be CI-enabled AND codefort.yml must exist at the commit.
 	enabled, err := storage.RepoCIEnabled(r.db, run.RepoID)
 	if err != nil {
 		log.Error("ci enabled check", "err", err)
@@ -461,7 +461,7 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 	bareRepo := filepath.Join(r.cfg.ReposDir, owner, name+".git")
 	raw, ok, err := r.readPipeline(parent, bareRepo, run.CommitSHA)
 	if err != nil {
-		log.Error("ci read mgitci.yml", "err", err)
+		log.Error("ci read codefort.yml", "err", err)
 		r.finish(run, storage.RunError)
 		return
 	}
@@ -473,7 +473,7 @@ func (r *ciRunner) executeRun(parent context.Context, run storage.CIRun) {
 
 	pipeline, err := ci.Parse(raw)
 	if err != nil {
-		log.Error("ci parse mgitci.yml", "err", err)
+		log.Error("ci parse codefort.yml", "err", err)
 		r.finish(run, storage.RunError)
 		return
 	}
@@ -1341,11 +1341,11 @@ func gitCheckout(ctx context.Context, bareRepo, commitSHA, workDir string) error
 	return nil
 }
 
-// gitReadPipeline reads mgitci.yml at commitSHA from the bare repo. A missing
+// gitReadPipeline reads codefort.yml at commitSHA from the bare repo. A missing
 // file (git reports the path doesn't exist at that rev) yields ok=false rather
 // than an error — that's the gate for "this commit has no pipeline".
 func gitReadPipeline(ctx context.Context, bareRepo, commitSHA string) ([]byte, bool, error) {
-	cmd := exec.CommandContext(ctx, "git", "--git-dir", bareRepo, "show", commitSHA+":mgitci.yml")
+	cmd := exec.CommandContext(ctx, "git", "--git-dir", bareRepo, "show", commitSHA+":codefort.yml")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

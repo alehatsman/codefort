@@ -94,7 +94,7 @@ unbounded history. Agent runs reuse this same claim/lease/execute spine.
 - **Agent runs.** Issue-spawned containerized agent sessions reuse this run
   spine (claim, lease, concurrency, reconcile, retention, event stream) but are
   specified separately; this spec is the deterministic-pipeline path.
-- **The pipeline file format.** The `mgitci.yml` schema and how steps map onto
+- **The pipeline file format.** The `codefort.yml` schema and how steps map onto
   mooncake are a configuration/mooncake concern, not specified here; this spec
   says the file gates and defines the job DAG, not its grammar.
 - **The events feed.** Runs emit push/run events, but the SSE fleet feed's

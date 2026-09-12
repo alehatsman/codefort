@@ -83,7 +83,7 @@ type Config struct {
 	// every CI-enabled repo). Set via CODEFORT_CI_ISOLATION.
 	CIIsolation string
 
-	// CIDefaultImage is the container image a job runs in when its mgitci.yml
+	// CIDefaultImage is the container image a job runs in when its codefort.yml
 	// doesn't set `image:`. It must be glibc-based and carry `provision`, `git`,
 	// and `curl` on PATH — see ci/Dockerfile. Only used when CIIsolation="docker".
 	// Set via CODEFORT_CI_DEFAULT_IMAGE.

@@ -52,14 +52,14 @@ The runner reads these settings (see `internal/config/config.go`):
 | env | default | meaning |
 | --- | --- | --- |
 | `CODEFORT_CI_ISOLATION` | `docker` | `docker` runs jobs in containers; `none` runs them on the host (legacy, untrusted). |
-| `CODEFORT_CI_DEFAULT_IMAGE` | `moongit-ci:latest` | image a job uses when its `mgitci.yml` doesn't set `image:`. |
+| `CODEFORT_CI_DEFAULT_IMAGE` | `moongit-ci:latest` | image a job uses when its `codefort.yml` doesn't set `image:`. |
 | `CODEFORT_CI_JOB_CONCURRENCY` | `4` | how many of a run's jobs run at once; the runner schedules jobs in dependency waves and runs every ready job concurrently up to this cap. |
 | `CODEFORT_MAX_CONCURRENCY` | `runtime.NumCPU()` | total runs in flight, CI **and** agent, from one shared budget. Each running job is its own container, so this is the knob that bounds container count. |
 | `CODEFORT_AGENT_RESERVED` | `2` | slots inside that budget only agent runs may take, so a CI backlog can never lock out an agent spawn. |
 
 ## Triggering runs
 
-A run normally starts on `git push` when an `mgitci.yml` is present at the
+A run normally starts on `git push` when an `codefort.yml` is present at the
 pushed commit. Two on-demand paths exist for re-running or starting CI without
 a push:
 
@@ -70,11 +70,11 @@ a push:
   `mgit ci run <ref>`, or `POST /api/repos/{owner}/{repo}/runs` with body
   `{"ref": "<ref>"}`. The server resolves the ref to a commit and enqueues a
   run with event `manual`. CI must be enabled for the repo, and the usual
-  `mgitci.yml`-present gate still applies at run time.
+  `codefort.yml`-present gate still applies at run time.
 
 ## Per-job image override
 
-A job may pin its own image in `mgitci.yml`:
+A job may pin its own image in `codefort.yml`:
 
 ```yaml
 version: "1"
@@ -97,7 +97,7 @@ Scope of the base image is isolation only — it deliberately bundles no languag
 toolchains. Add what your jobs need in a derived image.
 
 `ci/Dockerfile.dev` builds one such image, `moongit-ci-dev:latest` (base + Go +
-Node), which moongit's own `mgitci.yml` runs on:
+Node), which moongit's own `codefort.yml` runs on:
 
 ```sh
 docker build -t moongit-ci-dev:latest -f ci/Dockerfile.dev ci/

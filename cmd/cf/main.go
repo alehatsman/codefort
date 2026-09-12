@@ -87,7 +87,7 @@ USAGE:
     moongit pr close   <number>
     moongit pr reopen  <number>
 
-    moongit ci validate  [path]   (defaults to ./mgitci.yml)
+    moongit ci validate  [path]   (defaults to ./codefort.yml)
     moongit ci run       <ref>    (trigger a run for a branch/tag/sha)
 
     moongit repo delete  <owner>/<name> [--yes|-y]   (irreversible)
@@ -964,7 +964,7 @@ func runReviewDelete(args []string) error {
 }
 
 // runCI dispatches `moongit ci <subcommand>`. `validate` is local-only — it
-// parses the mgitci.yml in the working copy and never touches the server.
+// parses the codefort.yml in the working copy and never touches the server.
 // `run` does round-trip: it POSTs a run for a ref.
 func runCI(args []string) error {
 	if len(args) == 0 {
@@ -1024,7 +1024,7 @@ func runCITrigger(args []string) error {
 	return nil
 }
 
-// runCIValidate parses and validates an mgitci.yml locally, reporting the
+// runCIValidate parses and validates an codefort.yml locally, reporting the
 // jobs and their dependencies on success. It hits no server — it's the
 // authoring-time check before pushing a pipeline.
 func runCIValidate(args []string) error {
@@ -1032,7 +1032,7 @@ func runCIValidate(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	path := "mgitci.yml"
+	path := "codefort.yml"
 	if fs.NArg() == 1 {
 		path = fs.Arg(0)
 	} else if fs.NArg() > 1 {

@@ -6,7 +6,7 @@ in three parts:
 - **Dev loop (#410, done).** moongit's local dev-loop tasks moved from
   mooncake (`tasks.yml`) to provision's `tasks/` directory of plan/component
   files. See "Layout" through "Validation — done" below.
-- **CI runner (#411, done).** `mgitci.yml` jobs execute under provision
+- **CI runner (#411, done).** `codefort.yml` jobs execute under provision
   instead of mooncake inside `cmd/codefortd/ci_runner.go`. See "CI runner"
   below. The goq/tq quality-gate rewrite itself was explicitly excluded from
   #411 and deferred — `quality`'s job still shells out to `mooncake task ci`
@@ -281,9 +281,9 @@ on skips. Provision's `apply` (no `--keep-going`) stops at the first
 failure by default — matches mooncake's current all-or-nothing semantics
 (ci_runner.go:680-686), so no behavior change there.
 
-### Translation-layer scope (what mgitci.yml actually uses today)
+### Translation-layer scope (what codefort.yml actually uses today)
 
-Audited every job in `mgitci.yml`: exactly three step shapes are
+Audited every job in `codefort.yml`: exactly three step shapes are
 authored — `run: "<cmd>"` sugar, raw `shell: {cmd: "..."}`, and raw
 `assert: {http: {url, status, contains}}` (the `smoke` job). No `cmd:`,
 `file:`, `template:`, `pkg:`, or `service:` steps exist in the repo today,
@@ -299,7 +299,7 @@ to a `command`-form assert using `curl -f` (fails non-2xx) piping through
 `grep -q` for the body-contains check:
 
 ```yaml
-# mgitci.yml today:
+# codefort.yml today:
 - assert:
     http: { url: "http://host.docker.internal:8080/healthz", status: 200, contains: "ok" }
 
@@ -497,7 +497,7 @@ the `--add-host` flag, don't remove it.
 - `go build ./...`, `go vet ./...`, and the full `go test ./...` suite pass
   (every package, not just `internal/ci`/`cmd/codefortd`) — no regression
   anywhere else in the module.
-- `internal/ci`'s translator, run for real against the actual `mgitci.yml`
+- `internal/ci`'s translator, run for real against the actual `codefort.yml`
   (all three live jobs — `quality`, `web`, `smoke`): `TranslateJobPlan`'s
   output for each job validates clean under the real installed `provision
   0.9.1` binary (`provision validate --strict`), including `smoke`'s
@@ -527,7 +527,7 @@ the `--add-host` flag, don't remove it.
   wrong workDir — invisible while no fake touched the filesystem, real once
   `planExecutor` fakes read the plan file `runJob` wrote for real.
 - `ci/Dockerfile`, `ci/Dockerfile.dev`, `ci/README.md`, and `ci/.gitignore`
-  updated to bake/build `provision` alongside `mooncake`; `mgitci.yml`'s
+  updated to bake/build `provision` alongside `mooncake`; `codefort.yml`'s
   header comments (the two that stated the mooncake-per-step mechanism as
   current fact, plus one already-stale `mooncake task deploy` reference
   left over from #410) corrected.
@@ -596,7 +596,7 @@ Replaces `tasks.yml`'s mooncake `tq:` module binding (`ts-quality@v0.1.0`,
 `ui-lint`/`ui-build`/`ui-typecheck`/`ui-vuln`/`ui-test`/`ui-ci`/`ui-ci-fast`/
 `ui-sync-config`) with six provision task files under `tasks/`
 (`ui-tools.yml`, `ui-sync-config.yml`, `ui-config-check.yml`,
-`ui-findings.yml`, `ui-fast.yml`, `ui-ci.yml`), and wires `mgitci.yml`'s
+`ui-findings.yml`, `ui-fast.yml`, `ui-ci.yml`), and wires `codefort.yml`'s
 `web` job to the real gate instead of a bare `npm ci && npm run build`.
 
 ### Why now, not deferred further
@@ -775,7 +775,7 @@ notable non-mechanical ones:
   unrelated to it.
 - `tasks.yml`'s mooncake `tq:` module binding and all `ui-*` task entries
   removed; `mooncake task` (Go gate only) still lists cleanly.
-- `mgitci.yml`'s `web` job updated to `provision apply tasks/ui-tools.yml`
+- `codefort.yml`'s `web` job updated to `provision apply tasks/ui-tools.yml`
   then `provision apply tasks/ui-ci.yml` — **not yet run for real in CI**
   (would require a push through the live pipeline); the component-level
   validation above exercises the identical steps the job now runs, just

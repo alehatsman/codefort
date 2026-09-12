@@ -20,7 +20,7 @@ the thing, not the task list.
 | Epics (parent edge) + `depends-on` graph with computed ready/blocked views | [issues](specs/issues.md) |
 | Pull requests: open, merge (ff-only / merge-commit / rebase), CAS ref guard, mirror push | [pull-requests](specs/pull-requests.md) |
 | PR approvals / review state, opt-in as a merge gate; line-anchored review comments, resolve/reopen | [pull-requests](specs/pull-requests.md) |
-| CI: `mgitci.yml` DAG via `needs:`, container isolation, dependency waves, SSE logs, retention | [ci-pipelines](specs/ci-pipelines.md) |
+| CI: `codefort.yml` DAG via `needs:`, container isolation, dependency waves, SSE logs, retention | [ci-pipelines](specs/ci-pipelines.md) |
 | Cron-scheduled pipeline runs | [ci-pipelines](specs/ci-pipelines.md) |
 | Agent runs: spawn-from-issue, turns, park/resume, handoff branch, cancel | [agent-runs](specs/agent-runs.md) |
 | Event feed — DB-backed SSE, `mgit events` | [events-feed](specs/events-feed.md) |
@@ -59,7 +59,7 @@ reads as a broken feature rather than an unused one.
 
 ### 2. Finish mooncake → provision
 
-The last tie to the archived tool is the Go quality gate: `mgitci.yml` execs
+The last tie to the archived tool is the Go quality gate: `codefort.yml` execs
 `mooncake task ci`, and `ci/Dockerfile` bakes the binary into
 `moongit-ci:latest`. The unblocker is upstream — the go-quality → provision
 rewrite in `alehatsman/go-quality`. Background in

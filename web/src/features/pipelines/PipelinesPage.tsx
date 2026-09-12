@@ -145,7 +145,7 @@ function EnabledRunList({ owner, repo, kind }: { owner: string; repo: string; ki
             <>No agent runs yet. Open an issue and click "Spawn agent" to start one.</>
           ) : (
             <>
-              No runs yet. Push a commit with an <code>mgitci.yml</code> to trigger the first one.
+              No runs yet. Push a commit with an <code>codefort.yml</code> to trigger the first one.
             </>
           )}
         </EmptyState>
@@ -255,7 +255,7 @@ function RunListHead({
           </>
         ) : (
           <>
-            Runs trigger on push when an <code>mgitci.yml</code> is present at the pushed commit, or
+            Runs trigger on push when an <code>codefort.yml</code> is present at the pushed commit, or
             on demand for any ref above.
           </>
         )}
@@ -321,7 +321,7 @@ function CIDisabledCard({ owner, repo }: { owner: string; repo: string }) {
           <strong>CI is disabled for this repository.</strong>
         </p>
         <p className="muted small">
-          When enabled, pushing a commit that contains an <code>mgitci.yml</code> runs its pipeline.
+          When enabled, pushing a commit that contains an <code>codefort.yml</code> runs its pipeline.
           Each job runs in a throwaway container off the configured CI image, so repo-authored
           commands stay isolated from the host.
         </p>

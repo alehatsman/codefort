@@ -32,7 +32,7 @@ const (
 	// or a crash left it orphaned. It is operator-induced, not a gate result,
 	// so it's terminal but distinct from RunError/RunFailed: the UI renders it
 	// neutral, not red, and the operator can rerun. (RunCanceled stays reserved
-	// for a gated run — CI off / no mgitci.yml — which is a different "didn't
+	// for a gated run — CI off / no codefort.yml — which is a different "didn't
 	// run" meaning.)
 	RunInterrupted RunStatus = "interrupted"
 	// RunStalled is an agent-only terminal state: the agent ran to completion
@@ -98,7 +98,7 @@ func CountActiveRuns(db *sql.DB, repoID int64) (int, error) {
 
 // RunKind distinguishes a normal pipeline run from an agent run. An agent run
 // reuses the entire CI run spine but, instead of executing a translated
-// mgitci.yml, works an issue via a containerized Claude session (see #74). The
+// codefort.yml, works an issue via a containerized Claude session (see #74). The
 // zero value is treated as RunKindCI so pre-kind rows and callers that don't
 // set it keep the historical behavior.
 type RunKind string
@@ -114,7 +114,7 @@ const (
 )
 
 // AgentRunKinds is the agent family: run kinds that execute via the agent spine
-// (a containerized session) rather than a translated mgitci.yml. The single
+// (a containerized session) rather than a translated codefort.yml. The single
 // source of truth for "is this an agent run" — every classification (list
 // filter, runner dispatch, run-viewer body, retention) goes through this or
 // IsAgent(), so adding an agent kind is one edit here, not a scattered hunt for

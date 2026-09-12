@@ -91,7 +91,7 @@ type EventLog struct {
 // Seq numbering continues after any existing complete events, so re-opening a
 // stream after a crash keeps Seq monotonic. owner/repo/job are validated as
 // safe single path components to prevent traversal, since job names come from
-// the repo-authored mgitci.yml.
+// the repo-authored codefort.yml.
 func OpenEventLog(root, owner, repo string, runNumber int, job string) (*EventLog, error) {
 	for _, c := range []string{owner, repo, job} {
 		if err := safeComponent(c); err != nil {

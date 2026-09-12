@@ -53,7 +53,7 @@ The `/api` surface is unaffected by Basic auth — it keeps Bearer-token auth
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `CODEFORT_CI_ISOLATION` | `docker` | How a job's steps execute. `docker` runs each job in a throwaway container so repo-authored commands never touch the host; `none` runs them on the host as the moongitd user — the legacy path, RCE by design, only for deployments that trust every CI-enabled repo. Any other value **fails startup**. |
-| `CODEFORT_CI_DEFAULT_IMAGE` | `moongit-ci:latest` | Image a job runs in when its `mgitci.yml` sets no `image:`. Must be glibc-based and carry `provision`, `git`, and `curl` on PATH (see `ci/README.md`). Only used when isolation is `docker`. |
+| `CODEFORT_CI_DEFAULT_IMAGE` | `moongit-ci:latest` | Image a job runs in when its `codefort.yml` sets no `image:`. Must be glibc-based and carry `provision`, `git`, and `curl` on PATH (see `ci/README.md`). Only used when isolation is `docker`. |
 | `CODEFORT_CI_RUN_TIMEOUT` | `15m` | Hard wall-clock limit for a single run; the runner executes under a context with this deadline and kills + errors an overrunning run. Zero or negative disables it — not recommended, CI runs untrusted repo code. |
 | `CODEFORT_CI_POLL_INTERVAL` | `5s` | How often an idle runner polls for a queued run. Zero or negative falls back to `5s`; anything under `100ms` is floored there (with a warning), since sub-100ms polling only spins SQLite. |
 | `CODEFORT_CI_JOB_CONCURRENCY` | `4` | How many of a run's jobs execute at once. The runner schedules jobs in dependency waves and runs every ready job (all `needs` satisfied) concurrently up to this cap. Values `< 1` are silently clamped to `1`. |

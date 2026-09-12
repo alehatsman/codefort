@@ -91,8 +91,8 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
   conflicting paths and tells the user to resolve locally and retry; any other
   conflict (not fast-forwardable, nothing to merge, already merged) surfaces the
   server's message as-is.
-- WHERE `ci validate` is used, it is purely local: it parses an `mgitci.yml`
-  (defaulting to `./mgitci.yml`) with the same parser the server uses, prints the
+- WHERE `ci validate` is used, it is purely local: it parses an `codefort.yml`
+  (defaulting to `./codefort.yml`) with the same parser the server uses, prints the
   jobs and their `needs:` edges, and warns where a job invokes a toolchain the
   default image does not carry. It resolves no target and needs no token — it is
   the authoring-time check before pushing.

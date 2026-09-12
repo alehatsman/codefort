@@ -178,7 +178,7 @@ func (s *Server) handleRerunCIRun(w http.ResponseWriter, r *http.Request) {
 // commit SHA) without a git push — the on-demand counterpart to the
 // push-driven hook. It resolves the ref to a commit against the bare repo and
 // enqueues a run with event "manual". Requires CI still enabled; the runner's
-// mgitci.yml gate still applies at execution time, so triggering a commit that
+// codefort.yml gate still applies at execution time, so triggering a commit that
 // carries no pipeline simply yields a canceled run, exactly like a push.
 func (s *Server) handleTriggerCIRun(w http.ResponseWriter, r *http.Request) {
 	repoID, ok := s.lookupRepoOrFail(w, r)

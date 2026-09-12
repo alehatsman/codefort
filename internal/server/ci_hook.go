@@ -33,14 +33,14 @@ func gitCommitMeta(bareRepo, sha string) (subject, author string) {
 	return subject, author
 }
 
-// readPipelineAt reads mgitci.yml at sha from a bare repo, best-effort. ok=false
+// readPipelineAt reads codefort.yml at sha from a bare repo, best-effort. ok=false
 // means the file is absent at that commit, or git failed for any reason; the
 // caller then falls through to enqueue and lets the runner gate/report. Mirrors
 // gitReadPipeline (the runner's reader) but collapses every failure to "no
 // pipeline to enforce here" since this is only the branch-filter pre-check.
 func readPipelineAt(bareRepo, sha string) (raw []byte, ok bool) {
 	out, err := exec.Command(
-		"git", "--git-dir", bareRepo, "show", sha+":mgitci.yml",
+		"git", "--git-dir", bareRepo, "show", sha+":codefort.yml",
 	).Output()
 	if err != nil {
 		return nil, false

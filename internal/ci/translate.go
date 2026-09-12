@@ -126,10 +126,10 @@ type rewrittenStep struct {
 	label  string
 }
 
-// classifyStep renders one mgitci.yml step into a rewrittenStep. Recognizes
+// classifyStep renders one codefort.yml step into a rewrittenStep. Recognizes
 // `run:` sugar, raw `shell: {cmd: "..."}`, raw `cmd: {argv: [...]}`, and raw
 // `assert: {http: {...}}` — mooncake's own shapes for those, in real or
-// historical (test fixture) use in mgitci.yml. Anything else — an
+// historical (test fixture) use in codefort.yml. Anything else — an
 // unrecognized top-level key, or a shell/cmd/assert step already written in
 // provision's own shape (a plain-scalar `shell`, a bare-sequence `cmd`, an
 // assert.command/.expr) — passes through unchanged: classifyStep only
@@ -204,7 +204,7 @@ func mooncakeCmdArgv(val *yaml.Node) ([]string, bool) {
 	return argv, true
 }
 
-// httpAssertSpec is mgitci.yml's mooncake-native assert.http shape.
+// httpAssertSpec is codefort.yml's mooncake-native assert.http shape.
 type httpAssertSpec struct {
 	URL      string
 	Contains string
@@ -217,7 +217,7 @@ type httpAssertSpec struct {
 // docs/ops-provisioning.md's CI-runner section. Only status 200 is
 // supported: there is no single curl invocation that checks an arbitrary
 // status *and* a body substring at once (curl -f discards the body on a
-// non-2xx response), and every http assert in mgitci.yml checks 200
+// non-2xx response), and every http assert in codefort.yml checks 200
 // (audited for #411) — a different status is a translation error, not a
 // silent wrong check.
 func mooncakeHTTPAssert(val *yaml.Node) (httpAssertSpec, bool, error) {

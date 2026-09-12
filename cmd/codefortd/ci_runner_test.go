@@ -623,7 +623,7 @@ jobs:
 
 func TestExecuteRunGatedWhenNoPipeline(t *testing.T) {
 	// Enabled, but readPipeline returns absent.
-	r, run := newTestRunner(t, "" /* no mgitci.yml */, true, successExec)
+	r, run := newTestRunner(t, "" /* no codefort.yml */, true, successExec)
 	r.executeRun(context.Background(), run)
 
 	got, _ := storage.GetRun(r.db, run.RepoID, run.Number)

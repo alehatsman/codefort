@@ -61,7 +61,7 @@ provision apply tasks/install.yml    # binaries into ~/.local/bin + mgit/mgitd l
 provision apply tasks/run.yml        # moongitd in the foreground against ./data/
 ```
 
-**CI** (`mgitci.yml`) runs two independent jobs in throwaway containers:
+**CI** (`codefort.yml`) runs two independent jobs in throwaway containers:
 `quality` (`mooncake task ci`) and `web` (the two `ui-*` plans above). Deploy
 is deliberately not automated — `provision apply tasks/deploy.yml`.
 
@@ -90,6 +90,6 @@ is deliberately not automated — `provision apply tasks/deploy.yml`.
   modernization. New direct deps are a cost, not a convenience (`VISION.md`).
 - **Worktrees** for non-trivial changes — outside the repo, one per branch.
 - **Conventional branches and commits.** Prefixes CI accepts are listed in
-  `mgitci.yml`; an unlisted prefix silently loses pre-merge CI.
+  `codefort.yml`; an unlisted prefix silently loses pre-merge CI.
 - **Never auto-push `main`.** Ask before merge.
 - **Cite `path:line`** when reporting findings. Investigation is read-only.

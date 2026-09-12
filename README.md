@@ -74,7 +74,7 @@ SQLite file:
 | **Issues + claims** | Create, list, comment, set-state; `claim`/`unclaim` is a row-level lock so a fleet never double-works an issue |
 | **Pull requests** | Open, list, show, and `merge` (with `--ff-only`); diff and compare views in the UI |
 | **Code review** | Line-anchored review comments on any ref, resolvable/reopenable, surfaced on the Review tab |
-| **CI runner** | `mgitci.yml` jobs wired into a DAG via `needs:`, each in a throwaway container; in-process, no worker tier |
+| **CI runner** | `codefort.yml` jobs wired into a DAG via `needs:`, each in a throwaway container; in-process, no worker tier |
 | **Agent runs** | Spawn a containerized Claude CLI agent from an issue; live transcript over SSE; awaiting-input → finish lifecycle |
 | **Event feed** | `GET /api/events` — a DB-backed SSE stream of push / issue / CI / agent events; `mgit events` tails it |
 | **MCP server** | `mgit mcp` serves the toolset over stdio so an agent drives issues, reviews, pipelines, and runs directly |
@@ -97,7 +97,7 @@ mgit pr merge 7 --ff-only
 mgit review create --path internal/api.go --lines 10-24 --body "nit: name this"
 mgit review resolve 3
 
-mgit ci validate            # check ./mgitci.yml
+mgit ci validate            # check ./codefort.yml
 mgit ci run main            # trigger a run for a ref
 
 mgit events --types issue,ci # tail the fleet feed
@@ -176,7 +176,7 @@ go test ./...                      # Go tests
 cd web && npm ci && npm run build  # build the SPA into web/dist
 ```
 
-CI is defined in [`mgitci.yml`](mgitci.yml) and dogfoods moongit's own
+CI is defined in [`codefort.yml`](codefort.yml) and dogfoods moongit's own
 runner: a `quality` Go gate and a `web` build, each in a throwaway
 container.
 

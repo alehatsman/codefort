@@ -133,7 +133,7 @@ to fix in place rather than defer.
 
 ## Deliberately not in scope
 
-- **Finishing the mooncake → provision migration.** `mgitci.yml` still execs
+- **Finishing the mooncake → provision migration.** `codefort.yml` still execs
   `mooncake task ci` for the Go quality gate, and `ci/Dockerfile` bakes the
   binary in. This is known and deliberately deferred — the unblocker is the
   go-quality → provision rewrite, which lives upstream in
