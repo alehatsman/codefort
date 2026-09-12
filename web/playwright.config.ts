@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test"
 
 // Boots Vite dev server before running tests, points the browser at it.
 // All API calls are intercepted by tests/mockApi.ts via page.route — no
-// real moongitd needed for E2E.
+// real codefortd needed for E2E.
 //
 // PW_PORT: override the dev-server port so concurrent agents/worktrees don't
 // collide on 5173. --strictPort makes Vite fail loudly (not silently drift to
@@ -13,7 +13,7 @@ const baseURL = `http://localhost:${port}`
 
 export default defineConfig({
   testDir: "./tests",
-  // phase2-smoke.spec.ts needs a real moongitd on :8080 — it deliberately does
+  // phase2-smoke.spec.ts needs a real codefortd on :8080 — it deliberately does
   // not use mockApi, so it can never pass here and left the suite permanently
   // 5-red. It has its own runner: playwright-smoke.config.ts (npm run test:smoke).
   testIgnore: "**/phase2-smoke.spec.ts",

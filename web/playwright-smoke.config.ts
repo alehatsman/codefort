@@ -10,5 +10,5 @@ export default defineConfig({
   reporter: "list",
   use: { baseURL: base, trace: "retain-on-failure", screenshot: "only-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  // No webServer — tests hit the real moongitd directly.
+  // No webServer — tests hit the real codefortd directly.
 })

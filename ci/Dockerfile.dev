@@ -1,4 +1,4 @@
-# codefort CI *dev* image — the toolchain image codefort's own mgitci.yml runs on.
+# codefort CI *dev* image — the toolchain image codefort's own codefort.yml runs on.
 #
 # The base image (ci/Dockerfile, codefort-ci:latest) is deliberately
 # toolchain-free; this derives from it and adds the Go + Node toolchains

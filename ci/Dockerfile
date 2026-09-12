@@ -7,7 +7,7 @@
 # scope (#411 explicitly excludes the goq/tq rewrite — that's a separate,
 # larger, deferred follow-up). This is the default image
 # (CODEFORT_CI_DEFAULT_IMAGE=codefort-ci:latest); per-job `image:` overrides in
-# mgitci.yml should derive from it (FROM codefort-ci:latest) or bundle both
+# codefort.yml should derive from it (FROM codefort-ci:latest) or bundle both
 # binaries the same way.
 #
 # `curl` is baked in too: mooncake's `assert: {http: {...}}` (no provision
