@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -182,6 +183,47 @@ func TestMCPServerError(t *testing.T) {
 	}
 	if out.Status != statusError || out.Error == "" {
 		t.Fatalf("out = %+v", out)
+	}
+}
+
+// TestMCPTargetErrDegrades confirms that when target discovery failed at
+// startup (no checkout, no resolvable remote), the server still advertises
+// its full toolset and every call reports the diagnosis as a structured
+// error instead of dialing a zero-value target (#3) — the fix for a client
+// seeing a bare CONNECTION_CLOSED instead of the real reason.
+func TestMCPTargetErrDegrades(t *testing.T) {
+	wantErr := fmt.Errorf("read git remote 'codefort' or 'origin': exit status 128 (run inside a checkout of the target repo)")
+	m := &mcpServer{targetErr: wantErr}
+
+	_, out, err := m.issueList(context.Background(), nil, issueListInput{})
+	if err != nil {
+		t.Fatalf("issueList returned a Go error, want structured: %v", err)
+	}
+	if out.Status != statusError || out.Error != wantErr.Error() {
+		t.Fatalf("out = %+v, want error %q", out, wantErr.Error())
+	}
+
+	// The toolset is still fully advertised — a client sees a real
+	// connection and a diagnosis on call, not a dropped connection.
+	ctx := context.Background()
+	serverT, clientT := sdk.NewInMemoryTransports()
+	ss, err := m.newServer().Connect(ctx, serverT, nil)
+	if err != nil {
+		t.Fatalf("server connect: %v", err)
+	}
+	defer ss.Close()
+	client := sdk.NewClient(&sdk.Implementation{Name: "test", Version: "0"}, nil)
+	cs, err := client.Connect(ctx, clientT, nil)
+	if err != nil {
+		t.Fatalf("client connect: %v", err)
+	}
+	defer cs.Close()
+	lt, err := cs.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatalf("list tools: %v", err)
+	}
+	if len(lt.Tools) != 21 {
+		t.Errorf("advertised %d tools with target unresolved, want 21", len(lt.Tools))
 	}
 }
 

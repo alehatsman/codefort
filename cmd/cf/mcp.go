@@ -41,15 +41,17 @@ func runMCP(args []string) error {
 		return fmt.Errorf("mcp: invalid profile %q (want full or review)", *profile)
 	}
 
-	tgt, err := discoverTarget()
-	if err != nil {
-		return fmt.Errorf("mcp: %w", err)
-	}
+	// discoverTarget can fail (no checkout, no resolvable remote). The
+	// toolset still registers and the transport still comes up — the
+	// failure surfaces per tool call instead of aborting the process, so an
+	// MCP client sees the diagnosis instead of a bare CONNECTION_CLOSED
+	// (#3).
+	tgt, targetErr := discoverTarget()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	return (&mcpServer{target: tgt, profile: *profile}).run(ctx)
+	return (&mcpServer{target: tgt, profile: *profile, targetErr: targetErr}).run(ctx)
 }
 
 // Tool profiles (#184) scope which tools the shim registers. The mapping is
@@ -85,8 +87,9 @@ func validProfile(p string) bool { return p == profileFull || p == profileReview
 // Handlers are methods so they can reach it (and the package-level
 // httpDo/decodeError helpers).
 type mcpServer struct {
-	target  target
-	profile string
+	target    target
+	profile   string
+	targetErr error // set when discoverTarget failed at startup; every call() fails with this instead of dialing a zero-value target
 }
 
 // allows reports whether the session's profile exposes the named tool. "full"
@@ -113,6 +116,9 @@ func addTool[In, Out any](m *mcpServer, srv *sdk.Server, t *sdk.Tool, h sdk.Tool
 // server's message; tool handlers turn that into a structured error output.
 // path is appended to the repo base and must start with "/".
 func (m *mcpServer) call(method, path string, reqBody any, okStatus int, out any) error {
+	if m.targetErr != nil {
+		return m.targetErr
+	}
 	var rdr io.Reader
 	contentType := ""
 	if reqBody != nil {
