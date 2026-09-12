@@ -13,5 +13,5 @@ steps:
   - name: create repo
     cmd: ["{{ binary_path }}", repo, create, "{{ owner }}/{{ name }}"]
     env:
-      MOONGIT_DATA_DIR: "{{ data_dir }}"
+      CODEFORT_DATA_DIR: "{{ data_dir }}"
     changed_when: "false"

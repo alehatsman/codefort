@@ -77,15 +77,15 @@ USAGE:
     moongitd help                          show this message
 
 Environment:
-    MOONGIT_ADDR        listen address (default ":8080")
-    MOONGIT_DATA_DIR    data dir for SQLite + repos (default "data")
-    MOONGIT_DB_PATH     SQLite path (default "$MOONGIT_DATA_DIR/moongit.db")
-    MOONGIT_REPOS_DIR   bare repo root (default "$MOONGIT_DATA_DIR/repos")
-    MOONGIT_WEB_DIR     built web UI dir (web/dist); empty serves API + git only
-    MOONGIT_BASIC_USER  HTTP Basic user gating the web UI + git; empty disables it
-    MOONGIT_BASIC_PASS  HTTP Basic password (paired with MOONGIT_BASIC_USER)
-    MOONGIT_SSH_ADDR    listen address for the opt-in git SSH transport (e.g. ":2222"); empty disables SSH (one port)
-    MOONGIT_SSH_HOST_KEY  SSH host key path (default "$MOONGIT_DATA_DIR/ssh_host_ed25519_key"); generated if absent
+    CODEFORT_ADDR        listen address (default ":8080")
+    CODEFORT_DATA_DIR    data dir for SQLite + repos (default "data")
+    CODEFORT_DB_PATH     SQLite path (default "$CODEFORT_DATA_DIR/moongit.db")
+    CODEFORT_REPOS_DIR   bare repo root (default "$CODEFORT_DATA_DIR/repos")
+    CODEFORT_WEB_DIR     built web UI dir (web/dist); empty serves API + git only
+    CODEFORT_BASIC_USER  HTTP Basic user gating the web UI + git; empty disables it
+    CODEFORT_BASIC_PASS  HTTP Basic password (paired with CODEFORT_BASIC_USER)
+    CODEFORT_SSH_ADDR    listen address for the opt-in git SSH transport (e.g. ":2222"); empty disables SSH (one port)
+    CODEFORT_SSH_HOST_KEY  SSH host key path (default "$CODEFORT_DATA_DIR/ssh_host_ed25519_key"); generated if absent
 `)
 }
 
@@ -93,6 +93,12 @@ func runServe(logger *slog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
+	}
+	// MOONGIT_* was renamed to CODEFORT_* as a hard cut, so a leftover var is
+	// ignored rather than rejected — the server would come up on defaults with
+	// nothing to say about it. Say it.
+	for _, name := range config.StaleEnv() {
+		logger.Warn("ignoring pre-rename environment variable", "var", name, "use", "CODEFORT_"+strings.TrimPrefix(name, "MOONGIT_"))
 	}
 	if err := cfg.EnsureDirs(); err != nil {
 		return fmt.Errorf("ensure dirs: %w", err)
@@ -177,7 +183,7 @@ func runServe(logger *slog.Logger) error {
 	}()
 
 	// Opt-in git SSH transport: a second listener on the same process, started
-	// only when MOONGIT_SSH_ADDR is set so the default deployment stays one
+	// only when CODEFORT_SSH_ADDR is set so the default deployment stays one
 	// port. It shuts down with ctx; a listen failure here surfaces on listenErr
 	// to bring the whole process down rather than silently losing SSH. sshDone
 	// closes when the listener has drained, so shutdown can wait for it before
@@ -487,7 +493,7 @@ func runTokenCreate(args []string) error {
 	fmt.Println("  " + plaintext)
 	fmt.Println()
 	fmt.Println("Save this token now — it will NOT be shown again.")
-	fmt.Println("Clients should set MOONGIT_TOKEN to use it.")
+	fmt.Println("Clients should set CODEFORT_TOKEN to use it.")
 	return nil
 }
 

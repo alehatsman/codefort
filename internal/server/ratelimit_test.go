@@ -143,7 +143,7 @@ func TestWithRateLimitRejectsOverBudget(t *testing.T) {
 }
 
 func TestWithRateLimitDisabledIsPassThrough(t *testing.T) {
-	// A nil limiter is how MOONGIT_RATE_LIMIT=0 disables the feature; it must
+	// A nil limiter is how CODEFORT_RATE_LIMIT=0 disables the feature; it must
 	// not merely be generous, it must not wrap at all.
 	s := &Server{limiter: nil}
 	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

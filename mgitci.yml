@@ -2,7 +2,7 @@
 # every 5 minutes. No container spin-up — mooncake steps run directly on
 # the CI host, which IS the prod server, so 127.0.0.1:8080 is always local.
 # Checks: /healthz (no auth), SPA root, and three API endpoints (Bearer token
-# from MOONGIT_TOKEN in the service env — mint via: mgit token create smoke-ci).
+# from CODEFORT_TOKEN in the service env — mint via: mgit token create smoke-ci).
 # A failed assertion fails the step; provision aborts on the first failure.
 #
 # moongit CI — moongit's own pipeline (dogfooding the moongitci stack).

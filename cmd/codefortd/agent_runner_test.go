@@ -226,16 +226,16 @@ func TestAgentRunInjectsCredentials(t *testing.T) {
 	env := *h.gotEnv
 	for k, want := range map[string]string{
 		"CLAUDE_CODE_OAUTH_TOKEN": "oauth-tok",
-		"MOONGIT_SERVER":          "http://host.docker.internal:8080",
+		"CODEFORT_SERVER":         "http://host.docker.internal:8080",
 	} {
 		if got := envValue(env, k); got != want {
 			t.Errorf("env %s = %q, want %q (all: %v)", k, got, want, env)
 		}
 	}
 
-	mgitTok := envValue(env, "MOONGIT_TOKEN")
+	mgitTok := envValue(env, "CODEFORT_TOKEN")
 	if mgitTok == "" {
-		t.Fatal("MOONGIT_TOKEN not injected")
+		t.Fatal("CODEFORT_TOKEN not injected")
 	}
 	// The injected token is a real, active moongit token while parked.
 	tok, err := storage.LookupToken(h.r.db, mgitTok)

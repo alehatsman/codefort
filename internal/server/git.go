@@ -184,10 +184,10 @@ func (s *Server) pushEnv(owner, name, pusher string) ([]string, error) {
 		return nil, err
 	}
 	return []string{
-		"MOONGIT_CI_URL=" + s.ciURL,
-		"MOONGIT_CI_SECRET=" + s.ciSecret,
-		"MOONGIT_CI_REPO=" + owner + "/" + name,
-		"MOONGIT_CI_PUSHER=" + pusher,
-		"MOONGIT_PROTECTED_REFS=" + patterns,
+		"CODEFORT_CI_URL=" + s.ciURL,
+		"CODEFORT_CI_SECRET=" + s.ciSecret,
+		"CODEFORT_CI_REPO=" + owner + "/" + name,
+		"CODEFORT_CI_PUSHER=" + pusher,
+		"CODEFORT_PROTECTED_REFS=" + patterns,
 	}, nil
 }

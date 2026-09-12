@@ -164,7 +164,7 @@ mechanical substitutions. Flagging only what's non-obvious per task:
   `file` takes one path per step, and three tiny steps buys nothing here.
 - **create-repo** — inline `vars:` (`binary_path`, `data_dir`). Takes
   caller-supplied `owner`/`name` vars, same undefined-var-is-an-error
-  contract as `restore`. `env: {MOONGIT_DATA_DIR: ...}` is a direct
+  contract as `restore`. `env: {CODEFORT_DATA_DIR: ...}` is a direct
   1:1 (env is a step modifier in both).
 - **run** — no shared vars needed. Foreground `go run`, same as today.
 - **ui** — no shared vars needed. `npm run dev` never exits — true under

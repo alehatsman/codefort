@@ -20,7 +20,7 @@ const (
 	// SettingAgentLLMBaseURL is the operator-set LLM endpoint injected into
 	// agent containers as ANTHROPIC_BASE_URL (point claude at a gateway / local
 	// model). Not a secret — returned over the API. Overrides the
-	// MOONGIT_AGENT_LLM_BASE_URL env so it can be set without a restart.
+	// CODEFORT_AGENT_LLM_BASE_URL env so it can be set without a restart.
 	SettingAgentLLMBaseURL = "agent.llm_base_url"
 
 	// SettingAgentAnthropicAuthToken is the operator-set bearer token injected

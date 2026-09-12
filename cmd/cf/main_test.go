@@ -45,7 +45,7 @@ func TestParseRemote(t *testing.T) {
 		},
 		{
 			// scp-style ssh resolves owner/repo; server is left empty for
-			// the caller to fill from MOONGIT_SERVER.
+			// the caller to fill from CODEFORT_SERVER.
 			name:       "ssh scp-style resolves owner/repo",
 			remote:     "git@example.com:aleh/hello.git",
 			wantServer: "",

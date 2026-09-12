@@ -20,8 +20,8 @@ func TestAgentContainerEnvOAuth(t *testing.T) {
 	want := []string{
 		"CLAUDE_CODE_OAUTH_TOKEN=oauth",
 		"ANTHROPIC_BASE_URL=http://llm.local",
-		"MOONGIT_TOKEN=mgt_tok",
-		"MOONGIT_SERVER=http://host.docker.internal:8080",
+		"CODEFORT_TOKEN=mgt_tok",
+		"CODEFORT_SERVER=http://host.docker.internal:8080",
 	}
 	for _, w := range want {
 		if !contains(env, w) {
@@ -126,7 +126,7 @@ func TestWriteAgentMCPConfig(t *testing.T) {
 			t.Fatalf("config not valid JSON: %v", err)
 		}
 		// No secret rides in the file — bearer/token are env-only.
-		if strings.Contains(string(raw), "MOONGIT_TOKEN") {
+		if strings.Contains(string(raw), "CODEFORT_TOKEN") {
 			t.Errorf("MCP config file should carry no secret:\n%s", raw)
 		}
 		return conf.MCPServers

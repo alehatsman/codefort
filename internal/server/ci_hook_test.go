@@ -157,7 +157,7 @@ func TestWritePostReceiveHook(t *testing.T) {
 		t.Errorf("hook mode = %v, want executable", info.Mode().Perm())
 	}
 	body, _ := os.ReadFile(p)
-	for _, want := range []string{"curl", "/internal/ci/events", "X-Moongit-CI-Secret", "MOONGIT_CI_REPO", "MOONGIT_CI_SECRET"} {
+	for _, want := range []string{"curl", "/internal/ci/events", "X-Moongit-CI-Secret", "CODEFORT_CI_REPO", "CODEFORT_CI_SECRET"} {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("hook script missing %q", want)
 		}

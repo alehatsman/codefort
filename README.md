@@ -14,7 +14,7 @@ moongitd serve            # API + git + CI + web SPA on :8080
 
 # A token names your identity; claims are rows; coordination is HTTP.
 moongitd token create alice
-export MOONGIT_TOKEN=mgt_...
+export CODEFORT_TOKEN=mgt_...
 
 # The client is a thin, scriptable CLI.
 mgit issue create --title "ship the thing" --body "plan goes here"
@@ -49,8 +49,8 @@ go install github.com/alehatsman/moongit/cmd/cf@latest   # the `mgit` client
 moongitd token create alice
 moongitd repo create alice/widgets
 
-# Run the server. Set MOONGIT_WEB_DIR to also serve the built SPA.
-MOONGIT_WEB_DIR=web/dist moongitd serve
+# Run the server. Set CODEFORT_WEB_DIR to also serve the built SPA.
+CODEFORT_WEB_DIR=web/dist moongitd serve
 
 # Point a checkout's origin at the server and push.
 git remote add origin http://localhost:8080/alice/widgets
@@ -58,7 +58,7 @@ git push origin main
 ```
 
 The client reads the target repo from the checkout's `origin` remote
-(or `MOONGIT_SERVER`), and the server stamps author/assignee from the
+(or `CODEFORT_SERVER`), and the server stamps author/assignee from the
 token's name — so claims and comments are attributed without any
 account setup.
 
@@ -70,7 +70,7 @@ SQLite file:
 | Capability | What it gives you |
 |---|---|
 | **Git smart-HTTP** | `git clone` / `push` / `pull` over `:8080`, packs streamed straight from bare repos |
-| **Git over SSH** *(opt-in)* | A second listener (`MOONGIT_SSH_ADDR`) maps `publickey` → token identity; off by default to keep it one port |
+| **Git over SSH** *(opt-in)* | A second listener (`CODEFORT_SSH_ADDR`) maps `publickey` → token identity; off by default to keep it one port |
 | **Issues + claims** | Create, list, comment, set-state; `claim`/`unclaim` is a row-level lock so a fleet never double-works an issue |
 | **Pull requests** | Open, list, show, and `merge` (with `--ff-only`); diff and compare views in the UI |
 | **Code review** | Line-anchored review comments on any ref, resolvable/reopenable, surfaced on the Review tab |
@@ -149,19 +149,19 @@ staying a single binary you fully own.
 
 | Variable | Purpose |
 |---|---|
-| `MOONGIT_ADDR` | Listen address (default `:8080`) |
-| `MOONGIT_DATA_DIR` | Data dir for SQLite + repos (default `data`) |
-| `MOONGIT_DB_PATH` | SQLite path (default `$MOONGIT_DATA_DIR/moongit.db`) |
-| `MOONGIT_REPOS_DIR` | Bare repo root (default `$MOONGIT_DATA_DIR/repos`) |
-| `MOONGIT_WEB_DIR` | Built web UI dir (`web/dist`); empty serves API + git only |
-| `MOONGIT_BASIC_USER` / `MOONGIT_BASIC_PASS` | Optional HTTP Basic gate on the UI + git |
-| `MOONGIT_SSH_ADDR` | Opt-in git SSH transport (e.g. `:2222`); empty keeps it one port |
-| `MOONGIT_SSH_HOST_KEY` | SSH host key path (default `$MOONGIT_DATA_DIR/ssh_host_ed25519_key`); generated if absent |
+| `CODEFORT_ADDR` | Listen address (default `:8080`) |
+| `CODEFORT_DATA_DIR` | Data dir for SQLite + repos (default `data`) |
+| `CODEFORT_DB_PATH` | SQLite path (default `$CODEFORT_DATA_DIR/moongit.db`) |
+| `CODEFORT_REPOS_DIR` | Bare repo root (default `$CODEFORT_DATA_DIR/repos`) |
+| `CODEFORT_WEB_DIR` | Built web UI dir (`web/dist`); empty serves API + git only |
+| `CODEFORT_BASIC_USER` / `CODEFORT_BASIC_PASS` | Optional HTTP Basic gate on the UI + git |
+| `CODEFORT_SSH_ADDR` | Opt-in git SSH transport (e.g. `:2222`); empty keeps it one port |
+| `CODEFORT_SSH_HOST_KEY` | SSH host key path (default `$CODEFORT_DATA_DIR/ssh_host_ed25519_key`); generated if absent |
 
 That's the short list — the ones you'll actually set. See
-[`docs/config.md`](docs/config.md) for the complete `MOONGIT_*` reference.
+[`docs/config.md`](docs/config.md) for the complete `CODEFORT_*` reference.
 
-The client honors `MOONGIT_TOKEN` (identity) and `MOONGIT_SERVER`
+The client honors `CODEFORT_TOKEN` (identity) and `CODEFORT_SERVER`
 (overrides the `origin` remote when pointing at a specific server).
 
 ## Development

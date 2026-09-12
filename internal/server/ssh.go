@@ -30,7 +30,7 @@ const (
 )
 
 // ServeSSH runs the git SSH transport on addr until ctx is cancelled. It is
-// opt-in: cmd/moongitd only calls it when MOONGIT_SSH_ADDR is set, so the
+// opt-in: cmd/moongitd only calls it when CODEFORT_SSH_ADDR is set, so the
 // default deployment stays a single HTTP port. Authentication is publickey
 // only — every connection must present a registered key (HTTP remains the open
 // path); there is no anonymous SSH. Blocks until the listener closes.

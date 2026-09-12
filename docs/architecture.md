@@ -21,7 +21,7 @@ and `ci install-hooks`. Only `serve` starts the system.
 
 `runServe` (`cmd/codefortd/main.go:94`) does, in order:
 
-1. `config.Load()` — every knob is a `MOONGIT_*` env var (`internal/config`).
+1. `config.Load()` — every knob is a `CODEFORT_*` env var (`internal/config`).
    `EnsureDirs()` creates the data dir, repos dir.
 2. `storage.Open(cfg.DBPath)` — the **writer** pool.
 3. `storage.Migrate(db)` — schema catch-up, on the writer, before anything else
@@ -36,7 +36,7 @@ and `ci install-hooks`. Only `serve` starts the system.
    container).
 7. Background goroutines: claim reaper, token reaper, CI retention reaper,
    event retention reaper, cron scheduler, CI/agent runner.
-8. HTTP listener; plus the **optional** SSH listener when `MOONGIT_SSH_ADDR` is
+8. HTTP listener; plus the **optional** SSH listener when `CODEFORT_SSH_ADDR` is
    set (`internal/server/ssh.go`) — the one second listener, same process.
 9. Signal wait, then the shutdown drain (see *Background work*).
 
@@ -74,7 +74,7 @@ handleHealth │          withRateLimit    withRateLimit       withBasicAuth  wi
         handleCIEvents     login)         withRepoAccess      gitHandler   fallback)
         loopback-only +                        │              (ServeMux,       │
         CI-secret gated                    apiHandler          bare        nil when
-                                           (ServeMux,          wildcards)  MOONGIT_WEB_DIR
+                                           (ServeMux,          wildcards)  CODEFORT_WEB_DIR
                                             /api/... )                     unset → git mux
 ```
 
@@ -104,13 +104,13 @@ Notes that bite if you get them wrong:
   wedged — which is exactly the failure that matters. Bounded by a 2s timeout.
 - **Rate limiting** (`internal/server/ratelimit.go`) is a stdlib-only per-IP
   token bucket, applied *before* auth so failed auth attempts are throttled too.
-  `nil` (disabled) unless `MOONGIT_RATE_LIMIT > 0`; burst is `3 × rate`.
+  `nil` (disabled) unless `CODEFORT_RATE_LIMIT > 0`; burst is `3 × rate`.
 - **Bearer auth** (`internal/server/auth.go:37`) looks the token up on the
   **reader**, and writes `last_used_at` on the **writer** — debounced to
   `tokenTouchInterval` (5 min) so a polling agent fleet doesn't turn every read
   into a serialized write.
 - **Basic auth** (`auth.go:72`) is a single optional credential
-  (`MOONGIT_BASIC_USER`/`_PASS`) gating the human/git surfaces; constant-time
+  (`CODEFORT_BASIC_USER`/`_PASS`) gating the human/git surfaces; constant-time
   compare; no-op when unset. It never wraps `/api`, which keeps its own bearer
   auth, and never wraps `/healthz`.
 - **Repo access** (`internal/server/access.go`) is enforced in exactly **two
@@ -240,7 +240,7 @@ writing). Key columns only; FKs cascade from `repos`/`users` unless noted.
 Bare repos on disk are the source of truth; SQLite holds coordination metadata
 *about* them, never a copy of history.
 
-- **Layout:** `$MOONGIT_REPOS_DIR/<owner>/<name>.git`, created by
+- **Layout:** `$CODEFORT_REPOS_DIR/<owner>/<name>.git`, created by
   `git init --bare -b main` (`internal/server/repos.go:130`). `repoPath`
   (`internal/server/git.go:23`) resolves `{owner}/{repo}` and rejects traversal,
   accepting both `name` and `name.git` because the router pattern and real git
@@ -252,14 +252,14 @@ Bare repos on disk are the source of truth; SQLite holds coordination metadata
   `decodeBody`) and `cmd.Stdout = w`. There is no worktree, no temp file, and no
   pack held in memory — moongit is a pipe between the client and `git`.
 - **Push hooks carry no secrets on disk.** On `git-receive-pack`,
-  `handleServiceRPC` injects `MOONGIT_CI_URL`, `MOONGIT_CI_SECRET`,
-  `MOONGIT_CI_REPO`, `MOONGIT_CI_PUSHER` into the child's environment; the
+  `handleServiceRPC` injects `CODEFORT_CI_URL`, `CODEFORT_CI_SECRET`,
+  `CODEFORT_CI_REPO`, `CODEFORT_CI_PUSHER` into the child's environment; the
   generic `post-receive` hook (`internal/server/ci_hook.go`) inherits them and
   POSTs each pushed ref to the loopback `/internal/ci/events`. The secret is
   per-process and never persisted. The hook soft-fails — a CI problem must never
   block a push.
 - **Push hooks also carry the branch-protection rules.** The same injection adds
-  `MOONGIT_PROTECTED_REFS`, the repo's newline-separated glob patterns, read
+  `CODEFORT_PROTECTED_REFS`, the repo's newline-separated glob patterns, read
   from SQLite by `pushEnv` (`internal/server/git.go`) and shared with the SSH
   push path. The `pre-receive` hook matches each pushed branch against them and
   hard-fails on a delete or a non-fast-forward, rejecting the whole push before
@@ -363,9 +363,9 @@ SIGKILL and power loss.
 ## The web SPA
 
 Vite + React 19, built to `web/dist`, served by the same process from
-`MOONGIT_WEB_DIR` via `webHandler` (`internal/server/web.go`): existing file →
+`CODEFORT_WEB_DIR` via `webHandler` (`internal/server/web.go`): existing file →
 serve it, anything else → `index.html` so the client router owns the route. When
-`MOONGIT_WEB_DIR` is unset the handler is `nil` and the process runs API+git
+`CODEFORT_WEB_DIR` is unset the handler is `nil` and the process runs API+git
 only.
 
 Routing lives in `web/src/App.tsx`: a `TokenGate` in front of everything (no
@@ -394,7 +394,7 @@ here.
 | **Change scheduling / concurrency** | Slot policy: `cmd/codefortd/budget.go` (+ `budget_test.go`). Drain order and poll cadence: `ciRunner.run` in `cmd/codefortd/ci_runner.go`. Cron: `cmd/codefortd/cron_scheduler.go`. |
 | **Add a UI page** | Add the component under `web/src/features/<feature>/`, register the route in `web/src/App.tsx` (static routes before `/:owner/:repo`), wire data through `web/src/api/queries.ts` / `mutations.ts` and types in `web/src/api/types.ts`. Feature CSS in `web/src/features/<feature>/<feature>.css`. New shared primitive → `web/src/ui/` **and** a `/dev/ui` gallery row. Follow `web/CLAUDE.md`. |
 | **Add a UI primitive** | `web/src/ui/` + barrel export + a section in `DevGalleryPage.tsx`; base styles in `web/src/styles.css`. |
-| **Add a config knob** | `internal/config/config.go` (`MOONGIT_*`, with a default), document it in the `printUsage` block in `cmd/codefortd/main.go` if it's operator-facing. |
+| **Add a config knob** | `internal/config/config.go` (`CODEFORT_*`, with a default), document it in the `printUsage` block in `cmd/codefortd/main.go` if it's operator-facing. |
 | **Add a background loop** | A `run…` function in `cmd/codefortd/main.go` following the reaper shape (ticker, `ctx.Done()`, writer pool, no-op when disabled), started with the others in `runServe`. If it can be mid-work at shutdown, it needs a drain before `db.Close()`. |
 | **Add an event type** | Emit through `internal/storage/events.go`; consumers are `GET /api/events` (`internal/server/events.go`) and the SPA's feed. |
 | **Add an admin CLI subcommand** | The `switch` in `main()` (`cmd/codefortd/main.go:37`), a `run…` function, `printUsage`, and `openDB()` if it needs the database. |

@@ -57,7 +57,7 @@ func commit(t *testing.T, work, msg string) {
 // the hook does on the server.
 func push(t *testing.T, work, patterns string, args ...string) (string, error) {
 	t.Helper()
-	env := append(os.Environ(), "MOONGIT_PROTECTED_REFS="+patterns)
+	env := append(os.Environ(), "CODEFORT_PROTECTED_REFS="+patterns)
 	return runEnv(env, work, "git", append([]string{"push"}, args...)...)
 }
 

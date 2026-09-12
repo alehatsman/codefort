@@ -6,7 +6,7 @@
 # stays too, as long as the `quality` job's `mooncake task ci` shell-out is in
 # scope (#411 explicitly excludes the goq/tq rewrite — that's a separate,
 # larger, deferred follow-up). This is the default image
-# (MOONGIT_CI_DEFAULT_IMAGE=moongit-ci:latest); per-job `image:` overrides in
+# (CODEFORT_CI_DEFAULT_IMAGE=moongit-ci:latest); per-job `image:` overrides in
 # mgitci.yml should derive from it (FROM moongit-ci:latest) or bundle both
 # binaries the same way.
 #

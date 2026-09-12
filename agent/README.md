@@ -39,20 +39,20 @@ The runner reads these (see `internal/config/config.go`):
 
 | env | default | meaning |
 | --- | --- | --- |
-| `MOONGIT_AGENT_DEFAULT_IMAGE` | `moongit-agent:latest` | image an agent run executes in (parallel to `MOONGIT_CI_DEFAULT_IMAGE`). |
-| `MOONGIT_MAX_CONCURRENCY` | `runtime.NumCPU()` | total runs in flight, agent **and** CI, from one shared budget (not separate pools). |
-| `MOONGIT_AGENT_RESERVED` | `2` | slots inside that budget only agent runs may take, so a CI backlog can never starve a spawn. |
-| `MOONGIT_AGENT_SERVER_URL` | loopback `MOONGIT_ADDR` | base URL injected as `MOONGIT_SERVER` so in-container `mgit` reaches this daemon. |
-| `MOONGIT_AGENT_RUN_TIMEOUT` | `60m` | whole-session lifetime cap; a parked run past this is reaped. |
-| `MOONGIT_AGENT_TURN_TIMEOUT` | `15m` | per-turn wall-clock limit. |
-| `MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN` | — | subscription token (`claude setup-token`) → `CLAUDE_CODE_OAUTH_TOKEN`. |
-| `MOONGIT_AGENT_ANTHROPIC_API_KEY` | — | alternate API-key auth → `ANTHROPIC_API_KEY`. |
-| `MOONGIT_AGENT_LLM_BASE_URL` | — | optional `ANTHROPIC_BASE_URL` override (a local model later). |
+| `CODEFORT_AGENT_DEFAULT_IMAGE` | `moongit-agent:latest` | image an agent run executes in (parallel to `CODEFORT_CI_DEFAULT_IMAGE`). |
+| `CODEFORT_MAX_CONCURRENCY` | `runtime.NumCPU()` | total runs in flight, agent **and** CI, from one shared budget (not separate pools). |
+| `CODEFORT_AGENT_RESERVED` | `2` | slots inside that budget only agent runs may take, so a CI backlog can never starve a spawn. |
+| `CODEFORT_AGENT_SERVER_URL` | loopback `CODEFORT_ADDR` | base URL injected as `CODEFORT_SERVER` so in-container `mgit` reaches this daemon. |
+| `CODEFORT_AGENT_RUN_TIMEOUT` | `60m` | whole-session lifetime cap; a parked run past this is reaped. |
+| `CODEFORT_AGENT_TURN_TIMEOUT` | `15m` | per-turn wall-clock limit. |
+| `CODEFORT_AGENT_CLAUDE_OAUTH_TOKEN` | — | subscription token (`claude setup-token`) → `CLAUDE_CODE_OAUTH_TOKEN`. |
+| `CODEFORT_AGENT_ANTHROPIC_API_KEY` | — | alternate API-key auth → `ANTHROPIC_API_KEY`. |
+| `CODEFORT_AGENT_LLM_BASE_URL` | — | optional `ANTHROPIC_BASE_URL` override (a local model later). |
 
 **Settings → Agent overrides (#106, no restart):** the operator can set these in
 the UI (persisted in `settings`), and they win over the env per run —
-`agent.claude_oauth_token` over `MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN`,
-`agent.llm_base_url` over `MOONGIT_AGENT_LLM_BASE_URL` (→ `ANTHROPIC_BASE_URL`).
+`agent.claude_oauth_token` over `CODEFORT_AGENT_CLAUDE_OAUTH_TOKEN`,
+`agent.llm_base_url` over `CODEFORT_AGENT_LLM_BASE_URL` (→ `ANTHROPIC_BASE_URL`).
 A new `agent.anthropic_auth_token` injects `ANTHROPIC_AUTH_TOKEN` (the bearer for
 a custom-endpoint gateway); when set it claims the container's auth slot alone,
 ahead of the OAuth/API-key paths. Secrets are stored write-only.
@@ -81,7 +81,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
 - `claude` — the Claude Code CLI (runs on the Node runtime installed here).
   Auth comes from `CLAUDE_CODE_OAUTH_TOKEN` / `ANTHROPIC_API_KEY` injected into
   the container env per run (#77), never baked in.
-- `mgit` — the moongit issue client (`MOONGIT_TOKEN`/`MOONGIT_SERVER` are
+- `mgit` — the moongit issue client (`CODEFORT_TOKEN`/`CODEFORT_SERVER` are
   injected per run), exposed to Claude via the MCP shim rather than as a raw
   CLI — Claude itself can't invoke it directly (headless Bash is
   policy-gated, #110). Drop a static `mgit` into `agent/mgit` (git-ignored

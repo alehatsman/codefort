@@ -57,18 +57,18 @@ func readPipelineAt(bareRepo, sha string) (raw []byte, ok bool) {
 // must never block a push.
 const postReceiveHook = `#!/bin/sh
 # moongit CI post-receive hook — managed by moongitd; do not edit.
-[ -n "$MOONGIT_CI_URL" ] || exit 0
-[ -n "$MOONGIT_CI_SECRET" ] || exit 0
-[ -n "$MOONGIT_CI_REPO" ] || exit 0
+[ -n "$CODEFORT_CI_URL" ] || exit 0
+[ -n "$CODEFORT_CI_SECRET" ] || exit 0
+[ -n "$CODEFORT_CI_REPO" ] || exit 0
 # Escape a value for embedding in a JSON string: backslash first, then quote.
 # Git ref names may contain " (and a token name is arbitrary), so interpolating
 # raw would break the JSON or let a crafted ref inject fields.
 je() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 while read -r old new ref; do
 	body=$(printf '{"repo":"%s","old":"%s","new":"%s","ref":"%s","pusher":"%s"}' \
-		"$(je "$MOONGIT_CI_REPO")" "$(je "$old")" "$(je "$new")" "$(je "$ref")" "$(je "${MOONGIT_CI_PUSHER:-}")")
-	curl -fsS -m 5 -X POST "$MOONGIT_CI_URL/internal/ci/events" \
-		-H "X-Moongit-CI-Secret: $MOONGIT_CI_SECRET" \
+		"$(je "$CODEFORT_CI_REPO")" "$(je "$old")" "$(je "$new")" "$(je "$ref")" "$(je "${CODEFORT_CI_PUSHER:-}")")
+	curl -fsS -m 5 -X POST "$CODEFORT_CI_URL/internal/ci/events" \
+		-H "X-Moongit-CI-Secret: $CODEFORT_CI_SECRET" \
 		-H "Content-Type: application/json" \
 		-d "$body" >/dev/null 2>&1 || true
 done
@@ -87,7 +87,7 @@ func WritePostReceiveHook(bareRepo string) error {
 
 // preReceiveHook enforces branch protection at push time. Like the
 // post-receive hook it is identical across repos and carries no state: the
-// repo's patterns arrive as MOONGIT_PROTECTED_REFS, which moongitd injects
+// repo's patterns arrive as CODEFORT_PROTECTED_REFS, which moongitd injects
 // into the receive-pack process it spawns. That keeps the hook free of any
 // network call or database read, so a push neither waits on the daemon nor
 // slips past protection when the daemon is unwell.
@@ -96,7 +96,7 @@ func WritePostReceiveHook(bareRepo string) error {
 // before any ref moves, which is the point.
 const preReceiveHook = `#!/bin/sh
 # moongit branch-protection hook — managed by moongitd; do not edit.
-[ -n "$MOONGIT_PROTECTED_REFS" ] || exit 0
+[ -n "$CODEFORT_PROTECTED_REFS" ] || exit 0
 
 # A ref's "null" value is all-zeros, 40 hex digits under sha1 and 64 under
 # sha256; testing for a non-zero character covers both without pinning a width.
@@ -114,7 +114,7 @@ while read -r old new ref; do
 	oldifs=$IFS
 	IFS='
 '
-	for pat in $MOONGIT_PROTECTED_REFS; do
+	for pat in $CODEFORT_PROTECTED_REFS; do
 		[ -n "$pat" ] || continue
 		case "$branch" in
 		$pat) protected=1; break ;;

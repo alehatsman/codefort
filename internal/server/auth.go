@@ -64,7 +64,7 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 }
 
 // withBasicAuth gates a handler behind a single HTTP Basic credential
-// when one is configured (MOONGIT_BASIC_USER). It's a no-op when unset,
+// when one is configured (CODEFORT_BASIC_USER). It's a no-op when unset,
 // preserving the open-by-default posture. Used to protect the web UI and
 // git smart-HTTP on a shared network; the /api surface keeps its own
 // Bearer-token auth and is not wrapped by this. Comparisons are

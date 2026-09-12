@@ -38,14 +38,14 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
   base URL and `owner/repo` come from it; WHERE it is `ssh://…` or scp-like
   (`git@host:owner/repo.git`), only `owner/repo` is derived and the server base
   is left empty. Any other scheme (e.g. `file://`) is rejected.
-- WHERE `MOONGIT_SERVER` is set, it overrides **only** the server base URL
+- WHERE `CODEFORT_SERVER` is set, it overrides **only** the server base URL
   (trailing slashes trimmed); `owner/repo` always comes from the remote. It is
   therefore required for an SSH-only checkout, and never a substitute for having
   a remote at all.
 - IF neither remote exists, the command fails telling the user to run inside a
   checkout of the target repo; IF a remote resolved but no http base could be
-  derived and `MOONGIT_SERVER` is unset, it fails asking for one.
-- WHERE a request is authenticated, `MOONGIT_TOKEN` is sent as an
+  derived and `CODEFORT_SERVER` is unset, it fails asking for one.
+- WHERE a request is authenticated, `CODEFORT_TOKEN` is sent as an
   `Authorization: Bearer` header and is the client's *only* notion of identity.
   IF the variable is unset the header is simply omitted and the request still
   goes out — the resulting 401 is reported as a plain server error, not caught
@@ -101,14 +101,14 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
   queued run number; a conflict is reported as CI being disabled for the repo.
 - WHERE `repo delete <owner>/<name>` is used, the repo comes from the explicit
   argument, not the checkout — only the server URL is resolved from the remote —
-  so it works from any checkout. A checkout (or `MOONGIT_SERVER` plus a remote)
+  so it works from any checkout. A checkout (or `CODEFORT_SERVER` plus a remote)
   is still required.
 - WHERE a command is destructive (`issue delete`, `repo delete`), it prompts on
   stdout for a `y`/`N` confirmation naming exactly what will be destroyed, unless
   `--yes` (or `-y`) is passed. Declining prints `aborted` and exits **0** — a
   refused confirmation is not an error.
 - WHERE `mgit mcp` appears in dispatch, it is this CLI's stdio/MCP sibling and is
-  specified separately; it reuses target resolution and `MOONGIT_TOKEN` unchanged.
+  specified separately; it reuses target resolution and `CODEFORT_TOKEN` unchanged.
 
 ### Streaming the feed
 
@@ -160,7 +160,7 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
 - **The `moongitd` server binary's CLI.** `moongitd serve`, `token create`,
   `repo create` and friends are the operator-side surface — a different binary,
   a different audience, and out of scope here even though `token create` mints
-  the `MOONGIT_TOKEN` this client consumes.
+  the `CODEFORT_TOKEN` this client consumes.
 - **Git itself.** `mgit` never wraps clone/push/fetch; it reads `git remote` to
   locate the server and nothing more. Code moves over plain git.
 - **Configuration and sessions.** No config file, no login/logout, no profile or
@@ -172,8 +172,8 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
 
 - [x] Target resolved from the `moongit` remote, falling back to `origin`
 - [x] http(s) remotes yield server + owner/repo; ssh/scp yield owner/repo only
-- [x] `MOONGIT_SERVER` overrides the server base URL only, never owner/repo
-- [x] `MOONGIT_TOKEN` sent as Bearer; identity stamped server-side; no author sent
+- [x] `CODEFORT_SERVER` overrides the server base URL only, never owner/repo
+- [x] `CODEFORT_TOKEN` sent as Bearer; identity stamped server-side; no author sent
 - [x] issue / review / pr / ci / repo / events / mcp / help dispatch with local arg + enum validation
 - [x] Positional identifier before flags; trailing positionals rejected
 - [x] `issue edit` sends only the flags passed; distinguishes empty from omitted

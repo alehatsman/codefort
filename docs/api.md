@@ -19,13 +19,13 @@ Exceptions:
 - `POST /api/auth/register` and `POST /api/auth/login` — public (no token).
 - `GET /healthz` — open.
 - `POST /internal/ci/events` — no bearer token; loopback-only + CI-secret gated.
-- Git smart-HTTP — no bearer token; gated by HTTP Basic when `MOONGIT_BASIC_USER`
+- Git smart-HTTP — no bearer token; gated by HTTP Basic when `CODEFORT_BASIC_USER`
   is configured.
 
 The token's **name** is the caller's identity. Author/assignee/actor fields are
 stamped server-side from it; a client-supplied `author`/`assignee` is ignored.
 
-Rate limiting (per client IP, when `MOONGIT_RATE_LIMIT > 0`) wraps both the
+Rate limiting (per client IP, when `CODEFORT_RATE_LIMIT > 0`) wraps both the
 authed and public `/api` surfaces and answers `429` with the standard error
 envelope.
 
@@ -711,7 +711,7 @@ A `resume` sentinel means *reconnect from the last id*, not end-of-stream.
 
 Served off the API mux, under `/{owner}/{repo}/…`. `{repo}` may carry a
 trailing `.git` (real git clients send it). No bearer token; HTTP Basic gates
-these when `MOONGIT_BASIC_USER` is set.
+these when `CODEFORT_BASIC_USER` is set.
 
 ### GET /{owner}/{repo}/info/refs
 - Query: `service` — must be `git-upload-pack` or `git-receive-pack`
@@ -726,8 +726,8 @@ Fetch/clone RPC.
 - `400` bad owner/repo; `404` repo not on disk; `415` unexpected content-type
 
 ### POST /{owner}/{repo}/git-receive-pack
-Push RPC. On push the server injects `MOONGIT_CI_URL`, `MOONGIT_CI_SECRET`,
-`MOONGIT_CI_REPO` and `MOONGIT_CI_PUSHER` (the Basic-auth user) into
+Push RPC. On push the server injects `CODEFORT_CI_URL`, `CODEFORT_CI_SECRET`,
+`CODEFORT_CI_REPO` and `CODEFORT_CI_PUSHER` (the Basic-auth user) into
 `receive-pack`'s environment, which the `post-receive` hook inherits to notify
 `/internal/ci/events`.
 - `Content-Type: application/x-git-receive-pack-request` (gzip bodies accepted)

@@ -218,7 +218,7 @@ const (
 
 func (r *ciRunner) run(ctx context.Context) {
 	// <= 0 means "unset" and falls back to the default. A tiny-but-positive
-	// value is the one that actually hurts: `MOONGIT_CI_POLL_INTERVAL=1ms`
+	// value is the one that actually hurts: `CODEFORT_CI_POLL_INTERVAL=1ms`
 	// parses fine and spins this loop a thousand times a second against SQLite
 	// for no benefit, so floor it at something a human could plausibly mean.
 	interval := r.cfg.CIPollInterval
@@ -226,7 +226,7 @@ func (r *ciRunner) run(ctx context.Context) {
 	case interval <= 0:
 		interval = defaultCIPollInterval
 	case interval < minCIPollInterval:
-		r.logger.Warn("MOONGIT_CI_POLL_INTERVAL is below the floor; using the floor",
+		r.logger.Warn("CODEFORT_CI_POLL_INTERVAL is below the floor; using the floor",
 			"configured", interval, "floor", minCIPollInterval)
 		interval = minCIPollInterval
 	}

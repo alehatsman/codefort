@@ -21,7 +21,7 @@ HTTP behavior, and turning it off is the default.
 
 ## Behavior
 
-- WHILE `MOONGIT_SSH_ADDR` is set, the daemon listens for git SSH on that
+- WHILE `CODEFORT_SSH_ADDR` is set, the daemon listens for git SSH on that
   address; unset, no SSH listener starts and moongit stays a single HTTP port.
 - WHEN a client connects over SSH, authentication is public-key only — there is
   no password and no anonymous access; the key's fingerprint is looked up in the
@@ -71,7 +71,7 @@ HTTP behavior, and turning it off is the default.
 
 ## Checklist
 
-- [x] Opt-in second listener via `MOONGIT_SSH_ADDR`; HTTP stays open + default
+- [x] Opt-in second listener via `CODEFORT_SSH_ADDR`; HTTP stays open + default
 - [x] Public-key-only auth; fingerprint → owning token; unknown key rejected
 - [x] SSH push/pull identity == Bearer-path token name (uniform attribution)
 - [x] Only git-upload-pack / git-receive-pack exec; shell/pty/other rejected

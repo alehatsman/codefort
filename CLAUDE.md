@@ -7,8 +7,8 @@ the client. This repo is the coordination backend itself — dogfood it.
 
 ## Workflow — track work as moongit issues (mgit)
 
-Prereq: the repo has a `moongit` remote (code mirror) — or `MOONGIT_SERVER`
-points at the server. Export your **own** `MOONGIT_TOKEN` (`mgt_…`); the
+Prereq: the repo has a `moongit` remote (code mirror) — or `CODEFORT_SERVER`
+points at the server. Export your **own** `CODEFORT_TOKEN` (`mgt_…`); the
 token's name is your identity in every claim/comment, so never share one.
 
 1. **Survey:** `mgit issue list --state todo,in_progress`.
@@ -73,7 +73,7 @@ is deliberately not automated — `provision apply tasks/deploy.yml`.
 | `ROADMAP.md` | What's shipped, what's next, what was rejected. |
 | `docs/architecture.md` | How the one process fits together; start here on any backend change. |
 | `docs/api.md` | The JSON API reference (route table lives in `internal/server/server.go`). |
-| `docs/config.md` | The full `MOONGIT_*` env reference — there is no config file. |
+| `docs/config.md` | The full `CODEFORT_*` env reference — there is no config file. |
 | `docs/specs.md` | The spec format contract: front-matter, layout, what the parser guarantees. |
 | `docs/ops-provisioning.md` | The mooncake → provision migration; task/command equivalences. |
 | `specs/` | Per-subsystem specs. `specs/constitution.md` is the repo-wide contract every other spec inherits — read it first. |

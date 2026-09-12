@@ -522,7 +522,7 @@ export interface CIJob {
 
 // AgentSettings mirrors api.AgentSettings — the Claude token is write-only (only
 // whether one is configured is returned); claude_token_env_fallback reports
-// whether a server-env credential (MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN /
+// whether a server-env credential (CODEFORT_AGENT_CLAUDE_OAUTH_TOKEN /
 // _ANTHROPIC_API_KEY) backs runs when no Settings token is set. llm_base_url
 // is the operator-set ANTHROPIC_BASE_URL (not a secret — returned as-is);
 // anthropic_auth_token_set reports whether the write-only gateway bearer

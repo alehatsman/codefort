@@ -159,7 +159,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 	// Operator-set Settings values win over the env (#106), so spawning works
 	// without a moongitd restart — the Claude token, the LLM base URL, and the
-	// gateway auth token all override their MOONGIT_AGENT_* env counterparts.
+	// gateway auth token all override their CODEFORT_AGENT_* env counterparts.
 	override := agentSettingsOverride{
 		claudeToken:        storage.SettingValue(r.db, storage.SettingAgentClaudeToken),
 		llmBaseURL:         storage.SettingValue(r.db, storage.SettingAgentLLMBaseURL),

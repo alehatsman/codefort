@@ -91,7 +91,7 @@ func streamEvents(endpoint string, lastSeq int64) (int64, error) {
 		return lastSeq, stopErr{err}
 	}
 	req.Header.Set("Accept", "text/event-stream")
-	if tok := os.Getenv("MOONGIT_TOKEN"); tok != "" {
+	if tok := os.Getenv("CODEFORT_TOKEN"); tok != "" {
 		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 	if lastSeq > 0 {

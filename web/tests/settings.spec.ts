@@ -186,7 +186,7 @@ test("agent section sets and clears the global Claude token", async ({ page }) =
 })
 
 test("agent section reports the env fallback instead of 'no token' (#129)", async ({ page }) => {
-  // DB token unset, but the server has MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN /
+  // DB token unset, but the server has CODEFORT_AGENT_CLAUDE_OAUTH_TOKEN /
   // _ANTHROPIC_API_KEY — runs authenticate via the env, so the status must not
   // claim runs "can't authenticate yet".
   await mockApi(page, { agentTokenEnvFallback: true })

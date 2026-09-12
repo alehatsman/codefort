@@ -1,6 +1,6 @@
 # Fast dev-loop deploy of the CURRENT working tree — bypasses the
 # HEAD-gated `mooncake apply -t moongit` in dotfiles. Rebuilds both
-# binaries + the web UI (served from web/dist via MOONGIT_WEB_DIR),
+# binaries + the web UI (served from web/dist via CODEFORT_WEB_DIR),
 # reinstalls to ~/.local/bin, and restarts the live service. Does not
 # touch the .sha sidecar, so a later `apply` still reconciles to HEAD.
 #

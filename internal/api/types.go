@@ -653,7 +653,7 @@ type CreateAgentTurnRequest struct {
 // AgentSettings is the operator-facing agent config. The Claude token is
 // write-only — the API reports only whether one is set, never its value.
 // EnvFallbackSet reports whether a server-env credential
-// (MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN or MOONGIT_AGENT_ANTHROPIC_API_KEY) is
+// (CODEFORT_AGENT_CLAUDE_OAUTH_TOKEN or CODEFORT_AGENT_ANTHROPIC_API_KEY) is
 // configured, so the UI can distinguish "no auth at all" from "authenticating
 // via the env fallback" when no Settings token is set. ExecutionModel is the
 // default model new agent runs use when they don't pick one at spawn ("" means

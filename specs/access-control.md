@@ -83,7 +83,7 @@ vocabulary. The *grid* of per-user, per-resource rules stays out.
   moongit token presented as a `Bearer` header or as the **password** half of
   HTTP Basic with any username — git has no bearer support, so this is the same
   token-over-git-HTTP shape as a forge personal access token. The shared
-  `MOONGIT_BASIC_USER` credential does not satisfy this: it names a deployment,
+  `CODEFORT_BASIC_USER` credential does not satisfy this: it names a deployment,
   not a person, and so cannot resolve a principal.
 - WHEN a private repo is requested over git with no usable credential, the
   server answers 401 with a `WWW-Authenticate: Basic` challenge, so `git clone`

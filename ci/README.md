@@ -1,6 +1,6 @@
 # moongit CI base image
 
-When CI runs with container isolation (the default — `MOONGIT_CI_ISOLATION=docker`),
+When CI runs with container isolation (the default — `CODEFORT_CI_ISOLATION=docker`),
 moongitd executes each job inside a throwaway container as one streamed
 `docker exec <container> provision apply /work/<job>.plan.yml --json` (#411).
 So **every image used for CI must carry `provision` (and `git`) on PATH.**
@@ -51,11 +51,11 @@ The runner reads these settings (see `internal/config/config.go`):
 
 | env | default | meaning |
 | --- | --- | --- |
-| `MOONGIT_CI_ISOLATION` | `docker` | `docker` runs jobs in containers; `none` runs them on the host (legacy, untrusted). |
-| `MOONGIT_CI_DEFAULT_IMAGE` | `moongit-ci:latest` | image a job uses when its `mgitci.yml` doesn't set `image:`. |
-| `MOONGIT_CI_JOB_CONCURRENCY` | `4` | how many of a run's jobs run at once; the runner schedules jobs in dependency waves and runs every ready job concurrently up to this cap. |
-| `MOONGIT_MAX_CONCURRENCY` | `runtime.NumCPU()` | total runs in flight, CI **and** agent, from one shared budget. Each running job is its own container, so this is the knob that bounds container count. |
-| `MOONGIT_AGENT_RESERVED` | `2` | slots inside that budget only agent runs may take, so a CI backlog can never lock out an agent spawn. |
+| `CODEFORT_CI_ISOLATION` | `docker` | `docker` runs jobs in containers; `none` runs them on the host (legacy, untrusted). |
+| `CODEFORT_CI_DEFAULT_IMAGE` | `moongit-ci:latest` | image a job uses when its `mgitci.yml` doesn't set `image:`. |
+| `CODEFORT_CI_JOB_CONCURRENCY` | `4` | how many of a run's jobs run at once; the runner schedules jobs in dependency waves and runs every ready job concurrently up to this cap. |
+| `CODEFORT_MAX_CONCURRENCY` | `runtime.NumCPU()` | total runs in flight, CI **and** agent, from one shared budget. Each running job is its own container, so this is the knob that bounds container count. |
+| `CODEFORT_AGENT_RESERVED` | `2` | slots inside that budget only agent runs may take, so a CI backlog can never lock out an agent spawn. |
 
 ## Triggering runs
 

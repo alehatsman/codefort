@@ -99,11 +99,11 @@ USAGE:
                                   (serve the toolset over stdio as an MCP server)
 
 Identity: the server stamps author/assignee from the name of the token
-in MOONGIT_TOKEN. Mint a token with "moongitd token create <name>" and
-export MOONGIT_TOKEN=mgt_... before running the client.
+in CODEFORT_TOKEN. Mint a token with "moongitd token create <name>" and
+export CODEFORT_TOKEN=mgt_... before running the client.
 
 Run inside a git checkout of the target repo. owner/repo is parsed from
-the 'moongit' remote, falling back to 'origin'. MOONGIT_SERVER overrides
+the 'moongit' remote, falling back to 'origin'. CODEFORT_SERVER overrides
 only the server host — owner/repo always comes from the remote, so a
 checkout is required even when it is set.
 `)
@@ -1084,7 +1084,7 @@ func runRepo(args []string) error {
 // comments, pulls, and the on-disk git data. Irreversible, so it confirms
 // interactively unless --yes is given. The target repo is the explicit
 // <owner>/<name> argument; only the server URL is derived from the local
-// remote (or MOONGIT_SERVER), so it works from any checkout.
+// remote (or CODEFORT_SERVER), so it works from any checkout.
 func runRepoDelete(args []string) error {
 	// The <owner>/<name> positional comes first; flags are parsed from what
 	// follows it. (Go's flag package stops at the first non-flag arg, so a
@@ -1153,7 +1153,7 @@ type target struct {
 // current git checkout's remotes. It prefers a dedicated `moongit` remote
 // (the code mirror) so the server URL + owner/repo come straight from it,
 // and falls back to `origin` for checkouts that only have their upstream
-// configured. MOONGIT_SERVER overrides the derived server host — required
+// configured. CODEFORT_SERVER overrides the derived server host — required
 // when the chosen remote is SSH (no http base URL to derive).
 func discoverTarget() (target, error) {
 	remote, err := gitRemoteURL("moongit")
@@ -1167,11 +1167,11 @@ func discoverTarget() (target, error) {
 	if err != nil {
 		return target{}, err
 	}
-	if override := os.Getenv("MOONGIT_SERVER"); override != "" {
+	if override := os.Getenv("CODEFORT_SERVER"); override != "" {
 		t.server = strings.TrimRight(override, "/")
 	}
 	if t.server == "" {
-		return target{}, fmt.Errorf("remote %q has no http(s) host; add a `moongit` http remote or set MOONGIT_SERVER", remote)
+		return target{}, fmt.Errorf("remote %q has no http(s) host; add a `moongit` http remote or set CODEFORT_SERVER", remote)
 	}
 	return t, nil
 }
@@ -1179,7 +1179,7 @@ func discoverTarget() (target, error) {
 // parseRemote extracts owner/repo from any git remote form (http(s), ssh://,
 // or scp-like git@host:owner/repo). For http(s) it also derives the server
 // base URL; ssh/scp forms leave server empty so the caller supplies
-// MOONGIT_SERVER.
+// CODEFORT_SERVER.
 func parseRemote(remote string) (target, error) {
 	remote = strings.TrimSpace(remote)
 
@@ -1249,7 +1249,7 @@ func httpDo(method, urlStr string, body io.Reader, contentType string) (*http.Re
 		req.Header.Set("Content-Type", contentType)
 	}
 	req.Header.Set("Accept", "application/json")
-	if tok := os.Getenv("MOONGIT_TOKEN"); tok != "" {
+	if tok := os.Getenv("CODEFORT_TOKEN"); tok != "" {
 		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 

@@ -35,7 +35,7 @@ type Server struct {
 	agentCanceler AgentCanceler
 
 	// limiter is the per-IP rate limiter. nil when rate limiting is disabled
-	// (MOONGIT_RATE_LIMIT=0 or unset).
+	// (CODEFORT_RATE_LIMIT=0 or unset).
 	limiter *ipLimiter
 }
 
@@ -95,7 +95,7 @@ func (s *Server) Handler() http.Handler {
 	// credential) runs first, then per-repo visibility resolves the individual
 	// caller from their own token. It is a no-op for public repos.
 	gitMux := s.withBasicAuth(s.withGitRepoAccess(s.gitHandler()))
-	web := s.webHandler() // nil when MOONGIT_WEB_DIR is unset
+	web := s.webHandler() // nil when CODEFORT_WEB_DIR is unset
 	if web != nil {
 		web = s.withBasicAuth(web)
 	}

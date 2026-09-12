@@ -51,7 +51,7 @@ requests, CI, and agents all assume a repo already lives and moves here.
 - WHILE a repository has in-flight CI/agent runs, deleting it is refused with a
   conflict; otherwise deletion removes its registration, its on-disk bare repo,
   and its run logs.
-- WHILE `MOONGIT_BASIC_USER` is set, git smart-HTTP and the web UI require HTTP
+- WHILE `CODEFORT_BASIC_USER` is set, git smart-HTTP and the web UI require HTTP
   Basic credentials; unset, they stay open. The `/api` surface always uses its
   own Bearer-token auth regardless.
 - WHILE the daemon runs, one process serves the `/api` surface, git smart-HTTP,

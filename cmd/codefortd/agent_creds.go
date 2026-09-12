@@ -58,10 +58,10 @@ func agentContainerEnv(cfg *config.Config, o agentSettingsOverride, moongitToken
 		env = append(env, "ANTHROPIC_BASE_URL="+baseURL)
 	}
 	if moongitToken != "" {
-		env = append(env, "MOONGIT_TOKEN="+moongitToken)
+		env = append(env, "CODEFORT_TOKEN="+moongitToken)
 	}
 	if serverURL != "" {
-		env = append(env, "MOONGIT_SERVER="+serverURL)
+		env = append(env, "CODEFORT_SERVER="+serverURL)
 	}
 	return env
 }
@@ -87,7 +87,7 @@ func agentServerURL(cfg *config.Config) string {
 // under --strict-mcp-config, so this file is the agent's whole MCP surface):
 //
 //   - mgit: the moongit issue/review/pipeline/agent toolset (`mgit mcp`, #158).
-//     Always registered — the per-run MOONGIT_TOKEN + MOONGIT_SERVER ride in the
+//     Always registered — the per-run CODEFORT_TOKEN + CODEFORT_SERVER ride in the
 //     container env (agentContainerEnv), so the shim resolves its target and
 //     identity without anything in this file. The run's tool profile (#184) is
 //     passed as `--profile <p>`, so the shim only registers the tools that

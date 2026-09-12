@@ -89,7 +89,7 @@ type Job struct {
 	// DockerSocket mounts /var/run/docker.sock from the host into the job's
 	// container, giving steps access to the host Docker daemon. Use for jobs
 	// that build or manage container images (DinD-lite). No effect under host
-	// isolation (MOONGIT_CI_ISOLATION=none).
+	// isolation (CODEFORT_CI_ISOLATION=none).
 	DockerSocket bool `yaml:"docker_socket"`
 	// Steps stay as raw YAML nodes so raw mooncake steps survive translation
 	// untouched and `run:` sugar can be rewritten precisely.

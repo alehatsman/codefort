@@ -95,7 +95,7 @@ func TestAgentSettingsLifecycle(t *testing.T) {
 	}
 }
 
-// The env fallback (MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN / _ANTHROPIC_API_KEY) is
+// The env fallback (CODEFORT_AGENT_CLAUDE_OAUTH_TOKEN / _ANTHROPIC_API_KEY) is
 // reported independently of the DB token, so the UI can tell "authenticating
 // via env" from "no auth at all".
 func TestAgentSettingsEnvFallbackReported(t *testing.T) {

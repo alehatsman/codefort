@@ -76,7 +76,7 @@ The load-bearing fix. Design: **one gate, not 61 call sites.**
   and `provision apply tasks/…`, and the genuinely good docs (`web/CLAUDE.md`,
   `docs/specs.md`, `specs/`) are undiscoverable from it.
 - `AGENTS.md` — non-Claude harnesses read that filename.
-- `docs/config.md` — all 33 `MOONGIT_*` vars in one table. `README.md`
+- `docs/config.md` — all 33 `CODEFORT_*` vars in one table. `README.md`
   documented 10; the CI and agent vars were scattered across `ci/README.md` and
   `agent/README.md`.
 - `docs/architecture.md` — request graph, the two muxes, the single-writer +
@@ -161,8 +161,8 @@ Everything that exists only to talk to a dex server comes out:
   it goes with the client. The spec *list*, *read*, *write-via-PR*, and the
   deterministic drift classification are untouched; none of them ever called
   dex.
-- **Config.** `MOONGIT_DEX_URL`, `MOONGIT_DEX_TOKEN`,
-  `MOONGIT_AGENT_DEX_PROJECT`, and the `DEX_*` env the agent container was
+- **Config.** `CODEFORT_DEX_URL`, `CODEFORT_DEX_TOKEN`,
+  `CODEFORT_AGENT_DEX_PROJECT`, and the `DEX_*` env the agent container was
   handed.
 - **Agent wiring.** The dex MCP server in the generated agent MCP config, and
   the prompt text telling agents to reach for dex tools. `mgit` stays the

@@ -23,8 +23,8 @@ let the operator hand an agent only the tools its job needs.
 - WHEN `mgit mcp` starts, it serves moongit's toolset over stdio as an MCP server
   and blocks until the transport closes or its context is cancelled.
 - WHERE identity and target come from, they reuse the rest of the CLI's plumbing:
-  the repo is resolved from the checkout's git remotes (or `MOONGIT_SERVER`), and
-  requests authenticate with `MOONGIT_TOKEN`; the session is scoped to that one
+  the repo is resolved from the checkout's git remotes (or `CODEFORT_SERVER`), and
+  requests authenticate with `CODEFORT_TOKEN`; the session is scoped to that one
   repo for its lifetime.
 - WHILE the session runs, it holds no state of its own — each tool call is a
   single authenticated request to the scoped repo's `/api` endpoint, the same one
@@ -66,7 +66,7 @@ let the operator hand an agent only the tools its job needs.
 
 - [x] `mgit mcp` serves the toolset over stdio (modelcontextprotocol/go-sdk)
 - [x] Stateless stdio↔REST proxy; tools wrap the same /api endpoints as the CLI
-- [x] Repo from git remotes / MOONGIT_SERVER; auth via MOONGIT_TOKEN; single-repo scope
+- [x] Repo from git remotes / CODEFORT_SERVER; auth via CODEFORT_TOKEN; single-repo scope
 - [x] Tool errors surfaced as structured output with the server's message
 - [x] 16 tools across issue / review / pipeline / agent groups
 - [x] `full` (default) and `review` profiles; review = read + review_* + issue_comment

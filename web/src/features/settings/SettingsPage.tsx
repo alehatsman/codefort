@@ -327,7 +327,7 @@ function AgentSection() {
       <p className="muted small">
         The Claude token agent runs authenticate with (a value from <code>claude setup-token</code>
         ), injected into each agent container as <code>CLAUDE_CODE_OAUTH_TOKEN</code>. It overrides
-        the <code>MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN</code> env, so you can set it here without
+        the <code>CODEFORT_AGENT_CLAUDE_OAUTH_TOKEN</code> env, so you can set it here without
         restarting the server. Stored write-only — it's never shown again.
       </p>
 
@@ -453,7 +453,7 @@ function CustomEndpointFields({
       <h3 className="settings__subtitle">Custom endpoint</h3>
       <p className="muted small">
         Point agent runs at an Anthropic-compatible gateway or local model. The base URL is injected
-        as <code>ANTHROPIC_BASE_URL</code> (overriding <code>MOONGIT_AGENT_LLM_BASE_URL</code>); the
+        as <code>ANTHROPIC_BASE_URL</code> (overriding <code>CODEFORT_AGENT_LLM_BASE_URL</code>); the
         auth token as <code>ANTHROPIC_AUTH_TOKEN</code>, which then becomes the agent's auth
         (replacing the Claude token above). The token is stored write-only — it's never shown again.
         Leave both blank to use Anthropic directly.
@@ -626,7 +626,7 @@ function TokensSection() {
             </button>
           </div>
           <p className="muted">
-            Copy it now — it won't be shown again. Store it as <code>MOONGIT_TOKEN</code>.
+            Copy it now — it won't be shown again. Store it as <code>CODEFORT_TOKEN</code>.
           </p>
           <div className="token-reveal__secret">
             <code>{revealed.secret}</code>
@@ -753,7 +753,7 @@ function SSHKeysSection() {
       <h2 className="settings__title">SSH keys</h2>
       <p className="muted settings__lead">
         Public keys authenticate git over SSH (clone/push). A key inherits its token's identity, so
-        a push lands as that token's name. Set <code>MOONGIT_SSH_ADDR</code> on the server to enable
+        a push lands as that token's name. Set <code>CODEFORT_SSH_ADDR</code> on the server to enable
         the transport.
       </p>
 

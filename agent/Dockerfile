@@ -8,8 +8,8 @@
 # bind-mount convention, and adds the `claude` CLI plus `mgit` on PATH.
 #
 # This is the default agent image
-# (MOONGIT_AGENT_DEFAULT_IMAGE=moongit-agent:latest, parallel to
-# MOONGIT_CI_DEFAULT_IMAGE). It stays toolchain-light like the CI base; a repo
+# (CODEFORT_AGENT_DEFAULT_IMAGE=moongit-agent:latest, parallel to
+# CODEFORT_CI_DEFAULT_IMAGE). It stays toolchain-light like the CI base; a repo
 # whose agent needs Go/node/etc. derives its own image FROM moongit-agent.
 #
 # Build (from the moongit repo root) — see agent/README.md:
@@ -30,7 +30,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # mgit — the moongit issue client, so the agent can comment on the issue it's
-# working (MOONGIT_TOKEN + MOONGIT_SERVER are injected per run, #77). A static
+# working (CODEFORT_TOKEN + CODEFORT_SERVER are injected per run, #77). A static
 # build dropped in like ci/provision — a build input, not source
 # (agent/mgit is git-ignored).
 COPY mgit /usr/local/bin/mgit

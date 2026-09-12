@@ -25,8 +25,8 @@ import (
 // bypassPermissions where Bash does not (#157).
 //
 // Identity and target come from the same plumbing the rest of the CLI uses:
-// the repo is resolved from the checkout's git remotes (or MOONGIT_SERVER), and
-// requests authenticate with MOONGIT_TOKEN. The server is scoped to that one
+// the repo is resolved from the checkout's git remotes (or CODEFORT_SERVER), and
+// requests authenticate with CODEFORT_TOKEN. The server is scoped to that one
 // repo for its lifetime — owner/repo overrides are a later addition.
 func runMCP(args []string) error {
 	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)

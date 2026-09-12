@@ -220,7 +220,7 @@ func isGitWrite(r *http.Request) bool {
 // token already names its identity, and git clients send arbitrary usernames.
 //
 // ok is false when no credential parses as a live token — including when the
-// only credential present is the shared MOONGIT_BASIC_USER pair, which
+// only credential present is the shared CODEFORT_BASIC_USER pair, which
 // authenticates the deployment rather than a person.
 func (s *Server) gitIdentity(r *http.Request) (string, bool) {
 	raw, err := bearerToken(r)
