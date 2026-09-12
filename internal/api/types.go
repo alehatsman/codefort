@@ -492,18 +492,21 @@ type UpdatePullRequest struct {
 
 // MergeMethod selects how a PR is merged. "merge" (default) always creates a
 // merge commit; "ff-only" fast-forwards the base ref and fails if the branches
-// have diverged.
+// have diverged; "rebase" replays the head's commits onto base and advances
+// base to the last replayed commit, producing linear history even when the
+// branches have diverged.
 type MergeMethod string
 
 const (
 	MergeCommitMethod MergeMethod = "merge"
 	MergeFFOnlyMethod MergeMethod = "ff-only"
+	MergeRebaseMethod MergeMethod = "rebase"
 )
 
 // Valid reports whether m is a known merge method. The empty string is treated
 // as the default (merge) by the handler before validating.
 func (m MergeMethod) Valid() bool {
-	return m == MergeCommitMethod || m == MergeFFOnlyMethod
+	return m == MergeCommitMethod || m == MergeFFOnlyMethod || m == MergeRebaseMethod
 }
 
 // MergeRequest is the body of the merge endpoint. An empty Method means the

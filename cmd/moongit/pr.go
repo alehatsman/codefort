@@ -194,7 +194,7 @@ func runPRShow(args []string) error {
 
 func runPRMerge(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: moongit pr merge <number> [--ff-only]")
+		return errors.New("usage: moongit pr merge <number> [--ff-only | --rebase]")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -203,16 +203,23 @@ func runPRMerge(args []string) error {
 
 	fs := flag.NewFlagSet("pr merge", flag.ContinueOnError)
 	ffOnly := fs.Bool("ff-only", false, "fast-forward only; fail if the branches have diverged")
+	rebase := fs.Bool("rebase", false, "replay the head's commits onto base (linear history, no merge commit)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
 		return fmt.Errorf("unexpected extra args: %v", fs.Args())
 	}
+	if *ffOnly && *rebase {
+		return errors.New("--ff-only and --rebase are mutually exclusive")
+	}
 
 	method := api.MergeCommitMethod
-	if *ffOnly {
+	switch {
+	case *ffOnly:
 		method = api.MergeFFOnlyMethod
+	case *rebase:
+		method = api.MergeRebaseMethod
 	}
 
 	target, err := discoverTarget()

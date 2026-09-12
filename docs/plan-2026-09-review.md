@@ -179,3 +179,21 @@ Everything that exists only to talk to a dex server comes out:
 Deliberately *not* replaced: nothing here grows a hand-rolled substitute.
 Substring search over specs would be a new feature, not a removal, and it can
 earn its own slot if the gap is ever felt.
+
+## Phase 9 — roadmap execution  `in progress`
+
+Working the ROADMAP "Next" list directly, now that the review remediation is
+closed out.
+
+- **Spec verify loop** — turned out to be already built (#218/#219/#220) and
+  merely never *run*. The roadmap entry and the specs checklist both claimed it
+  was unimplemented; both corrected, and the DB-vs-frontmatter split the reading
+  exposed is now documented in `specs/specs.md`. Actually running a pass needs
+  a moongitd with agent credentials, which is an ops step, not a build.
+- **Server-side rebase (#257)** — done. A third merge method that replays the
+  head'''s commits onto base with `merge-tree --merge-base` + `commit-tree`,
+  worktree-free, all-or-nothing.
+- **Review state gating merge** — deliberately not taken. Whether an approval
+  should block a merge is a product call about how much local-trust bends, and
+  it is the owner'''s to make. Carried on `ROADMAP.md` as an open question
+  rather than a task.

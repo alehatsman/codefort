@@ -65,6 +65,13 @@ conflict rules, not from access gates.
   rebase head onto base inside the bare repo (worktree-free), reporting conflicts
   the same way a merge does, so a linear history is produced without a local
   fetch-rebase-push round-trip.
+- WHERE a rebase runs, each non-merge commit the head adds over base is replayed
+  in order as a three-way merge against its original parent, keeping the original
+  author and message while recording the server as committer. Base advances only
+  after every commit replays cleanly, so a conflict leaves it untouched rather
+  than half-applied; merge commits in the range are dropped, matching `git
+  rebase`; and the head ref is never rewritten, because the replayed commits are
+  new objects and rewriting published history is not the server's call.
 - WHEN a client creates a review comment, it is anchored to a file line range on a
   branch (defaulting to the repo's HEAD branch); the branch and path must exist,
   the body is required, and the branch's current commit is frozen for drift
@@ -122,14 +129,14 @@ conflict rules, not from access gates.
 - [x] Merged-PR compare reproduced from frozen pre-merge tips
 - [x] Update title/body/state (close/reopen); merged only via merge endpoint
 - [x] Merge inside the bare repo (no worktree), returns commit + fast-forward flag
-- [x] ff-only vs merge-commit methods; refuse non-fast-forward under ff-only
+- [x] ff-only / merge-commit / rebase methods; refuse non-fast-forward under ff-only
 - [x] Conflicts reported as paths, never auto-resolved
 - [x] CAS ref update guards against a concurrent push moving base
 - [x] Review comments anchored to a line range, with source snippets
 - [x] Author-only resolve/unresolve and delete; open/resolved/all listing
 - [x] CI run + merge event enqueued on a server-side merge (#256)
 - [x] Merged base branch mirror-pushed to a configured `mirror` remote (best-effort, non-forced)
-- [ ] Server-side rebase of head onto base, worktree-free (#257)
+- [x] Server-side rebase of head onto base, worktree-free (#257)
 - [x] Approve / request-changes verdicts with token-stamped reviewer; invalid states rejected
 - [x] One standing verdict per reviewer — re-submitting replaces it
 - [x] Verdicts surfaced on the PR detail response and emitted to the feed

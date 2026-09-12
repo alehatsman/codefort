@@ -408,7 +408,7 @@ export interface UpdatePullRequestInput {
   state?: PRState
 }
 
-export type MergeMethod = "merge" | "ff-only"
+export type MergeMethod = "merge" | "ff-only" | "rebase"
 
 export interface MergeRequestInput {
   method?: MergeMethod

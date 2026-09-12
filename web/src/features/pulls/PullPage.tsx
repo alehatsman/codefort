@@ -243,17 +243,30 @@ function PullMergePanel({
           {mergePull.isPending ? "Merging…" : "Merge pull request"}
         </Button>
         {notFastForwardable && (
-          <Button
-            disabled={mergePull.isPending}
-            onClick={() =>
-              mergePull.mutate(
-                { method: "merge" },
-                { onSuccess: () => toast(`Pull request #${n} merged`, { variant: "success" }) }
-              )
-            }
-          >
-            Merge with commit
-          </Button>
+          <>
+            <Button
+              disabled={mergePull.isPending}
+              onClick={() =>
+                mergePull.mutate(
+                  { method: "rebase" },
+                  { onSuccess: () => toast(`Pull request #${n} merged`, { variant: "success" }) }
+                )
+              }
+            >
+              Rebase and merge
+            </Button>
+            <Button
+              disabled={mergePull.isPending}
+              onClick={() =>
+                mergePull.mutate(
+                  { method: "merge" },
+                  { onSuccess: () => toast(`Pull request #${n} merged`, { variant: "success" }) }
+                )
+              }
+            >
+              Merge with commit
+            </Button>
+          </>
         )}
         <Button
           variant="danger"
@@ -299,8 +312,9 @@ function PullMergeStatus({
   if (notFastForwardable) {
     return (
       <div className="pull-merge__warn">
-        Branches have diverged — fast-forward not possible. Use "Merge with commit" to create a
-        merge commit, or rebase the head branch onto base and push.
+        Branches have diverged — fast-forward not possible. "Rebase and merge" replays the head's
+        commits onto base for linear history; "Merge with commit" records the divergence as a merge
+        commit.
       </div>
     )
   }

@@ -395,13 +395,20 @@ On success, issues referenced by closing keywords (`closes/fixes/resolves #N`)
 in the PR title+body are moved to `done`, and the base branch is pushed to the
 `mirror` remote if one is configured (best-effort, async).
 - Body (optional; empty body allowed): `{"method"?}` — `merge` (default) |
-  `ff-only`
+  `ff-only` | `rebase`. `rebase` replays each non-merge commit the head adds
+  over base onto the base tip (authorship preserved, committer `moongit`) and
+  advances base to the last one, so the result is linear and `fast_forward` is
+  true. It does not move the head ref — the replayed commits are new objects.
+  An already-linear head fast-forwards instead of being replayed.
 - `200` → `MergeResult` (`PullRequest` + `merge_commit`, `fast_forward`)
 - `400` invalid method / invalid number
 - `404` pull request not found
 - `409` PR not open · base or head branch no longer exists · not
-  fast-forwardable (`ff-only`) · base moved during the merge (retry) ·
-  **merge conflict** — body is `MergeConflictResponse` with `conflicts[]`
+  fast-forwardable (`ff-only`) · nothing to rebase, i.e. the head adds only
+  merge commits (`rebase`) · base moved during the merge (retry) ·
+  **merge conflict** — body is `MergeConflictResponse` with `conflicts[]`. A
+  conflicting rebase leaves base exactly where it was; commits are only
+  published once every one of them replays cleanly.
 
 ### POST /api/repos/{owner}/{repo}/pulls/{number}/reviews
 Upsert the caller's verdict on a PR.

@@ -17,7 +17,7 @@ the thing, not the task list.
 | Git over SSH, opt-in, publickey → token identity | [ssh-transport](specs/ssh-transport.md) |
 | Issues: CRUD, four-state lifecycle, claim-as-lock with lease, comments, labels | [issues](specs/issues.md) |
 | Epics (parent edge) + `depends-on` graph with computed ready/blocked views | [issues](specs/issues.md) |
-| Pull requests: open, merge (ff-only / merge-commit), CAS ref guard, mirror push | [pull-requests](specs/pull-requests.md) |
+| Pull requests: open, merge (ff-only / merge-commit / rebase), CAS ref guard, mirror push | [pull-requests](specs/pull-requests.md) |
 | PR approvals / review state; line-anchored review comments, resolve/reopen | [pull-requests](specs/pull-requests.md) |
 | CI: `mgitci.yml` DAG via `needs:`, container isolation, dependency waves, SSE logs, retention | [ci-pipelines](specs/ci-pipelines.md) |
 | Cron-scheduled pipeline runs | [ci-pipelines](specs/ci-pipelines.md) |
@@ -55,11 +55,13 @@ That is defensible (the frontmatter is the human-facing record, the table is
 the machine's) but it is undocumented, and it is why "every spec is draft"
 reads as a broken feature rather than an unused one.
 
-### 2. Pull-request completeness
+### 2. Should review state gate merge?
 
-- Server-side rebase of head onto base, worktree-free.
-- Review state does not gate merge: an approval is recorded but the merge
-  endpoint never consults it.
+An approval or a changes-requested verdict is recorded, surfaced on the PR, and
+emitted to the feed — and then ignored: the merge endpoint never consults it.
+That is consistent with local-trust (a valid token is the bar, claims are the
+social lock) and inconsistent with having a review feature at all. The call is a
+product one, not a technical one, and it has not been made.
 
 ### 3. Finish mooncake → provision
 

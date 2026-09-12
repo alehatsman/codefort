@@ -83,7 +83,7 @@ USAGE:
     moongit pr create  --base <ref> --head <ref> --title <t> [--body <b>]
     moongit pr list    [--state open|merged|closed|all]
     moongit pr show    <number>
-    moongit pr merge   <number> [--ff-only]
+    moongit pr merge   <number> [--ff-only | --rebase]
     moongit pr close   <number>
     moongit pr reopen  <number>
 

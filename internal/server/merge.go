@@ -119,8 +119,11 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 
 	newTip, ff, conflicts, err := s.doMerge(r.Context(), repoDir, pr, req.Method, baseTip, headTip, identityFromContext(r))
 	switch {
+	case errors.Is(err, errNothingToRebase):
+		writeError(w, http.StatusConflict, "nothing to rebase; the head branch adds only merge commits over base")
+		return
 	case errors.Is(err, errNotFastForward):
-		writeError(w, http.StatusConflict, "not fast-forwardable; use method \"merge\" or rebase head onto base")
+		writeError(w, http.StatusConflict, "not fast-forwardable; use method \"merge\" or \"rebase\"")
 		return
 	case errors.Is(err, errBaseMoved):
 		writeError(w, http.StatusConflict, "base branch moved during merge; retry")
@@ -240,7 +243,11 @@ func pushMirror(ctx context.Context, repoDir, branch string) error {
 // can map them to specific 409 messages.
 var (
 	errNotFastForward = errors.New("not fast-forwardable")
-	errBaseMoved      = errors.New("base ref moved")
+	// errNothingToRebase is its own sentinel so the 409 can say what actually
+	// happened: "not fast-forwardable, use rebase" would be nonsense advice to a
+	// caller who already asked for rebase.
+	errNothingToRebase = errors.New("nothing to rebase")
+	errBaseMoved       = errors.New("base ref moved")
 )
 
 // doMerge performs the ref update for one of the two methods. On a content
@@ -272,6 +279,16 @@ func (s *Server) doMerge(ctx context.Context, repoDir string, pr api.PullRequest
 		return headTip, true, nil, nil
 	}
 
+	if method == api.MergeRebaseMethod {
+		if baseAncestorOfHead {
+			// Head already sits on top of base, so replaying would mint new SHAs
+			// for commits that are already linear. `git rebase` fast-forwards
+			// here for the same reason; so do we.
+			return s.doMerge(ctx, repoDir, pr, api.MergeFFOnlyMethod, baseTip, headTip, identity)
+		}
+		return rebaseOnto(ctx, repoDir, pr, baseTip, headTip)
+	}
+
 	// method == merge: build a merge commit without a worktree.
 	tree, conflicts, err := mergeTree(ctx, repoDir, baseTip, headTip)
 	if err != nil {
@@ -295,6 +312,136 @@ func (s *Server) doMerge(ctx context.Context, repoDir string, pr api.PullRequest
 	return commit, false, nil, nil
 }
 
+// rebaseOnto replays every commit the head branch adds over base onto baseTip
+// and advances the base ref to the last replayed commit. It is worktree-free:
+// each commit is re-applied as a three-way merge computed in memory
+// (`merge-tree --merge-base=<original parent>`), then written with commit-tree.
+// That is exactly a cherry-pick, done without checking anything out.
+//
+// It deliberately does not move the head ref. The rebased commits are new
+// objects with new SHAs, so rewriting head would rewrite published history for
+// anyone who fetched it; the PR is closed as merged instead, exactly as the
+// other two methods leave it.
+//
+// Merge commits in the range are dropped, matching `git rebase`'s own default —
+// replaying a merge onto a new base is not well-defined without a strategy the
+// caller never picked.
+func rebaseOnto(ctx context.Context, repoDir string, pr api.PullRequest, baseTip, headTip string) (newTip string, ff bool, conflicts []string, err error) {
+	todo, err := rebaseTodo(ctx, repoDir, baseTip, headTip)
+	if err != nil {
+		return "", false, nil, err
+	}
+	if len(todo) == 0 {
+		// Head adds no non-merge commit over base — everything it contributes is
+		// a merge commit, which rebase drops. Advancing base would mark the PR
+		// merged having changed nothing, so say so instead.
+		return "", false, nil, errNothingToRebase
+	}
+
+	onto := baseTip
+	for _, c := range todo {
+		tree, cf, terr := cherryPickTree(ctx, repoDir, onto, c)
+		if terr != nil {
+			return "", false, nil, fmt.Errorf("rebase %s: %w", c.oid, terr)
+		}
+		if len(cf) > 0 {
+			return "", false, cf, nil
+		}
+		picked, cerr := commitTreeAs(ctx, repoDir, tree, c, onto)
+		if cerr != nil {
+			return "", false, nil, fmt.Errorf("rebase %s: %w", c.oid, cerr)
+		}
+		onto = picked
+	}
+
+	if err := updateRef(ctx, repoDir, "refs/heads/"+pr.BaseRef, onto, baseTip); err != nil {
+		// Same reading as the other two paths: almost always the CAS guard
+		// losing to a concurrent push, which is a retryable 409.
+		return "", false, nil, errBaseMoved
+	}
+	// The replayed commits sit directly on baseTip, so the ref moved forward in
+	// a straight line — a fast-forward in effect, which is the whole point.
+	return onto, true, nil, nil
+}
+
+// rebaseCommit is one commit to replay: its OID and the first parent the
+// original was built against, which is the merge base for re-applying it.
+type rebaseCommit struct {
+	oid    string
+	parent string
+}
+
+// rebaseTodo lists the non-merge commits base..head, oldest first — the same
+// set and order `git rebase` would replay.
+func rebaseTodo(ctx context.Context, repoDir, base, head string) ([]rebaseCommit, error) {
+	out, err := gitOutput(ctx, repoDir, "rev-list", "--reverse", "--no-merges",
+		"--format=%H %P", "--no-commit-header", base+".."+head)
+	if err != nil {
+		return nil, err
+	}
+	var todo []rebaseCommit
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		c := rebaseCommit{oid: fields[0]}
+		if len(fields) > 1 {
+			c.parent = fields[1] // first parent; --no-merges guarantees at most one
+		}
+		todo = append(todo, c)
+	}
+	return todo, nil
+}
+
+// cherryPickTree computes the tree that results from applying c onto onto,
+// three-way merging against c's original parent. A root commit (no parent) has
+// nothing to diff against, so it is applied against the empty tree.
+func cherryPickTree(ctx context.Context, repoDir, onto string, c rebaseCommit) (tree string, conflicts []string, err error) {
+	mergeBase := c.parent
+	if mergeBase == "" {
+		mergeBase = emptyTreeOID
+	}
+	out, code, runErr := gitRun(ctx, repoDir, "merge-tree", "--write-tree", "-z", "--name-only",
+		"--merge-base="+mergeBase, onto, c.oid)
+	return parseMergeTree(out, code, runErr)
+}
+
+// commitTreeAs writes tree as a commit with parent onto, preserving the
+// original commit's message, author, and author date — the rebase contract:
+// authorship survives, the committer becomes whoever moved it.
+func commitTreeAs(ctx context.Context, repoDir, tree string, c rebaseCommit, onto string) (string, error) {
+	meta, err := gitOutput(ctx, repoDir, "show", "-s", "--format=%an%x00%ae%x00%aI%x00%B", c.oid)
+	if err != nil {
+		return "", err
+	}
+	parts := strings.SplitN(string(meta), "\x00", 4)
+	if len(parts) < 4 {
+		return "", fmt.Errorf("unreadable commit metadata for %s", c.oid)
+	}
+	name, email, date, msg := parts[0], parts[1], parts[2], parts[3]
+
+	cmd := exec.CommandContext(ctx, "git", "commit-tree", tree, "-p", onto, "-m", strings.TrimRight(msg, "\n"))
+	cmd.Dir = repoDir
+	// Author is preserved verbatim; the committer is the server, matching what a
+	// local `git rebase` records.
+	cmd.Env = append(cmd.Environ(),
+		"GIT_AUTHOR_NAME="+name, "GIT_AUTHOR_EMAIL="+email, "GIT_AUTHOR_DATE="+date,
+		"GIT_COMMITTER_NAME=moongit", "GIT_COMMITTER_EMAIL=moongit@moongit.local",
+	)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return "", errors.New("git commit-tree: " + err.Error() + ": " + stderr.String())
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// emptyTreeOID is git's well-known empty tree, used as the merge base when
+// replaying a root commit (which has no parent to diff against).
+const emptyTreeOID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
 // mergeTree runs `git merge-tree --write-tree` to merge head into base in
 // memory. On a clean merge it returns the resulting tree OID; on a content
 // conflict it returns the conflicting paths (and an empty tree). The -z output
@@ -302,6 +449,12 @@ func (s *Server) doMerge(ctx context.Context, repoDir string, pr api.PullRequest
 // empty field terminates the conflicted-files section.
 func mergeTree(ctx context.Context, repoDir, base, head string) (tree string, conflicts []string, err error) {
 	out, code, runErr := gitRun(ctx, repoDir, "merge-tree", "--write-tree", "-z", "--name-only", base, head)
+	return parseMergeTree(out, code, runErr)
+}
+
+// parseMergeTree decodes one `merge-tree --write-tree -z --name-only` result,
+// shared by the merge and rebase paths since both read the same format.
+func parseMergeTree(out []byte, code int, runErr error) (tree string, conflicts []string, err error) {
 	switch code {
 	case 0:
 		// Clean: the whole output is the tree OID (with -z, NUL-terminated).

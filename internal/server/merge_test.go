@@ -455,3 +455,146 @@ func TestMergeWithCIDisabledStillMerges(t *testing.T) {
 		t.Errorf("runs = %d, want none when CI is off for the repo", len(runs))
 	}
 }
+
+// --- Rebase method (#257) --------------------------------------------------
+
+// The fixture's `feature` branch forked before main's edit, so it is diverged:
+// ff-only rejects it and a merge commit would fork the history. Rebase replays
+// feature's one commit onto main's tip, producing a linear result.
+func TestMergeRebaseReplaysOntoBase(t *testing.T) {
+	s, bare := newMergeTestServer(t)
+	openPull(t, s, "main", "feature", "rebase me")
+	baseTip := bareRev(t, bare, "refs/heads/main")
+	headTip := bareRev(t, bare, "refs/heads/feature")
+
+	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{Method: api.MergeRebaseMethod})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d (body=%s)", rr.Code, rr.Body.String())
+	}
+	res := mergeResult(t, rr.Result())
+
+	newTip := bareRev(t, bare, "refs/heads/main")
+	if newTip != res.MergeCommit {
+		t.Errorf("main = %s, merge_commit = %s; want the same commit", newTip, res.MergeCommit)
+	}
+	// Linear, not a merge: exactly one parent, and it is the old base tip.
+	if n := bareParentCount(t, bare, "refs/heads/main"); n != 1 {
+		t.Errorf("new tip has %d parents, want 1 (rebase must not create a merge commit)", n)
+	}
+	if p := bareRev(t, bare, "refs/heads/main^"); p != baseTip {
+		t.Errorf("new tip's parent = %s, want the pre-merge base tip %s", p, baseTip)
+	}
+	// It is a replay, not a move: a new commit object carrying the same content.
+	if newTip == headTip {
+		t.Error("main points at the original head commit; want a replayed commit")
+	}
+	if !res.FastForward {
+		t.Error("a rebase lands linearly on base; want fast_forward true")
+	}
+
+	// Both sides' content is present — main's edit survived and feature's file
+	// arrived, which is the whole point of replaying rather than resetting.
+	if got := bareFile(t, bare, "refs/heads/main", "a.txt"); got != "main side\n" {
+		t.Errorf("a.txt = %q, want main's edit preserved", got)
+	}
+	if got := bareFile(t, bare, "refs/heads/main", "f.txt"); got != "feature\n" {
+		t.Errorf("f.txt = %q, want feature's file replayed", got)
+	}
+
+	// The head ref is deliberately untouched: the replayed commits are new
+	// objects, and rewriting a published branch is not the server's call.
+	if got := bareRev(t, bare, "refs/heads/feature"); got != headTip {
+		t.Errorf("feature moved to %s; rebase must not rewrite the head ref", got)
+	}
+}
+
+// Authorship survives a replay; only the committer becomes the server.
+func TestMergeRebasePreservesAuthor(t *testing.T) {
+	s, bare := newMergeTestServer(t)
+	openPull(t, s, "main", "feature", "keep my name")
+
+	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{Method: api.MergeRebaseMethod})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d (body=%s)", rr.Code, rr.Body.String())
+	}
+	if got := bareShow(t, bare, "refs/heads/main", "%an"); got != "Alice" {
+		t.Errorf("author = %q, want the original author Alice", got)
+	}
+	if got := bareShow(t, bare, "refs/heads/main", "%cn"); got != "moongit" {
+		t.Errorf("committer = %q, want moongit (the server did the replay)", got)
+	}
+	if got := bareShow(t, bare, "refs/heads/main", "%s"); got != "feature work" {
+		t.Errorf("subject = %q, want the original message preserved", got)
+	}
+}
+
+// A conflicting replay reports the same 409 + path list a merge does, and
+// leaves the base ref where it was — a half-applied rebase is the failure mode
+// worth ruling out, since each commit lands as its own update.
+func TestMergeRebaseConflictLeavesBaseUntouched(t *testing.T) {
+	s, bare := newMergeTestServer(t)
+	openPull(t, s, "main", "conflict", "conflicting rebase")
+	before := bareRev(t, bare, "refs/heads/main")
+
+	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{Method: api.MergeRebaseMethod})
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409 (body=%s)", rr.Code, rr.Body.String())
+	}
+	var resp api.MergeConflictResponse
+	json.Unmarshal(rr.Body.Bytes(), &resp)
+	if len(resp.Conflicts) != 1 || resp.Conflicts[0] != "a.txt" {
+		t.Errorf("conflicts = %v, want [a.txt]", resp.Conflicts)
+	}
+	if after := bareRev(t, bare, "refs/heads/main"); after != before {
+		t.Errorf("main moved on a conflicting rebase: %s -> %s", before, after)
+	}
+	repoID, _ := storage.LookupRepo(s.rdb, cOwner, cRepo)
+	pr, _ := storage.GetPull(s.rdb, repoID, 1)
+	if pr.State != api.PROpen {
+		t.Errorf("PR state = %q after conflict, want open", pr.State)
+	}
+}
+
+// An already-linear head needs no replay: rebase fast-forwards instead of
+// minting new SHAs for commits that are already on top of base.
+func TestMergeRebaseFastForwardsWhenAlreadyLinear(t *testing.T) {
+	s, bare := newMergeTestServer(t)
+	openPull(t, s, "main", "ahead", "already linear")
+	headTip := bareRev(t, bare, "refs/heads/ahead")
+
+	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{Method: api.MergeRebaseMethod})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d (body=%s)", rr.Code, rr.Body.String())
+	}
+	if got := bareRev(t, bare, "refs/heads/main"); got != headTip {
+		t.Errorf("main = %s, want the existing head tip %s (no replay needed)", got, headTip)
+	}
+}
+
+// bareFile returns a file's content at a ref in the bare repo.
+func bareFile(t *testing.T, bare, ref, path string) string {
+	t.Helper()
+	cmd := exec.Command("git", "show", ref+":"+path)
+	cmd.Dir = bare
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git show %s:%s: %v: %s", ref, path, err, out)
+	}
+	return string(out)
+}
+
+// bareShow returns one `git show -s --format=<f>` field for a ref.
+func bareShow(t *testing.T, bare, ref, format string) string {
+	t.Helper()
+	cmd := exec.Command("git", "show", "-s", "--format="+format, ref)
+	cmd.Dir = bare
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git show -s %s %s: %v: %s", format, ref, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
