@@ -16,7 +16,7 @@ covers:
 ## Intent
 
 A pull request proposes folding one branch into another, and merging it is how a
-repo's canonical branch actually advances on the server. moongit performs the
+repo's canonical branch actually advances on the server. codefort performs the
 merge inside its own bare repository — no worktree, no checkout — so it is safe
 against the same repo that smart-HTTP is concurrently serving, and the result is
 a real ref update, not a relabeled row. Review happens through comments anchored
@@ -51,7 +51,7 @@ conflict rules, not from access gates.
   ref's pre-merge tip, so a concurrent push that moved base is detected and the
   merge is refused as retryable rather than clobbering the push.
 - WHEN a merge commit is created, it is stamped with the merging token's identity
-  (synthetic email; moongit identifies by token name, not email).
+  (synthetic email; codefort identifies by token name, not email).
 - WHEN a PR is merged on the server, the server enqueues a CI run for the
   resulting base tip — the same gate and run lifecycle as a pushed commit — and
   emits a merge event to the fleet feed, so a merge is built, tested, and visible

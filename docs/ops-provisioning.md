@@ -3,7 +3,7 @@
 Tracks the mooncake → provision migration (`~/projects/futurumlab/provision`)
 in three parts:
 
-- **Dev loop (#410, done).** moongit's local dev-loop tasks moved from
+- **Dev loop (#410, done).** codefort's local dev-loop tasks moved from
   mooncake (`tasks.yml`) to provision's `tasks/` directory of plan/component
   files. See "Layout" through "Validation — done" below.
 - **CI runner (#411, done).** `codefort.yml` jobs execute under provision
@@ -72,7 +72,7 @@ below.
 
 First attempt: one `tasks/vars.yml` (a plain mapping, direct carry-over of
 `tasks.yml`'s `vars:` block) loaded via `vars_file: ./vars.yml` in every
-task that needed it — `binary_path: "{{ home }}/.local/bin/moongitd"` etc.
+task that needed it — `binary_path: "{{ home }}/.local/bin/codefortd"` etc.
 
 **This is broken by design, not a bug.** Confirmed with Provision master
 mind (provision spec §3.3, `ba8bf9a`): a `vars:` step's values are
@@ -85,7 +85,7 @@ inserts its raw text — including the un-rendered `{{ home }}` inside it —
 and nothing re-renders that result. Confirmed by real failure: running
 `provision apply tasks/backup.yml` created a directory literally named
 `{{ home }}` in the invocation cwd. It failed safe (a malformed relative
-path, so the real `~/.local/share/moongit` was never touched) but every
+path, so the real `~/.local/share/codefort` was never touched) but every
 task using a home-anchored vars_file value was equally broken.
 
 `~` would work for pure path fields (`file.path/src`, `creates`, `cwd` all
@@ -104,8 +104,8 @@ home-relative var now has its own inline `- vars:` step, e.g.
 ```yaml
 steps:
   - vars:
-      binary_path: "{{ home }}/.local/bin/moongitd"
-      client_path: "{{ home }}/.local/bin/moongit"
+      binary_path: "{{ home }}/.local/bin/codefortd"
+      client_path: "{{ home }}/.local/bin/codefort"
   - name: "~/.local/bin directory"
     file: { path: "{{ home }}/.local/bin", state: dir }
   ...
@@ -135,7 +135,7 @@ removed wholesale, so that var is gone.)
 | — | `changed_when: "false"` on every ported `shell`/`cmd` step | `validate --strict` requires unless/creates/changed_when on every command step; these are exit-code-is-the-contract steps, same idiom as provision's own `tasks/build.yml` |
 | `{{ invocation_dir }}` | `$(pwd)` inside the shell script | provision has no `invocation_dir` template var, but every step's `cwd` defaults to the invocation directory (phase 5b: one rule, no per-file override) unless the step sets its own `cwd:` — none of ci-images/agent-image's steps do, so `$(pwd)` is exactly equivalent |
 | shared `vars:` block (`tasks.yml`) | inline `- vars:` step per task | see "Shared vars" above — `vars_file` doesn't render nested `{{ }}`, so home-anchored values can't be shared that way |
-| `mooncake apply -c ... -t moongit` invocation model | n/a | out of scope — host/server provisioning lives in dotfiles, untouched |
+| `mooncake apply -c ... -t codefort` invocation model | n/a | out of scope — host/server provisioning lives in dotfiles, untouched |
 | a colon+space inside an unquoted `shell: echo "text: text"` value | quote the whole value: `shell: 'echo "text: text"'` | YAML rule (colon-space is invalid in a plain scalar), not a provision quirk — hit twice (install/deploy done-messages) |
 
 ## Task-by-task
@@ -222,14 +222,14 @@ thing to type is not worth a translation layer (explicit > magic).
   - `build`, `clean` — zero risk, local-only. Correct.
   - `backup` — first real run hit the vars_file bug (above) and failed
     safe; re-run after the fix wrote a real 63 MB tarball to
-    `~/.local/share/moongit/backups/`. Correct.
-  - `install` — rebuilt + reinstalled `moongitd`/`moongit` + aliases.
+    `~/.local/share/codefort/backups/`. Correct.
+  - `install` — rebuilt + reinstalled `codefortd`/`codefort` + aliases.
     Correct.
   - `create-repo` — created `alehatsman/provision-smoke-test` against the
     live data dir. Correct.
   - `ci-images`, `agent-image` — built (docker-cache-hit, no rebuild
-    needed since this morning's images were current) `moongit-ci`,
-    `moongit-ci-dev`, `moongit-agent`. Correct.
+    needed since this morning's images were current) `codefort-ci`,
+    `codefort-ci-dev`, `codefort-agent`. Correct.
   - `deploy` — **correctly refused**: the #300 upstream guard fired
     because this branch has no upstream (unpushed feature branch), which
     is exactly what it's for. Proves the guard ported faithfully. The
@@ -237,11 +237,11 @@ thing to type is not worth a translation layer (explicit > magic).
     design — it can only run from a checkout level with canonical main,
     which this branch deliberately isn't yet.
 - **Not applied for real** (plan-verified only): `restore`, `uninstall` —
-  both touch the live moongit host this session's own tooling depends on
+  both touch the live codefort host this session's own tooling depends on
   (`restore` rolls the DB back to the backup's timestamp, destroying
   anything written since — including `provision-smoke-test` and session
   issue comments; `uninstall` deletes the systemd unit entirely, and
-  recovery is `mooncake apply -c ~/dotfiles/main_pc.yml -t moongit`, a
+  recovery is `mooncake apply -c ~/dotfiles/main_pc.yml -t codefort`, a
   different repo, unverified by anything here). Deferred by explicit
   choice, not a gap in the port itself — both showed correct `plan`
   output.
@@ -249,7 +249,7 @@ thing to type is not worth a translation layer (explicit > magic).
 ## CI runner (#411)
 
 Replaces mooncake as `cmd/codefortd/ci_runner.go`'s exec target. This is a
-model change, not a binary swap — see moongit issue #411 for the full
+model change, not a binary swap — see codefort issue #411 for the full
 before/after and why. This section is the code gate: no code lands until
 this holds.
 
@@ -261,7 +261,7 @@ loops, calling `jobSession.Exec(ctx, stepYAML) (stepResult, error)` once per
 step — N subprocess invocations (`mooncake step '<yaml>'`), each returning
 one JSON object `{rc,stdout,stderr,duration_ms,changed,failed,skipped,
 action,error}`. mooncake never sees a whole job, only one step's YAML at a
-time; moongit's event log is synthesized by the Go loop driving it.
+time; codefort's event log is synthesized by the Go loop driving it.
 
 **provision:** one whole plan file, one process, streamed NDJSON — one line
 per step as it runs, ending in a summary line (confirmed with Provision
@@ -432,7 +432,7 @@ skipped := ev.Status == "skipped"
 // than silently mapping them to something.
 ```
 
-moongit's job-level status still derives from "any step failed" (not the
+codefort's job-level status still derives from "any step failed" (not the
 summary line's more granular counts) — matches current semantics
 (ci_runner.go:664-671), a deliberate no-behavior-change choice, not an
 oversight: the summary's `changed`/`ok`/`skipped` breakdown is available
@@ -475,7 +475,7 @@ already is.
 `curl` had to be added to the base image too. mooncake's `assert: {http:
 {...}}` used mooncake's own built-in Go HTTP client — no external binary
 needed. provision's translated equivalent (the curl-based command assert,
-above) does need one, and the base `moongit-ci:latest` image is
+above) does need one, and the base `codefort-ci:latest` image is
 deliberately toolchain-free — it didn't carry curl. First live run of the
 `smoke` job failed with `curl: command not found`; fixed by adding `curl`
 to `ci/Dockerfile`'s package list, documented in `ci/README.md`. This is a
@@ -503,7 +503,7 @@ the `--add-host` flag, don't remove it.
   0.9.1` binary (`provision validate --strict`), including `smoke`'s
   http-assert rewrite.
 - The http-assert curl/grep rewrite, applied for real (`provision apply
-  --json`) against the live moongit host at `127.0.0.1:8080` — both the
+  --json`) against the live codefort host at `127.0.0.1:8080` — both the
   healthy case (200 + "ok" body, step reports `ok`) and a deliberately
   wrong-port failure case (step reports `failed`, `msg` surfaced, exit 1) —
   confirming the translation preserves the status+contains semantics, not
@@ -533,12 +533,12 @@ the `--add-host` flag, don't remove it.
   left over from #410) corrected.
 
 **Live end-to-end run — done, against an isolated scratch instance, not the
-live moongitd:**
+live codefortd:**
 
-Rebuilt `moongit-ci:latest` from the updated Dockerfile (both binaries +
-curl). Built this branch's `moongitd`/`mgit` into a scratch data dir, on a
+Rebuilt `codefort-ci:latest` from the updated Dockerfile (both binaries +
+curl). Built this branch's `codefortd`/`cf` into a scratch data dir, on a
 different port, with a fresh SQLite DB, docker isolation — a separate
-process and separate CI-container namespace from the real moongit
+process and separate CI-container namespace from the real codefort
 deployment, so the live daemon (and its live job queue, if anything had
 been running) was never touched. Registered a throwaway repo, enabled CI,
 pushed and manually triggered runs through the real `POST .../runs` API
@@ -566,16 +566,16 @@ chased down since the manual-trigger path exercises the exact same
   `TestExecuteRunFailurePropagatesAndSkips`, now proven for real, not just
   against a fake).
 - Torn down cleanly: scratch process killed, scratch data dir removed, no
-  leftover `moongit-ci-*` containers, live moongitd's own `/healthz`
+  leftover `codefort-ci-*` containers, live codefortd's own `/healthz`
   reconfirmed healthy and untouched throughout.
 
 **One real operational risk found, not yet acted on:** `sweepOrphanContainers`
-(ci_runner.go) filters by container name prefix only (`moongit-ci-`/
-`moongit-agent-`), not by data dir or port — it's Docker-daemon-wide, not
-scoped per moongitd instance. Starting the scratch instance swept 2
+(ci_runner.go) filters by container name prefix only (`codefort-ci-`/
+`codefort-agent-`), not by data dir or port — it's Docker-daemon-wide, not
+scoped per codefortd instance. Starting the scratch instance swept 2
 pre-existing orphan containers on the shared daemon; harmless this time
 (nothing was genuinely in-flight at that moment, confirmed via `docker ps`
-before/after), but a second moongitd instance started against the same
+before/after), but a second codefortd instance started against the same
 Docker daemon while the *live* one has real in-flight CI/agent containers
 would force-remove them. Not a regression from #411 (the sweep is
 pre-existing, untouched by this change) and out of this issue's scope to
@@ -583,8 +583,8 @@ fix, but worth its own issue if a second local instance (staging, another
 dev) is ever going to coexist with the production one on one Docker host.
 
 **Still not done:** `quality`'s `mooncake task ci` shell-out inside a
-provision-run container (needs `moongit-ci-dev:latest` rebuilt — not done
-in this pass, only the base `moongit-ci:latest` was) and a deliberately-
+provision-run container (needs `codefort-ci-dev:latest` rebuilt — not done
+in this pass, only the base `codefort-ci:latest` was) and a deliberately-
 failing step's actual UI rendering (the storage/event-log data it renders
 from is proven correct above; the UI component itself wasn't opened).
 Neither blocks merging on its own judgment, but flagging both rather than
@@ -628,7 +628,7 @@ tasks/
 ```
 
 Mirrors the real precedent already in the fleet for rust-quality
-(`isayes`/`teleport`'s `tasks/tools.yml` + `tasks/ci.yml` etc — moongit is
+(`isayes`/`teleport`'s `tasks/tools.yml` + `tasks/ci.yml` etc — codefort is
 the *first* ts-quality/provision consumer, no prior art in this repo to
 copy from directly). The pin lives in `tasks/ui-tools.yml`'s `vars:` step,
 nowhere else:
@@ -711,7 +711,7 @@ silently dropped — invisible until a stray `npm run build` left a 900KB
 minified `dist/assets/*.js` in the tree, which the gate then tried to lint
 (6.5GB RSS, minutes to complete, one false-positive rules-of-hooks
 finding from the minified code). Fix: `web/biome.json`'s `files.includes`
-repeats the base's six excludes verbatim, then adds moongit-local ones
+repeats the base's six excludes verbatim, then adds codefort-local ones
 (`test-results/`, `playwright-report/`, `.vite/`, `*.tsbuildinfo`, `*.log`,
 `.playwright-mcp/` — `web/.gitignore`'s entries, since the base's
 `vcs.useIgnoreFile: false` means `.gitignore` isn't consulted either).
@@ -779,7 +779,7 @@ notable non-mechanical ones:
   then `provision apply tasks/ui-ci.yml` — **not yet run for real in CI**
   (would require a push through the live pipeline); the component-level
   validation above exercises the identical steps the job now runs, just
-  not inside the `moongit-ci-dev:latest` container via `ci_runner.go`.
+  not inside the `codefort-ci-dev:latest` container via `ci_runner.go`.
   Flagging as the one piece not end-to-end proven, matching this doc's own
   standard elsewhere (the CI-runner section flags its own not-yet-done
   items rather than claiming a clean sweep).

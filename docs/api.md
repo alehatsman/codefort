@@ -1,6 +1,6 @@
 # HTTP API
 
-`moongitd` serves the JSON API, git smart-HTTP, and the SPA on one port. This
+`codefortd` serves the JSON API, git smart-HTTP, and the SPA on one port. This
 document is the reference for the JSON API; the route table it describes is
 `Handler()` / `apiHandler()` / `gitHandler()` in `internal/server/server.go`,
 and every wire type is in `internal/api/types.go`.
@@ -410,7 +410,7 @@ in the PR title+body are moved to `done`, and the base branch is pushed to the
 `mirror` remote if one is configured (best-effort, async).
 - Body (optional; empty body allowed): `{"method"?}` — `merge` (default) |
   `ff-only` | `rebase`. `rebase` replays each non-merge commit the head adds
-  over base onto the base tip (authorship preserved, committer `moongit`) and
+  over base onto the base tip (authorship preserved, committer `codefort`) and
   advances base to the last one, so the result is linear and `fast_forward` is
   true. It does not move the head ref — the replayed commits are new objects.
   An already-linear head fast-forwards instead of being replayed.

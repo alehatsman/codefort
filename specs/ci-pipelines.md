@@ -14,10 +14,10 @@ covers:
 
 ## Intent
 
-CI turns a push into feedback. When code lands in a moongit repo, the daemon
+CI turns a push into feedback. When code lands in a codefort repo, the daemon
 enqueues a run, executes the repo's pipeline against that exact commit in an
 isolated workspace, and streams the result back live. The whole thing runs
-in-process in the single `moongitd` binary — no external runner fleet — so a
+in-process in the single `codefortd` binary — no external runner fleet — so a
 self-hosted box gets push-triggered CI with nothing else to operate. Runs are
 durable across restarts and bounded in resource use (concurrency caps, run
 timeout, retention) so an unattended fleet doesn't accumulate stuck runs or
@@ -101,7 +101,7 @@ unbounded history. Agent runs reuse this same claim/lease/execute spine.
   delivery and backing store are the events-feed spec's domain. The per-job
   event-log stream (replay/tail/resume) *is* in scope here.
 - **Container image provisioning.** What the CI/agent image contains and how it's
-  built lives outside moongit (mooncake task); this spec only states that docker
+  built lives outside codefort (mooncake task); this spec only states that docker
   isolation runs jobs in a container.
 - **An external runner / agentd.** CI stays in-process by design; a separate
   runner daemon is explicitly deferred and out of scope.

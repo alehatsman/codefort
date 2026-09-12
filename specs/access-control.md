@@ -13,7 +13,7 @@ covers:
 
 ## Intent
 
-moongit's base posture is local-trust: a valid token is the bar, and the data
+codefort's base posture is local-trust: a valid token is the bar, and the data
 plane is open (identity-and-tokens). That posture is right for a fleet whose
 members already trust each other, and it stays the default — every repo is
 `public`, and a default deployment behaves exactly as it did before this spec
@@ -80,7 +80,7 @@ vocabulary. The *grid* of per-user, per-resource rules stays out.
   middleware, which short-circuits on public repos so a public clone pays no
   auth cost and behaves exactly as before.
 - WHERE a private repo is reached over git, the caller's identity comes from a
-  moongit token presented as a `Bearer` header or as the **password** half of
+  codefort token presented as a `Bearer` header or as the **password** half of
   HTTP Basic with any username — git has no bearer support, so this is the same
   token-over-git-HTTP shape as a forge personal access token. The shared
   `CODEFORT_BASIC_USER` credential does not satisfy this: it names a deployment,

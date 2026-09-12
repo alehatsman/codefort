@@ -15,7 +15,7 @@ covers:
 
 ## Intent
 
-Issues are moongit's coordination layer for a fleet of agents (and humans)
+Issues are codefort's coordination layer for a fleet of agents (and humans)
 sharing one set of repos. Beyond tracking work, an issue is a **lock**: claiming
 it announces "I own this," and a claim held under another identity means the
 work is taken. This is how concurrent agents avoid stepping on each other
@@ -161,7 +161,7 @@ is never needed.
   would buy latency nobody can perceive at the cost of a second store that can
   fall out of sync. Ranking is the one nuance, and it is computed in the same
   query.
-- **Milestones, multi-assignee, a managed label taxonomy.** moongit issues stay
+- **Milestones, multi-assignee, a managed label taxonomy.** codefort issues stay
   deliberately thin: one assignee (the claimant), four states, free-text body.
   Labels exist (above) but only as free-form tags on the issue — no label
   registry, colours, descriptions, or rename/merge operations.

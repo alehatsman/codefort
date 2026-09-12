@@ -7,13 +7,13 @@ covers:
   - "cmd/cf/pr.go"
   - "cmd/cf/events.go"
 ---
-# mgit — the human-facing client
+# cf — the human-facing client
 
 ## Intent
 
-`mgit` (built from `cmd/cf`) is the hand-driven front door to a moongit
+`cf` (built from `cmd/cf`) is the hand-driven front door to a codefort
 server: a thin, stateless REST client that infers *where to talk* from the git
-checkout you are standing in, so the common case is a bare verb — `mgit issue
+checkout you are standing in, so the common case is a bare verb — `cf issue
 claim 42` — with no host, repo, or user to type. It holds no config file, no
 cache, and no local state; every invocation resolves its target from `git
 remote`, authenticates with one environment variable, makes one (or a few)
@@ -23,16 +23,16 @@ the client's job is to *not* add a second source of truth: it validates only
 what it can settle locally (arg shape, enum spelling, mutually exclusive flags)
 so a typo costs no round-trip, and otherwise surfaces the server's own message
 verbatim. This is deliberately the terse, dogfooded surface; the agent-facing
-dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
+dual is `cf mcp` (see mcp-server), which reuses exactly this plumbing.
 
 ## Behavior
 
 ### Target resolution and identity
 
 - WHEN any server-touching command runs, the target is resolved from the current
-  checkout: the `moongit` remote is tried first (the code mirror), and only if
+  checkout: the `codefort` remote is tried first (the code mirror), and only if
   that remote is absent does it fall back to `origin`. The first one found wins
-  outright — a malformed `moongit` remote is an error, not a reason to try
+  outright — a malformed `codefort` remote is an error, not a reason to try
   `origin`.
 - WHERE the chosen remote is `http(s)://host/owner/repo(.git)`, both the server
   base URL and `owner/repo` come from it; WHERE it is `ssh://…` or scp-like
@@ -56,7 +56,7 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
 
 ### Command groups
 
-- WHEN `mgit` is run with no arguments, or with `help`/`-h`/`--help`, it prints
+- WHEN `cf` is run with no arguments, or with `help`/`-h`/`--help`, it prints
   usage to stdout and exits 0; an unrecognised top-level or sub-command is an
   error naming the offender.
 - WHERE a command takes an identifier (issue number, PR number, comment id,
@@ -107,12 +107,12 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
   stdout for a `y`/`N` confirmation naming exactly what will be destroyed, unless
   `--yes` (or `-y`) is passed. Declining prints `aborted` and exits **0** — a
   refused confirmation is not an error.
-- WHERE `mgit mcp` appears in dispatch, it is this CLI's stdio/MCP sibling and is
+- WHERE `cf mcp` appears in dispatch, it is this CLI's stdio/MCP sibling and is
   specified separately; it reuses target resolution and `CODEFORT_TOKEN` unchanged.
 
 ### Streaming the feed
 
-- WHEN `mgit events` runs, it opens the authenticated SSE feed at `/api/events`
+- WHEN `cf events` runs, it opens the authenticated SSE feed at `/api/events`
   on the resolved server (cross-repo by default), prints one compact line per
   event — `HH:MM:SS  type  repo  @actor  summary`, with a per-type summary pulled
   from the event payload — and tails until interrupted.
@@ -135,7 +135,7 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
   human-formatted lines; only the terminal error and the events reconnect notice
   go to **stderr**.
 - WHEN a command fails for any reason, the error is printed to stderr prefixed
-  `moongit:` and the process exits **1**. There is exactly one failure exit code:
+  `codefort:` and the process exits **1**. There is exactly one failure exit code:
   a usage error, a not-found, and a claim conflict are indistinguishable by
   status and must be told apart by parsing the message.
 - WHERE a request fails, the client prefers the server's own `error` field over
@@ -145,11 +145,11 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
 - WHERE machine-readable output is concerned, `review list --json` is the **only**
   command that emits raw API JSON; every other command prints formatted text
   only, so scripts and agents must scrape columns. This is a real gap for the
-  fleet's scripted use (agents are expected to drive `mgit`), tracked below.
+  fleet's scripted use (agents are expected to drive `cf`), tracked below.
 
 ## Non-goals
 
-- **The MCP tool surface.** `mgit mcp`'s toolset, profiles, and stdio transport
+- **The MCP tool surface.** `cf mcp`'s toolset, profiles, and stdio transport
   are the mcp-server spec's; this spec covers it only as one dispatch branch that
   shares target resolution and auth.
 - **Server-side semantics of the endpoints being called.** What a claim locks,
@@ -157,11 +157,11 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
   pull-requests, ci-pipelines, and events-feed own those. Here the client is a
   transport: it states *which* endpoint a verb hits and how the result is
   rendered, never what the server decides.
-- **The `moongitd` server binary's CLI.** `moongitd serve`, `token create`,
+- **The `codefortd` server binary's CLI.** `codefortd serve`, `token create`,
   `repo create` and friends are the operator-side surface — a different binary,
   a different audience, and out of scope here even though `token create` mints
   the `CODEFORT_TOKEN` this client consumes.
-- **Git itself.** `mgit` never wraps clone/push/fetch; it reads `git remote` to
+- **Git itself.** `cf` never wraps clone/push/fetch; it reads `git remote` to
   locate the server and nothing more. Code moves over plain git.
 - **Configuration and sessions.** No config file, no login/logout, no profile or
   context switching, no credential storage: two environment variables and the
@@ -170,7 +170,7 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
 
 ## Checklist
 
-- [x] Target resolved from the `moongit` remote, falling back to `origin`
+- [x] Target resolved from the `codefort` remote, falling back to `origin`
 - [x] http(s) remotes yield server + owner/repo; ssh/scp yield owner/repo only
 - [x] `CODEFORT_SERVER` overrides the server base URL only, never owner/repo
 - [x] `CODEFORT_TOKEN` sent as Bearer; identity stamped server-side; no author sent
@@ -181,12 +181,12 @@ dual is `mgit mcp` (see mcp-server), which reuses exactly this plumbing.
 - [x] `repo delete` targets an explicit `owner/name`, server URL from the remote
 - [x] `issue delete` / `repo delete` confirm interactively unless `--yes`/`-y`; declining exits 0
 - [x] `events` filters via `--repo`/`--types`, resumes by seq/`Last-Event-ID`, reconnects on drop, `--once` drains and exits
-- [x] Results on stdout, errors on stderr prefixed `moongit:`; server error messages surfaced verbatim
-- [ ] **No `--json` anywhere except `review list`** — agents scripting `mgit` must parse formatted text
+- [x] Results on stdout, errors on stderr prefixed `codefort:`; server error messages surfaced verbatim
+- [ ] **No `--json` anywhere except `review list`** — agents scripting `cf` must parse formatted text
 - [ ] **One exit code for every failure (1)** — usage vs not-found vs conflict indistinguishable programmatically
 - [ ] `issue edit` multi-call sequence is not atomic: a mid-sequence failure leaves earlier steps applied
-- [ ] Usage text drift: `issue comment`'s usage advertises `--author`, which no flag set defines; `--labels`/`--label`, `pr close`/`pr reopen`, `mcp --profile`, and the `-y` shorthand are absent from `mgit help`
-- [ ] Usage text says to run inside a checkout whose `origin` points at moongit, but resolution prefers a `moongit` remote
-- [ ] Usage and error text say `moongit`; the distributed binary is `mgit`
+- [ ] Usage text drift: `issue comment`'s usage advertises `--author`, which no flag set defines; `--labels`/`--label`, `pr close`/`pr reopen`, `mcp --profile`, and the `-y` shorthand are absent from `cf help`
+- [ ] Usage text says to run inside a checkout whose `origin` points at codefort, but resolution prefers a `codefort` remote
+- [ ] Usage and error text say `codefort`; the distributed binary is `cf`
 - [ ] No `--repo` override: every server-touching command, including `repo delete`, needs a git checkout with a usable remote
 - [ ] Verified against the code by the verify workflow (flip to `living`)

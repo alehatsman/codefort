@@ -1,12 +1,12 @@
-# moongit — Vision
+# codefort — Vision
 
 A self-hosted git host, issue tracker, and CI runner that fits in your head and
 runs on your own machine. One binary, one port, one file of state.
 
-moongit exists because the tools we use to coordinate software have drifted far
+codefort exists because the tools we use to coordinate software have drifted far
 from the work itself. A git host should not need a cluster, a managed database,
 an object store, a message queue, and a build farm to let a few people share
-code and track what needs doing. moongit is the bet that it never did.
+code and track what needs doing. codefort is the bet that it never did.
 
 ## The three commitments
 
@@ -15,7 +15,7 @@ code and track what needs doing. moongit is the bet that it never did.
 Every part you can remove is a part that can't break, can't be misconfigured,
 and doesn't need to be understood by the next person who reads the source.
 
-- **One process.** `moongitd` serves the API, git smart-HTTP, and the web SPA
+- **One process.** `codefortd` serves the API, git smart-HTTP, and the web SPA
   on a single port. There is no sidecar, no reverse proxy requirement, no
   separate worker pool to keep alive. (The git SSH transport is the one
   optional second listener — off unless `CODEFORT_SSH_ADDR` is set, and still
@@ -28,7 +28,7 @@ and doesn't need to be understood by the next person who reads the source.
   longevity, not a convenience — they earn their place or they don't come in.
 - **No required ecosystem.** No Docker to run it, no Kubernetes to scale it, no
   cloud account to host it. A binary and a data directory.
-- **The client is small too.** `mgit` is a thin, scriptable CLI. Identity is a
+- **The client is small too.** `cf` is a thin, scriptable CLI. Identity is a
   token, claims are rows, coordination is plain HTTP. Nothing to learn that
   isn't already a git or REST concept.
 
@@ -65,7 +65,7 @@ or not the internet does.
   up with `cp`, move it to a new box, or read it with any SQLite tool. No export
   ritual, no vendor lock, no API you have to beg for your own data.
 - **Trust is local.** A token names an identity; the data plane is intentionally
-  open within a trusted network. moongit assumes a small group that already
+  open within a trusted network. codefort assumes a small group that already
   trusts each other, not an adversarial public internet — and is far simpler for
   it. This still leaves room for *lightweight* refinements on top of that base —
   named user accounts, a handful of branch-protection rules — as conveniences
@@ -78,14 +78,14 @@ or not the internet does.
 
 ## What this rules out
 
-A vision is also a set of nos. To stay true to the three commitments, moongit
+A vision is also a set of nos. To stay true to the three commitments, codefort
 will not:
 
 - grow a microservice architecture, a required external database, or a
   background-worker tier;
 - adopt heavy frameworks on either the server or the web client when the
   standard library and a small SPA suffice;
-- add features that only make sense at a scale moongit is not built for (orgs of
+- add features that only make sense at a scale codefort is not built for (orgs of
   thousands, public multi-tenant hosting, fine-grained RBAC matrices — the *grid*
   of per-user, per-resource permission rules, not coarse accounts or a few branch
   rules, which the trust model above permits);
@@ -106,6 +106,6 @@ Before adding anything, ask:
 3. Does it work fully offline, on hardware the user owns, with data they can
    copy?
 
-If the answer to any of these is no, the feature is wrong for moongit — or
-moongit is wrong, and we should say so plainly rather than compromise the three
+If the answer to any of these is no, the feature is wrong for codefort — or
+codefort is wrong, and we should say so plainly rather than compromise the three
 commitments.

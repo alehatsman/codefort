@@ -19,7 +19,7 @@ reuses the CI run spine end-to-end — claim, lease, concurrency, isolation, the
 per-job event stream, reconcile, retention — so an agent run is "a CI run whose
 job is an LLM," not a parallel subsystem. What's distinct is the conversation:
 the run parks between turns so a human can steer it, and finishing it is an
-explicit, server-side handoff (no push — moongitd owns the repo). Credentials
+explicit, server-side handoff (no push — codefortd owns the repo). Credentials
 and repo access are minted per-run and torn down on finalize; nothing sensitive
 lives in the image.
 
@@ -48,8 +48,8 @@ lives in the image.
   turn drives a resumable headless Claude session that edits files.
 - WHERE credentials are needed, they are injected per-run into the container and
   never baked into the image: a scoped LLM auth token (operator gateway bearer >
-  operator OAuth > env OAuth > env API key), an ephemeral moongit token (revoked
-  on finalize) plus the server URL for in-container git/mgit.
+  operator OAuth > env OAuth > env API key), an ephemeral codefort token (revoked
+  on finalize) plus the server URL for in-container git/cf.
 - WHEN a client finishes a parked (`awaiting_input`) run, the run transitions to
   `finishing` and the runner materializes the workspace as a commit on
   `agent/issue-<n>` server-side (no push), posts a summary comment on the issue,
@@ -85,13 +85,13 @@ lives in the image.
   The shared spine (claim/lease/concurrency/reconcile/retention/event stream) is
   specified there.
 - **The agent container image.** What the image contains, how it's built, and
-  how Claude plans internally live outside moongit. This spec stops at the env
-  moongit injects and the contract that a turn edits `/work`.
+  how Claude plans internally live outside codefort. This spec stops at the env
+  codefort injects and the contract that a turn edits `/work`.
 - **The events feed.** Run lifecycle may surface on the fleet feed, but the SSE
   feed's delivery and store are the events-feed spec's concern.
 - **Headless command execution.** Bash is not reliably unlockable in a
   headless subscription-auth Claude session, so `claude-edit` — now the only
-  execution model — cannot run commands (tests, git, mgit) inside a turn; it
+  execution model — cannot run commands (tests, git, cf) inside a turn; it
   only edits files. This was previously offset by the `mooncake-agent` model,
   which ran commands under its own control; with that model gone, this is a
   known capability gap, not a deliberate non-goal — closing it (e.g. a
@@ -105,7 +105,7 @@ lives in the image.
 - [x] Turn 1 in a fresh checked-out workspace + container; park in awaiting_input
 - [x] Follow-up turns queue, resume the session, stream, re-park
 - [x] claude-edit as the single execution model over a shared spine
-- [x] Per-run scoped credentials (LLM auth, ephemeral moongit token) torn down on finalize
+- [x] Per-run scoped credentials (LLM auth, ephemeral codefort token) torn down on finalize
 - [x] Finish = server-side handoff to agent/issue-<n> + summary comment; parked-only
 - [x] Cancel/force-stop from any non-terminal state; discards the workspace
 - [x] Per-turn timeout; schema-tolerant transcript translation

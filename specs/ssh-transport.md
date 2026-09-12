@@ -12,7 +12,7 @@ covers:
 ## Intent
 
 Git over SSH is an opt-in, additive second transport for the same repositories
-moongit already serves over HTTP. It exists for clients that prefer key-based
+codefort already serves over HTTP. It exists for clients that prefer key-based
 git access over a Basic-auth HTTP remote, and it resolves an SSH public key to
 the same token identity the HTTP path uses — so a push over SSH is attributed
 and triggers CI identically to a push over HTTP. It is strictly additive: the
@@ -22,7 +22,7 @@ HTTP behavior, and turning it off is the default.
 ## Behavior
 
 - WHILE `CODEFORT_SSH_ADDR` is set, the daemon listens for git SSH on that
-  address; unset, no SSH listener starts and moongit stays a single HTTP port.
+  address; unset, no SSH listener starts and codefort stays a single HTTP port.
 - WHEN a client connects over SSH, authentication is public-key only — there is
   no password and no anonymous access; the key's fingerprint is looked up in the
   registered SSH keys and resolved to its owning token.

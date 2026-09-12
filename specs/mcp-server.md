@@ -5,13 +5,13 @@ owners: [aleh]
 covers:
   - "cmd/cf/mcp.go"
 ---
-# MCP Server (mgit mcp)
+# MCP Server (cf mcp)
 
 ## Intent
 
-`mgit mcp` exposes moongit's control plane to an agent as MCP tools over stdio.
+`cf mcp` exposes codefort's control plane to an agent as MCP tools over stdio.
 It exists because a headless Claude session reliably gets MCP tools but not a
-shell — so an agent that can't run `mgit` on the command line can still file
+shell — so an agent that can't run `cf` on the command line can still file
 issues, claim work, review code, and trigger pipelines through tool calls. It is
 a pure stdio↔REST proxy with no local state: every tool is a thin wrapper over
 the same `/api` endpoints the human UI and CLI use, so the MCP surface is the
@@ -20,7 +20,7 @@ let the operator hand an agent only the tools its job needs.
 
 ## Behavior
 
-- WHEN `mgit mcp` starts, it serves moongit's toolset over stdio as an MCP server
+- WHEN `cf mcp` starts, it serves codefort's toolset over stdio as an MCP server
   and blocks until the transport closes or its context is cancelled.
 - WHERE identity and target come from, they reuse the rest of the CLI's plumbing:
   the repo is resolved from the checkout's git remotes (or `CODEFORT_SERVER`), and
@@ -44,7 +44,7 @@ let the operator hand an agent only the tools its job needs.
 - WHILE a profile restricts the toolset, the restriction is enforced at
   registration: a disallowed tool is never advertised to the client, not merely
   rejected when called.
-- WHERE the profile contract lives, mgit owns its own tool→profile mapping; the
+- WHERE the profile contract lives, cf owns its own tool→profile mapping; the
   server only names the profile (`full`/`review`) over the wire, mirroring the
   stored tool-profile values.
 
@@ -64,12 +64,12 @@ let the operator hand an agent only the tools its job needs.
 
 ## Checklist
 
-- [x] `mgit mcp` serves the toolset over stdio (modelcontextprotocol/go-sdk)
+- [x] `cf mcp` serves the toolset over stdio (modelcontextprotocol/go-sdk)
 - [x] Stateless stdio↔REST proxy; tools wrap the same /api endpoints as the CLI
 - [x] Repo from git remotes / CODEFORT_SERVER; auth via CODEFORT_TOKEN; single-repo scope
 - [x] Tool errors surfaced as structured output with the server's message
 - [x] 16 tools across issue / review / pipeline / agent groups
 - [x] `full` (default) and `review` profiles; review = read + review_* + issue_comment
 - [x] Profile enforced at registration (disallowed tools never advertised)
-- [x] Profile mapping owned by mgit; only the profile name crosses the wire
+- [x] Profile mapping owned by cf; only the profile name crosses the wire
 - [ ] Verified against the code by the verify workflow (flip to `living`)

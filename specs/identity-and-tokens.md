@@ -11,7 +11,7 @@ covers:
 
 ## Intent
 
-moongit's whole point is to coordinate a fleet of agents (and humans) that act
+codefort's whole point is to coordinate a fleet of agents (and humans) that act
 under distinct, attributable identities. A bearer token *is* an identity: its
 name is stamped as the author/assignee/trigger on every write, so the issue
 tracker, claims, PRs, and the event feed can attribute and serialize work. The

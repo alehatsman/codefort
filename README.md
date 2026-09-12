@@ -1,8 +1,8 @@
-# moongit
+# codefort
 
 **A self-hosted git host, issue tracker, and CI runner that fits in your head.**
 
-moongit is one Go binary that serves the API, git smart-HTTP, a CI
+codefort is one Go binary that serves the API, git smart-HTTP, a CI
 runner, and the web UI on a single port — backed by one SQLite file you
 can copy with `cp`. No cluster, no managed database, no object store,
 no message queue, no build farm. A git host never needed any of that to
@@ -10,15 +10,15 @@ let a few people share code and track what needs doing.
 
 ```bash
 # One process, one port, one file of state.
-moongitd serve            # API + git + CI + web SPA on :8080
+codefortd serve            # API + git + CI + web SPA on :8080
 
 # A token names your identity; claims are rows; coordination is HTTP.
-moongitd token create alice
+codefortd token create alice
 export CODEFORT_TOKEN=mgt_...
 
 # The client is a thin, scriptable CLI.
-mgit issue create --title "ship the thing" --body "plan goes here"
-mgit issue claim 42 --state in_progress
+cf issue create --title "ship the thing" --body "plan goes here"
+cf issue claim 42 --state in_progress
 ```
 
 Identity is a token, an issue claim is a lock, and the whole data plane
@@ -28,7 +28,7 @@ concept.
 ## Who it's for
 
 - **Small trusting teams** — share code and coordinate work on hardware
-  you control. moongit assumes a handful of people who already trust
+  you control. codefort assumes a handful of people who already trust
   each other, not an adversarial public internet, and is far simpler
   for it.
 - **Solo developers & self-hosters** — the same binary you'd run "in
@@ -42,15 +42,15 @@ concept.
 ## Quick start
 
 ```bash
-go install github.com/alehatsman/moongit/cmd/codefortd@latest
-go install github.com/alehatsman/moongit/cmd/cf@latest   # the `mgit` client
+go install github.com/alehatsman/codefort/cmd/codefortd@latest
+go install github.com/alehatsman/codefort/cmd/cf@latest   # the `cf` client
 
 # Mint a token (shown once) and register a repo.
-moongitd token create alice
-moongitd repo create alice/widgets
+codefortd token create alice
+codefortd repo create alice/widgets
 
 # Run the server. Set CODEFORT_WEB_DIR to also serve the built SPA.
-CODEFORT_WEB_DIR=web/dist moongitd serve
+CODEFORT_WEB_DIR=web/dist codefortd serve
 
 # Point a checkout's origin at the server and push.
 git remote add origin http://localhost:8080/alice/widgets
@@ -76,36 +76,36 @@ SQLite file:
 | **Code review** | Line-anchored review comments on any ref, resolvable/reopenable, surfaced on the Review tab |
 | **CI runner** | `codefort.yml` jobs wired into a DAG via `needs:`, each in a throwaway container; in-process, no worker tier |
 | **Agent runs** | Spawn a containerized Claude CLI agent from an issue; live transcript over SSE; awaiting-input → finish lifecycle |
-| **Event feed** | `GET /api/events` — a DB-backed SSE stream of push / issue / CI / agent events; `mgit events` tails it |
-| **MCP server** | `mgit mcp` serves the toolset over stdio so an agent drives issues, reviews, pipelines, and runs directly |
+| **Event feed** | `GET /api/events` — a DB-backed SSE stream of push / issue / CI / agent events; `cf events` tails it |
+| **MCP server** | `cf mcp` serves the toolset over stdio so an agent drives issues, reviews, pipelines, and runs directly |
 
 The web SPA ships as static files served by the same process — Code,
 Commits, Issues, Board, Pulls, Pipelines, Review, Specs, Agents, and
 Settings tabs, no SSR tier, no hydration tax.
 
-### The `mgit` client
+### The `cf` client
 
 ```bash
-mgit issue list --state todo,in_progress      # survey open work
-mgit issue show 42
-mgit issue comment 42 --body "checkpoint: tests green"
-mgit issue set-state 42 done
+cf issue list --state todo,in_progress      # survey open work
+cf issue show 42
+cf issue comment 42 --body "checkpoint: tests green"
+cf issue set-state 42 done
 
-mgit pr create --base main --head feat/x --title "Add x"
-mgit pr merge 7 --ff-only
+cf pr create --base main --head feat/x --title "Add x"
+cf pr merge 7 --ff-only
 
-mgit review create --path internal/api.go --lines 10-24 --body "nit: name this"
-mgit review resolve 3
+cf review create --path internal/api.go --lines 10-24 --body "nit: name this"
+cf review resolve 3
 
-mgit ci validate            # check ./codefort.yml
-mgit ci run main            # trigger a run for a ref
+cf ci validate            # check ./codefort.yml
+cf ci run main            # trigger a run for a ref
 
-mgit events --types issue,ci # tail the fleet feed
+cf events --types issue,ci # tail the fleet feed
 ```
 
 ## The three commitments
 
-moongit is a bet that a git host can stay small forever. Every change
+codefort is a bet that a git host can stay small forever. Every change
 is measured against three lines it will not cross:
 
 1. **Absolute minimalism** — one process, one file of state, a `go.mod`
@@ -124,11 +124,11 @@ When a proposed change pulls against minimalism, performance, or
 local-first ownership, the default answer is no. See
 [VISION.md](VISION.md) for the full rationale and the explicit list of
 nos (no microservices, no required external database, no fine-grained
-RBAC matrix, no scale moongit isn't built for).
+RBAC matrix, no scale codefort isn't built for).
 
 ## Comparison
 
-| Capability | moongit | GitHub / GitLab | bare git + scripts |
+| Capability | codefort | GitHub / GitLab | bare git + scripts |
 |---|---|---|---|
 | Single-binary install | ✓ | hosted / heavy self-host | n/a |
 | One file of state (SQLite) | ✓ `cp` to back up | managed Postgres + object store | n/a |
@@ -139,13 +139,13 @@ RBAC matrix, no scale moongit isn't built for).
 | Agent-native: REST + MCP + spawn-from-issue | ✓ | ✗ | ✗ |
 | Fine-grained RBAC matrix | ✗ (by design) | ✓ | n/a |
 
-moongit isn't trying to replace GitHub at organization scale — it ships
+codefort isn't trying to replace GitHub at organization scale — it ships
 the coordination primitives a small trusting team actually needs while
 staying a single binary you fully own.
 
 ## Configuration
 
-`moongitd` is configured entirely through the environment:
+`codefortd` is configured entirely through the environment:
 
 | Variable | Purpose |
 |---|---|
@@ -167,8 +167,8 @@ The client honors `CODEFORT_TOKEN` (identity) and `CODEFORT_SERVER`
 ## Development
 
 ```bash
-git clone https://github.com/alehatsman/moongit.git
-cd moongit
+git clone https://github.com/alehatsman/codefort.git
+cd codefort
 
 go run ./cmd/codefortd serve        # run the server
 go test ./...                      # Go tests
@@ -176,7 +176,7 @@ go test ./...                      # Go tests
 cd web && npm ci && npm run build  # build the SPA into web/dist
 ```
 
-CI is defined in [`codefort.yml`](codefort.yml) and dogfoods moongit's own
+CI is defined in [`codefort.yml`](codefort.yml) and dogfoods codefort's own
 runner: a `quality` Go gate and a `web` build, each in a throwaway
 container.
 

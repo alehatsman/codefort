@@ -16,7 +16,7 @@ polling every endpoint. Every meaningful action on the data plane — a push, an
 issue claim, a CI run starting or finishing — appends a row to a durable events
 table, and `GET /api/events` streams that table as Server-Sent Events: replay
 what you missed, then live-tail what's new. It is deliberately **pull-based**:
-moongit makes no outbound calls (no webhooks, #73), so subscribers reach in over
+codefort makes no outbound calls (no webhooks, #73), so subscribers reach in over
 the same authenticated API and there's nothing to configure or to fail
 delivering. The feed is a notification side-channel — best-effort and never on
 the critical path of the action it reports.
@@ -49,7 +49,7 @@ the critical path of the action it reports.
   sequence and type intact and a null data field, rather than being dropped.
 - WHILE the daemon runs, a retention sweep bounds the table to the newest
   configured number of events, and deleting a repo cascades away its events.
-- WHEN a client uses the `mgit events` command, it subscribes to this feed and
+- WHEN a client uses the `cf events` command, it subscribes to this feed and
   prints events as they arrive, with a snapshot (`--once`) mode over the same
   endpoint.
 
@@ -82,5 +82,5 @@ the critical path of the action it reports.
 - [x] Bounded batch drain + sub-second tail + heartbeat
 - [x] Corrupt-payload event still streams (seq/type intact, null data)
 - [x] Retention sweep to newest-N; repo delete cascades events
-- [x] `mgit events` client (stream + `--once`)
+- [x] `cf events` client (stream + `--once`)
 - [ ] Verified against the code by the verify workflow (flip to `living`)

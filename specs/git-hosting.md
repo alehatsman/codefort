@@ -15,7 +15,7 @@ covers:
 
 ## Intent
 
-moongit is a self-hosted git host: a single binary that stores bare git
+codefort is a self-hosted git host: a single binary that stores bare git
 repositories on disk and serves them over git's smart-HTTP protocol, so any
 stock `git` client can clone, fetch, and push without a special client. On top
 of that it exposes read-only views of repository contents — branches, file
@@ -68,10 +68,10 @@ requests, CI, and agents all assume a repo already lives and moves here.
   belongs to the CI pipeline spec; here it is mentioned only as a fact, not
   specified.
 - **Repository hosting at scale.** No forks, no per-repo access control lists,
-  no LFS, no pack-file GC policy. moongit hosts a small fleet's repos, not a
+  no LFS, no pack-file GC policy. codefort hosts a small fleet's repos, not a
   public forge.
 - **Semantic code intelligence.** Symbol indexes, call graphs, and semantic
-  search are not moongit's business (see the constitution's non-goals);
+  search are not codefort's business (see the constitution's non-goals);
   "browse" here means raw git content only.
 
 ## Checklist

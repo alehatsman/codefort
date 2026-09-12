@@ -13,7 +13,7 @@ covers:
 ## Intent
 
 A push that force-updates or deletes `main` is the one mistake this fleet
-cannot undo from inside moongit: the old commits are still in the object
+cannot undo from inside codefort: the old commits are still in the object
 store, but nothing records what the ref used to point at, so recovery means a
 reflog on somebody's laptop. Every other destructive action here is either
 guarded (repo delete is type-to-confirm, merge is compare-and-swap) or
@@ -58,12 +58,12 @@ opts a repo in.
   and why, on stderr, so the message arrives in the pusher's terminal rather
   than only in the server log.
 - WHERE enforcement lives, it is a `pre-receive` hook in the bare repo, fed
-  the repo's patterns through an environment variable that `moongitd` injects
+  the repo's patterns through an environment variable that `codefortd` injects
   when it spawns `git receive-pack` — over HTTP and over SSH alike. The hook
   makes no network call and reads no database, so a protected branch stays
   protected whether or not the daemon can answer, and a push never waits on
   one.
-- WHERE moongit itself moves a base ref during a server-side merge, it uses
+- WHERE codefort itself moves a base ref during a server-side merge, it uses
   `update-ref` rather than `receive-pack` and so does not pass this hook. That
   is deliberate: a merge is already fast-forward-or-new-commit by
   construction, guarded by its own compare-and-swap, and gated by the review

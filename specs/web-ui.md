@@ -9,8 +9,8 @@ covers:
 
 ## Intent
 
-The SPA is the human face of the same `/api` surface `mgit` drives — served by
-the same `moongitd` binary on the same port, so self-hosting the daemon is all
+The SPA is the human face of the same `/api` surface `cf` drives — served by
+the same `codefortd` binary on the same port, so self-hosting the daemon is all
 it takes to get a UI. It is a thin, pull-based client: the server owns all
 state, the browser owns a token and a cache. Its job is to make a fleet's
 coordination legible at a glance — what needs attention, what is claimed, what
@@ -69,7 +69,7 @@ reconstruct: reload is always a valid recovery.
   conversation, review state and merge action; **Compare** picks base/head from
   the branch list, shows the diff, and opens a PR from it; **Review** is the
   repo-wide inbox of line-anchored code comments, filterable by ref and by
-  open/resolved — the same set `mgit review` works through.
+  open/resolved — the same set `cf review` works through.
 - WHERE the tab is **Pipelines**, it lists CI runs with state filters and opens
   one run's job DAG with live per-job logs; **Agents** is the same shell scoped
   to agent runs, whose detail view renders the run as a transcript with a

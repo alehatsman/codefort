@@ -1,6 +1,6 @@
-# Architecture — moongit
+# Architecture — codefort
 
-moongit is one Go process (`moongitd`) that serves the `/api` surface, git
+codefort is one Go process (`codefortd`) that serves the `/api` surface, git
 smart-HTTP, the built SPA, and the in-process CI/agent runner on a single port,
 against a single SQLite file and a directory of bare repos. Everything else in
 this document follows from that: there is no worker tier to schedule against, no
@@ -15,7 +15,7 @@ substrate, boring mechanisms).
 
 ## Process layout
 
-`moongitd` is also a small admin CLI; `cmd/codefortd/main.go` dispatches
+`codefortd` is also a small admin CLI; `cmd/codefortd/main.go` dispatches
 `serve` (the default with no args), `repo create`, `token create|list|revoke`,
 and `ci install-hooks`. Only `serve` starts the system.
 
@@ -163,7 +163,7 @@ decides": a handler that reads calls `storage.X(s.rdb, …)` and a handler that
 writes calls `storage.X(s.db, …)`. Getting it backwards fails in two directions:
 
 - *Read on the writer* — quietly serializes the read behind every in-flight
-  mutation. Under a polling fleet this is the classic symptom of "moongit feels
+  mutation. Under a polling fleet this is the classic symptom of "codefort feels
   slow for no reason," and it is invisible in tests.
 - *Write on the reader* — `query_only(1)` rejects it, so this fails loudly. That
   pragma is deliberately a defensive backstop, not an assumption.
@@ -250,7 +250,7 @@ Bare repos on disk are the source of truth; SQLite holds coordination metadata
   `git upload-pack --stateless-rpc --advertise-refs` as `cmd.Stdout`.
   `handleServiceRPC` wires `cmd.Stdin = body` (transparently gunzipped by
   `decodeBody`) and `cmd.Stdout = w`. There is no worktree, no temp file, and no
-  pack held in memory — moongit is a pipe between the client and `git`.
+  pack held in memory — codefort is a pipe between the client and `git`.
 - **Push hooks carry no secrets on disk.** On `git-receive-pack`,
   `handleServiceRPC` injects `CODEFORT_CI_URL`, `CODEFORT_CI_SECRET`,
   `CODEFORT_CI_REPO`, `CODEFORT_CI_PUSHER` into the child's environment; the
@@ -269,8 +269,8 @@ Bare repos on disk are the source of truth; SQLite holds coordination metadata
 - **Hook path is pinned per repo.** `WriteManagedHooks` writes both hooks *and*
   sets the bare repo's own `core.hooksPath`. That is not redundant: git resolves
   `core.hooksPath` from the global config too, so a server whose git user sets
-  it in `~/.gitconfig` would silently run those hooks and none of moongit's —
-  no CI on push, no branch protection, and no error anywhere. `moongitd ci
+  it in `~/.gitconfig` would silently run those hooks and none of codefort's —
+  no CI on push, no branch protection, and no error anywhere. `codefortd ci
   install-hooks` backfills both the hooks and the pin onto existing repos.
 - **Server-side operations are worktree-free**, because the same bare repo is
   being served concurrently. Reads use plumbing (`cat-file -t/-s/blob`,

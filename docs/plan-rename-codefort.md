@@ -89,7 +89,7 @@ the reason this is a plan and not a one-liner.
 Each phase is one commit and each leaves the tree building. Phase 1 is the only
 one that must be atomic internally.
 
-### Phase 1 — Go module path and package directories  `todo`
+### Phase 1 — Go module path and package directories  `done`
 
 The atomic one: the module path, the 102 importing files, and the two command
 directories move together or nothing compiles.
@@ -104,7 +104,7 @@ directories move together or nothing compiles.
 
 Branch/commit: `refactor(rename): module path and command dirs → codefort`.
 
-### Phase 2 — environment variables  `todo`
+### Phase 2 — environment variables  `done`
 
 - `internal/config/config.go` + `config_test.go` (190 hits between them) —
   every `envOr("MOONGIT_…")` key.
@@ -116,7 +116,7 @@ Branch/commit: `refactor(rename): module path and command dirs → codefort`.
   `CODEFORT_SERVER` to the container; the agent image's expectations move with
   it.
 
-### Phase 3 — CI manifest  `todo`
+### Phase 3 — CI manifest  `done`
 
 - Every reader and every doc: `mgitci.yml` → `codefort.yml`
   (`cmd/codefortd/ci_runner.go`, `cron_scheduler.go`, `cmd/cf/main.go`).
@@ -124,7 +124,7 @@ Branch/commit: `refactor(rename): module path and command dirs → codefort`.
   branch-prefix gate intact.
 - No fallback path is added. That was the decision; Trap 4 is its cost.
 
-### Phase 4 — images, services, provision tasks  `todo`
+### Phase 4 — images, services, provision tasks  `done`
 
 - `moongit-ci:latest` → `codefort-ci:latest`, `moongit-agent:latest` →
   `codefort-agent:latest` (config defaults + `tasks/ci-images.yml` +
@@ -134,7 +134,7 @@ Branch/commit: `refactor(rename): module path and command dirs → codefort`.
   `deploy.yml`, and the install/uninstall symlink names.
 - `tasks.yml` descriptions.
 
-### Phase 5 — web UI  `todo`
+### Phase 5 — web UI  `done`
 
 15 files. Visible title and shell branding (`web/index.html`,
 `web/shell/Layout.tsx`, `features/settings/TokenGate.tsx` — the last one tells
@@ -143,7 +143,7 @@ create`), `package.json` name, the API types comment, and the three
 localStorage keys per Trap 6. Playwright specs that assert on branding move with
 it.
 
-### Phase 6 — docs, specs, and agent instructions  `todo`
+### Phase 6 — docs, specs, and agent instructions  `done`
 
 28 Markdown files. `README.md`, `VISION.md`, `ROADMAP.md`, `CLAUDE.md`,
 `AGENTS.md`, `web/CLAUDE.md`, all six `docs/`, all fifteen `specs/`.

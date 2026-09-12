@@ -1,4 +1,4 @@
-# moongit web — conventions
+# codefort web — conventions
 
 Vite + React 19 SPA. Read this before adding or editing components.
 
@@ -122,10 +122,10 @@ demote the rule; suppress a deliberate exception inline with a justified
 
 `npm test` runs the suite (`tests/*.spec.ts`). Add/extend a spec for new
 interactive UI. Every spec mocks the API through `tests/mockApi.ts` — no real
-moongitd — which is what lets the suite boot a Vite dev server and stay
+codefortd — which is what lets the suite boot a Vite dev server and stay
 hermetic.
 
-`tests/phase2-smoke.spec.ts` is the one exception: it hits a **real** moongitd
+`tests/phase2-smoke.spec.ts` is the one exception: it hits a **real** codefortd
 on `:8080` and so is excluded from the default config. Run it with
 `npm run test:smoke` against a live server. Keep integration specs out of the
 default net for the same reason — a suite that cannot pass locally stops being

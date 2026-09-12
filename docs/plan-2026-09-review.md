@@ -49,7 +49,7 @@ The load-bearing fix. Design: **one gate, not 61 call sites.**
   - no read access → **404, not 403**, so a private repo's existence does not
     leak.
 - `withGitRepoAccess` on the git smart-HTTP mux. Git clients authenticate with
-  HTTP Basic, so a moongit token is accepted as the Basic *password* (the
+  HTTP Basic, so a codefort token is accepted as the Basic *password* (the
   standard token-over-git-HTTP pattern). Public repos keep today's open
   behavior; private repos require an identity that passes `CanAccessRepo`, and
   `git-receive-pack` additionally requires `CanWriteRepo`.
@@ -91,7 +91,7 @@ Shipped code with zero spec coverage, in descending order of risk:
 - `specs/access-control.md` — accounts / visibility / membership (Phase 2).
 - `specs/web-ui.md` — 20k LOC, no spec. `specs/specs.md` already defers its
   Specs-tab behavior to a web spec that did not exist.
-- `specs/cli.md` — the `mgit` surface. `specs/mcp-server.md` covers MCP only.
+- `specs/cli.md` — the `cf` surface. `specs/mcp-server.md` covers MCP only.
 - Extend `specs/issues.md` with labels (migration 23, #340).
 - Extend `specs/pull-requests.md` with approvals / review state (migration 28,
   #401, `internal/storage/pr_reviews.go`).
@@ -120,11 +120,11 @@ to fix in place rather than defer.
 - `/research` and `/summaries` redirected to `/:owner/:repo/explore`, a route
   commented out in ce12340, so both landed on the catch-all not-found page. A
   redirect implies somewhere to go; they now share Explore's fate.
-- `mgit issue comment`'s usage string advertised a `--author` flag that was
+- `cf issue comment`'s usage string advertised a `--author` flag that was
   never registered, so following the usage produced a parse error. `printUsage`
   had also drifted from the parser on labels, `pr close`/`reopen`,
   `mcp --profile`, the `-y` shorthand, and target resolution (it named
-  `origin`, while the client tries the `moongit` remote first).
+  `origin`, while the client tries the `codefort` remote first).
 - `web/CLAUDE.md` pointed at a top-bar theme switcher that lives in Settings,
   conflated the github/monokai schemes with the separate light/dark axis, and
   listed `explore` as live while omitting the routed `specs` feature. It is
@@ -147,7 +147,7 @@ to fix in place rather than defer.
 ## Phase 8 — remove the dex integration  `done`
 
 Added 2026-09-12 by owner decision: dex is a deprecated experiment and is not
-part of moongit's forward direction. This supersedes "Intel / Explore: ship it
+part of codefort's forward direction. This supersedes "Intel / Explore: ship it
 or cut it" on `ROADMAP.md` — the call is *cut*, and the cut is total, not just
 the dark UI tab.
 
@@ -165,7 +165,7 @@ Everything that exists only to talk to a dex server comes out:
   `CODEFORT_AGENT_DEX_PROJECT`, and the `DEX_*` env the agent container was
   handed.
 - **Agent wiring.** The dex MCP server in the generated agent MCP config, and
-  the prompt text telling agents to reach for dex tools. `mgit` stays the
+  the prompt text telling agents to reach for dex tools. `cf` stays the
   agent's only MCP server.
 - **Web.** The `explore` feature (already unrouted), the Intel card on the repo
   overview, the spec search box, the `intel`/`spec-search` query layer, and the
@@ -189,7 +189,7 @@ closed out.
   merely never *run*. The roadmap entry and the specs checklist both claimed it
   was unimplemented; both corrected, and the DB-vs-frontmatter split the reading
   exposed is now documented in `specs/specs.md`. Actually running a pass needs
-  a moongitd with agent credentials, which is an ops step, not a build.
+  a codefortd with agent credentials, which is an ops step, not a build.
 - **Server-side rebase (#257)** — done. A third merge method that replays the
   head'''s commits onto base with `merge-tree --merge-base` + `commit-tree`,
   worktree-free, all-or-nothing.
@@ -204,7 +204,7 @@ closed out.
   Spec written first: `specs/branch-protection.md`.
 - **`core.hooksPath` trap** — found while testing the above. git resolves
   `core.hooksPath` from the *global* config, so a server whose git user sets it
-  in `~/.gitconfig` ran those hooks and none of moongit's: CI-on-push was
+  in `~/.gitconfig` ran those hooks and none of codefort's: CI-on-push was
   silently dead, with no error anywhere. Fixed by pinning the bare repo's own
   `core.hooksPath` next to the hooks; `ci install-hooks` backfills it. This was
   not on any list — it only showed up because a *hard*-failing hook made the
@@ -218,7 +218,7 @@ closed out.
   keep in sync. An explicitly requested sort is never reordered.
 
 What remains on the roadmap is either an ops step (run the spec verify loop,
-needs a live moongitd with agent credentials), blocked upstream (mooncake →
+needs a live codefortd with agent credentials), blocked upstream (mooncake →
 provision, waiting on the `go-quality` rewrite), or a genuine judgment call
 about scope (milestones, which the roadmap already gates on epics proving
 insufficient in practice).

@@ -7,7 +7,7 @@ owners: [aleh]
 
 ## Intent
 
-This is the repo-wide contract every other spec inherits. moongit is a
+This is the repo-wide contract every other spec inherits. codefort is a
 self-hosted git host, issue tracker, and agent-coordination backend for a small,
 trusted fleet — not a public forge. These principles are the *why* behind the
 per-subsystem specs; where they bear on a feature, that spec applies them rather
@@ -17,7 +17,7 @@ one place is what lets the rest of the specs stay short.
 
 ## Behavior
 
-- WHILE moongit runs, it is a single binary: one `moongitd` process serves the
+- WHILE codefort runs, it is a single binary: one `codefortd` process serves the
   `/api` surface, git smart-HTTP, the web SPA, and the in-process CI/agent runner
   on one port — a self-hostable box gets the whole system with nothing else to
   operate.
@@ -39,7 +39,7 @@ one place is what lets the rest of the specs stay short.
   repo being served), the canonical branch advances through pull-request merges,
   and history is append-only (reruns and superseded specs are kept, not rewritten).
 - WHERE notifications flow, they are pull-based: subscribers reach in over the
-  authenticated SSE feed and moongit makes no outbound calls (no webhooks), so
+  authenticated SSE feed and codefort makes no outbound calls (no webhooks), so
   there is nothing to configure or fail delivering.
 - WHERE a capability beyond the core is added (SSH transport, CI, agent runs),
   it is opt-in and additive: the default deployment stays a single open HTTP
@@ -52,14 +52,14 @@ one place is what lets the rest of the specs stay short.
   single-writer SQLite pool with a separate read pool, plain git plumbing) are
   preferred over abstraction and magic, and scope is added only when a real need
   demands it.
-- WHILE moongit is developed, it is dogfooded: this repo's own work is tracked as
-  moongit issues, claimed before coding, merged through moongit pull requests, and
+- WHILE codefort is developed, it is dogfooded: this repo's own work is tracked as
+  codefort issues, claimed before coding, merged through codefort pull requests, and
   specified by these specs — the backend coordinates its own development.
 
 ## Non-goals
 
 - **A public, multi-tenant forge.** No org hierarchy, forks, or abuse controls.
-  moongit hosts a known fleet's repos on a trusted box. Named accounts exist, but
+  codefort hosts a known fleet's repos on a trusted box. Named accounts exist, but
   as identities and coarse grantees — not as tenants.
 - **A fine-grained authorization system.** Coarse repo access (owner/write/read)
   is the ceiling; per-resource ACLs, custom roles, scopes, and expiring/scoped
@@ -73,9 +73,9 @@ one place is what lets the rest of the specs stay short.
 - **A webhook / outbound-integration hub.** Pull-based SSE is the chosen feed
   shape; pushing to external systems is not a goal.
 - **Semantic code intelligence.** Embedding indexes, symbol graphs, and
-  meaning-based search over the code or the specs are not moongit's business.
+  meaning-based search over the code or the specs are not codefort's business.
   The dex integration that once provided them was an experiment and has been
-  removed wholesale; anything in this shape is a separate tool moongit does not
+  removed wholesale; anything in this shape is a separate tool codefort does not
   depend on.
 - **Restating subsystem detail.** This spec holds principles only; the concrete
   behavior of each capability lives in its own spec.
@@ -91,4 +91,4 @@ one place is what lets the rest of the specs stay short.
 - [x] Beyond-core capabilities (SSH/CI/agents) are opt-in; single open HTTP port default
 - [x] Specs are the dual of code; drift is a non-blocking signal
 - [x] Boring/explicit tech; simplicity over abstraction
-- [x] moongit dogfoods its own coordination (issues/claims/PRs/specs)
+- [x] codefort dogfoods its own coordination (issues/claims/PRs/specs)

@@ -1,25 +1,25 @@
-# moongit
+# codefort
 
 Self-hosted git host, issue tracker, and CI runner: one Go daemon
-(`moongitd`) serving `/api/*`, git smart-HTTP, and the Vite/React SPA on a
-single port, over one SQLite file and a directory of bare repos. `mgit` is
+(`codefortd`) serving `/api/*`, git smart-HTTP, and the Vite/React SPA on a
+single port, over one SQLite file and a directory of bare repos. `cf` is
 the client. This repo is the coordination backend itself — dogfood it.
 
-## Workflow — track work as moongit issues (mgit)
+## Workflow — track work as codefort issues (cf)
 
-Prereq: the repo has a `moongit` remote (code mirror) — or `CODEFORT_SERVER`
+Prereq: the repo has a `codefort` remote (code mirror) — or `CODEFORT_SERVER`
 points at the server. Export your **own** `CODEFORT_TOKEN` (`mgt_…`); the
 token's name is your identity in every claim/comment, so never share one.
 
-1. **Survey:** `mgit issue list --state todo,in_progress`.
+1. **Survey:** `cf issue list --state todo,in_progress`.
 2. **Plan as issues** — one issue per unit of work, the plan in the body. Split
    multi-part work into multiple issues:
-   `mgit issue create --title "<t>" --body "<plan>"`.
-3. **Claim before coding:** `mgit issue claim <n> --state in_progress`. Never
+   `cf issue create --title "<t>" --body "<plan>"`.
+3. **Claim before coding:** `cf issue claim <n> --state in_progress`. Never
    work an issue already `in_progress` under another identity.
-4. **Report progress** at real checkpoints: `mgit issue comment <n> --body "…"`.
-5. **Close out** when merged + verified: `mgit issue set-state <n> done`
-   (`mgit issue unclaim <n>` if you drop it).
+4. **Report progress** at real checkpoints: `cf issue comment <n> --body "…"`.
+5. **Close out** when merged + verified: `cf issue set-state <n> done`
+   (`cf issue unclaim <n>` if you drop it).
 
 No code without an owned issue.
 
@@ -57,8 +57,8 @@ provision plans in `tasks/`.
 ```bash
 provision list tasks/                # discover every task + its description
 provision apply tasks/build.yml      # both binaries into ./bin/
-provision apply tasks/install.yml    # binaries into ~/.local/bin + mgit/mgitd links
-provision apply tasks/run.yml        # moongitd in the foreground against ./data/
+provision apply tasks/install.yml    # binaries into ~/.local/bin + cf/codefortd links
+provision apply tasks/run.yml        # codefortd in the foreground against ./data/
 ```
 
 **CI** (`codefort.yml`) runs two independent jobs in throwaway containers:

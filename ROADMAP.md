@@ -1,11 +1,11 @@
-# moongit — roadmap
+# codefort — roadmap
 
 What's shipped, what's next, and what we've decided not to build. Measured
 against the three commitments in [VISION.md](VISION.md): absolute minimalism,
 high performance, local first. A line item that pulls against one of those is
 either reshaped until it doesn't, or dropped.
 
-Work is tracked as moongit issues in this repo's own tracker (see
+Work is tracked as codefort issues in this repo's own tracker (see
 [CLAUDE.md](CLAUDE.md)); this file is the altitude above them — the shape of
 the thing, not the task list.
 
@@ -23,13 +23,13 @@ the thing, not the task list.
 | CI: `codefort.yml` DAG via `needs:`, container isolation, dependency waves, SSE logs, retention | [ci-pipelines](specs/ci-pipelines.md) |
 | Cron-scheduled pipeline runs | [ci-pipelines](specs/ci-pipelines.md) |
 | Agent runs: spawn-from-issue, turns, park/resume, handoff branch, cancel | [agent-runs](specs/agent-runs.md) |
-| Event feed — DB-backed SSE, `mgit events` | [events-feed](specs/events-feed.md) |
+| Event feed — DB-backed SSE, `cf events` | [events-feed](specs/events-feed.md) |
 | MCP server — 22 tools over stdio | [mcp-server](specs/mcp-server.md) |
 | In-repo specs: list, read, write-via-PR, deterministic drift | [specs](specs/specs.md) |
 | Accounts, repo visibility, membership, and the two access gates | [access-control](specs/access-control.md) |
 | Branch protection: per-repo glob patterns, refusing deletes and force-pushes at push time | [branch-protection](specs/branch-protection.md) |
 | Web SPA: Code, Commits, Issues, Board, Pulls, Pipelines, Review, Specs, Agents, Settings | [web-ui](specs/web-ui.md) |
-| `mgit` client | [cli](specs/cli.md) |
+| `cf` client | [cli](specs/cli.md) |
 
 ## Next
 
@@ -45,7 +45,7 @@ verdict, records it with per-line markers, and stamps `last_verified` /
 `verifications` table is empty, every spec reads `unverified`, and every spec
 except the constitution still says `status: draft`.
 
-That makes this an operations step, not a build: point a moongitd with agent
+That makes this an operations step, not a build: point a codefortd with agent
 credentials at this repo, verify each spec, review the stamp branches, and
 merge the ones that hold. Only then does a spec earn `living`.
 
@@ -61,11 +61,11 @@ reads as a broken feature rather than an unused one.
 
 The last tie to the archived tool is the Go quality gate: `codefort.yml` execs
 `mooncake task ci`, and `ci/Dockerfile` bakes the binary into
-`moongit-ci:latest`. The unblocker is upstream — the go-quality → provision
+`codefort-ci:latest`. The unblocker is upstream — the go-quality → provision
 rewrite in `alehatsman/go-quality`. Background in
 [docs/ops-provisioning.md](docs/ops-provisioning.md).
 
-### 3. Rename: moongit → codefort
+### 3. Rename: codefort → codefort
 
 A total rebrand, decided 2026-09-12. Binaries become `codefortd` / `cf`, the CI
 manifest becomes `codefort.yml`, and the env prefix becomes `CODEFORT_` — all
@@ -87,13 +87,13 @@ re-proposed:
 - **A fine-grained RBAC matrix.** Coarse membership (owner / write / read) is
   the ceiling. The *grid* of per-user, per-resource rules is out.
 - **A public multi-tenant forge.** No forks, no abuse controls, no org
-  hierarchy. moongit hosts a known fleet's repos on a trusted box.
-- **Outbound webhooks.** The pull-based SSE feed is the chosen shape; moongit
+  hierarchy. codefort hosts a known fleet's repos on a trusted box.
+- **Outbound webhooks.** The pull-based SSE feed is the chosen shape; codefort
   makes no outbound calls, so there is nothing to configure or fail delivering.
 - **Semantic code intelligence.** The dex integration (Intel/Explore, semantic
   spec search, the agent's dex MCP) was an experiment and was removed in full.
   Embedding indexes and meaning-based search are a separate tool's job, not
-  moongit's.
+  codefort's.
 - **A worker tier, an external database, or a microservice split.** One
   process, one SQLite file. This is the feature, not a phase.
 - **Horizontal scale, replication, failover.** Single-writer, one box. Any such
