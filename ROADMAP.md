@@ -65,7 +65,16 @@ The last tie to the archived tool is the Go quality gate: `mgitci.yml` execs
 rewrite in `alehatsman/go-quality`. Background in
 [docs/ops-provisioning.md](docs/ops-provisioning.md).
 
-### 3. Smaller, unblocked
+### 3. Rename: moongit → codefort
+
+A total rebrand, decided 2026-09-12. Binaries become `codefortd` / `cf`, the CI
+manifest becomes `codefort.yml`, and the env prefix becomes `CODEFORT_` — all
+three as hard cuts, with no compatibility shim. Plan, inventory, traps, and the
+cutover runbook: [docs/plan-rename-codefort.md](docs/plan-rename-codefort.md).
+
+Pure rename; no behavior moves with it.
+
+### 4. Smaller, unblocked
 
 - No milestones. Labels + epics cover most of what they'd do — this only earns
   a slot if the epic rollup proves insufficient in practice.
