@@ -56,12 +56,14 @@ type Config struct {
 	// CIJobConcurrency caps how many of a run's jobs execute at once: the
 	// runner schedules jobs in dependency waves and runs every ready job (all
 	// needs satisfied) concurrently up to this many. Set via
-	// MOONGIT_CI_JOB_CONCURRENCY (default 4); values < 1 are treated as 1.
+	// MOONGIT_CI_JOB_CONCURRENCY (default 4). Load stores the value as given;
+	// the runner is what treats < 1 as 1, so a nonsense value survives Load.
 	CIJobConcurrency int
 
 	// MaxConcurrency caps how many runs execute at once across one shared budget
 	// that CI and agent runs both draw from. Set via MOONGIT_MAX_CONCURRENCY
-	// (default runtime.NumCPU()); values < 1 are treated as 1. A CI run still
+	// (default runtime.NumCPU()). As with CIJobConcurrency, the < 1 floor is
+	// applied by the runner, not here. A CI run still
 	// bounds its own jobs by CIJobConcurrency, so this caps concurrent *runs*,
 	// not strictly job containers. Replaces the former independent CI/agent caps.
 	MaxConcurrency int
@@ -88,7 +90,9 @@ type Config struct {
 	// AgentReserved is how many of MaxConcurrency's slots only agent-family runs
 	// may take, so a CI backlog can never lock out an agent spawn (the inverse
 	// starves too — see the runner's fair, non-blocking drain). Set via
-	// MOONGIT_AGENT_RESERVED (default 2); clamped to [0, MaxConcurrency].
+	// MOONGIT_AGENT_RESERVED (default 2). The clamp to [0, MaxConcurrency] is
+	// the work budget's, not Load's — see the startup warning in the runner for
+	// why a value at or above MaxConcurrency is worth noticing.
 	AgentReserved int
 
 	// AgentRunTimeout is the whole-session lifetime cap for an agent run: a run
@@ -206,6 +210,12 @@ func Load() (*Config, error) {
 	rateLimit, err := strconv.ParseFloat(envOr("MOONGIT_RATE_LIMIT", "0"), 64)
 	if err != nil {
 		return nil, fmt.Errorf("MOONGIT_RATE_LIMIT: %w", err)
+	}
+	// 0 disables rate limiting; a negative is meaningless and previously
+	// disabled it too, so a typo'd limit looked like a deliberate one. Load is
+	// where a bad value should be loud.
+	if rateLimit < 0 {
+		return nil, fmt.Errorf("MOONGIT_RATE_LIMIT: %g is negative (use 0 to disable)", rateLimit)
 	}
 	cfg.RateLimit = rateLimit
 

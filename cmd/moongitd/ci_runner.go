@@ -248,6 +248,13 @@ func (r *ciRunner) run(ctx context.Context) {
 	// #268 starvation). wg tracks in-flight runs so shutdown drains them: run()
 	// returns only once every dispatched executeRun has finalized its run
 	// against the still-open DB (the restart-drain contract — see main.go).
+	// An AgentReserved at or above the total silently leaves CI zero slots —
+	// the budget clamps it, and CI then simply never runs, which presents as a
+	// mysteriously dead pipeline rather than as a misconfiguration. Say so.
+	if r.cfg.AgentReserved >= maxConc {
+		r.logger.Warn("agent reservation leaves no CI slots; CI runs will never start",
+			"agent_reserved", r.cfg.AgentReserved, "max_concurrency", maxConc)
+	}
 	budget := newWorkBudget(maxConc, r.cfg.AgentReserved)
 	var wg sync.WaitGroup
 	defer wg.Wait()
