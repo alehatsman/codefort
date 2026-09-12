@@ -82,9 +82,9 @@ func (o On) Matches(ref string) bool {
 type Job struct {
 	Needs []string `yaml:"needs"`
 	// Image overrides the server default CI image for this job (honored only
-	// under docker isolation). It must be glibc-based and carry `mooncake` on
-	// PATH — the runner execs `mooncake step` inside it. Empty means "use the
-	// server default image".
+	// under docker isolation). It must be glibc-based and carry `provision` on
+	// PATH — the runner execs `provision apply` inside it. Empty means "use
+	// the server default image".
 	Image string `yaml:"image"`
 	// DockerSocket mounts /var/run/docker.sock from the host into the job's
 	// container, giving steps access to the host Docker daemon. Use for jobs

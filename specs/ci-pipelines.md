@@ -95,14 +95,14 @@ unbounded history. Agent runs reuse this same claim/lease/execute spine.
   spine (claim, lease, concurrency, reconcile, retention, event stream) but are
   specified separately; this spec is the deterministic-pipeline path.
 - **The pipeline file format.** The `codefort.yml` schema and how steps map onto
-  mooncake are a configuration/mooncake concern, not specified here; this spec
+  provision are a configuration/provision concern, not specified here; this spec
   says the file gates and defines the job DAG, not its grammar.
 - **The events feed.** Runs emit push/run events, but the SSE fleet feed's
   delivery and backing store are the events-feed spec's domain. The per-job
   event-log stream (replay/tail/resume) *is* in scope here.
 - **Container image provisioning.** What the CI/agent image contains and how it's
-  built lives outside codefort (mooncake task); this spec only states that docker
-  isolation runs jobs in a container.
+  built lives outside codefort (a provision task); this spec only states that
+  docker isolation runs jobs in a container.
 - **An external runner / agentd.** CI stays in-process by design; a separate
   runner daemon is explicitly deferred and out of scope.
 
