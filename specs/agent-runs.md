@@ -68,6 +68,17 @@ lives in the image.
   events tolerantly — an evolving inner schema or a non-JSON line never breaks the
   stream.
 
+- WHEN a handoff materializes a branch, it takes the first free ref in the
+  `agent/issue-<n>` series — `agent/issue-<n>`, then `-2`, `-3` — claimed with
+  a compare-and-swap that requires the ref not to already exist, so two
+  concurrent handoffs can never take the same name. A handoff never overwrites
+  an earlier one: each run commits on its own immutable base, so an existing
+  tip is never an ancestor of the new commit and a force-write would discard
+  the earlier run's work outright rather than advancing past it. Reruns are
+  append-only, per the constitution.
+- WHERE the handoff comment names a branch, it names the ref actually taken,
+  not the first in the series, so a reviewer never opens the wrong one.
+
 ## Non-goals
 
 - **The deterministic CI path.** Push/pipeline CI is the ci-pipelines spec; this
@@ -101,5 +112,5 @@ lives in the image.
 - [x] Finish = server-side handoff to agent/issue-<n> + summary comment; parked-only
 - [x] Cancel/force-stop from any non-terminal state; discards the workspace
 - [x] Per-turn timeout; schema-tolerant transcript translation
-- [ ] Defined handoff branch naming / CAS policy — no silent force-overwrite (#197)
+- [x] Handoff takes the next free ref in the agent/issue-<n> series; never force-overwrites (#197)
 - [ ] Verified against the code by the verify workflow (flip to `living`)

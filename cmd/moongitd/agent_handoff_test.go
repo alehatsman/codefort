@@ -267,3 +267,94 @@ func (r *ciRunner) status(t *testing.T, run storage.CIRun) storage.RunStatus {
 	}
 	return got.Status
 }
+
+// A handoff must never clobber an existing branch in its series. Each run
+// commits on its own immutable base, so an existing tip is never an ancestor of
+// the new commit — a force-write here would be true history loss, not a
+// fast-forward (#197).
+func TestFinishAgentRunDoesNotClobberEarlierHandoff(t *testing.T) {
+	r, run, issue, _ := handoffHarness(t, true)
+	bare := filepath.Join(r.cfg.ReposDir, "alice", "repo.git")
+
+	// Stand in for an earlier run's handoff, pointing somewhere this run would
+	// never produce.
+	if _, err := gitIn(t, bare, "update-ref", "refs/heads/agent/issue-1", run.CommitSHA); err != nil {
+		t.Fatalf("seed prior handoff: %v", err)
+	}
+
+	r.finishAgentRun(context.Background(), run)
+
+	// The earlier branch is exactly where it was.
+	if got, err := gitIn(t, bare, "rev-parse", "refs/heads/agent/issue-1"); err != nil || got != run.CommitSHA {
+		t.Errorf("agent/issue-1 = %q (err %v), want it untouched at %q", got, err, run.CommitSHA)
+	}
+	// This run's work landed on the next name in the series instead.
+	next, err := gitIn(t, bare, "rev-parse", "refs/heads/agent/issue-1-2")
+	if err != nil {
+		t.Fatalf("agent/issue-1-2 not created: %v", err)
+	}
+	files, err := gitIn(t, bare, "ls-tree", "--name-only", next)
+	if err != nil || !strings.Contains(files, "new.txt") {
+		t.Errorf("agent/issue-1-2 tree = %q (err %v), want it to include new.txt", files, err)
+	}
+
+	// The comment must name the branch that was actually taken, or a reviewer
+	// looks at the wrong one.
+	comments, err := storage.ListComments(r.db, issue.ID)
+	if err != nil || len(comments) != 1 {
+		t.Fatalf("ListComments = %v, %v; want one comment", comments, err)
+	}
+	if !strings.Contains(comments[0].Body, "agent/issue-1-2") {
+		t.Errorf("comment body = %q, want it to name agent/issue-1-2", comments[0].Body)
+	}
+}
+
+func TestAllocateHandoffRefTakesNextFreeName(t *testing.T) {
+	reposDir := t.TempDir()
+	bare, base := initBareRepo(t, reposDir)
+	env := append(os.Environ(), "GIT_DIR="+bare)
+
+	const refBase = "refs/heads/agent/issue-7"
+	first, err := allocateHandoffRef(context.Background(), env, refBase, base)
+	if err != nil {
+		t.Fatalf("first allocate: %v", err)
+	}
+	if first != refBase {
+		t.Errorf("first ref = %q, want %q", first, refBase)
+	}
+
+	// The series steps aside rather than overwriting.
+	second, err := allocateHandoffRef(context.Background(), env, refBase, base)
+	if err != nil {
+		t.Fatalf("second allocate: %v", err)
+	}
+	if second != refBase+"-2" {
+		t.Errorf("second ref = %q, want %q", second, refBase+"-2")
+	}
+	third, err := allocateHandoffRef(context.Background(), env, refBase, base)
+	if err != nil {
+		t.Fatalf("third allocate: %v", err)
+	}
+	if third != refBase+"-3" {
+		t.Errorf("third ref = %q, want %q", third, refBase+"-3")
+	}
+
+	// And the original still resolves — the whole point.
+	if got, err := gitIn(t, bare, "rev-parse", refBase); err != nil || got != base {
+		t.Errorf("%s = %q (err %v), want %q", refBase, got, err, base)
+	}
+}
+
+// A genuine git failure must surface, not be mistaken for "this name is taken"
+// and silently consume the whole series.
+func TestAllocateHandoffRefReportsRealFailure(t *testing.T) {
+	reposDir := t.TempDir()
+	bare, base := initBareRepo(t, reposDir)
+	env := append(os.Environ(), "GIT_DIR="+bare)
+
+	// "refs/heads" alone is not a valid ref name, so update-ref fails and
+	// show-ref finds nothing — the shape of a real fault.
+	if _, err := allocateHandoffRef(context.Background(), env, "refs/heads", base); err == nil {
+		t.Error("allocateHandoffRef on an invalid ref name = nil error, want a failure")
+	}
+}

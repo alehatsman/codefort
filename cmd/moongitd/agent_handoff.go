@@ -17,14 +17,17 @@ import (
 // posted under.
 const agentCommentAuthor = "moongit-agent"
 
-// agentBranchRef is the ref an agent run's work lands on.
+// agentBranchRef is the *first* ref in the series an agent run's work lands on.
+// A second run on the same issue takes agent/issue-<n>-2, and so on — see
+// allocateHandoffRef for why the series exists.
 func agentBranchRef(issueNumber int) string {
 	return fmt.Sprintf("agent/issue-%d", issueNumber)
 }
 
 // finishAgentRun performs handoff for a claimed finishing run: materialize the
-// workspace as a commit on agent/issue-<n> in the bare repo (server-side — no
-// push, since moongitd owns the repo), post a summary comment on the issue,
+// workspace as a commit on the agent/issue-<n> series in the bare repo
+// (server-side — no push, since moongitd owns the repo), post a summary
+// comment on the issue naming the branch it actually took,
 // tear down the container/workspace/token, and finalize the run. A handoff
 // failure finalizes the run errored with a failure comment; the branch ref is
 // only updated on a clean materialize, so a failure never leaves a half-pushed
@@ -53,7 +56,7 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 	jobID := r.agentJobIDOrZero(run.ID)
 	workDir := agentWorkDir(r.cfg.DataDir, run.ID)
 	bareRepo := filepath.Join(r.cfg.ReposDir, owner, name+".git")
-	branch := agentBranchRef(issue.Number)
+	refBase := "refs/heads/" + agentBranchRef(issue.Number)
 
 	// The MCP config we wrote into the workspace isn't the agent's work — drop
 	// it so it doesn't land in the branch.
@@ -61,7 +64,8 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 
 	msg := fmt.Sprintf("agent: %s\n\nWorked issue #%d via moongit agent run #%d.\n",
 		issue.Title, issue.Number, run.Number)
-	commit, changed, err := materializeAgentBranch(parent, run.ID, bareRepo, run.CommitSHA, workDir, "refs/heads/"+branch, agentCommentAuthor, msg)
+	ref, commit, changed, err := materializeAgentBranch(parent, run.ID, bareRepo, run.CommitSHA, workDir, refBase, agentCommentAuthor, msg)
+	branch := strings.TrimPrefix(ref, "refs/heads/")
 	if err != nil {
 		log.Error("handoff materialize branch", "err", err)
 		r.postAgentComment(issue.ID, fmt.Sprintf(
@@ -96,13 +100,14 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 	log.Info("agent run finished", "branch", branch, "changed", changed)
 }
 
-// materializeAgentBranch commits the workspace tree onto base as ref, directly
-// in the bare repo, and reports whether it differed from base. It uses a throw-
-// away index with the bare repo as GIT_DIR and the workspace as GIT_WORK_TREE,
-// seeding the index from base so deletions are captured. The ref is updated
-// only after a successful commit, so a mid-way failure leaves no branch. When
-// the tree is identical to base, no commit/ref is made (changed=false).
-func materializeAgentBranch(ctx context.Context, runID int64, bareRepo, base, workDir, ref, author, msg string) (commit string, changed bool, err error) {
+// materializeAgentBranch commits the workspace tree onto base directly in the
+// bare repo and returns the ref it landed on, which is refBase or the next free
+// name in its series (see allocateHandoffRef). It uses a throwaway index with
+// the bare repo as GIT_DIR and the workspace as GIT_WORK_TREE, seeding the
+// index from base so deletions are captured. The ref is created only after a
+// successful commit, so a mid-way failure leaves no branch. When the tree is
+// identical to base, no commit or ref is made (changed=false, ref="").
+func materializeAgentBranch(ctx context.Context, runID int64, bareRepo, base, workDir, refBase, author, msg string) (ref, commit string, changed bool, err error) {
 	// Key the throwaway index on the (globally unique) run id, not the ref:
 	// the ref is a pure function of the issue number, so two concurrent
 	// handoffs for the same issue would otherwise share one GIT_INDEX_FILE and
@@ -117,21 +122,21 @@ func materializeAgentBranch(ctx context.Context, runID int64, bareRepo, base, wo
 		"GIT_WORK_TREE="+workDir,
 	)
 	if _, err := runGit(ctx, env, "read-tree", base); err != nil {
-		return "", false, fmt.Errorf("read-tree: %w", err)
+		return "", "", false, fmt.Errorf("read-tree: %w", err)
 	}
 	if _, err := runGit(ctx, env, "add", "-A", "--", "."); err != nil {
-		return "", false, fmt.Errorf("add: %w", err)
+		return "", "", false, fmt.Errorf("add: %w", err)
 	}
 	tree, err := runGit(ctx, env, "write-tree")
 	if err != nil {
-		return "", false, fmt.Errorf("write-tree: %w", err)
+		return "", "", false, fmt.Errorf("write-tree: %w", err)
 	}
 	baseTree, err := runGit(ctx, env, "rev-parse", base+"^{tree}")
 	if err != nil {
-		return "", false, fmt.Errorf("rev-parse base tree: %w", err)
+		return "", "", false, fmt.Errorf("rev-parse base tree: %w", err)
 	}
 	if tree == baseTree {
-		return "", false, nil // agent changed nothing
+		return "", "", false, nil // agent changed nothing
 	}
 	commitEnv := append(env,
 		"GIT_AUTHOR_NAME="+author, "GIT_AUTHOR_EMAIL=agent@moongit.local",
@@ -139,12 +144,53 @@ func materializeAgentBranch(ctx context.Context, runID int64, bareRepo, base, wo
 	)
 	commit, err = runGit(ctx, commitEnv, "commit-tree", tree, "-p", base, "-m", msg)
 	if err != nil {
-		return "", false, fmt.Errorf("commit-tree: %w", err)
+		return "", "", false, fmt.Errorf("commit-tree: %w", err)
 	}
-	if _, err := runGit(ctx, env, "update-ref", ref, commit); err != nil {
-		return "", false, fmt.Errorf("update-ref: %w", err)
+	ref, err = allocateHandoffRef(ctx, env, refBase, commit)
+	if err != nil {
+		return "", "", false, err
 	}
-	return commit, true, nil
+	return ref, commit, true, nil
+}
+
+// maxHandoffRefAttempts bounds the series probe. A hundred handoffs on one
+// issue is already pathological; the cap exists so a persistent git fault
+// can't spin here forever.
+const maxHandoffRefAttempts = 100
+
+// allocateHandoffRef atomically creates the first free ref in the refBase[-k]
+// series pointing at commit, and returns the ref it took.
+//
+// The series exists because a handoff must never destroy an earlier one. Each
+// run commits on its own immutable base, so an existing tip is never an
+// ancestor of the new commit — a plain `update-ref <ref> <new>` would have
+// silently discarded a previous run's work rather than advancing past it. The
+// constitution's rule for reruns is append-only, and a second run on the same
+// issue is exactly a rerun.
+//
+// The three-argument `update-ref <ref> <new> ""` form requires the ref to not
+// already exist, which makes the claim atomic: two handoffs racing on the same
+// series cannot both take a name, and the loser simply moves to the next
+// candidate. Probing with show-ref first and then writing would leave that race
+// open.
+func allocateHandoffRef(ctx context.Context, env []string, refBase, commit string) (string, error) {
+	for attempt := 1; attempt <= maxHandoffRefAttempts; attempt++ {
+		ref := refBase
+		if attempt > 1 {
+			ref = fmt.Sprintf("%s-%d", refBase, attempt)
+		}
+		if _, err := runGit(ctx, env, "update-ref", ref, commit, ""); err == nil {
+			return ref, nil
+		}
+		// An exit status alone doesn't separate "ref already exists" from a
+		// genuine git failure. Confirm the ref is really taken before moving
+		// on, so a broken repo surfaces as an error instead of masquerading as
+		// a full series.
+		if _, err := runGit(ctx, env, "show-ref", "--verify", "--quiet", ref); err != nil {
+			return "", fmt.Errorf("create %s: ref was neither created nor already present", ref)
+		}
+	}
+	return "", fmt.Errorf("no free ref in the %s series after %d attempts", refBase, maxHandoffRefAttempts)
 }
 
 // agentDiffStat returns a fenced `git diff --stat base..commit`, or "" on error

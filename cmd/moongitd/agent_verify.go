@@ -110,14 +110,17 @@ func (r *ciRunner) stampVerifyBranch(parent context.Context, f verifyFinalize, s
 		log.Error("write stamped spec", "err", err)
 		return "", ""
 	}
-	branch = "spec-verify/" + branchSafe(specID)
+	refBase := "refs/heads/spec-verify/" + branchSafe(specID)
 	bareRepo := filepath.Join(r.cfg.ReposDir, f.owner, f.name+".git")
 	msg := fmt.Sprintf("docs(specs): stamp %s — alignment %.2f, verified %s\n", f.run.SpecPath, alignment, date)
-	c, changed, err := materializeAgentBranch(parent, f.run.ID, bareRepo, f.run.CommitSHA, f.workDir, "refs/heads/"+branch, agentCommentAuthor, msg)
+	// Takes the next free ref in the series rather than overwriting a prior
+	// stamp, so re-verifying a spec keeps the earlier verdict's branch.
+	ref, c, changed, err := materializeAgentBranch(parent, f.run.ID, bareRepo, f.run.CommitSHA, f.workDir, refBase, agentCommentAuthor, msg)
 	if err != nil {
 		log.Error("stamp materialize branch", "err", err)
 		return "", ""
 	}
+	branch = strings.TrimPrefix(ref, "refs/heads/")
 	if !changed {
 		return "", "" // already stamped with the same values
 	}
