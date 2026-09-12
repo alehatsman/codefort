@@ -49,7 +49,8 @@ type Config struct {
 	CIRunTimeout time.Duration
 
 	// CIPollInterval is how often the CI runner polls for a queued run when
-	// idle. Set via MOONGIT_CI_POLL_INTERVAL (default 5s).
+	// idle. Set via MOONGIT_CI_POLL_INTERVAL (default 5s). As with the
+	// concurrency values, the runner applies the floor — see minCIPollInterval.
 	CIPollInterval time.Duration
 
 	// CIJobConcurrency caps how many of a run's jobs execute at once: the

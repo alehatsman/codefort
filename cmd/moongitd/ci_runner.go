@@ -208,10 +208,27 @@ func runCIRunner(ctx context.Context, r *ciRunner) {
 	r.run(ctx)
 }
 
+// defaultCIPollInterval matches config's documented default; minCIPollInterval
+// is the floor below which polling is pure waste — a queued run is noticed
+// within a poll either way, and nobody is waiting on 100ms of latency here.
+const (
+	defaultCIPollInterval = 5 * time.Second
+	minCIPollInterval     = 100 * time.Millisecond
+)
+
 func (r *ciRunner) run(ctx context.Context) {
+	// <= 0 means "unset" and falls back to the default. A tiny-but-positive
+	// value is the one that actually hurts: `MOONGIT_CI_POLL_INTERVAL=1ms`
+	// parses fine and spins this loop a thousand times a second against SQLite
+	// for no benefit, so floor it at something a human could plausibly mean.
 	interval := r.cfg.CIPollInterval
-	if interval <= 0 {
-		interval = 5 * time.Second
+	switch {
+	case interval <= 0:
+		interval = defaultCIPollInterval
+	case interval < minCIPollInterval:
+		r.logger.Warn("MOONGIT_CI_POLL_INTERVAL is below the floor; using the floor",
+			"configured", interval, "floor", minCIPollInterval)
+		interval = minCIPollInterval
 	}
 	maxConc := max(r.cfg.MaxConcurrency, 1)
 	r.logger.Info("ci runner started", "poll", interval, "run_timeout", r.cfg.CIRunTimeout, "isolation", r.cfg.CIIsolation, "max_concurrency", maxConc, "agent_reserved", r.cfg.AgentReserved)
