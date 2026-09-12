@@ -197,3 +197,20 @@ closed out.
   opt-in (`require_approval`, migration 30, default off). Default-off is the
   part that needed a decision of its own: a default-on gate would have started
   rejecting merges the fleet was already making, on upgrade, with no warning.
+- **Branch protection** — done, the last decision-free item on the "Next" list.
+  Per-repo glob patterns (migration 31, empty by default) enforced by a
+  `pre-receive` hook that refuses deletes and non-fast-forwards; the patterns
+  ride in on the push environment so enforcement needs no network and no DB.
+  Spec written first: `specs/branch-protection.md`.
+- **`core.hooksPath` trap** — found while testing the above. git resolves
+  `core.hooksPath` from the *global* config, so a server whose git user sets it
+  in `~/.gitconfig` ran those hooks and none of moongit's: CI-on-push was
+  silently dead, with no error anywhere. Fixed by pinning the bare repo's own
+  `core.hooksPath` next to the hooks; `ci install-hooks` backfills it. This was
+  not on any list — it only showed up because a *hard*-failing hook made the
+  silence audible.
+
+What remains on the roadmap is either an ops step (run the spec verify loop,
+needs a live moongitd with agent credentials), blocked upstream (mooncake →
+provision, waiting on the `go-quality` rewrite), or a genuine judgment call
+about scope (issue-search ranking, milestones).
