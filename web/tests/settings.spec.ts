@@ -85,13 +85,14 @@ test("Users section shows account creation form", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Create user" })).toBeVisible()
 })
 
-test("Branch rules section is marked planned", async ({ page }) => {
+// Branch protection shipped as a per-repo setting, so the global surface must
+// not offer a section for it — a second place to look is worse than none.
+test("global settings has no branch-rules section", async ({ page }) => {
   await mockApi(page)
   await page.goto("/settings")
 
-  await page.getByRole("button", { name: "Branch rules" }).click()
-  await expect(page.getByText("Planned", { exact: false })).toBeVisible()
-  await expect(page.getByText("Branch protection is planned", { exact: false })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Branch rules" })).toHaveCount(0)
+  await expect(page.getByText("Planned", { exact: false })).toHaveCount(0)
 })
 
 test("add an SSH key shows its fingerprint in the list", async ({ page }) => {

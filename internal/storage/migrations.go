@@ -467,6 +467,15 @@ CREATE INDEX IF NOT EXISTS idx_pr_reviews_pr ON pr_reviews(repo_id, pr_number);
 	`
 	ALTER TABLE repos ADD COLUMN require_approval INTEGER NOT NULL DEFAULT 0;
 	`,
+
+	// 31: per-repo protected branch patterns, newline-separated shell globs
+	// matched against the branch name. Empty (the default) means no ref is
+	// protected, so an existing deployment pushes exactly as it did. Stored as
+	// text rather than a child table because the list is a handful of patterns
+	// read as a unit on every push — a join would buy nothing.
+	`
+	ALTER TABLE repos ADD COLUMN protected_refs TEXT NOT NULL DEFAULT '';
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

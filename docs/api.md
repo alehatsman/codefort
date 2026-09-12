@@ -150,7 +150,8 @@ Register a public key against the calling token.
 ### GET /api/repos
 Repos visible to the caller, each with issue/PR/CI counters.
 - `200` → `[Repo]` (`owner`, `name`, `open_issues`, `total_issues`,
-  `ci_enabled`, `require_approval`, `ci_status`, `ci_number`, `open_pulls`,
+  `ci_enabled`, `require_approval`, `protected_refs`, `ci_status`, `ci_number`,
+  `open_pulls`,
   `open_reviews`,
   `active_agents`, `visibility`)
 
@@ -166,10 +167,16 @@ Provision a bare git repo on disk and register it.
 
 ### PATCH /api/repos/{owner}/{repo}
 Partial update of repo settings.
-- Body: `{"ci_enabled"?, "visibility"?, "require_approval"?}` — at least one
-  required. `require_approval` is the merge review gate (see the merge endpoint)
+- Body: `{"ci_enabled"?, "visibility"?, "require_approval"?, "protected_refs"?}`
+  — at least one required. `require_approval` is the merge review gate (see the
+  merge endpoint). `protected_refs` replaces the branch-protection list whole:
+  shell globs over branch names (`["main", "release/*"]`), max 32 patterns of
+  200 chars; `[]` clears it. A matching branch cannot be deleted or
+  force-pushed — the refusal comes from a `pre-receive` hook at push time, on
+  git's stderr, not from this API.
 - `200` → `Repo`
-- `400` no fields, or visibility not `public`/`private`; `404` unknown repo
+- `400` no fields, visibility not `public`/`private`, or a bad pattern (too
+  many, too long, or multi-line); `404` unknown repo
 
 ### DELETE /api/repos/{owner}/{repo}
 Destructive: deletes the DB row (cascading issues, runs, comments, pulls,

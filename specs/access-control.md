@@ -114,8 +114,9 @@ vocabulary. The *grid* of per-user, per-resource rules stays out.
 - **SSH transport access.** The SSH listener resolves a public key to an
   identity in ssh-transport; applying these rules there is not yet done (see the
   checklist).
-- **Branch protection.** Restricting *which refs* a writer may advance is a
-  separate, still-unbuilt coarse rule; this spec governs repo-level access only.
+- **Branch protection.** Restricting what a push may do to a ref is
+  [branch-protection](branch-protection.md)'s job, enforced in a push hook
+  rather than in this gate; this spec governs repo-level access only.
 - **Transport encryption.** TLS termination is a deployment concern.
 
 ## Checklist

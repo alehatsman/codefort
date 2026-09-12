@@ -24,17 +24,16 @@ import {
   useToast,
 } from "@/ui"
 
-// Sections of the settings surface. "tokens", "agent", "ssh", and "appearance"
-// are backed. "users" and "branches" are planned features whose server backends
-// aren't built yet, so they render as roadmap placeholders (not dead ends).
-type Section = "tokens" | "agent" | "users" | "ssh" | "branches" | "repos" | "appearance"
+// Sections of the settings surface. Every one is backed by a real endpoint.
+// Branch protection is deliberately not among them: it is a per-repo setting,
+// so it lives on a repo's own settings page.
+type Section = "tokens" | "agent" | "users" | "ssh" | "repos" | "appearance"
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: "tokens", label: "API tokens" },
   { id: "agent", label: "Agent" },
   { id: "users", label: "Users" },
   { id: "ssh", label: "SSH keys" },
-  { id: "branches", label: "Branch rules" },
   { id: "repos", label: "Repositories" },
   { id: "appearance", label: "Appearance" },
 ]
@@ -62,13 +61,6 @@ export default function SettingsPage() {
         {section === "agent" && <AgentSection />}
         {section === "users" && <UsersSection />}
         {section === "ssh" && <SSHKeysSection />}
-        {section === "branches" && (
-          <Placeholder
-            title="Branch rules"
-            note="Branch protection is planned. Rules take effect once the server
-              enforces them on the push path; until then any token can push any branch."
-          />
-        )}
         {section === "repos" && <ReposSection />}
         {section === "appearance" && <AppearanceSection />}
       </div>
@@ -284,20 +276,6 @@ function UsersSection() {
         </Button>
       </form>
       <ErrorMessage error={register.error} inline />
-    </section>
-  )
-}
-
-// A section for a feature that's on the roadmap but whose backend isn't built
-// yet. The "Planned." lead signals an intentional, coming feature — not an
-// abandoned stub or a hard non-goal.
-function Placeholder({ title, note }: { title: string; note: string }) {
-  return (
-    <section className="settings__section">
-      <h2 className="settings__title">{title}</h2>
-      <EmptyState>
-        <strong>Planned.</strong> {note}
-      </EmptyState>
     </section>
   )
 }

@@ -438,13 +438,13 @@ func runCIInstallHooks(args []string) error {
 			fmt.Fprintf(os.Stderr, "skip %s/%s: %v\n", repo.Owner, repo.Name, err)
 			continue
 		}
-		if err := server.WritePostReceiveHook(bare); err != nil {
+		if err := server.WriteManagedHooks(bare); err != nil {
 			return fmt.Errorf("%s/%s: %w", repo.Owner, repo.Name, err)
 		}
-		fmt.Printf("installed hook: %s/%s\n", repo.Owner, repo.Name)
+		fmt.Printf("installed hooks: %s/%s\n", repo.Owner, repo.Name)
 		installed++
 	}
-	fmt.Printf("installed %d hook(s)\n", installed)
+	fmt.Printf("installed hooks for %d repo(s)\n", installed)
 	return nil
 }
 

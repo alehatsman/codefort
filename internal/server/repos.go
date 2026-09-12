@@ -133,10 +133,10 @@ func CreateRepo(db *sql.DB, reposDir, owner, name string) (int64, string, error)
 		}
 	}
 
-	// Install (or refresh) the CI post-receive hook on every call so existing
-	// repos pick it up too. Cheap and idempotent.
-	if err := WritePostReceiveHook(repoDir); err != nil {
-		return 0, "", fmt.Errorf("write post-receive hook: %w", err)
+	// Install (or refresh) the managed hooks on every call so existing repos
+	// pick them up too. Cheap and idempotent.
+	if err := WriteManagedHooks(repoDir); err != nil {
+		return 0, "", fmt.Errorf("write hooks: %w", err)
 	}
 
 	id, err := storage.EnsureRepo(db, owner, name)
@@ -160,6 +160,7 @@ func toAPIRepo(r storage.RepoSummary) api.Repo {
 		TotalIssues:     r.TotalIssues,
 		CIEnabled:       r.CIEnabled,
 		RequireApproval: r.RequireApproval,
+		ProtectedRefs:   splitPatterns(r.ProtectedRefs),
 		CIStatus:        r.CIStatus,
 		CINumber:        r.CINumber,
 		OpenPulls:       r.OpenPulls,
@@ -170,8 +171,8 @@ func toAPIRepo(r storage.RepoSummary) api.Repo {
 }
 
 // handleUpdateRepo applies a partial update to a repo's settings.
-// Mutable fields: ci_enabled, visibility, require_approval. Returns the updated
-// repo summary.
+// Mutable fields: ci_enabled, visibility, require_approval, protected_refs.
+// Returns the updated repo summary.
 func (s *Server) handleUpdateRepo(w http.ResponseWriter, r *http.Request) {
 	owner := r.PathValue("owner")
 	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
@@ -181,8 +182,8 @@ func (s *Server) handleUpdateRepo(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
-	if req.CIEnabled == nil && req.Visibility == nil && req.RequireApproval == nil {
-		writeError(w, http.StatusBadRequest, "no fields to update (provide ci_enabled, visibility, or require_approval)")
+	if req.CIEnabled == nil && req.Visibility == nil && req.RequireApproval == nil && req.ProtectedRefs == nil {
+		writeError(w, http.StatusBadRequest, "no fields to update (provide ci_enabled, visibility, require_approval, or protected_refs)")
 		return
 	}
 
@@ -207,6 +208,18 @@ func (s *Server) handleUpdateRepo(w http.ResponseWriter, r *http.Request) {
 	if req.RequireApproval != nil {
 		if err := storage.SetRepoRequireApproval(s.db, repoID, *req.RequireApproval); err != nil {
 			s.logger.Error("update repo require_approval", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+	}
+	if req.ProtectedRefs != nil {
+		patterns, perr := joinPatterns(*req.ProtectedRefs)
+		if perr != nil {
+			writeError(w, http.StatusBadRequest, perr.Error())
+			return
+		}
+		if err := storage.SetRepoProtectedRefs(s.db, repoID, patterns); err != nil {
+			s.logger.Error("update repo protected_refs", "err", err)
 			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
@@ -311,4 +324,51 @@ func (s *Server) handleDeleteRepo(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// maxProtectedRefs and maxProtectedRefLen bound the pattern list. VISION.md
+// allows "a handful" of branch-protection rules; these numbers are what
+// "handful" means in code, and they keep the push-time environment small.
+const (
+	maxProtectedRefs   = 32
+	maxProtectedRefLen = 200
+)
+
+// splitPatterns turns the stored newline-separated list into a slice. Always
+// non-nil so the JSON is `[]` rather than `null` — a client toggling patterns
+// should not have to distinguish the two.
+func splitPatterns(stored string) []string {
+	out := make([]string, 0)
+	for _, line := range strings.Split(stored, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
+// joinPatterns validates a submitted pattern list and renders it for storage.
+// Blank entries are dropped rather than rejected, so a textarea with a trailing
+// newline is not an error.
+func joinPatterns(patterns []string) (string, error) {
+	out := make([]string, 0, len(patterns))
+	for _, p := range patterns {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if len(p) > maxProtectedRefLen {
+			return "", fmt.Errorf("branch pattern is longer than %d characters", maxProtectedRefLen)
+		}
+		// The hook splits the list on newlines, so an embedded one would smuggle
+		// in a second pattern; a NUL would truncate the environment variable.
+		if strings.ContainsAny(p, "\n\r\x00") {
+			return "", fmt.Errorf("branch pattern must be a single line")
+		}
+		out = append(out, p)
+	}
+	if len(out) > maxProtectedRefs {
+		return "", fmt.Errorf("at most %d branch patterns (got %d)", maxProtectedRefs, len(out))
+	}
+	return strings.Join(out, "\n"), nil
 }

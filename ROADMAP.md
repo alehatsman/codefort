@@ -26,6 +26,7 @@ the thing, not the task list.
 | MCP server — 22 tools over stdio | [mcp-server](specs/mcp-server.md) |
 | In-repo specs: list, read, write-via-PR, deterministic drift | [specs](specs/specs.md) |
 | Accounts, repo visibility, membership, and the two access gates | [access-control](specs/access-control.md) |
+| Branch protection: per-repo glob patterns, refusing deletes and force-pushes at push time | [branch-protection](specs/branch-protection.md) |
 | Web SPA: Code, Commits, Issues, Board, Pulls, Pipelines, Review, Specs, Agents, Settings | [web-ui](specs/web-ui.md) |
 | `mgit` client | [cli](specs/cli.md) |
 
@@ -68,11 +69,6 @@ rewrite in `alehatsman/go-quality`. Background in
 - Issue search is substring-only over title/body; no ranking.
 - No milestones. Labels + epics cover most of what they'd do — this only earns
   a slot if the epic rollup proves insufficient in practice.
-- Branch protection is a labelled placeholder in Settings. `VISION.md` permits
-  "a handful of branch-protection rules" as a coarse convenience; the shape is
-  a small allowlist of protected refs checked on the push path, not a rules
-  engine. The merge review gate is the same shape and is the precedent to
-  follow: one per-repo boolean, off by default.
 
 ## Not building
 

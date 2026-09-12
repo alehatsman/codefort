@@ -178,6 +178,19 @@
   border-bottom: none;
 }
 
+/* A row whose copy carries an input rather than one line of prose: the action
+   sits against the top so it stays next to the label, not centred on a
+   textarea. */
+.repo-settings__row--stacked {
+  align-items: flex-start;
+}
+
+.repo-settings__row--stacked .textarea {
+  margin-top: var(--space-2);
+  width: 100%;
+  font-family: var(--font-mono);
+}
+
 .repo-settings__row-copy {
   flex: 1;
   min-width: 0;

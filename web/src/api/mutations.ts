@@ -377,6 +377,21 @@ export function useSetRequireApproval(owner: string, repo: string) {
   })
 }
 
+// useSetProtectedRefs replaces a repo's branch-protection patterns. The list
+// is submitted whole rather than per-pattern: it is a handful of globs edited
+// together, so a diff protocol would be more machinery than the feature has.
+export function useSetProtectedRefs(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (patterns: string[]) =>
+      api.updateRepo(owner, repo, { protected_refs: patterns } as UpdateRepoInput),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.repo(owner, repo) })
+      void qc.invalidateQueries({ queryKey: keys.repos() })
+    },
+  })
+}
+
 // useSetRepoVisibility toggles a repo between public and private.
 export function useSetRepoVisibility(owner: string, repo: string) {
   const qc = useQueryClient()

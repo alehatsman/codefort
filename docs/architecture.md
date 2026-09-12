@@ -258,6 +258,20 @@ Bare repos on disk are the source of truth; SQLite holds coordination metadata
   POSTs each pushed ref to the loopback `/internal/ci/events`. The secret is
   per-process and never persisted. The hook soft-fails — a CI problem must never
   block a push.
+- **Push hooks also carry the branch-protection rules.** The same injection adds
+  `MOONGIT_PROTECTED_REFS`, the repo's newline-separated glob patterns, read
+  from SQLite by `pushEnv` (`internal/server/git.go`) and shared with the SSH
+  push path. The `pre-receive` hook matches each pushed branch against them and
+  hard-fails on a delete or a non-fast-forward, rejecting the whole push before
+  any ref moves. Passing the patterns in rather than letting the hook call back
+  means enforcement needs no network and no database, so it holds whatever the
+  daemon is doing. See [branch-protection](../specs/branch-protection.md).
+- **Hook path is pinned per repo.** `WriteManagedHooks` writes both hooks *and*
+  sets the bare repo's own `core.hooksPath`. That is not redundant: git resolves
+  `core.hooksPath` from the global config too, so a server whose git user sets
+  it in `~/.gitconfig` would silently run those hooks and none of moongit's —
+  no CI on push, no branch protection, and no error anywhere. `moongitd ci
+  install-hooks` backfills both the hooks and the pin onto existing repos.
 - **Server-side operations are worktree-free**, because the same bare repo is
   being served concurrently. Reads use plumbing (`cat-file -t/-s/blob`,
   `--git-dir … show`) in `internal/server/tree.go` and

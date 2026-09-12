@@ -85,6 +85,99 @@ func WritePostReceiveHook(bareRepo string) error {
 	return os.WriteFile(filepath.Join(hooksDir, "post-receive"), []byte(postReceiveHook), 0o755)
 }
 
+// preReceiveHook enforces branch protection at push time. Like the
+// post-receive hook it is identical across repos and carries no state: the
+// repo's patterns arrive as MOONGIT_PROTECTED_REFS, which moongitd injects
+// into the receive-pack process it spawns. That keeps the hook free of any
+// network call or database read, so a push neither waits on the daemon nor
+// slips past protection when the daemon is unwell.
+//
+// Unlike post-receive it hard-fails: a non-zero exit rejects the whole push
+// before any ref moves, which is the point.
+const preReceiveHook = `#!/bin/sh
+# moongit branch-protection hook — managed by moongitd; do not edit.
+[ -n "$MOONGIT_PROTECTED_REFS" ] || exit 0
+
+# A ref's "null" value is all-zeros, 40 hex digits under sha1 and 64 under
+# sha256; testing for a non-zero character covers both without pinning a width.
+is_null() { case "$1" in *[!0]*) return 1 ;; *) return 0 ;; esac; }
+
+rc=0
+while read -r old new ref; do
+	# Only branches are protected; tags and other refs are out of scope.
+	case "$ref" in refs/heads/*) ;; *) continue ;; esac
+	branch=${ref#refs/heads/}
+
+	# Patterns are newline-separated shell globs over the branch name. $pat is
+	# deliberately unquoted in the case arm — that is what makes it a glob.
+	protected=0
+	oldifs=$IFS
+	IFS='
+'
+	for pat in $MOONGIT_PROTECTED_REFS; do
+		[ -n "$pat" ] || continue
+		case "$branch" in
+		$pat) protected=1; break ;;
+		esac
+	done
+	IFS=$oldifs
+	[ "$protected" = 1 ] || continue
+
+	if is_null "$new"; then
+		echo "moongit: '$branch' is protected — refusing to delete it" >&2
+		rc=1
+		continue
+	fi
+	# A branch that does not exist yet is being created, not rewritten.
+	is_null "$old" && continue
+	# Fast-forward: the old tip is still reachable from the new one.
+	git merge-base --is-ancestor "$old" "$new" 2>/dev/null && continue
+
+	echo "moongit: '$branch' is protected — refusing a non-fast-forward push" >&2
+	echo "moongit: clear the protection pattern in repo settings to rewrite it" >&2
+	rc=1
+done
+exit $rc
+`
+
+// WritePreReceiveHook installs (or refreshes) the branch-protection hook in a
+// bare repo. Idempotent, same as WritePostReceiveHook.
+func WritePreReceiveHook(bareRepo string) error {
+	hooksDir := filepath.Join(bareRepo, "hooks")
+	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(hooksDir, "pre-receive"), []byte(preReceiveHook), 0o755)
+}
+
+// pinHooksPath sets the repo's own `core.hooksPath`, which is not redundant:
+// git resolves that setting from the global config too, so a server whose git
+// user has `core.hooksPath` set in ~/.gitconfig silently runs *those* hooks
+// and none of moongit's — no CI on push, no branch protection, no error
+// anywhere. Writing it per-repo pins the lookup to the directory moongitd
+// manages.
+func pinHooksPath(bareRepo string) error {
+	hooksDir := filepath.Join(bareRepo, "hooks")
+	out, err := exec.Command("git", "--git-dir", bareRepo, "config", "core.hooksPath", hooksDir).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("pin core.hooksPath: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// WriteManagedHooks installs every hook moongitd owns and pins the repo's hook
+// path at them. Idempotent — called on every repo creation and by the
+// install-hooks backfill, so an existing repo picks up new or changed hooks.
+func WriteManagedHooks(bareRepo string) error {
+	if err := WritePostReceiveHook(bareRepo); err != nil {
+		return err
+	}
+	if err := WritePreReceiveHook(bareRepo); err != nil {
+		return err
+	}
+	return pinHooksPath(bareRepo)
+}
+
 // generateCISecret returns a fresh 256-bit hex secret for the loopback CI
 // endpoint. The secret is per-process: the same value is injected into the
 // push hook's environment and checked by the endpoint, so it never needs to

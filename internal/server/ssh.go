@@ -209,15 +209,16 @@ func (s *Server) runGitOverSSH(ctx context.Context, ch ssh.Channel, command, ide
 	if gitProtocol != "" {
 		cmd.Env = append(cmd.Env, "GIT_PROTOCOL="+gitProtocol)
 	}
-	// On push, hand the post-receive hook the same notification env the HTTP
-	// path injects — the pusher here is the authenticated key's token name.
+	// On push, hand the managed hooks the same environment the HTTP path
+	// injects — the pusher here is the authenticated key's token name.
 	if service == "git-receive-pack" {
-		cmd.Env = append(cmd.Env,
-			"MOONGIT_CI_URL="+s.ciURL,
-			"MOONGIT_CI_SECRET="+s.ciSecret,
-			"MOONGIT_CI_REPO="+owner+"/"+strings.TrimSuffix(repo, ".git"),
-			"MOONGIT_CI_PUSHER="+identity,
-		)
+		env, err := s.pushEnv(owner, strings.TrimSuffix(repo, ".git"), identity)
+		if err != nil {
+			s.logger.Error("ssh: push env", "repo", repoDir, "err", err)
+			fmt.Fprintf(ch.Stderr(), "moongit: cannot verify this repo's branch protection; push refused\n")
+			return 1
+		}
+		cmd.Env = append(cmd.Env, env...)
 	}
 
 	if err := cmd.Run(); err != nil {

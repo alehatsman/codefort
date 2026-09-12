@@ -256,6 +256,10 @@ type Repo struct {
 	// the merge endpoint will touch a ref. Off by default — review verdicts are
 	// advisory unless a repo opts in.
 	RequireApproval bool `json:"require_approval"`
+	// ProtectedRefs lists the repo's branch-protection patterns — shell globs
+	// matched against a branch name. A branch that matches cannot be deleted or
+	// force-pushed. Empty (the default) protects nothing.
+	ProtectedRefs []string `json:"protected_refs"`
 	// CIStatus / CINumber describe the repo's most recent CI run (highest run
 	// number), omitted when the repo has no runs. They let the repos list show
 	// a CI status icon linking to that run.
@@ -277,6 +281,9 @@ type UpdateRepoRequest struct {
 	Visibility *string `json:"visibility,omitempty"`
 	// RequireApproval gates merges on review state — see Repo.RequireApproval.
 	RequireApproval *bool `json:"require_approval,omitempty"`
+	// ProtectedRefs replaces the branch-protection pattern list wholesale — see
+	// Repo.ProtectedRefs. An empty slice clears it; nil leaves it alone.
+	ProtectedRefs *[]string `json:"protected_refs,omitempty"`
 }
 
 // CreateRepoRequest provisions a new repository: a bare git repo on disk

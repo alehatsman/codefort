@@ -6,6 +6,7 @@ import {
   useDeleteRepo,
   useRemoveRepoMember,
   useSetCIEnabled,
+  useSetProtectedRefs,
   useSetRepoVisibility,
   useSetRequireApproval,
 } from "@/api/mutations"
@@ -34,6 +35,7 @@ export default function RepoSettingsPage() {
           ciEnabled={r.ci_enabled}
           visibility={r.visibility}
           requireApproval={r.require_approval}
+          protectedRefs={r.protected_refs}
         />
         <MembersSection owner={owner} repo={repo} />
         <DangerSection owner={owner} repo={repo} />
@@ -48,12 +50,14 @@ function GeneralSection({
   ciEnabled,
   visibility,
   requireApproval,
+  protectedRefs,
 }: {
   owner: string
   repo: string
   ciEnabled: boolean
   visibility: "public" | "private"
   requireApproval: boolean
+  protectedRefs: string[]
 }) {
   const setCI = useSetCIEnabled(owner, repo)
   const setVis = useSetRepoVisibility(owner, repo)
@@ -123,6 +127,8 @@ function GeneralSection({
           </Button>
         </div>
 
+        <ProtectedBranchesRow owner={owner} repo={repo} patterns={protectedRefs} />
+
         <div className="repo-settings__row">
           <div className="repo-settings__row-copy">
             <strong>Visibility</strong>
@@ -145,6 +151,70 @@ function GeneralSection({
       {setGate.isError && <ErrorMessage error={setGate.error} inline />}
       {setVis.isError && <ErrorMessage error={setVis.error} inline />}
     </section>
+  )
+}
+
+// ProtectedBranchesRow edits the whole pattern list as text, one glob per
+// line. A textarea rather than a chip editor because the list is short, the
+// patterns are typed not picked, and the server takes the list whole anyway.
+function ProtectedBranchesRow({
+  owner,
+  repo,
+  patterns,
+}: {
+  owner: string
+  repo: string
+  patterns: string[]
+}) {
+  const setRefs = useSetProtectedRefs(owner, repo)
+  const toast = useToast()
+  // draft is null until the user types; that keeps the textarea tracking the
+  // server value after a save or an invalidation instead of pinning a stale one.
+  const [draft, setDraft] = useState<string | null>(null)
+  const saved = patterns.join("\n")
+  const text = draft ?? saved
+
+  function save() {
+    const next = text
+      .split("\n")
+      .map((p) => p.trim())
+      .filter(Boolean)
+    setRefs.mutate(next, {
+      onSuccess: () => {
+        setDraft(null)
+        toast(next.length ? `Protecting ${next.length} pattern(s)` : "Branch protection cleared", {
+          variant: "success",
+        })
+      },
+    })
+  }
+
+  return (
+    <div className="repo-settings__row repo-settings__row--stacked">
+      <div className="repo-settings__row-copy">
+        <strong>Protected branches</strong>
+        <p className="muted small">
+          One glob per line (<code>main</code>, <code>release/*</code>). A matching branch cannot be
+          deleted or force-pushed. Empty protects nothing.
+        </p>
+        <textarea
+          className="textarea"
+          rows={3}
+          spellCheck={false}
+          aria-label="Protected branch patterns"
+          value={text}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+      </div>
+      <Button
+        variant="primary"
+        size="small"
+        onClick={save}
+        disabled={setRefs.isPending || text === saved}
+      >
+        Save patterns
+      </Button>
+    </div>
   )
 }
 

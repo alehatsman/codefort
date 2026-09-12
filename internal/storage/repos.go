@@ -56,6 +56,9 @@ type RepoSummary struct {
 	CIEnabled   bool
 	// RequireApproval is the repo's opt-in review gate on merge (off by default).
 	RequireApproval bool
+	// ProtectedRefs is the repo's newline-separated branch-protection patterns
+	// (shell globs over branch names). Empty means no branch is protected.
+	ProtectedRefs string
 	// CIStatus is the status of the repo's most recent CI-kind run (highest run
 	// number among kind='ci'), empty when the repo has no CI runs. Agent runs
 	// share the ci_runs table but are excluded so the icon tracks pipeline
@@ -97,6 +100,7 @@ func ListRepos(db *sql.DB) ([]RepoSummary, error) {
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
 		  repos.ci_enabled,
 		  repos.require_approval,
+		  repos.protected_refs,
 		  repos.visibility,
 		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_status,
 		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number,` + repoMetricSubqueries + `
@@ -135,6 +139,7 @@ func GetRepoSummary(db *sql.DB, owner, name string) (RepoSummary, error) {
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
 		  repos.ci_enabled,
 		  repos.require_approval,
+		  repos.protected_refs,
 		  repos.visibility,
 		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_status,
 		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number,`+repoMetricSubqueries+`
@@ -162,6 +167,7 @@ func scanRepoSummary(s scanner, r *RepoSummary) error {
 	if err := s.Scan(
 		&r.ID, &r.Owner, &r.Name, &r.CreatedAt, &r.OpenIssues, &r.TotalIssues, &r.CIEnabled,
 		&r.RequireApproval,
+		&r.ProtectedRefs,
 		&r.Visibility,
 		&ciStatus, &ciNumber,
 		&r.OpenPulls, &r.OpenReviews, &r.ActiveAgents,
@@ -269,6 +275,37 @@ func SetRepoRequireApproval(db *sql.DB, repoID int64, required bool) error {
 	return nil
 }
 
+// RepoProtectedRefs returns a repo's newline-separated branch-protection
+// patterns by owner/name. Looked up on the push path, so it is a single narrow
+// read rather than a full repo summary. A repo that does not resolve yields
+// ErrNotFound; the caller treats that as "nothing to protect" only if it has
+// already established the repo exists.
+func RepoProtectedRefs(db *sql.DB, owner, name string) (string, error) {
+	var v string
+	err := db.QueryRow(`
+		SELECT repos.protected_refs FROM repos
+		JOIN users ON users.id = repos.owner_id
+		WHERE users.name = ? AND repos.name = ?`, owner, name).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return v, err
+}
+
+// SetRepoProtectedRefs replaces a repo's protection patterns. Missing repo ->
+// ErrNotFound.
+func SetRepoProtectedRefs(db *sql.DB, repoID int64, patterns string) error {
+	res, err := db.Exec(`UPDATE repos SET protected_refs = ? WHERE id = ?`, patterns, repoID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // ListReposForCaller returns repos visible to the given caller (by token name).
 // Public repos are always visible. Private repos are only visible when the
 // caller is the owner or a member. callerName="" is treated as an anonymous
@@ -284,6 +321,7 @@ func ListReposForCaller(db *sql.DB, callerName string) ([]RepoSummary, error) {
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
 		  repos.ci_enabled,
 		  repos.require_approval,
+		  repos.protected_refs,
 		  repos.visibility,
 		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_status,
 		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number,`+repoMetricSubqueries+`

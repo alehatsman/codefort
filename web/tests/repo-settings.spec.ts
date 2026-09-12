@@ -88,3 +88,29 @@ test("review gate toggles between advisory and required", async ({ page }) => {
   await row.getByRole("button", { name: "Make advisory" }).click()
   await expect(row).toContainText("Review verdicts are advisory")
 })
+
+// The pattern list is submitted whole, and Save stays disabled until the text
+// actually differs from what the server holds — otherwise a no-op PATCH is one
+// stray click away.
+test("protected branches save the pattern list", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/alice/demo/settings")
+
+  const row = page.locator(".repo-settings__row", { hasText: "Protected branches" })
+  const box = row.getByLabel("Protected branch patterns")
+  await expect(box).toHaveValue("")
+  await expect(row.getByRole("button", { name: "Save patterns" })).toBeDisabled()
+
+  await box.fill("main\nrelease/*")
+  await row.getByRole("button", { name: "Save patterns" }).click()
+  await expect(page.getByText("Protecting 2 pattern(s)")).toBeVisible()
+
+  // The saved value round-trips, so Save goes quiet again.
+  await expect(box).toHaveValue("main\nrelease/*")
+  await expect(row.getByRole("button", { name: "Save patterns" })).toBeDisabled()
+
+  // Clearing it is how a fleet un-protects a branch to rewrite it.
+  await box.fill("")
+  await row.getByRole("button", { name: "Save patterns" }).click()
+  await expect(page.getByText("Branch protection cleared")).toBeVisible()
+})

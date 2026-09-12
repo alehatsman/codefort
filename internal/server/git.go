@@ -2,6 +2,7 @@ package server
 
 import (
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/alehatsman/moongit/internal/storage"
 )
 
 // validServices lists the git smart-HTTP services we accept on /info/refs.
@@ -118,18 +121,15 @@ func (s *Server) handleServiceRPC(service string) http.HandlerFunc {
 		cmd.Stdin = body
 		cmd.Stdout = w
 		cmd.Stderr = os.Stderr
-		// On push, hand the post-receive hook what it needs to notify the CI
-		// endpoint: the loopback URL, the per-process secret, the repo
-		// identity, and the pusher (the Basic-auth user, when present). The
-		// hook inherits this environment from receive-pack.
 		if service == "git-receive-pack" {
 			pusher, _, _ := r.BasicAuth()
-			cmd.Env = append(os.Environ(),
-				"MOONGIT_CI_URL="+s.ciURL,
-				"MOONGIT_CI_SECRET="+s.ciSecret,
-				"MOONGIT_CI_REPO="+r.PathValue("owner")+"/"+strings.TrimSuffix(r.PathValue("repo"), ".git"),
-				"MOONGIT_CI_PUSHER="+pusher,
-			)
+			env, err := s.pushEnv(r.PathValue("owner"), strings.TrimSuffix(r.PathValue("repo"), ".git"), pusher)
+			if err != nil {
+				s.logger.Error("push env", "repo", repoDir, "err", err)
+				http.Error(w, "cannot verify this repo's branch protection; push refused", http.StatusInternalServerError)
+				return
+			}
+			cmd.Env = append(os.Environ(), env...)
 		}
 		if err := cmd.Run(); err != nil {
 			s.logger.Error("service rpc git failed", "service", service, "repo", repoDir, "err", err)
@@ -164,4 +164,30 @@ func (g *gzipBody) Close() error {
 func pktLine(payload string) []byte {
 	n := len(payload) + 4
 	return fmt.Appendf(nil, "%04x%s", n, payload)
+}
+
+// pushEnv builds the environment moongitd injects into `git receive-pack`.
+// Two managed hooks read it: post-receive needs the loopback URL, the
+// per-process CI secret, the repo identity, and the pusher; pre-receive needs
+// the repo's branch-protection patterns. Passing the patterns in rather than
+// letting the hook query keeps enforcement free of a network round-trip on
+// every push.
+//
+// A repo with no row (on disk but never registered) has no patterns to read
+// and therefore nothing to protect, so that is an empty list rather than an
+// error. A real read failure is an error: failing open would silently
+// unprotect a branch, and a refused push is recoverable where a rewritten
+// main is not.
+func (s *Server) pushEnv(owner, name, pusher string) ([]string, error) {
+	patterns, err := storage.RepoProtectedRefs(s.rdb, owner, name)
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+		return nil, err
+	}
+	return []string{
+		"MOONGIT_CI_URL=" + s.ciURL,
+		"MOONGIT_CI_SECRET=" + s.ciSecret,
+		"MOONGIT_CI_REPO=" + owner + "/" + name,
+		"MOONGIT_CI_PUSHER=" + pusher,
+		"MOONGIT_PROTECTED_REFS=" + patterns,
+	}, nil
 }

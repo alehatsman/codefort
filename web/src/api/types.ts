@@ -20,6 +20,9 @@ export interface Repo {
   /** Opt-in review gate: merge needs an approval and no outstanding
    *  changes_requested. Off by default — verdicts are advisory otherwise. */
   require_approval: boolean
+  /** Branch-protection patterns — shell globs over branch names. A matching
+   *  branch cannot be deleted or force-pushed. Empty protects nothing. */
+  protected_refs: string[]
   // Status + per-repo number of the repo's most recent CI run, absent when the
   // repo has no runs. Drives the at-a-glance CI icon on the repos list.
   ci_status?: CIRunStatus
@@ -36,6 +39,8 @@ export interface UpdateRepoInput {
   ci_enabled?: boolean
   visibility?: "public" | "private"
   require_approval?: boolean
+  /** Replaces the protected-branch pattern list wholesale; [] clears it. */
+  protected_refs?: string[]
 }
 
 export interface User {

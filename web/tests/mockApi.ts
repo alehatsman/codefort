@@ -36,6 +36,7 @@ export interface Repo {
   // Opt-in review gate on merge; optional here so sub-page specs that inline a
   // repo seed don't have to set it (the real API always emits it).
   require_approval?: boolean
+  protected_refs?: string[]
   // Latest CI run status + per-repo number, surfaced by /api/repos. Optional
   // (a repo with no runs omits them); drives the repos-list CI metric tile.
   ci_status?: string
@@ -246,6 +247,7 @@ function freshState(seed: Partial<State> = {}): State {
         total_issues: 0,
         ci_enabled: false,
         require_approval: false,
+        protected_refs: [],
         open_pulls: 0,
         open_reviews: 0,
         active_agents: 0,
@@ -403,9 +405,14 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
       return route.fulfill({ status: 204 })
     }
     if (req.method() === "PATCH") {
-      const body = req.postDataJSON() as { ci_enabled?: boolean; require_approval?: boolean }
+      const body = req.postDataJSON() as {
+        ci_enabled?: boolean
+        require_approval?: boolean
+        protected_refs?: string[]
+      }
       if (typeof body.ci_enabled === "boolean") repo.ci_enabled = body.ci_enabled
       if (typeof body.require_approval === "boolean") repo.require_approval = body.require_approval
+      if (Array.isArray(body.protected_refs)) repo.protected_refs = body.protected_refs
     }
     return json(route, 200, repo)
   })
