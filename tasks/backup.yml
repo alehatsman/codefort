@@ -19,9 +19,9 @@ steps:
       ts=$(date -u +%Y%m%dT%H%M%SZ)
       tmp=$(mktemp -d)
       trap "rm -rf $tmp" EXIT
-      sqlite3 "{{ data_dir }}/moongit.db" ".backup '$tmp/moongit.db'"
+      sqlite3 "{{ data_dir }}/codefort.db" ".backup '$tmp/codefort.db'"
       tar czf "{{ backup_dir }}/codefort-$ts.tar.gz" \
         -C "{{ data_dir }}" repos \
-        -C "$tmp" moongit.db
+        -C "$tmp" codefort.db
       echo "wrote {{ backup_dir }}/codefort-$ts.tar.gz"
     changed_when: "false"

@@ -186,10 +186,7 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.DataDir = dataDir
-	// moongit.db keeps its pre-rename name deliberately. Renaming it would mean
-	// moving live data on every existing deployment for no functional gain; an
-	// operator who wants the new name renames the file and sets CODEFORT_DB_PATH.
-	cfg.DBPath = envOr("CODEFORT_DB_PATH", filepath.Join(dataDir, "moongit.db"))
+	cfg.DBPath = envOr("CODEFORT_DB_PATH", filepath.Join(dataDir, "codefort.db"))
 	cfg.ReposDir = envOr("CODEFORT_REPOS_DIR", filepath.Join(dataDir, "repos"))
 	cfg.HostDataDir = envOr("CODEFORT_HOST_DATA_DIR", dataDir)
 	cfg.WebDir = envOr("CODEFORT_WEB_DIR", "")
@@ -329,4 +326,29 @@ func StaleEnv() []string {
 	}
 	sort.Strings(stale)
 	return stale
+}
+
+// CheckLegacyDB refuses startup when the configured database is absent but a
+// pre-rename moongit.db sits beside it.
+//
+// Without this the failure is silent and expensive: SQLite happily creates
+// codefort.db on first open, so a server whose data was never renamed comes up
+// healthy with zero repos, zero issues and an empty event feed, and the real
+// database is still sitting in the same directory untouched.
+//
+// It deliberately does not move the file. A rename that misses the -wal
+// sidecar drops every transaction not yet checkpointed, and doing that behind
+// the operator's back during an unattended restart is worse than not starting.
+func (c *Config) CheckLegacyDB() error {
+	if _, err := os.Stat(c.DBPath); err == nil || !os.IsNotExist(err) {
+		return nil
+	}
+	legacy := filepath.Join(filepath.Dir(c.DBPath), "moongit.db")
+	if _, err := os.Stat(legacy); err != nil {
+		return nil
+	}
+	return fmt.Errorf("%s does not exist but %s does — the database was not renamed. "+
+		"Stop the service, move all three files (mv moongit.db codefort.db; and the "+
+		"-wal and -shm sidecars if present), then start again. Set CODEFORT_DB_PATH to "+
+		"override", c.DBPath, legacy)
 }

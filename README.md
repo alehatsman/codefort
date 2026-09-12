@@ -151,7 +151,7 @@ staying a single binary you fully own.
 |---|---|
 | `CODEFORT_ADDR` | Listen address (default `:8080`) |
 | `CODEFORT_DATA_DIR` | Data dir for SQLite + repos (default `data`) |
-| `CODEFORT_DB_PATH` | SQLite path (default `$CODEFORT_DATA_DIR/moongit.db`) |
+| `CODEFORT_DB_PATH` | SQLite path (default `$CODEFORT_DATA_DIR/codefort.db`) |
 | `CODEFORT_REPOS_DIR` | Bare repo root (default `$CODEFORT_DATA_DIR/repos`) |
 | `CODEFORT_WEB_DIR` | Built web UI dir (`web/dist`); empty serves API + git only |
 | `CODEFORT_BASIC_USER` / `CODEFORT_BASIC_PASS` | Optional HTTP Basic gate on the UI + git |

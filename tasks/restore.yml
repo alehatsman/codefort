@@ -17,7 +17,7 @@ steps:
     shell: |
       set -eu
       test -f "{{ tarball }}" || { echo "tarball not found: {{ tarball }}"; exit 1; }
-      rm -rf "{{ data_dir }}/repos" "{{ data_dir }}/moongit.db"*
+      rm -rf "{{ data_dir }}/repos" "{{ data_dir }}/codefort.db"*
       tar xzf "{{ tarball }}" -C "{{ data_dir }}"
       echo "restored from {{ tarball }}"
     changed_when: "false"

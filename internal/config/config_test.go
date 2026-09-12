@@ -87,7 +87,7 @@ func TestLoadDefaults(t *testing.T) {
 	}{
 		{"Addr", cfg.Addr, ":8080"},
 		{"DataDir", cfg.DataDir, dataDir},
-		{"DBPath", cfg.DBPath, filepath.Join(dataDir, "moongit.db")},
+		{"DBPath", cfg.DBPath, filepath.Join(dataDir, "codefort.db")},
 		{"ReposDir", cfg.ReposDir, filepath.Join(dataDir, "repos")},
 		{"HostDataDir", cfg.HostDataDir, dataDir},
 		{"SSHHostKey", cfg.SSHHostKey, filepath.Join(dataDir, "ssh_host_ed25519_key")},
@@ -230,9 +230,9 @@ func TestLoadPathOverridesBeatDerivation(t *testing.T) {
 	// A relative CODEFORT_DB_PATH therefore stays relative to the CWD.
 	dir := t.TempDir()
 	t.Chdir(dir)
-	rel := load(t, "CODEFORT_DATA_DIR", dataDir, "CODEFORT_DB_PATH", "moongit.db")
-	if rel.DBPath != "moongit.db" {
-		t.Errorf("relative DBPath = %q, want it kept verbatim as %q", rel.DBPath, "moongit.db")
+	rel := load(t, "CODEFORT_DATA_DIR", dataDir, "CODEFORT_DB_PATH", "codefort.db")
+	if rel.DBPath != "codefort.db" {
+		t.Errorf("relative DBPath = %q, want it kept verbatim as %q", rel.DBPath, "codefort.db")
 	}
 }
 
@@ -283,7 +283,7 @@ func TestLoadEmptyStringIsUnset(t *testing.T) {
 		t.Errorf("CIDefaultImage = %q, want the default", cfg.CIDefaultImage)
 	}
 	// Same rule applies to the path derivation: DB_PATH="" still derives.
-	if want := filepath.Join(dataDir, "moongit.db"); cfg.DBPath != want {
+	if want := filepath.Join(dataDir, "codefort.db"); cfg.DBPath != want {
 		t.Errorf("DBPath = %q, want %q", cfg.DBPath, want)
 	}
 }
@@ -609,5 +609,46 @@ func TestStaleEnvDoesNotAffectLoad(t *testing.T) {
 	}
 	if cfg.Addr != ":8080" {
 		t.Errorf("Addr = %q, want the default :8080", cfg.Addr)
+	}
+}
+
+// A data dir holding the pre-rename database and no codefort.db is the exact
+// shape of "the operator deployed without moving the file". Starting would
+// create an empty database beside the real one.
+func TestCheckLegacyDBRefusesUnmigratedDataDir(t *testing.T) {
+	dir := t.TempDir()
+	legacy := filepath.Join(dir, "moongit.db")
+	if err := os.WriteFile(legacy, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &Config{DBPath: filepath.Join(dir, "codefort.db")}
+
+	err := cfg.CheckLegacyDB()
+	if err == nil {
+		t.Fatal("CheckLegacyDB() = nil, want an error naming the unmoved file")
+	}
+	if !strings.Contains(err.Error(), "moongit.db") {
+		t.Errorf("error %q should name the file the operator has to move", err)
+	}
+}
+
+// Once the file is moved the guard has nothing to say, and it must also stay
+// quiet on a genuinely fresh install where neither file exists.
+func TestCheckLegacyDBAllowsMigratedAndFresh(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{DBPath: filepath.Join(dir, "codefort.db")}
+
+	if err := cfg.CheckLegacyDB(); err != nil {
+		t.Errorf("fresh install: %v", err)
+	}
+
+	if err := os.WriteFile(cfg.DBPath, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "moongit.db"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.CheckLegacyDB(); err != nil {
+		t.Errorf("migrated (both present): %v", err)
 	}
 }

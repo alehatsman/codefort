@@ -79,7 +79,7 @@ USAGE:
 Environment:
     CODEFORT_ADDR        listen address (default ":8080")
     CODEFORT_DATA_DIR    data dir for SQLite + repos (default "data")
-    CODEFORT_DB_PATH     SQLite path (default "$CODEFORT_DATA_DIR/moongit.db")
+    CODEFORT_DB_PATH     SQLite path (default "$CODEFORT_DATA_DIR/codefort.db")
     CODEFORT_REPOS_DIR   bare repo root (default "$CODEFORT_DATA_DIR/repos")
     CODEFORT_WEB_DIR     built web UI dir (web/dist); empty serves API + git only
     CODEFORT_BASIC_USER  HTTP Basic user gating the web UI + git; empty disables it
@@ -102,6 +102,9 @@ func runServe(logger *slog.Logger) error {
 	}
 	if err := cfg.EnsureDirs(); err != nil {
 		return fmt.Errorf("ensure dirs: %w", err)
+	}
+	if err := cfg.CheckLegacyDB(); err != nil {
+		return err
 	}
 
 	db, err := storage.Open(cfg.DBPath)
@@ -559,6 +562,9 @@ func openDB() (*config.Config, *sql.DB, error) {
 	}
 	if err := cfg.EnsureDirs(); err != nil {
 		return nil, nil, fmt.Errorf("ensure dirs: %w", err)
+	}
+	if err := cfg.CheckLegacyDB(); err != nil {
+		return nil, nil, err
 	}
 	db, err := storage.Open(cfg.DBPath)
 	if err != nil {
