@@ -1,4 +1,4 @@
-# codefort agent base image
+# cf agent base image
 
 An **agent run** (the "Spawn agent" button on an issue) executes a containerized
 Claude session to work the issue. codefortd opens this image exactly like a CI
@@ -19,11 +19,11 @@ directory builds the default agent image, `codefort-agent:latest`.
    input, not source:
 
    ```sh
-   # from the codefort repo root
+   # from the cf repo root
    CGO_ENABLED=0 go build -o agent/cf ./cmd/cf
    ```
 
-2. **Build the image** from the codefort repo root, once `codefort-ci:latest`
+2. **Build the image** from the cf repo root, once `codefort-ci:latest`
    exists (see `ci/README.md`):
 
    ```sh
@@ -81,7 +81,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
 - `claude` — the Claude Code CLI (runs on the Node runtime installed here).
   Auth comes from `CLAUDE_CODE_OAUTH_TOKEN` / `ANTHROPIC_API_KEY` injected into
   the container env per run (#77), never baked in.
-- `cf` — the codefort issue client (`CODEFORT_TOKEN`/`CODEFORT_SERVER` are
+- `cf` — the cf issue client (`CODEFORT_TOKEN`/`CODEFORT_SERVER` are
   injected per run), exposed to Claude via the MCP shim rather than as a raw
   CLI — Claude itself can't invoke it directly (headless Bash is
   policy-gated, #110). Drop a static `cf` into `agent/cf` (git-ignored
@@ -101,7 +101,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
   `awaiting_input` between turns). It's removed on finalize; the startup sweep
   reaps leftover `codefort-agent-*` containers from a prior crash.
 - Per-run credentials are injected as env at container creation and revoked on
-  finalize; the ephemeral codefort token is `agent-run-<runID>`.
+  finalize; the ephemeral cf token is `agent-run-<runID>`.
 - **Force-stop** (`POST /api/repos/{o}/{r}/runs/{n}/cancel`, #146): cancels a
   run from any non-terminal state — unlike Finish, which only accepts a parked
   (`awaiting_input`) run and hands off the work. Cancel interrupts an in-flight

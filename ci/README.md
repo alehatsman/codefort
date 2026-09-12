@@ -36,7 +36,7 @@ directory builds the default image, `codefort-ci:latest`.
    `codefort-ci:latest` is `debian:stable-slim` (glibc). `ci/provision` is
    git-ignored — it's a build input, not source.
 
-3. **Build the image** from the codefort repo root:
+3. **Build the image** from the cf repo root:
 
    ```sh
    docker build -t codefort-ci:latest ci/
@@ -116,4 +116,4 @@ toolchain (go, npm, …) but pins no `image:`.
   by codefortd and workspace cleanup works.
 - On startup the runner sweeps any leftover `codefort-ci-*` containers from a
   prior crash.
-- Resource/network limits are not yet applied (tracked in codefort issue #26).
+- Resource/network limits are not yet applied (tracked in cf issue #26).

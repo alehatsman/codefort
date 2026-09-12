@@ -1016,7 +1016,7 @@ func openAgentDockerSession(ctx context.Context, logger *slog.Logger, name, work
 		// host-gateway to the host, same as Docker Desktop.
 		"--add-host", "host.docker.internal:host-gateway",
 	}
-	// Pass the per-run secrets (Claude/LLM tokens, the ephemeral codefort token,
+	// Pass the per-run secrets (Claude/LLM tokens, the ephemeral cf token,
 	// LLM bearer) via --env-file rather than `-e KEY=VALUE`: the latter puts every
 	// value on the docker-run argv (visible in `ps`/proc) and bakes it into
 	// `docker inspect`.Config.Env for the container's whole lifetime. The 0600

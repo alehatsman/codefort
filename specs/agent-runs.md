@@ -48,7 +48,7 @@ lives in the image.
   turn drives a resumable headless Claude session that edits files.
 - WHERE credentials are needed, they are injected per-run into the container and
   never baked into the image: a scoped LLM auth token (operator gateway bearer >
-  operator OAuth > env OAuth > env API key), an ephemeral codefort token (revoked
+  operator OAuth > env OAuth > env API key), an ephemeral cf token (revoked
   on finalize) plus the server URL for in-container git/cf.
 - WHEN a client finishes a parked (`awaiting_input`) run, the run transitions to
   `finishing` and the runner materializes the workspace as a commit on
@@ -105,7 +105,7 @@ lives in the image.
 - [x] Turn 1 in a fresh checked-out workspace + container; park in awaiting_input
 - [x] Follow-up turns queue, resume the session, stream, re-park
 - [x] claude-edit as the single execution model over a shared spine
-- [x] Per-run scoped credentials (LLM auth, ephemeral codefort token) torn down on finalize
+- [x] Per-run scoped credentials (LLM auth, ephemeral cf token) torn down on finalize
 - [x] Finish = server-side handoff to agent/issue-<n> + summary comment; parked-only
 - [x] Cancel/force-stop from any non-terminal state; discards the workspace
 - [x] Per-turn timeout; schema-tolerant transcript translation

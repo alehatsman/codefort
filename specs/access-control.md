@@ -80,7 +80,7 @@ vocabulary. The *grid* of per-user, per-resource rules stays out.
   middleware, which short-circuits on public repos so a public clone pays no
   auth cost and behaves exactly as before.
 - WHERE a private repo is reached over git, the caller's identity comes from a
-  codefort token presented as a `Bearer` header or as the **password** half of
+  cf token presented as a `Bearer` header or as the **password** half of
   HTTP Basic with any username — git has no bearer support, so this is the same
   token-over-git-HTTP shape as a forge personal access token. The shared
   `CODEFORT_BASIC_USER` credential does not satisfy this: it names a deployment,

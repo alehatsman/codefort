@@ -134,7 +134,7 @@ func (s *Server) withRepoAccess(next http.Handler) http.Handler {
 //
 // A private repo needs a per-caller identity, which the shared Basic credential
 // cannot provide (it names a deployment, not a person). So identity here comes
-// from a codefort token presented either as a Bearer header or — the way git
+// from a cf token presented either as a Bearer header or — the way git
 // clients actually authenticate — as the *password* of a Basic credential, with
 // any username. That is the same token-over-git-HTTP pattern as a forge PAT.
 func (s *Server) withGitRepoAccess(next http.Handler) http.Handler {

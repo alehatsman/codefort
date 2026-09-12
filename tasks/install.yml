@@ -5,7 +5,7 @@ steps:
   # value from a file never gets a second render pass (provision spec
   # §3.3). An inline `vars:` step's values ARE rendered, so home-anchored
   # paths live here, not in a shared vars_file (confirmed with Provision
-  # master mind, codefort issue #410).
+  # master mind, cf issue #410).
   - vars:
       binary_path: "{{ home }}/.local/bin/codefortd"
       client_path: "{{ home }}/.local/bin/codefort"

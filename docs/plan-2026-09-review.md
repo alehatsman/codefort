@@ -49,7 +49,7 @@ The load-bearing fix. Design: **one gate, not 61 call sites.**
   - no read access → **404, not 403**, so a private repo's existence does not
     leak.
 - `withGitRepoAccess` on the git smart-HTTP mux. Git clients authenticate with
-  HTTP Basic, so a codefort token is accepted as the Basic *password* (the
+  HTTP Basic, so a cf token is accepted as the Basic *password* (the
   standard token-over-git-HTTP pattern). Public repos keep today's open
   behavior; private repos require an identity that passes `CanAccessRepo`, and
   `git-receive-pack` additionally requires `CanWriteRepo`.

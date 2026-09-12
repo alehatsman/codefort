@@ -7,7 +7,7 @@
 #
 # The dev-loop tasks (build/install/deploy/backup/gc/restore/uninstall/
 # create-repo/run/ui/clean/ci-images/agent-image) moved to tasks/
-# (provision) — see docs/ops-provisioning.md and codefort issue #410. The
+# (provision) — see docs/ops-provisioning.md and cf issue #410. The
 # web/ quality gate (ts-quality) moved there too, in the same pass that
 # picked up ts-quality's provision-migration rewrite (upstream dropped
 # mooncake-module compatibility outright — see docs/ops-provisioning.md's

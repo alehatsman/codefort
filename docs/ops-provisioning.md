@@ -249,7 +249,7 @@ thing to type is not worth a translation layer (explicit > magic).
 ## CI runner (#411)
 
 Replaces mooncake as `cmd/codefortd/ci_runner.go`'s exec target. This is a
-model change, not a binary swap — see codefort issue #411 for the full
+model change, not a binary swap — see cf issue #411 for the full
 before/after and why. This section is the code gate: no code lands until
 this holds.
 

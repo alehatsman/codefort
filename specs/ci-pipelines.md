@@ -14,7 +14,7 @@ covers:
 
 ## Intent
 
-CI turns a push into feedback. When code lands in a codefort repo, the daemon
+CI turns a push into feedback. When code lands in a cf repo, the daemon
 enqueues a run, executes the repo's pipeline against that exact commit in an
 isolated workspace, and streams the result back live. The whole thing runs
 in-process in the single `codefortd` binary — no external runner fleet — so a

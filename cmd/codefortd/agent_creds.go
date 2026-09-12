@@ -15,7 +15,7 @@ import (
 // reachable at /work/<name> inside the container).
 const agentMCPConfigName = ".codefort-agent-mcp.json"
 
-// agentTokenName is the deterministic name of a run's ephemeral codefort token,
+// agentTokenName is the deterministic name of a run's ephemeral cf token,
 // so it can be revoked on finalize without persisting anything extra.
 func agentTokenName(runID int64) string {
 	return fmt.Sprintf("agent-run-%d", runID)
@@ -35,7 +35,7 @@ type agentSettingsOverride struct {
 // Auth precedence: an operator-set gateway bearer (ANTHROPIC_AUTH_TOKEN) wins
 // and claims the auth slot alone; else the operator-set OAuth token, then the
 // OAuth-token env, then the API-key env. ANTHROPIC_BASE_URL is the operator-set
-// value when present, else the env. The ephemeral codefort token + server URL
+// value when present, else the env. The ephemeral cf token + server URL
 // let the in-container git/cf talk to codefortd. Order is stable for
 // testability.
 func agentContainerEnv(cfg *config.Config, o agentSettingsOverride, codefortToken, serverURL string) []string {
@@ -86,7 +86,7 @@ func agentServerURL(cfg *config.Config) string {
 // registering the stdio MCP servers the agent gets (reachable at /work and run
 // under --strict-mcp-config, so this file is the agent's whole MCP surface):
 //
-//   - cf: the codefort issue/review/pipeline/agent toolset (`cf mcp`, #158).
+//   - cf: the cf issue/review/pipeline/agent toolset (`cf mcp`, #158).
 //     Always registered — the per-run CODEFORT_TOKEN + CODEFORT_SERVER ride in the
 //     container env (agentContainerEnv), so the shim resolves its target and
 //     identity without anything in this file. The run's tool profile (#184) is

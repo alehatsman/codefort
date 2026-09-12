@@ -218,7 +218,7 @@ func TestExecuteAgentRunParksAfterTurn1(t *testing.T) {
 }
 
 // The run injects scoped per-run credentials into the container env, mints a
-// real ephemeral codefort token (revoked on teardown), and wires the MCP config.
+// real ephemeral cf token (revoked on teardown), and wires the MCP config.
 func TestAgentRunInjectsCredentials(t *testing.T) {
 	h := newAgentHarness(t, agentTestOpts{lines: successTurn})
 	h.r.executeAgentRun(context.Background(), h.run)
@@ -237,7 +237,7 @@ func TestAgentRunInjectsCredentials(t *testing.T) {
 	if mgitTok == "" {
 		t.Fatal("CODEFORT_TOKEN not injected")
 	}
-	// The injected token is a real, active codefort token while parked.
+	// The injected token is a real, active cf token while parked.
 	tok, err := storage.LookupToken(h.r.db, mgitTok)
 	if err != nil {
 		t.Fatalf("injected token not valid: %v", err)

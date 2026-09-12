@@ -62,7 +62,7 @@ func (r *ciRunner) finishAgentRun(parent context.Context, run storage.CIRun) {
 	// it so it doesn't land in the branch.
 	_ = os.Remove(filepath.Join(workDir, agentMCPConfigName))
 
-	msg := fmt.Sprintf("agent: %s\n\nWorked issue #%d via codefort agent run #%d.\n",
+	msg := fmt.Sprintf("agent: %s\n\nWorked issue #%d via cf agent run #%d.\n",
 		issue.Title, issue.Number, run.Number)
 	ref, commit, changed, err := materializeAgentBranch(parent, run.ID, bareRepo, run.CommitSHA, workDir, refBase, agentCommentAuthor, msg)
 	branch := strings.TrimPrefix(ref, "refs/heads/")

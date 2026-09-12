@@ -144,7 +144,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 	r.emit(elog, ci.EventRunStarted, map[string]any{"total_steps": 1})
 
-	// Mint the ephemeral, per-run codefort token and compose the container env
+	// Mint the ephemeral, per-run cf token and compose the container env
 	// (creds, scoped token). The token is revoked on teardown.
 	codefortToken, err := storage.GenerateTokenString()
 	if err == nil {
@@ -534,7 +534,7 @@ func (r *ciRunner) CancelCIRun(runID int64) bool {
 }
 
 // tearDownAgent releases a finished agent run's resources: remove the container
-// (best-effort), revoke its ephemeral codefort token, and delete the workspace.
+// (best-effort), revoke its ephemeral cf token, and delete the workspace.
 func (r *ciRunner) tearDownAgent(runID, jobID int64, workDir string) {
 	if jobID != 0 && r.teardownContainer != nil {
 		r.teardownContainer(agentContainerName(jobID))

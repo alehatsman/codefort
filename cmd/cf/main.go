@@ -1,6 +1,6 @@
-// Command codefort is the client CLI for the codefort server. It infers the
+// Command cf is the client CLI for the codefort server. It infers the
 // target repo from the local git remote, so users run it from inside a working
-// copy: `codefort issue create --title "..."`.
+// copy: `cf issue create --title "..."`.
 package main
 
 import (
@@ -24,7 +24,7 @@ import (
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "codefort:", err)
+		fmt.Fprintln(os.Stderr, "cf:", err)
 		os.Exit(1)
 	}
 }
@@ -53,49 +53,49 @@ func run(args []string) error {
 		printUsage(os.Stdout)
 		return nil
 	default:
-		return fmt.Errorf("unknown command %q (try `codefort help`)", args[0])
+		return fmt.Errorf("unknown command %q (try `cf help`)", args[0])
 	}
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprint(w, `codefort — client for the codefort server
+	fmt.Fprint(w, `cf — client for the codefort server
 
 USAGE:
-    codefort issue create  --title <t> [--body <b>] [--parent <n>] [--labels <a,b>]
-    codefort issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--label <l>]
+    cf issue create  --title <t> [--body <b>] [--parent <n>] [--labels <a,b>]
+    cf issue list    [--state s,s] [--assignee a|null] [--query|-q kw] [--label <l>]
                           [--limit n] [--ready|--blocked|--epics]
-    codefort issue show    <number>
-    codefort issue edit    <number> [--title <t>] [--body <b>] [--state <s>] [--parent <n>|0]
+    cf issue show    <number>
+    cf issue edit    <number> [--title <t>] [--body <b>] [--state <s>] [--parent <n>|0]
                                    [--labels <a,b>]
                                    [--depends-on <m,...>] [--remove-depends-on <m,...>]
-    codefort issue set-state <number> <todo|in_progress|done|closed>
-    codefort issue claim   <number> [--state s]
-    codefort issue unclaim <number>
-    codefort issue delete  <number> [--yes|-y]
-    codefort issue comment <number> --body <b>
+    cf issue set-state <number> <todo|in_progress|done|closed>
+    cf issue claim   <number> [--state s]
+    cf issue unclaim <number>
+    cf issue delete  <number> [--yes|-y]
+    cf issue comment <number> --body <b>
 
-    codefort review list    [--ref <branch>] [--path <p>] [--state open|resolved|all] [--json]
-    codefort review create  --path <p> --lines <n|a-b> --body <b> [--ref <branch>]
-    codefort review resolve <id>
-    codefort review reopen  <id>
-    codefort review delete  <id>
+    cf review list    [--ref <branch>] [--path <p>] [--state open|resolved|all] [--json]
+    cf review create  --path <p> --lines <n|a-b> --body <b> [--ref <branch>]
+    cf review resolve <id>
+    cf review reopen  <id>
+    cf review delete  <id>
 
-    codefort pr create  --base <ref> --head <ref> --title <t> [--body <b>]
-    codefort pr list    [--state open|merged|closed|all]
-    codefort pr show    <number>
-    codefort pr merge   <number> [--ff-only | --rebase]
-    codefort pr close   <number>
-    codefort pr reopen  <number>
+    cf pr create  --base <ref> --head <ref> --title <t> [--body <b>]
+    cf pr list    [--state open|merged|closed|all]
+    cf pr show    <number>
+    cf pr merge   <number> [--ff-only | --rebase]
+    cf pr close   <number>
+    cf pr reopen  <number>
 
-    codefort ci validate  [path]   (defaults to ./codefort.yml)
-    codefort ci run       <ref>    (trigger a run for a branch/tag/sha)
+    cf ci validate  [path]   (defaults to ./codefort.yml)
+    cf ci run       <ref>    (trigger a run for a branch/tag/sha)
 
-    codefort repo delete  <owner>/<name> [--yes|-y]   (irreversible)
+    cf repo delete  <owner>/<name> [--yes|-y]   (irreversible)
 
-    codefort events                (tail the fleet event feed; Ctrl-C to stop)
+    cf events                (tail the fleet event feed; Ctrl-C to stop)
         [--repo owner/name] [--types a,b] [--since <seq>] [--once]
 
-    codefort mcp [--profile full|review]
+    cf mcp [--profile full|review]
                                   (serve the toolset over stdio as an MCP server)
 
 Identity: the server stamps author/assignee from the name of the token
@@ -111,7 +111,7 @@ checkout is required even when it is set.
 
 func runIssue(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: codefort issue <create|list|show|edit|set-state|claim|unclaim|delete|comment>")
+		return errors.New("usage: cf issue <create|list|show|edit|set-state|claim|unclaim|delete|comment>")
 	}
 	switch args[0] {
 	case "create":
@@ -280,7 +280,7 @@ func runIssueList(args []string) error {
 
 func runIssueShow(args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: codefort issue show <number>")
+		return errors.New("usage: cf issue show <number>")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -362,7 +362,7 @@ func runIssueShow(args []string) error {
 
 func runIssueSetState(args []string) error {
 	if len(args) != 2 {
-		return errors.New("usage: codefort issue set-state <number> <todo|in_progress|done|closed>")
+		return errors.New("usage: cf issue set-state <number> <todo|in_progress|done|closed>")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -405,7 +405,7 @@ func runIssueSetState(args []string) error {
 // clobbers the body and vice versa.
 func runIssueEdit(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: codefort issue edit <number> [--title <t>] [--body <b>] [--state <s>] [--labels <a,b>] [--parent <n>|0] [--depends-on <m,...>] [--remove-depends-on <m,...>]")
+		return errors.New("usage: cf issue edit <number> [--title <t>] [--body <b>] [--state <s>] [--labels <a,b>] [--parent <n>|0] [--depends-on <m,...>] [--remove-depends-on <m,...>]")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -578,7 +578,7 @@ func parseIssueNums(s string) ([]int, error) {
 
 func runIssueClaim(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: codefort issue claim <number> [--state <s>]")
+		return errors.New("usage: cf issue claim <number> [--state <s>]")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -627,7 +627,7 @@ func runIssueClaim(args []string) error {
 
 func runIssueUnclaim(args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: codefort issue unclaim <number>")
+		return errors.New("usage: cf issue unclaim <number>")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -651,7 +651,7 @@ func runIssueUnclaim(args []string) error {
 
 func runIssueDelete(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: codefort issue delete <number> [--yes]")
+		return errors.New("usage: cf issue delete <number> [--yes]")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -697,7 +697,7 @@ func runIssueDelete(args []string) error {
 
 func runIssueComment(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: codefort issue comment <number> --body <b>")
+		return errors.New("usage: cf issue comment <number> --body <b>")
 	}
 	num, err := strconv.Atoi(args[0])
 	if err != nil || num <= 0 {
@@ -740,11 +740,11 @@ func runIssueComment(args []string) error {
 	return nil
 }
 
-// runReview dispatches `codefort review <subcommand>` — the read/triage side of
+// runReview dispatches `cf review <subcommand>` — the read/triage side of
 // the code-review comments anchored to file blocks on a branch.
 func runReview(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: codefort review <list|create|resolve|reopen|delete>")
+		return errors.New("usage: cf review <list|create|resolve|reopen|delete>")
 	}
 	switch args[0] {
 	case "list":
@@ -794,7 +794,7 @@ func runReviewCreate(args []string) error {
 		return err
 	}
 	if *path == "" || *lines == "" || strings.TrimSpace(*body) == "" {
-		return errors.New("usage: codefort review create --path <p> --lines <n|a-b> --body <b> [--ref <branch>]")
+		return errors.New("usage: cf review create --path <p> --lines <n|a-b> --body <b> [--ref <branch>]")
 	}
 	start, end, err := parseLineSpec(*lines)
 	if err != nil {
@@ -913,7 +913,7 @@ func runReviewSetResolved(args []string, resolved bool) error {
 		verb, past = "reopen", "reopened"
 	}
 	if len(args) != 1 {
-		return fmt.Errorf("usage: codefort review %s <id>", verb)
+		return fmt.Errorf("usage: cf review %s <id>", verb)
 	}
 	id, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil || id <= 0 {
@@ -941,7 +941,7 @@ func runReviewSetResolved(args []string, resolved bool) error {
 
 func runReviewDelete(args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: codefort review delete <id>")
+		return errors.New("usage: cf review delete <id>")
 	}
 	id, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil || id <= 0 {
@@ -963,12 +963,12 @@ func runReviewDelete(args []string) error {
 	return nil
 }
 
-// runCI dispatches `codefort ci <subcommand>`. `validate` is local-only — it
+// runCI dispatches `cf ci <subcommand>`. `validate` is local-only — it
 // parses the codefort.yml in the working copy and never touches the server.
 // `run` does round-trip: it POSTs a run for a ref.
 func runCI(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: codefort ci <validate|run>")
+		return errors.New("usage: cf ci <validate|run>")
 	}
 	switch args[0] {
 	case "validate":
@@ -989,7 +989,7 @@ func runCITrigger(args []string) error {
 		return err
 	}
 	if fs.NArg() != 1 {
-		return errors.New("usage: codefort ci run <ref>")
+		return errors.New("usage: cf ci run <ref>")
 	}
 	ref := fs.Arg(0)
 
@@ -1065,12 +1065,12 @@ func runCIValidate(args []string) error {
 	return nil
 }
 
-// runRepo dispatches `codefort repo <subcommand>`. Repo-level operations target
+// runRepo dispatches `cf repo <subcommand>`. Repo-level operations target
 // a repo by its explicit <owner>/<name>, not the current checkout's remote —
 // you typically delete a repo other than the one you're standing in.
 func runRepo(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: codefort repo <delete>")
+		return errors.New("usage: cf repo <delete>")
 	}
 	switch args[0] {
 	case "delete":
@@ -1090,7 +1090,7 @@ func runRepoDelete(args []string) error {
 	// follows it. (Go's flag package stops at the first non-flag arg, so a
 	// trailing --yes would otherwise be left unparsed.)
 	if len(args) < 1 {
-		return errors.New("usage: codefort repo delete <owner>/<name> [--yes]")
+		return errors.New("usage: cf repo delete <owner>/<name> [--yes]")
 	}
 	owner, repo, err := splitOwnerRepo(args[0])
 	if err != nil {
