@@ -70,3 +70,21 @@ test("deleting a repo that's already gone surfaces the 404", async ({ page }) =>
   await page.getByRole("button", { name: "Delete repository" }).click()
   await expect(page.getByText(/not registered/)).toBeVisible()
 })
+
+// The review gate is per-repo and opt-in, so the toggle has to say which state
+// it is in — "Require review" reads as an action, not a status.
+test("review gate toggles between advisory and required", async ({ page }) => {
+  await mockApi(page)
+  await page.goto("/alice/demo/settings")
+
+  const row = page.locator(".repo-settings__row", { hasText: "Require review before merge" })
+  await expect(row).toContainText("Review verdicts are advisory")
+
+  await row.getByRole("button", { name: "Require review" }).click()
+  await expect(row).toContainText("needs one approval")
+  await expect(row.getByRole("button", { name: "Make advisory" })).toBeVisible()
+
+  // And back — the setting is a toggle, not a one-way door.
+  await row.getByRole("button", { name: "Make advisory" }).click()
+  await expect(row).toContainText("Review verdicts are advisory")
+})

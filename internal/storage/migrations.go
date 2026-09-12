@@ -458,6 +458,15 @@ CREATE INDEX IF NOT EXISTS idx_pr_reviews_pr ON pr_reviews(repo_id, pr_number);
 	UPDATE ci_runs SET execution_model = 'claude-edit' WHERE execution_model = 'mooncake-agent';
 	ALTER TABLE ci_runs DROP COLUMN mooncake_allow_shell;
 	`,
+
+	// 30: opt-in review gate on merge. Off by default so an upgrade never
+	// silently starts rejecting merges a fleet was already making; a repo that
+	// wants review to mean something turns it on. Coarse on purpose — one flag,
+	// not a per-branch policy (VISION.md permits coarse-and-optional rules and
+	// rules out a rules engine).
+	`
+	ALTER TABLE repos ADD COLUMN require_approval INTEGER NOT NULL DEFAULT 0;
+	`,
 }
 
 // Migrate brings the database up to the latest schema version. Idempotent —

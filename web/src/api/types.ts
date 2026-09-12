@@ -17,6 +17,9 @@ export interface Repo {
   open_issues: number
   total_issues: number
   ci_enabled: boolean
+  /** Opt-in review gate: merge needs an approval and no outstanding
+   *  changes_requested. Off by default — verdicts are advisory otherwise. */
+  require_approval: boolean
   // Status + per-repo number of the repo's most recent CI run, absent when the
   // repo has no runs. Drives the at-a-glance CI icon on the repos list.
   ci_status?: CIRunStatus
@@ -32,6 +35,7 @@ export interface Repo {
 export interface UpdateRepoInput {
   ci_enabled?: boolean
   visibility?: "public" | "private"
+  require_approval?: boolean
 }
 
 export interface User {

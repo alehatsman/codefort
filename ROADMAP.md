@@ -18,7 +18,7 @@ the thing, not the task list.
 | Issues: CRUD, four-state lifecycle, claim-as-lock with lease, comments, labels | [issues](specs/issues.md) |
 | Epics (parent edge) + `depends-on` graph with computed ready/blocked views | [issues](specs/issues.md) |
 | Pull requests: open, merge (ff-only / merge-commit / rebase), CAS ref guard, mirror push | [pull-requests](specs/pull-requests.md) |
-| PR approvals / review state; line-anchored review comments, resolve/reopen | [pull-requests](specs/pull-requests.md) |
+| PR approvals / review state, opt-in as a merge gate; line-anchored review comments, resolve/reopen | [pull-requests](specs/pull-requests.md) |
 | CI: `mgitci.yml` DAG via `needs:`, container isolation, dependency waves, SSE logs, retention | [ci-pipelines](specs/ci-pipelines.md) |
 | Cron-scheduled pipeline runs | [ci-pipelines](specs/ci-pipelines.md) |
 | Agent runs: spawn-from-issue, turns, park/resume, handoff branch, cancel | [agent-runs](specs/agent-runs.md) |
@@ -55,15 +55,7 @@ That is defensible (the frontmatter is the human-facing record, the table is
 the machine's) but it is undocumented, and it is why "every spec is draft"
 reads as a broken feature rather than an unused one.
 
-### 2. Should review state gate merge?
-
-An approval or a changes-requested verdict is recorded, surfaced on the PR, and
-emitted to the feed — and then ignored: the merge endpoint never consults it.
-That is consistent with local-trust (a valid token is the bar, claims are the
-social lock) and inconsistent with having a review feature at all. The call is a
-product one, not a technical one, and it has not been made.
-
-### 3. Finish mooncake → provision
+### 2. Finish mooncake → provision
 
 The last tie to the archived tool is the Go quality gate: `mgitci.yml` execs
 `mooncake task ci`, and `ci/Dockerfile` bakes the binary into
@@ -71,7 +63,7 @@ The last tie to the archived tool is the Go quality gate: `mgitci.yml` execs
 rewrite in `alehatsman/go-quality`. Background in
 [docs/ops-provisioning.md](docs/ops-provisioning.md).
 
-### 4. Smaller, unblocked
+### 3. Smaller, unblocked
 
 - Issue search is substring-only over title/body; no ranking.
 - No milestones. Labels + epics cover most of what they'd do — this only earns
@@ -79,7 +71,8 @@ rewrite in `alehatsman/go-quality`. Background in
 - Branch protection is a labelled placeholder in Settings. `VISION.md` permits
   "a handful of branch-protection rules" as a coarse convenience; the shape is
   a small allowlist of protected refs checked on the push path, not a rules
-  engine.
+  engine. The merge review gate is the same shape and is the precedent to
+  follow: one per-repo boolean, off by default.
 
 ## Not building
 

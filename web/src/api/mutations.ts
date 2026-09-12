@@ -363,6 +363,20 @@ export function useSetCIEnabled(owner: string, repo: string) {
   })
 }
 
+// useSetRequireApproval flips a repo's review gate on merge. The PR detail view
+// reads the flag to explain a blocked merge, so invalidate repo views too.
+export function useSetRequireApproval(owner: string, repo: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (required: boolean) =>
+      api.updateRepo(owner, repo, { require_approval: required } as UpdateRepoInput),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.repo(owner, repo) })
+      void qc.invalidateQueries({ queryKey: keys.repos() })
+    },
+  })
+}
+
 // useSetRepoVisibility toggles a repo between public and private.
 export function useSetRepoVisibility(owner: string, repo: string) {
   const qc = useQueryClient()

@@ -251,6 +251,11 @@ type Repo struct {
 	OpenIssues  int       `json:"open_issues"`
 	TotalIssues int       `json:"total_issues"`
 	CIEnabled   bool      `json:"ci_enabled"`
+	// RequireApproval gates merging on review state: with it on, a PR needs at
+	// least one standing approval and no outstanding changes_requested before
+	// the merge endpoint will touch a ref. Off by default — review verdicts are
+	// advisory unless a repo opts in.
+	RequireApproval bool `json:"require_approval"`
 	// CIStatus / CINumber describe the repo's most recent CI run (highest run
 	// number), omitted when the repo has no runs. They let the repos list show
 	// a CI status icon linking to that run.
@@ -270,6 +275,8 @@ type Repo struct {
 type UpdateRepoRequest struct {
 	CIEnabled  *bool   `json:"ci_enabled,omitempty"`
 	Visibility *string `json:"visibility,omitempty"`
+	// RequireApproval gates merges on review state — see Repo.RequireApproval.
+	RequireApproval *bool `json:"require_approval,omitempty"`
 }
 
 // CreateRepoRequest provisions a new repository: a bare git repo on disk

@@ -7,6 +7,7 @@ import {
   useRemoveRepoMember,
   useSetCIEnabled,
   useSetRepoVisibility,
+  useSetRequireApproval,
 } from "@/api/mutations"
 import { useRepo, useRepoMembers } from "@/api/queries"
 import type { AddMemberInput } from "@/api/types"
@@ -32,6 +33,7 @@ export default function RepoSettingsPage() {
           repo={repo}
           ciEnabled={r.ci_enabled}
           visibility={r.visibility}
+          requireApproval={r.require_approval}
         />
         <MembersSection owner={owner} repo={repo} />
         <DangerSection owner={owner} repo={repo} />
@@ -45,19 +47,31 @@ function GeneralSection({
   repo,
   ciEnabled,
   visibility,
+  requireApproval,
 }: {
   owner: string
   repo: string
   ciEnabled: boolean
   visibility: "public" | "private"
+  requireApproval: boolean
 }) {
   const setCI = useSetCIEnabled(owner, repo)
   const setVis = useSetRepoVisibility(owner, repo)
+  const setGate = useSetRequireApproval(owner, repo)
   const toast = useToast()
 
   function toggleCI() {
     setCI.mutate(!ciEnabled, {
       onSuccess: () => toast(`CI ${!ciEnabled ? "enabled" : "disabled"}`, { variant: "success" }),
+    })
+  }
+
+  function toggleGate() {
+    setGate.mutate(!requireApproval, {
+      onSuccess: () =>
+        toast(`Review ${!requireApproval ? "required" : "advisory"} before merge`, {
+          variant: "success",
+        }),
     })
   }
 
@@ -92,6 +106,25 @@ function GeneralSection({
 
         <div className="repo-settings__row">
           <div className="repo-settings__row-copy">
+            <strong>Require review before merge</strong>
+            <p className="muted small">
+              {requireApproval
+                ? "A pull request needs one approval and no outstanding changes-requested before it can merge."
+                : "Review verdicts are advisory — a pull request can merge without one."}
+            </p>
+          </div>
+          <Button
+            variant={requireApproval ? "ghost" : "primary"}
+            size="small"
+            onClick={toggleGate}
+            disabled={setGate.isPending}
+          >
+            {requireApproval ? "Make advisory" : "Require review"}
+          </Button>
+        </div>
+
+        <div className="repo-settings__row">
+          <div className="repo-settings__row-copy">
             <strong>Visibility</strong>
             <p className="muted small">
               This repository is currently <strong>{visibility}</strong>. Changing to private
@@ -109,6 +142,7 @@ function GeneralSection({
         </div>
       </div>
       {setCI.isError && <ErrorMessage error={setCI.error} inline />}
+      {setGate.isError && <ErrorMessage error={setGate.error} inline />}
       {setVis.isError && <ErrorMessage error={setVis.error} inline />}
     </section>
   )

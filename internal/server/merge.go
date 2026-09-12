@@ -69,6 +69,11 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if msg, ok := s.reviewGateBlocks(repoID, num); ok {
+		writeError(w, http.StatusConflict, msg)
+		return
+	}
+
 	// Both branches must still exist (a branch can be deleted after the PR is
 	// opened). The names came from refs/heads at create time but are re-checked
 	// here since the diff and ref updates interpolate them.
@@ -162,6 +167,49 @@ func (s *Server) handleMergePull(w http.ResponseWriter, r *http.Request) {
 		MergeCommit: newTip,
 		FastForward: ff,
 	})
+}
+
+// reviewGateBlocks reports whether the repo's opt-in review gate refuses this
+// merge, and why. It runs before any ref is touched.
+//
+// The gate is off by default: review verdicts stay advisory unless a repo turns
+// it on, so an upgrade never starts rejecting merges a fleet was already making.
+// When it is on the rule is deliberately coarse — at least one standing
+// approval, and no outstanding changes_requested — because the alternative is a
+// policy engine (reviewer counts, required reviewers, per-branch rules), which
+// VISION.md rules out. Verdicts are one-per-reviewer and replace on re-submit,
+// so "standing" is just the current row.
+//
+// A failure to read the gate blocks the merge rather than waving it through:
+// the only reason to enable it is that merging unreviewed is not acceptable
+// here, so an unreadable setting must not silently mean "no gate".
+func (s *Server) reviewGateBlocks(repoID int64, num int) (string, bool) {
+	required, err := storage.RepoRequiresApproval(s.rdb, repoID)
+	if err != nil {
+		s.logger.Error("read review gate", "repo_id", repoID, "pr", num, "err", err)
+		return "cannot verify the repo's review requirement; merge refused", true
+	}
+	if !required {
+		return "", false
+	}
+	reviews, err := storage.ListReviews(s.rdb, repoID, num)
+	if err != nil {
+		s.logger.Error("list reviews for merge gate", "repo_id", repoID, "pr", num, "err", err)
+		return "cannot verify this pull request's reviews; merge refused", true
+	}
+	approvals := 0
+	for _, rev := range reviews {
+		switch rev.State {
+		case api.PRReviewChangesRequested:
+			return "changes requested by " + rev.Author + "; resolve it before merging", true
+		case api.PRReviewApproved:
+			approvals++
+		}
+	}
+	if approvals == 0 {
+		return "this repository requires an approving review before merge", true
+	}
+	return "", false
 }
 
 // enqueueMergeRun builds the base branch at its new tip after a server-side

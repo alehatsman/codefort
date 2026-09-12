@@ -150,7 +150,8 @@ Register a public key against the calling token.
 ### GET /api/repos
 Repos visible to the caller, each with issue/PR/CI counters.
 - `200` → `[Repo]` (`owner`, `name`, `open_issues`, `total_issues`,
-  `ci_enabled`, `ci_status`, `ci_number`, `open_pulls`, `open_reviews`,
+  `ci_enabled`, `require_approval`, `ci_status`, `ci_number`, `open_pulls`,
+  `open_reviews`,
   `active_agents`, `visibility`)
 
 ### POST /api/repos
@@ -165,7 +166,8 @@ Provision a bare git repo on disk and register it.
 
 ### PATCH /api/repos/{owner}/{repo}
 Partial update of repo settings.
-- Body: `{"ci_enabled"?, "visibility"?}` — at least one required
+- Body: `{"ci_enabled"?, "visibility"?, "require_approval"?}` — at least one
+  required. `require_approval` is the merge review gate (see the merge endpoint)
 - `200` → `Repo`
 - `400` no fields, or visibility not `public`/`private`; `404` unknown repo
 
@@ -403,7 +405,9 @@ in the PR title+body are moved to `done`, and the base branch is pushed to the
 - `200` → `MergeResult` (`PullRequest` + `merge_commit`, `fast_forward`)
 - `400` invalid method / invalid number
 - `404` pull request not found
-- `409` PR not open · base or head branch no longer exists · not
+- `409` review gate (when the repo has `require_approval`): no approving review,
+  or an outstanding `changes_requested` — checked before any ref is touched ·
+  PR not open · base or head branch no longer exists · not
   fast-forwardable (`ff-only`) · nothing to rebase, i.e. the head adds only
   merge commits (`rebase`) · base moved during the merge (retry) ·
   **merge conflict** — body is `MergeConflictResponse` with `conflicts[]`. A

@@ -152,24 +152,26 @@ func toAPIRepo(r storage.RepoSummary) api.Repo {
 		vis = "public"
 	}
 	return api.Repo{
-		ID:           r.ID,
-		Owner:        r.Owner,
-		Name:         r.Name,
-		CreatedAt:    time.Unix(r.CreatedAt, 0).UTC(),
-		OpenIssues:   r.OpenIssues,
-		TotalIssues:  r.TotalIssues,
-		CIEnabled:    r.CIEnabled,
-		CIStatus:     r.CIStatus,
-		CINumber:     r.CINumber,
-		OpenPulls:    r.OpenPulls,
-		OpenReviews:  r.OpenReviews,
-		ActiveAgents: r.ActiveAgents,
-		Visibility:   vis,
+		ID:              r.ID,
+		Owner:           r.Owner,
+		Name:            r.Name,
+		CreatedAt:       time.Unix(r.CreatedAt, 0).UTC(),
+		OpenIssues:      r.OpenIssues,
+		TotalIssues:     r.TotalIssues,
+		CIEnabled:       r.CIEnabled,
+		RequireApproval: r.RequireApproval,
+		CIStatus:        r.CIStatus,
+		CINumber:        r.CINumber,
+		OpenPulls:       r.OpenPulls,
+		OpenReviews:     r.OpenReviews,
+		ActiveAgents:    r.ActiveAgents,
+		Visibility:      vis,
 	}
 }
 
 // handleUpdateRepo applies a partial update to a repo's settings.
-// Mutable fields: ci_enabled, visibility. Returns the updated repo summary.
+// Mutable fields: ci_enabled, visibility, require_approval. Returns the updated
+// repo summary.
 func (s *Server) handleUpdateRepo(w http.ResponseWriter, r *http.Request) {
 	owner := r.PathValue("owner")
 	repo := strings.TrimSuffix(r.PathValue("repo"), ".git")
@@ -179,8 +181,8 @@ func (s *Server) handleUpdateRepo(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
-	if req.CIEnabled == nil && req.Visibility == nil {
-		writeError(w, http.StatusBadRequest, "no fields to update (provide ci_enabled or visibility)")
+	if req.CIEnabled == nil && req.Visibility == nil && req.RequireApproval == nil {
+		writeError(w, http.StatusBadRequest, "no fields to update (provide ci_enabled, visibility, or require_approval)")
 		return
 	}
 
@@ -198,6 +200,13 @@ func (s *Server) handleUpdateRepo(w http.ResponseWriter, r *http.Request) {
 	if req.CIEnabled != nil {
 		if err := storage.SetRepoCIEnabled(s.db, repoID, *req.CIEnabled); err != nil {
 			s.logger.Error("update repo ci_enabled", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+	}
+	if req.RequireApproval != nil {
+		if err := storage.SetRepoRequireApproval(s.db, repoID, *req.RequireApproval); err != nil {
+			s.logger.Error("update repo require_approval", "err", err)
 			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}

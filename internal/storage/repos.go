@@ -54,6 +54,8 @@ type RepoSummary struct {
 	OpenIssues  int
 	TotalIssues int
 	CIEnabled   bool
+	// RequireApproval is the repo's opt-in review gate on merge (off by default).
+	RequireApproval bool
 	// CIStatus is the status of the repo's most recent CI-kind run (highest run
 	// number among kind='ci'), empty when the repo has no CI runs. Agent runs
 	// share the ci_runs table but are excluded so the icon tracks pipeline
@@ -94,6 +96,7 @@ func ListRepos(db *sql.DB) ([]RepoSummary, error) {
 		  COALESCE(SUM(CASE WHEN issues.state IN ('todo','in_progress') THEN 1 ELSE 0 END), 0) AS open_issues,
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
 		  repos.ci_enabled,
+		  repos.require_approval,
 		  repos.visibility,
 		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_status,
 		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number,` + repoMetricSubqueries + `
@@ -131,6 +134,7 @@ func GetRepoSummary(db *sql.DB, owner, name string) (RepoSummary, error) {
 		  COALESCE(SUM(CASE WHEN issues.state IN ('todo','in_progress') THEN 1 ELSE 0 END), 0) AS open_issues,
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
 		  repos.ci_enabled,
+		  repos.require_approval,
 		  repos.visibility,
 		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_status,
 		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number,`+repoMetricSubqueries+`
@@ -157,6 +161,7 @@ func scanRepoSummary(s scanner, r *RepoSummary) error {
 	var ciNumber sql.NullInt64
 	if err := s.Scan(
 		&r.ID, &r.Owner, &r.Name, &r.CreatedAt, &r.OpenIssues, &r.TotalIssues, &r.CIEnabled,
+		&r.RequireApproval,
 		&r.Visibility,
 		&ciStatus, &ciNumber,
 		&r.OpenPulls, &r.OpenReviews, &r.ActiveAgents,
@@ -236,6 +241,34 @@ func SetRepoVisibility(db *sql.DB, repoID int64, visibility string) error {
 	return nil
 }
 
+// RepoRequiresApproval reports whether a repo gates merges on review state.
+// Missing repo -> ErrNotFound.
+func RepoRequiresApproval(db *sql.DB, repoID int64) (bool, error) {
+	var v int
+	err := db.QueryRow(`SELECT require_approval FROM repos WHERE id = ?`, repoID).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrNotFound
+	}
+	return v != 0, err
+}
+
+// SetRepoRequireApproval flips a repo's review gate. Missing repo -> ErrNotFound.
+func SetRepoRequireApproval(db *sql.DB, repoID int64, required bool) error {
+	v := 0
+	if required {
+		v = 1
+	}
+	res, err := db.Exec(`UPDATE repos SET require_approval = ? WHERE id = ?`, v, repoID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // ListReposForCaller returns repos visible to the given caller (by token name).
 // Public repos are always visible. Private repos are only visible when the
 // caller is the owner or a member. callerName="" is treated as an anonymous
@@ -250,6 +283,7 @@ func ListReposForCaller(db *sql.DB, callerName string) ([]RepoSummary, error) {
 		  COALESCE(SUM(CASE WHEN issues.state IN ('todo','in_progress') THEN 1 ELSE 0 END), 0) AS open_issues,
 		  COALESCE(COUNT(issues.id), 0) AS total_issues,
 		  repos.ci_enabled,
+		  repos.require_approval,
 		  repos.visibility,
 		  (SELECT cr.status FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_status,
 		  (SELECT cr.number FROM ci_runs cr WHERE cr.repo_id = repos.id AND cr.kind = 'ci' ORDER BY cr.number DESC LIMIT 1) AS ci_number,`+repoMetricSubqueries+`

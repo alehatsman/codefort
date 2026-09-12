@@ -193,7 +193,7 @@ closed out.
 - **Server-side rebase (#257)** — done. A third merge method that replays the
   head'''s commits onto base with `merge-tree --merge-base` + `commit-tree`,
   worktree-free, all-or-nothing.
-- **Review state gating merge** — deliberately not taken. Whether an approval
-  should block a merge is a product call about how much local-trust bends, and
-  it is the owner'''s to make. Carried on `ROADMAP.md` as an open question
-  rather than a task.
+- **Review state gating merge** — asked, answered yes, built as a per-repo
+  opt-in (`require_approval`, migration 30, default off). Default-off is the
+  part that needed a decision of its own: a default-on gate would have started
+  rejecting merges the fleet was already making, on upgrade, with no warning.

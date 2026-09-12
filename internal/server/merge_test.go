@@ -598,3 +598,117 @@ func bareShow(t *testing.T, bare, ref, format string) string {
 	}
 	return strings.TrimSpace(string(out))
 }
+
+// --- Review gate on merge ---------------------------------------------------
+
+// setRequireApproval flips the repo's opt-in review gate.
+func setRequireApproval(t *testing.T, s *Server, on bool) {
+	t.Helper()
+	repoID, err := storage.LookupRepo(s.rdb, cOwner, cRepo)
+	if err != nil {
+		t.Fatalf("LookupRepo: %v", err)
+	}
+	if err := storage.SetRepoRequireApproval(s.db, repoID, on); err != nil {
+		t.Fatalf("SetRepoRequireApproval: %v", err)
+	}
+}
+
+func review(t *testing.T, s *Server, num int, author string, state api.PRReviewState) {
+	t.Helper()
+	repoID, _ := storage.LookupRepo(s.rdb, cOwner, cRepo)
+	if _, err := storage.UpsertReview(s.db, repoID, num, author, state); err != nil {
+		t.Fatalf("UpsertReview: %v", err)
+	}
+}
+
+// Default is off: an unreviewed PR merges exactly as it did before the gate
+// existed. This is the upgrade-safety property — the rest of the suite merges
+// without ever recording a review.
+func TestMergeGateOffByDefaultAllowsUnreviewedMerge(t *testing.T) {
+	s, bare := newMergeTestServer(t)
+	openPull(t, s, "main", "feature", "no review")
+	before := bareRev(t, bare, "refs/heads/main")
+
+	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 with the gate off (body=%s)", rr.Code, rr.Body.String())
+	}
+	if after := bareRev(t, bare, "refs/heads/main"); after == before {
+		t.Error("main did not move")
+	}
+}
+
+func TestMergeGateRejectsUnapprovedPull(t *testing.T) {
+	s, bare := newMergeTestServer(t)
+	openPull(t, s, "main", "feature", "needs a review")
+	setRequireApproval(t, s, true)
+	before := bareRev(t, bare, "refs/heads/main")
+
+	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{})
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409 (body=%s)", rr.Code, rr.Body.String())
+	}
+	// The gate runs before anything touches a ref.
+	if after := bareRev(t, bare, "refs/heads/main"); after != before {
+		t.Errorf("main moved despite the gate: %s -> %s", before, after)
+	}
+	repoID, _ := storage.LookupRepo(s.rdb, cOwner, cRepo)
+	pr, _ := storage.GetPull(s.rdb, repoID, 1)
+	if pr.State != api.PROpen {
+		t.Errorf("PR state = %q, want it left open", pr.State)
+	}
+}
+
+func TestMergeGateAllowsApprovedPull(t *testing.T) {
+	s, bare := newMergeTestServer(t)
+	openPull(t, s, "main", "feature", "approved")
+	setRequireApproval(t, s, true)
+	review(t, s, 1, "bob", api.PRReviewApproved)
+	before := bareRev(t, bare, "refs/heads/main")
+
+	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body=%s)", rr.Code, rr.Body.String())
+	}
+	if after := bareRev(t, bare, "refs/heads/main"); after == before {
+		t.Error("main did not move on an approved merge")
+	}
+}
+
+// An outstanding changes_requested blocks even when someone else approved —
+// the objection is the stronger signal, and it names who raised it.
+func TestMergeGateChangesRequestedBeatsAnApproval(t *testing.T) {
+	s, _ := newMergeTestServer(t)
+	openPull(t, s, "main", "feature", "contested")
+	setRequireApproval(t, s, true)
+	review(t, s, 1, "bob", api.PRReviewApproved)
+	review(t, s, 1, "carol", api.PRReviewChangesRequested)
+
+	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{})
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409 (body=%s)", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "carol") {
+		t.Errorf("409 should name who requested changes; got %s", rr.Body.String())
+	}
+}
+
+// A verdict replaces the reviewer's previous one, so withdrawing an objection
+// by approving unblocks the merge without a second reviewer.
+func TestMergeGateReviewerCanWithdrawObjection(t *testing.T) {
+	s, _ := newMergeTestServer(t)
+	openPull(t, s, "main", "feature", "reconsidered")
+	setRequireApproval(t, s, true)
+	review(t, s, 1, "bob", api.PRReviewChangesRequested)
+	review(t, s, 1, "bob", api.PRReviewApproved)
+
+	rr := drivePull(t, s, s.handleMergePull, http.MethodPost,
+		"/api/repos/alice/proj/pulls/1/merge", "agent#7", "1", api.MergeRequest{})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 after the objection was withdrawn (body=%s)", rr.Code, rr.Body.String())
+	}
+}

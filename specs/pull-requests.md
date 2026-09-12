@@ -9,6 +9,7 @@ covers:
   - "internal/storage/pulls.go"
   - "internal/storage/code_comments.go"
   - "internal/storage/pr_reviews.go"
+  - "internal/storage/repos.go"
 ---
 # Pull Requests & Review
 
@@ -90,10 +91,19 @@ conflict rules, not from access gates.
   changing your mind is the normal path.
 - WHEN a PR is fetched, the response carries the current verdicts alongside the
   compare and the anchored comments, so review state is read in one round-trip.
-- WHILE verdicts are recorded and emitted to the fleet feed, they do **not** gate
-  the merge endpoint: an outstanding changes-requested verdict, or no verdict at
-  all, still merges. Review state is advisory signal, consistent with the
-  local-trust posture — git ancestry and conflicts are the only hard gates.
+- WHILE a repo has not opted in, verdicts are recorded and emitted to the fleet
+  feed but do **not** gate the merge endpoint: an outstanding changes-requested
+  verdict, or no verdict at all, still merges. Advisory is the default, and it is
+  the local-trust posture — git ancestry and conflicts are the only hard gates a
+  repo gets for free.
+- WHERE a repo opts into the review gate, the merge endpoint refuses a PR that
+  has no standing approval, or that has any outstanding changes-requested verdict
+  — checked before any ref is touched, and reported as a conflict naming the
+  reviewer who objected. The rule is deliberately coarse: one flag per repo, one
+  approval, no reviewer counts, no required reviewers, no per-branch variation.
+  A repo that cannot read its own setting is refused rather than waved through,
+  since the only reason to enable the gate is that merging unreviewed is not
+  acceptable there.
 
 - WHEN a merge moves the base ref, a CI run is enqueued for the base branch at
   the new tip, under the `merge` event and the merging identity. The merge
@@ -117,10 +127,10 @@ conflict rules, not from access gates.
 - **Diff/compare computation.** Producing the commit/file diff is the shared
   code-browse machinery (git-hosting); here the compare is consumed, not
   specified.
-- **Branch protection and required reviews.** Approvals are recorded (above) but
-  enforce nothing: no merge gating, no required-approval count, no
-  draft/auto-merge, no CODEOWNERS. Local-trust: the merge is allowed when git
-  says it is mergeable, full stop.
+- **A review policy engine.** The gate above is one boolean per repo. Required-
+  approval counts, named required reviewers, per-branch rules, CODEOWNERS,
+  draft/auto-merge, and dismissing stale approvals on a new push are all out:
+  they are the grid the constitution rules out, wearing a review costume.
 
 ## Checklist
 
@@ -140,5 +150,5 @@ conflict rules, not from access gates.
 - [x] Approve / request-changes verdicts with token-stamped reviewer; invalid states rejected
 - [x] One standing verdict per reviewer — re-submitting replaces it
 - [x] Verdicts surfaced on the PR detail response and emitted to the feed
-- [ ] Review state is advisory only — the merge endpoint does not consult it (known gap)
+- [x] Opt-in per-repo review gate on merge (off by default; advisory otherwise)
 - [ ] Verified against the code by the verify workflow (flip to `living`)
