@@ -47,7 +47,7 @@ set is not the value in effect.
 | `CODEFORT_AGENT_TOKEN_TTL` | `168h` (7d) | Idle TTL for per-agent session tokens (`agent#<n>`), measured from last use, or creation if never used. These are minted one-per-spawn and never explicitly revoked, so a reaper sweeps idle ones. `0` disables the sweep. |
 
 The `/api` surface is unaffected by Basic auth — it keeps Bearer-token auth
-(`mgt_…`) in all cases.
+(`cf_…`) in all cases.
 
 ## Git SSH transport
 
@@ -97,7 +97,7 @@ derives from the checkout's git remotes.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `CODEFORT_TOKEN` | *(empty)* | Bearer token (`mgt_…`) sent as `Authorization: Bearer`. **The token's name is your identity** — the server stamps author/assignee/claim owner from it — so never share one. Mint with `codefortd token create <name>`. Unset means unauthenticated requests. |
+| `CODEFORT_TOKEN` | *(empty)* | Bearer token (`cf_…`) sent as `Authorization: Bearer`. **The token's name is your identity** — the server stamps author/assignee/claim owner from it — so never share one. Mint with `codefortd token create <name>`. Unset means unauthenticated requests. |
 | `CODEFORT_SERVER` | *(derived)* | Overrides the server base URL otherwise derived from the `codefort` remote (preferred, the code mirror) or `origin`. Trailing slash stripped. **Required** when the chosen remote is SSH or scp-form, since those carry no http base URL — `cf` errors out asking for it. |
 
 Owner/repo always come from the remote URL, never from `CODEFORT_SERVER`, so

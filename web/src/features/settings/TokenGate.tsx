@@ -58,8 +58,8 @@ function TokenForm({ onSet }: { onSet: () => void }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = value.trim()
-    if (!trimmed.startsWith("mgt_")) {
-      setError("Tokens start with mgt_")
+    if (!trimmed.startsWith("cf_")) {
+      setError("Tokens start with cf_")
       return
     }
     setError(null)
@@ -83,7 +83,7 @@ function TokenForm({ onSet }: { onSet: () => void }) {
       <form onSubmit={submit}>
         <input
           type="password"
-          placeholder="mgt_..."
+          placeholder="cf_..."
           value={value}
           onChange={(e) => setValue(e.target.value)}
           disabled={checking}

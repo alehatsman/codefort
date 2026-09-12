@@ -621,7 +621,7 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
         created_at: nowIso(),
       }
       state.tokens.push(tok)
-      return json(route, 201, { ...tok, secret: `mgt_${"a".repeat(64)}` })
+      return json(route, 201, { ...tok, secret: `cf_${"a".repeat(64)}` })
     }
     return route.continue()
   })
@@ -1044,6 +1044,6 @@ export async function mockApi(page: Page, seed: Partial<State> = {}): Promise<St
 /** Set the token in localStorage before app boot so TokenGate doesn't intercept. */
 export async function seedToken(page: Page) {
   await page.addInitScript(() => {
-    localStorage.setItem("codefort_token", `mgt_test_${"x".repeat(60)}`)
+    localStorage.setItem("codefort_token", `cf_test_${"x".repeat(60)}`)
   })
 }

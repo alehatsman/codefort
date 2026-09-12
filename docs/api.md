@@ -11,7 +11,7 @@ All API paths are rooted at `/api`. Everything under `/api/` requires a bearer
 token:
 
 ```
-Authorization: Bearer mgt_…
+Authorization: Bearer cf_…
 ```
 
 Exceptions:
@@ -85,13 +85,13 @@ Repo path segments accept a trailing `.git`; it is stripped.
 ### POST /api/auth/register
 Self-register an account and mint its first token. Public.
 - Body: `{"username", "password"}`
-- `201` → `{"token": Token, "secret": "mgt_…"}` (`secret` is shown once)
+- `201` → `{"token": Token, "secret": "cf_…"}` (`secret` is shown once)
 - `409` username already taken; `400` on validation failure
 
 ### POST /api/auth/login
 Exchange username + password for a fresh bearer token. Public.
 - Body: `{"username", "password"}`
-- `200` → `{"token": Token, "secret": "mgt_…"}`
+- `200` → `{"token": Token, "secret": "cf_…"}`
 - `401` invalid credentials, or the user has no password set
 
 ### GET /api/whoami

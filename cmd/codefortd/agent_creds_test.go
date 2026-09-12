@@ -16,11 +16,11 @@ func TestAgentContainerEnvOAuth(t *testing.T) {
 		AgentClaudeOAuthToken: "oauth",
 		AgentLLMBaseURL:       "http://llm.local",
 	}
-	env := agentContainerEnv(cfg, agentSettingsOverride{}, "mgt_tok", "http://host.docker.internal:8080")
+	env := agentContainerEnv(cfg, agentSettingsOverride{}, "cf_tok", "http://host.docker.internal:8080")
 	want := []string{
 		"CLAUDE_CODE_OAUTH_TOKEN=oauth",
 		"ANTHROPIC_BASE_URL=http://llm.local",
-		"CODEFORT_TOKEN=mgt_tok",
+		"CODEFORT_TOKEN=cf_tok",
 		"CODEFORT_SERVER=http://host.docker.internal:8080",
 	}
 	for _, w := range want {

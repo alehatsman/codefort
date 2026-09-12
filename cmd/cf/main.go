@@ -100,7 +100,7 @@ USAGE:
 
 Identity: the server stamps author/assignee from the name of the token
 in CODEFORT_TOKEN. Mint a token with "codefortd token create <name>" and
-export CODEFORT_TOKEN=mgt_... before running the client.
+export CODEFORT_TOKEN=cf_... before running the client.
 
 Run inside a git checkout of the target repo. owner/repo is parsed from
 the 'codefort' remote, falling back to 'origin'. CODEFORT_SERVER overrides

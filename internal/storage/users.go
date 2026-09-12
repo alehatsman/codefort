@@ -82,7 +82,7 @@ func RegisterUser(db *sql.DB, username, password string) (api.User, api.Token, s
 
 // LoginUser validates a username/password pair and mints a new token for the
 // session. Each call produces a fresh token; the caller stores it like any
-// other mgt_ token.
+// other cf_ token.
 func LoginUser(db *sql.DB, username, password string) (api.Token, string, error) {
 	var userID int64
 	var hashStr sql.NullString

@@ -14,7 +14,7 @@ codefortd serve            # API + git + CI + web SPA on :8080
 
 # A token names your identity; claims are rows; coordination is HTTP.
 codefortd token create alice
-export CODEFORT_TOKEN=mgt_...
+export CODEFORT_TOKEN=cf_...
 
 # The client is a thin, scriptable CLI.
 cf issue create --title "ship the thing" --body "plan goes here"

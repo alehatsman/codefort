@@ -59,7 +59,7 @@ func deleteRepo(s *Server, tok api.Token, owner, repo string) *httptest.Response
 
 func TestDeleteRepoHandlerRemovesRowAndGitDir(t *testing.T) {
 	s, gitDir := newRepoDeleteServer(t)
-	tok, _ := storage.CreateToken(s.db, "alice", "mgt_alice")
+	tok, _ := storage.CreateToken(s.db, "alice", "cf_alice")
 
 	rr := deleteRepo(s, tok, "alice", "repo")
 	if rr.Code != http.StatusNoContent {
@@ -105,7 +105,7 @@ func TestDeleteRepoHandlerRemovesRowAndGitDir(t *testing.T) {
 // and leaves the repo intact until the run reaches a terminal state.
 func TestDeleteRepoRejectsWhileRunActive(t *testing.T) {
 	s, _ := newRepoDeleteServer(t)
-	tok, _ := storage.CreateToken(s.db, "alice", "mgt_alice")
+	tok, _ := storage.CreateToken(s.db, "alice", "cf_alice")
 	repoID, _ := storage.LookupRepo(s.db, "alice", "repo")
 
 	run, err := storage.EnqueueRun(s.db, repoID, storage.NewRun{
@@ -137,7 +137,7 @@ func TestDeleteRepoRejectsWhileRunActive(t *testing.T) {
 // lives outside ReposDir and so isn't covered by the git-dir removal.
 func TestDeleteRepoRemovesLogTree(t *testing.T) {
 	s, _ := newRepoDeleteServer(t)
-	tok, _ := storage.CreateToken(s.db, "alice", "mgt_alice")
+	tok, _ := storage.CreateToken(s.db, "alice", "cf_alice")
 
 	logDir := ci.RepoLogDir(s.cfg.DataDir, "alice", "repo")
 	if err := os.MkdirAll(filepath.Join(logDir, "1"), 0o755); err != nil {
@@ -163,7 +163,7 @@ func TestDeleteRepoRemovesLogTree(t *testing.T) {
 // repos is deleted.
 func TestDeleteRepoKeepsNonEmptyOwnerDir(t *testing.T) {
 	s, _ := newRepoDeleteServer(t)
-	tok, _ := storage.CreateToken(s.db, "alice", "mgt_alice")
+	tok, _ := storage.CreateToken(s.db, "alice", "cf_alice")
 
 	// A second repo under the same owner, on disk only (the delete only
 	// touches the filesystem prune path here).

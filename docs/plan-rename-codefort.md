@@ -156,7 +156,7 @@ skimped and the one with a machine that will catch it.
 `docs/ops-provisioning.md` and `docs/plan-2026-09-review.md` are historical
 records; they get renamed too, since they describe the same live system.
 
-### Phase 7 — token prefix  `todo`
+### Phase 7 — token prefix  `done`
 
 `internal/storage/tokens.go:18` → `cf_`, plus the test fixtures and the
 `export MOONGIT_TOKEN=mgt_…` line in the client usage text. Isolated on purpose:

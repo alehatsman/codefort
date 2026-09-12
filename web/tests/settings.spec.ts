@@ -48,7 +48,7 @@ test("create a token reveals the secret once", async ({ page }) => {
 
   // One-time reveal banner with the plaintext secret + copy affordance.
   await expect(page.getByText("New token", { exact: false })).toBeVisible()
-  await expect(page.getByText(/^mgt_a+$/)).toBeVisible()
+  await expect(page.getByText(/^cf_a+$/)).toBeVisible()
   await expect(page.getByRole("button", { name: "Copy" })).toBeVisible()
 
   // The new token now appears in the table as active.

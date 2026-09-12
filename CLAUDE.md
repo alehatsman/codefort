@@ -8,7 +8,7 @@ the client. This repo is the coordination backend itself — dogfood it.
 ## Workflow — track work as codefort issues (cf)
 
 Prereq: the repo has a `codefort` remote (code mirror) — or `CODEFORT_SERVER`
-points at the server. Export your **own** `CODEFORT_TOKEN` (`mgt_…`); the
+points at the server. Export your **own** `CODEFORT_TOKEN` (`cf_…`); the
 token's name is your identity in every claim/comment, so never share one.
 
 1. **Survey:** `cf issue list --state todo,in_progress`.

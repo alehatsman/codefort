@@ -24,7 +24,7 @@ git-hosting, issues, and pull-requests specs defer to it.
 
 ## Behavior
 
-- WHEN a token is minted, the server returns its plaintext (`mgt_` + 64 hex)
+- WHEN a token is minted, the server returns its plaintext (`cf_` + 64 hex)
   exactly once and stores only its SHA-256 hash, so a missed response is
   unrecoverable and the secret never lives in the database.
 - WHERE a token name is blank, over 100 chars, or already taken, minting is
@@ -84,7 +84,7 @@ git-hosting, issues, and pull-requests specs defer to it.
 ## Checklist
 
 - [x] Mint returns plaintext once; only the SHA-256 hash is stored
-- [x] `mgt_`-prefixed tokens; unique, length-bounded names
+- [x] `cf_`-prefixed tokens; unique, length-bounded names
 - [x] Bearer required on all `/api`; unknown/revoked/missing → unauthorized
 - [x] Identity stamped server-side from the token; client identity ignored
 - [x] Revocation takes effect immediately; debounced last-used updates

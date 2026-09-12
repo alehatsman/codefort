@@ -24,7 +24,7 @@ func seedTokenDB(t *testing.T) (db *sql.DB, tokenID int64) {
 	if err := Migrate(d); err != nil {
 		t.Fatalf("Migrate: %v", err)
 	}
-	tok, err := CreateToken(d, "alice", "mgt_test_alice")
+	tok, err := CreateToken(d, "alice", "cf_test_alice")
 	if err != nil {
 		t.Fatalf("CreateToken: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestLookupTokenBySSHKeyRejectsRevoked(t *testing.T) {
 
 func TestDeleteSSHKeyScopedToOwner(t *testing.T) {
 	db, aliceID := seedTokenDB(t)
-	bob, err := CreateToken(db, "bob", "mgt_test_bob")
+	bob, err := CreateToken(db, "bob", "cf_test_bob")
 	if err != nil {
 		t.Fatalf("CreateToken bob: %v", err)
 	}

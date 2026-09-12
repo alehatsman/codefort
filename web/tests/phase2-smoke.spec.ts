@@ -40,7 +40,7 @@ test.describe("TokenGate tabs", () => {
     await expect(page.getByRole("button", { name: "Account menu" })).toBeVisible({ timeout: 5000 })
 
     const stored = await page.evaluate(() => localStorage.getItem("codefort_token"))
-    expect(stored).toMatch(/^mgt_/)
+    expect(stored).toMatch(/^cf_/)
   })
 
   test("Sign in tab logs in with existing account", async ({ page }) => {

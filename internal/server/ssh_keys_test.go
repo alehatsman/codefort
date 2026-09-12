@@ -73,7 +73,7 @@ func genPubKeyLine(t *testing.T, comment string) string {
 
 func TestSSHKeyAPICreateListDelete(t *testing.T) {
 	s := newSSHKeyTestServer(t)
-	tok, err := storage.CreateToken(s.db, "alice", "mgt_alice")
+	tok, err := storage.CreateToken(s.db, "alice", "cf_alice")
 	if err != nil {
 		t.Fatalf("CreateToken: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestSSHKeyAPICreateListDelete(t *testing.T) {
 
 func TestSSHKeyAPIInvalidKey(t *testing.T) {
 	s := newSSHKeyTestServer(t)
-	tok, _ := storage.CreateToken(s.db, "alice", "mgt_alice")
+	tok, _ := storage.CreateToken(s.db, "alice", "cf_alice")
 	rr := asToken(s, tok, s.handleCreateSSHKey, http.MethodPost, "/api/ssh-keys",
 		api.CreateSSHKeyRequest{PublicKey: "garbage"})
 	if rr.Code != http.StatusBadRequest {
@@ -132,8 +132,8 @@ func TestSSHKeyAPIInvalidKey(t *testing.T) {
 
 func TestSSHKeyAPIScopedToCaller(t *testing.T) {
 	s := newSSHKeyTestServer(t)
-	alice, _ := storage.CreateToken(s.db, "alice", "mgt_alice")
-	bob, _ := storage.CreateToken(s.db, "bob", "mgt_bob")
+	alice, _ := storage.CreateToken(s.db, "alice", "cf_alice")
+	bob, _ := storage.CreateToken(s.db, "bob", "cf_bob")
 
 	// Alice registers a key.
 	rr := asToken(s, alice, s.handleCreateSSHKey, http.MethodPost, "/api/ssh-keys",

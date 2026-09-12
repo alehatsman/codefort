@@ -15,14 +15,20 @@ import (
 
 // TokenPrefix is prepended to every generated token so they're easy to
 // recognize in logs and grep results.
-const TokenPrefix = "mgt_"
+//
+// It is decoration, not structure: tokens are stored hashed and nothing on the
+// authentication path checks the prefix. That is why the rename from "mgt_"
+// cost nothing — every token minted before it still authenticates, and only
+// newly minted ones carry the new prefix. Do not add a prefix check here
+// without first migrating the stored rows.
+const TokenPrefix = "cf_"
 
 // ErrTokenExists is returned by CreateToken when the requested name is
 // already taken (UNIQUE constraint on the name column).
 var ErrTokenExists = errors.New("token name already exists")
 
 // GenerateTokenString returns a fresh plaintext token of the form
-// "mgt_<64-hex>". The caller is responsible for sending it to the user
+// "cf_<64-hex>". The caller is responsible for sending it to the user
 // once — the database only stores the hash.
 func GenerateTokenString() (string, error) {
 	buf := make([]byte, 32) // 256 bits

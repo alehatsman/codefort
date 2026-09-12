@@ -7,9 +7,9 @@ import (
 
 func TestHashTokenStable(t *testing.T) {
 	// Same input → same hash. Different input → different hash.
-	a := HashToken("mgt_test_abc")
-	b := HashToken("mgt_test_abc")
-	c := HashToken("mgt_test_abd")
+	a := HashToken("cf_test_abc")
+	b := HashToken("cf_test_abc")
+	c := HashToken("cf_test_abd")
 	if a != b {
 		t.Errorf("hash of identical input differs: %q vs %q", a, b)
 	}

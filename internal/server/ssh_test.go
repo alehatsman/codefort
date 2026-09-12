@@ -73,7 +73,7 @@ func TestSSHGitTransportEndToEnd(t *testing.T) {
 		t.Fatalf("git init bare: %v: %s", err, out)
 	}
 
-	tok, err := storage.CreateToken(db, "alice", "mgt_alice")
+	tok, err := storage.CreateToken(db, "alice", "cf_alice")
 	if err != nil {
 		t.Fatalf("CreateToken: %v", err)
 	}
