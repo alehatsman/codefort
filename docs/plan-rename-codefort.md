@@ -15,7 +15,7 @@ Status legend: `todo` / `doing` / `done` / `dropped`.
 | CI manifest | `codefort.yml`, **hard cut** | `mgitci.yml` is no longer read. Every hosted repo must rename its file at cutover or its CI silently stops firing. |
 | Env vars | `CODEFORT_*`, **hard cut** | 33 vars. A stale `MOONGIT_X` is not an error — the server starts with that setting's *default*. Silent, not loud. See "Traps". |
 | Token prefix | `mgt_` → `cf_` | Cosmetic only. Tokens are stored hashed and nothing validates the prefix on read (`internal/storage/tokens.go:18` is the sole definition, used only at generation), so **every existing `mgt_` token keeps working**. |
-| Data paths | unchanged | `moongit.db` and the data dir keep their names. Renaming them means moving live data for no functional gain; an operator who wants it renames the file and sets `CODEFORT_DB_PATH`. This is the one deliberate leftover. |
+| Data paths | renamed | **Reversed mid-execution by owner decision.** `moongit.db` → `codefort.db`, `~/.local/share/moongit` → `~/.local/share/codefort`, `~/.config/moongit/` → `~/.config/codefort/`. Nothing is moved automatically — see `CheckLegacyDB` below and the `mv` steps in the runbook. |
 
 ## Inventory
 
@@ -163,15 +163,35 @@ records; they get renamed too, since they describe the same live system.
 it is the one change that touches credential-shaped strings, and it is easier to
 reason about alone than buried in a 400-file diff.
 
-### Phase 8 — repository rename  `todo` (owner action)
+### Phase 8 — repository rename  `done` (self-hosted copy outstanding)
 
-- GitHub: `alehatsman/moongit` → `alehatsman/codefort`. GitHub redirects the
-  old URL, so `origin` keeps working, but `git remote set-url` anyway.
-- The self-hosted copy: this repo is hosted on its own server, so the rename is
-  also a codefort-side repo rename, and the `moongit` git remote in every local
-  clone and worktree becomes `codefort`.
-- The agent handoff remote name (Trap 7) and the MCP server name
-  (`cmd/cf/mcp.go:153`) move here.
+- GitHub: `alehatsman/moongit` → `alehatsman/codefort`, done, and `origin`
+  re-pointed. GitHub redirects the old URL, so other clones keep working until
+  they are updated.
+- The agent handoff remote name (Trap 7) and the MCP server name moved with
+  Phase 4.
+- **Outstanding, needs the live server:** the self-hosted copy of this repo is
+  still named `moongit` on the codefort server, and the local clone directory
+  is still `moongit` — which `deploy.yml`'s `web_dir` no longer matches.
+
+### Phase 9 — the fleet (`~/dotfiles`)  `done`, unpushed
+
+Added mid-execution: the deploy is driven by a provision component, not by this
+repo, so the rename is only half done without it. `components/moongit` →
+`components/codefort`, `moongit.service` → `codefort.service`, every
+`MOONGIT_*` export, the zsh helpers and the git mirror remote they write, the
+claude MCP registration, the Windows firewall rules, and dotfiles' own
+`mgitci.yml`.
+
+It carries the same two corrections this repo needed (client installs as `cf`,
+no alias symlinks) plus one step that has no counterpart here: a unit rename
+**orphans** the old unit rather than replacing it, so `moongit.service` would
+stay enabled and bound to :8080 and `codefort.service` would fail to start with
+a port conflict that says nothing about a rename. A guarded step disables and
+removes it.
+
+On a branch, not pushed and not applied — it must not run before the data and
+config directories are moved.
 
 ## Found while executing
 
@@ -184,10 +204,20 @@ Not planned; surfaced by running the binaries and reading the plans back.
 - **`install.yml` grew a self-link.** It built `moongitd` and symlinked `mgitd`
   beside it; after the rename both names were `codefortd`. Binaries now install
   under their real names and all four alias steps are gone.
-- **The data dir got swept along.** Six plans moved to
-  `~/.local/share/codefort` against the decision that data paths stay put,
-  which would have pointed backup, restore and gc at an empty directory.
-  Reverted.
+- **The data dir got swept along**, ahead of the decision that later allowed
+  it. Reverted, then reinstated when the owner reversed the call — worth noting
+  only because the intermediate state would have pointed backup, restore and gc
+  at an empty directory.
+- **Renaming the database needed code, not a caveat.** SQLite creates a
+  database on first open, so a server deployed without moving the file comes up
+  healthy with zero repos, zero issues and an empty feed while the real
+  database sits untouched beside it — a silent failure that reads as data loss.
+  `config.CheckLegacyDB` refuses to start when `codefort.db` is absent and
+  `moongit.db` is present. It deliberately does not move the file: a rename
+  that misses the `-wal` sidecar drops every uncheckpointed transaction, and
+  doing that unattended is worse than not starting. There is **no equivalent
+  guard for the data directory** — a missed `mv` there just creates an empty
+  one — which is why that step is the runbook's job.
 - **`deploy.yml` assumes the checkout is renamed.** `web_dir` is
   `~/projects/codefort/web/dist`; until the local clone directory is renamed in
   Phase 8, deploy syncs the web bundle to a path that does not exist.
@@ -200,20 +230,37 @@ Order matters, because Phases 2 and 3 are both hard cuts against a live box.
 2. Back up: `provision apply tasks/backup.yml`.
 3. Merge Phases 1–7 to `main`. **CI on this repo is now dark** — the deployed
    daemon is still looking for `mgitci.yml`.
-4. Update the systemd unit (external, dotfiles): rename to `codefort.service`,
-   rewrite every `MOONGIT_*` export to `CODEFORT_*`, point `ExecStart` at
-   `codefortd`. Do not start it yet.
-5. Rebuild the container images under their new names
+4. **Move the data, service stopped.** This is the step with no code behind it:
+   ```
+   mv ~/.local/share/moongit           ~/.local/share/codefort
+   mv ~/.local/share/codefort/moongit.db     ~/.local/share/codefort/codefort.db
+   mv ~/.local/share/codefort/moongit.db-wal ~/.local/share/codefort/codefort.db-wal
+   mv ~/.local/share/codefort/moongit.db-shm ~/.local/share/codefort/codefort.db-shm
+   mv ~/.config/moongit                ~/.config/codefort
+   mv ~/.config/codefort/moongit.env        ~/.config/codefort/codefort.env
+   mv ~/.config/codefort/moongit.secret.env ~/.config/codefort/codefort.secret.env
+   ```
+   The `-wal`/`-shm` pair may not exist after a clean stop; move them if they
+   do. `agent.env` keeps its name. Both env files are create-once, so moving
+   them preserves the basic-auth credentials and the minted agent token instead
+   of regenerating them.
+5. Rename the checkout: `mv ~/projects/moongit ~/projects/codefort` — the
+   component's `codefort_src_dir` and `web_dir` both expect it.
+6. `provision apply` the dotfiles branch. It retires `moongit.service`,
+   installs `codefortd`/`cf`, and renders the new unit and env file.
+7. Rebuild the container images under their new names
    (`tasks/ci-images.yml`, `tasks/agent-image.yml`) — the new daemon's defaults
    name images that do not exist yet.
-6. `provision apply tasks/deploy.yml` (itself renamed), then start
-   `codefort.service`.
-7. Verify: web UI loads and is branded; `cf issue list` against the server;
-   push a commit to this repo and confirm CI fires on `codefort.yml`; confirm an
-   existing `mgt_` token still authenticates.
-8. Rename each *other* hosted repo's `mgitci.yml` → `codefort.yml` and push.
-   Until a repo does this it has no CI, with no error to tell you.
-9. Phase 8: rename on GitHub, re-point remotes.
+8. Start `codefort.service`. If it refuses to start naming `moongit.db`, step 4
+   was incomplete — that is the guard doing its job.
+9. Verify: web UI loads and is branded; `cf issue list` against the server; the
+   repo list is not empty (an empty list means the data dir was not moved);
+   push a commit and confirm CI fires on `codefort.yml`; confirm an existing
+   `mgt_` token still authenticates.
+10. Rename the self-hosted copy of this repo from `moongit` to `codefort`, and
+    re-point the `moongit` mirror remote in every local clone and worktree.
+11. Rename each *other* hosted repo's `mgitci.yml` → `codefort.yml` and push.
+    Until a repo does this it has no CI, with no error to tell you.
 
 Rollback is the backup from step 2 plus reinstalling the previous binaries; the
 DB is untouched by every phase, which is what makes rollback cheap.
@@ -222,8 +269,6 @@ DB is untouched by every phase, which is what makes rollback cheap.
 
 - **Any behavior change.** If a rename exposes a bug, it gets its own issue and
   its own commit, not a ride-along.
-- **`moongit.db` and the data directory.** Per the decisions table — live data
-  stays put.
 - **A compatibility shim of any kind.** No `mgit` symlink, no `MOONGIT_*`
   fallback read, no `mgitci.yml` fallback. Hard cut was chosen deliberately; the
   startup warning in Phase 2 is diagnostics, not compatibility.
