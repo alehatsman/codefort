@@ -174,7 +174,7 @@ reason about alone than buried in a 400-file diff.
   still named `moongit` on the codefort server, and the local clone directory
   is still `moongit` — which `deploy.yml`'s `web_dir` no longer matches.
 
-### Phase 9 — the fleet (`~/dotfiles`)  `done`, unpushed
+### Phase 9 — the fleet (`~/dotfiles`)  `done`
 
 Added mid-execution: the deploy is driven by a provision component, not by this
 repo, so the rename is only half done without it. `components/moongit` →
@@ -190,8 +190,8 @@ stay enabled and bound to :8080 and `codefort.service` would fail to start with
 a port conflict that says nothing about a rename. A guarded step disables and
 removes it.
 
-On a branch, not pushed and not applied — it must not run before the data and
-config directories are moved.
+Merged to dotfiles `main` and pushed. Not yet applied to the live host — it
+must not run before the data and config directories are moved.
 
 ## Found while executing
 
