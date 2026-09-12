@@ -7,8 +7,8 @@ steps:
   # paths live here, not in a shared vars_file (confirmed with Provision
   # master mind, cf issue #410).
   - vars:
-      backup_dir: "{{ home }}/.local/share/moongit/backups"
-      data_dir: "{{ home }}/.local/share/moongit"
+      backup_dir: "{{ home }}/.local/share/codefort/backups"
+      data_dir: "{{ home }}/.local/share/codefort"
 
   - name: backup dir
     file: { path: "{{ backup_dir }}", state: dir }

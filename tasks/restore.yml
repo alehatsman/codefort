@@ -7,7 +7,7 @@ steps:
   # paths live here, not in a shared vars_file (confirmed with Provision
   # master mind, cf issue #410).
   - vars:
-      data_dir: "{{ home }}/.local/share/moongit"
+      data_dir: "{{ home }}/.local/share/codefort"
 
   - name: stop codefort.service
     shell: systemctl --user stop codefort.service || true

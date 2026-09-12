@@ -8,7 +8,7 @@ steps:
   # master mind, cf issue #410).
   - vars:
       binary_path: "{{ home }}/.local/bin/codefortd"
-      data_dir: "{{ home }}/.local/share/moongit"
+      data_dir: "{{ home }}/.local/share/codefort"
 
   - name: create repo
     cmd: ["{{ binary_path }}", repo, create, "{{ owner }}/{{ name }}"]
