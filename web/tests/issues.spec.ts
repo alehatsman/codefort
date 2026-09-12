@@ -565,7 +565,7 @@ test("a root-absolute link in a comment points at the app route, not a blob path
       {
         id: 1,
         issue_id: 1,
-        author: "moongit-agent",
+        author: "codefort-agent",
         body: "Finished — see [run #1](/alice/demo/pipelines/1).",
         created_at: now,
       },

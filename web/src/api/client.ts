@@ -55,10 +55,22 @@ import type {
   WriteSpecResult,
 } from "@/api/types"
 
-const TOKEN_KEY = "moongit_token"
+const TOKEN_KEY = "codefort_token"
+
+// The key was "moongit_token" before the rename. Hard-cutting it would log
+// every open session out, so read the old key once and carry the value over.
+// Delete this and LEGACY_TOKEN_KEY a release after the rename ships.
+const LEGACY_TOKEN_KEY = "moongit_token"
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token !== null) return token
+
+  const legacy = localStorage.getItem(LEGACY_TOKEN_KEY)
+  if (legacy === null) return null
+  localStorage.setItem(TOKEN_KEY, legacy)
+  localStorage.removeItem(LEGACY_TOKEN_KEY)
+  return legacy
 }
 
 export function setToken(token: string): void {
@@ -184,7 +196,7 @@ export interface Page<T> {
 
 // requestPage mirrors request() but also surfaces X-Total-Count so callers can
 // drive pagination. The body shape is unchanged (a bare array), keeping the
-// mgit CLI and other array consumers working against the same endpoint.
+// cf CLI and other array consumers working against the same endpoint.
 async function requestPage<T>(path: string): Promise<Page<T>> {
   const token = getToken()
   const headers = new Headers()

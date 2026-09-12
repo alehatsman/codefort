@@ -2,7 +2,7 @@
 // tab turns a chosen target into an issue title + body that drives a read-only
 // review agent (toolProfile "review"). Keeping the four target variants in one
 // module keeps their prompts consistent — the agent reads the body, reviews the
-// target, and posts findings via the moongit `review_create` MCP tool (anchored
+// target, and posts findings via the codefort `review_create` MCP tool (anchored
 // to a file path + line range on a ref) with no shell and no file edits.
 
 // ReviewTarget is the kind of thing a review agent is pointed at. Each maps to

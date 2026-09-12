@@ -16,7 +16,7 @@ export default function TokenGate({ onSet }: Props) {
   return (
     <div className="gate">
       <div className="gate__card">
-        <h1>moongit</h1>
+        <h1>codefort</h1>
 
         <div className="gate__tabs">
           <button
@@ -78,7 +78,7 @@ function TokenForm({ onSet }: { onSet: () => void }) {
     <>
       <p className="muted">
         Paste an API token to continue. Mint one with{" "}
-        <code>moongitd token create &lt;name&gt;</code>.
+        <code>codefortd token create &lt;name&gt;</code>.
       </p>
       <form onSubmit={submit}>
         <input

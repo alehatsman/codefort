@@ -16,7 +16,7 @@ export const DEFAULT_THEME: ThemeId = "monokai"
 // data-theme attribute off. Every other theme layers on top via data-theme.
 const BASE_THEME: ThemeId = "github"
 
-const STORAGE_KEY = "moongit:theme"
+const STORAGE_KEY = "codefort:theme"
 
 function isThemeId(v: string | null): v is ThemeId {
   return THEMES.some((t) => t.id === v)

@@ -15,7 +15,7 @@ const PROFILES: { value: CIRunToolProfile; label: string; hint: string }[] = [
   {
     value: "full",
     label: "Full toolset",
-    hint: "All mgit tools: claim issues, post comments, spawn agents, trigger pipelines.",
+    hint: "All cf tools: claim issues, post comments, spawn agents, trigger pipelines.",
   },
   {
     value: "review",

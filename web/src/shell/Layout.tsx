@@ -52,7 +52,7 @@ export default function Layout({ children, onSignOut }: Props) {
       <header className="topbar">
         <div className="topbar__lead">
           <Link to="/" className="brand">
-            moongit
+            codefort
           </Link>
           {ctx ? <RepoTabs owner={ctx.owner} repo={ctx.repo} /> : <GlobalTabs />}
         </div>

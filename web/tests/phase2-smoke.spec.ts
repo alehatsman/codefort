@@ -1,5 +1,5 @@
 /**
- * Phase 2 smoke tests — run against the real moongitd on :8080.
+ * Phase 2 smoke tests — run against the real codefortd on :8080.
  * Skips the Vite dev server; hits the production bundle.
  *
  * Run with:
@@ -18,7 +18,7 @@ test.describe("TokenGate tabs", () => {
   test("shows Use token / Sign in / Create account tabs", async ({ page }) => {
     // Clear any stored token so we land on the gate.
     await page.goto(BASE)
-    await page.evaluate(() => localStorage.removeItem("moongit_token"))
+    await page.evaluate(() => localStorage.removeItem("codefort_token"))
     await page.reload()
 
     await expect(page.getByRole("button", { name: "Use token" })).toBeVisible()
@@ -28,7 +28,7 @@ test.describe("TokenGate tabs", () => {
 
   test("Create account tab registers and enters the app", async ({ page }) => {
     await page.goto(BASE)
-    await page.evaluate(() => localStorage.removeItem("moongit_token"))
+    await page.evaluate(() => localStorage.removeItem("codefort_token"))
     await page.reload()
 
     await page.getByRole("button", { name: "Create account" }).click()
@@ -39,7 +39,7 @@ test.describe("TokenGate tabs", () => {
     // After success the gate should disappear and the app shell appears.
     await expect(page.getByRole("button", { name: "Account menu" })).toBeVisible({ timeout: 5000 })
 
-    const stored = await page.evaluate(() => localStorage.getItem("moongit_token"))
+    const stored = await page.evaluate(() => localStorage.getItem("codefort_token"))
     expect(stored).toMatch(/^mgt_/)
   })
 
@@ -53,7 +53,7 @@ test.describe("TokenGate tabs", () => {
     expect(regResp.ok()).toBeTruthy()
 
     await page.goto(BASE)
-    await page.evaluate(() => localStorage.removeItem("moongit_token"))
+    await page.evaluate(() => localStorage.removeItem("codefort_token"))
     await page.reload()
 
     await page.getByRole("button", { name: "Sign in" }).click()
@@ -80,7 +80,7 @@ test.describe("Repo visibility", () => {
     authToken = body.secret
 
     await page.goto(BASE)
-    await page.evaluate((tok) => localStorage.setItem("moongit_token", tok), authToken)
+    await page.evaluate((tok) => localStorage.setItem("codefort_token", tok), authToken)
     await page.reload()
     // Wait until the app shell is visible.
     await expect(page.getByRole("button", { name: "Account menu" })).toBeVisible({ timeout: 5000 })

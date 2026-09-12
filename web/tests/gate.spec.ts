@@ -23,7 +23,7 @@ test("invalid token is rejected at the gate and never persisted", async ({ page 
   await expect(page.getByRole("button", { name: "Continue" })).toBeVisible()
   await expect(page.getByRole("button", { name: "sign out" })).toHaveCount(0)
 
-  const stored = await page.evaluate(() => localStorage.getItem("moongit_token"))
+  const stored = await page.evaluate(() => localStorage.getItem("codefort_token"))
   expect(stored).toBeNull()
 })
 
@@ -42,6 +42,6 @@ test("valid token passes the gate, persists, and enters the app", async ({ page 
 
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible()
 
-  const stored = await page.evaluate(() => localStorage.getItem("moongit_token"))
+  const stored = await page.evaluate(() => localStorage.getItem("codefort_token"))
   expect(stored).toBe("mgt_valid_qa_token")
 })

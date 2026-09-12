@@ -519,7 +519,7 @@ test("a mooncake-agent run renders its steps, not a blank transcript", async ({ 
                   data: {
                     step_id: "s2",
                     duration_ms: 18,
-                    result: { status: "changed", target: "mgit issue comment 6 --body done" },
+                    result: { status: "changed", target: "cf issue comment 6 --body done" },
                   },
                 },
               },
@@ -572,7 +572,7 @@ test("a mooncake-agent run renders its steps, not a blank transcript", async ({ 
     transcript.locator(".agent-step--changed", { hasText: "report progress" })
   ).toBeVisible()
   await expect(transcript).not.toContainText("🔧")
-  await expect(transcript).not.toContainText("$ mgit issue comment 6 --body done")
+  await expect(transcript).not.toContainText("$ cf issue comment 6 --body done")
   await expect(transcript).not.toContainText("commented on #6 by agent-run-9")
   // run.completed renders mooncake's RECAP line; turn.completed's bogus 0s is gone.
   await expect(page.getByText(/RECAP/)).toBeVisible()
@@ -617,7 +617,7 @@ test("a stalled agent run reads neutral 'stalled', not red 'failed' (#173)", asy
         event: "agent",
         trigger: "agent#17",
         // The run hit its iteration cap without a failed step: mooncake reports
-        // status success + a soft stop_reason, which moongit finalizes RunStalled.
+        // status success + a soft stop_reason, which codefort finalizes RunStalled.
         status: "stalled",
         created_at: iso,
         started_at: iso,

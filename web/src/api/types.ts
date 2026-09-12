@@ -436,7 +436,7 @@ export interface MergeConflictResponse {
   conflicts?: string[]
 }
 
-// --- CI (moongitci) ---
+// --- CI (codefort.yml) ---
 
 // Mirrors storage.RunStatus. queued -> running -> a terminal state.
 export type CIRunStatus =
@@ -489,7 +489,7 @@ export type CIRunKind = "ci" | "agent" | "spec-verify"
 // NDJSON — see the folding logic in features/agents/AgentRunBody.tsx.)
 export type CIRunExecutionModel = "claude-edit"
 
-// CIRunToolProfile scopes which mgit MCP tools an agent run sees (#184): full =
+// CIRunToolProfile scopes which cf MCP tools an agent run sees (#184): full =
 // the whole toolset; review = read tools + review_* (the read-only review agent).
 export type CIRunToolProfile = "full" | "review"
 

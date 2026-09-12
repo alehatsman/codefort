@@ -45,7 +45,7 @@ function deriveState(open: boolean, resolved: boolean): CodeCommentState {
  * deep-linking into the blob viewer at its line range. The branch comes from
  * the shared `?ref=` param (same selector as the code browser); `?state=`
  * filters open / resolved / all. This is the surface a reviewer — or Claude via
- * `mgit review list` — works through.
+ * `cf review list` — works through.
  */
 export default function ReviewPage() {
   const { owner = "", repo = "" } = useParams()

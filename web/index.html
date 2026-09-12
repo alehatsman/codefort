@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>moongit</title>
+    <title>codefort</title>
     <script>
       // Apply the saved theme before first paint (no flash of default theme).
       // Mirror of theme.ts: monokai is the default; github is the base scheme,
@@ -11,7 +11,7 @@
       // resolves to monokai. "monokai-web"/"monokai-code" are legacy ids from
       // the earlier 3-scheme selector (the latter mapped to github/base).
       try {
-        const t = localStorage.getItem("moongit:theme")
+        const t = localStorage.getItem("codefort:theme")
         if (t !== "github" && t !== "monokai-code") {
           document.documentElement.setAttribute("data-theme", "monokai")
         }

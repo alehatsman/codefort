@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { Repo } from "@/api/types"
 
-const STORAGE_KEY = "moongit:repo-order"
+const STORAGE_KEY = "codefort:repo-order"
 
 function loadOrder(): string[] {
   try {
