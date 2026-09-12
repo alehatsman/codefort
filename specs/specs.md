@@ -48,9 +48,18 @@ verified by the very workflow it describes.)
   (aligned / drifted / unverifiable / unspecced) keyed to file-absolute lines for
   a truth gutter — and explicitly not a correctness or quality claim: a fully
   aligned spec can still be the wrong spec.
-- WHEN a verify pass completes for a spec, it should stamp `last_verified` and
-  `alignment` onto the spec's frontmatter and record the per-line verdicts, so
-  the drift backstop and the UI reflect the latest agreement.
+- WHEN a verify pass completes for a spec, it records the verdict (alignment +
+  per-line markers, keyed to the verified commit) in the `verifications` table
+  and stamps `last_verified` / `alignment` into the spec's frontmatter on a
+  `spec-verify/<id>` branch — never onto the default branch directly, the same
+  PR-shaped path a spec edit takes.
+- WHERE the two records diverge, the `verifications` table is authoritative for
+  drift and the frontmatter stamp is the human-facing record. The table advances
+  the moment a pass completes; the frontmatter only advances when someone merges
+  the stamp branch, so a spec can be classified against a baseline its own
+  frontmatter does not yet name. This is deliberate — a machine verdict does not
+  edit the default branch unreviewed — but it means "every spec says draft" is a
+  statement about what has been *merged*, not about what has been verified.
 - WHILE a spec's status is `draft`, it is in progress and not yet authoritative;
   once authoritative it is `living` (the verify workflow maintains its stamps
   from there); a replaced spec becomes `superseded` rather than being deleted.
@@ -79,5 +88,7 @@ verified by the very workflow it describes.)
 - [x] Deterministic drift: uncovered / unverified / stale / fresh; fail → stale
 - [x] Verification result model: alignment + per-line markers (match, not quality)
 - [x] Lenient parser: renders on bad metadata; Validate() reports semantic issues
-- [ ] Verify pass stamps last_verified/alignment + records per-line verdicts (#219, #220)
+- [x] Verify pass stamps last_verified/alignment + records per-line verdicts (#219, #220)
+- [ ] A verify pass has actually been run against this repo (the table is empty,
+      so every spec classifies `unverified` and stays `draft`)
 - [ ] Verified against the code by the verify workflow (flip to `living`)

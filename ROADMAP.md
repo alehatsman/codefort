@@ -33,14 +33,27 @@ the thing, not the task list.
 
 Ordered by what unblocks the most.
 
-### 1. Close the spec verify loop
+### 1. Run the spec verify loop (it is built, it has never been used)
 
-Every spec except the constitution is stuck at `status: draft`, because nothing
-stamps `last_verified` / `alignment` or records per-line verdicts. The
-deterministic drift backstop (uncovered / unverified / stale / fresh) works; the
-LLM verify pass that would let a spec graduate to `living` does not. Until this
-lands, specs-as-the-dual-of-code is a half-circuit — we can tell which specs
-*might* have drifted but never that one hasn't.
+The machinery is complete and shipped: the deterministic drift backstop
+(#218), the spec-verify agent run (#219), and the pass that parses the agent's
+verdict, records it with per-line markers, and stamps `last_verified` /
+`alignment` onto a `spec-verify/<id>` branch (#220). What is missing is
+*execution* — no verify pass has ever run against this repo, so the
+`verifications` table is empty, every spec reads `unverified`, and every spec
+except the constitution still says `status: draft`.
+
+That makes this an operations step, not a build: point a moongitd with agent
+credentials at this repo, verify each spec, review the stamp branches, and
+merge the ones that hold. Only then does a spec earn `living`.
+
+The one code-shaped gap it exposes: a stamp lands on a branch and waits for a
+human to merge it, while the drift classifier reads its baseline from the
+`verifications` table. The two can therefore disagree — the DB says a spec was
+verified at commit X while the spec's own frontmatter on `main` says nothing.
+That is defensible (the frontmatter is the human-facing record, the table is
+the machine's) but it is undocumented, and it is why "every spec is draft"
+reads as a broken feature rather than an unused one.
 
 ### 2. Pull-request completeness
 
