@@ -163,7 +163,7 @@ records; they get renamed too, since they describe the same live system.
 it is the one change that touches credential-shaped strings, and it is easier to
 reason about alone than buried in a 400-file diff.
 
-### Phase 8 — repository rename  `todo`
+### Phase 8 — repository rename  `todo` (owner action)
 
 - GitHub: `alehatsman/moongit` → `alehatsman/codefort`. GitHub redirects the
   old URL, so `origin` keeps working, but `git remote set-url` anyway.
@@ -172,6 +172,25 @@ reason about alone than buried in a 400-file diff.
   clone and worktree becomes `codefort`.
 - The agent handoff remote name (Trap 7) and the MCP server name
   (`cmd/cf/mcp.go:153`) move here.
+
+## Found while executing
+
+Not planned; surfaced by running the binaries and reading the plans back.
+
+- **The client's own usage text said `codefort issue list`.** The bulk rename
+  turned every `mgit <verb>` into `codefort <verb>`, which is the product name,
+  not the command. 92 invocation strings corrected to `cf <verb>`; prose about
+  the product was left alone.
+- **`install.yml` grew a self-link.** It built `moongitd` and symlinked `mgitd`
+  beside it; after the rename both names were `codefortd`. Binaries now install
+  under their real names and all four alias steps are gone.
+- **The data dir got swept along.** Six plans moved to
+  `~/.local/share/codefort` against the decision that data paths stay put,
+  which would have pointed backup, restore and gc at an empty directory.
+  Reverted.
+- **`deploy.yml` assumes the checkout is renamed.** `web_dir` is
+  `~/projects/codefort/web/dist`; until the local clone directory is renamed in
+  Phase 8, deploy syncs the web bundle to a path that does not exist.
 
 ## Cutover runbook
 
