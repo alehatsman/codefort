@@ -8,14 +8,13 @@ import type { CIRun, SpecContent, SpecListItem, SpecVerification } from "@/api/t
 import CommandPalette, { type Command } from "@/features/specs/CommandPalette"
 import QuickOpen from "@/features/specs/QuickOpen"
 import SpecEditor from "@/features/specs/SpecEditor"
-import SpecSearch from "@/features/specs/SpecSearch"
 import Markdown from "@/shell/Markdown"
 import OverviewCard from "@/shell/OverviewCard"
 import { Button, EmptyState, ErrorMessage, RelativeTime, Spinner } from "@/ui"
 
 /**
  * Specs tab: in-repo, human-authored specifications under specs/ — the dual of
- * the dex-derived Explore view ("what the code *is*"). A two-pane reader: a
+ * the code itself ("what the code *is*"). A two-pane reader: a
  * folder-grouped spec tree with a status rail on the left, the selected spec
  * rendered as markdown on the right. ↑/↓ (or j/k) move between specs; the
  * selection lives in ?path= so it deep-links and survives a refresh.
@@ -62,13 +61,11 @@ export default function SpecsPage() {
   useSpecKeyboardNav(ordered, selectedPath, selectSpec)
 
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
   const [cmdkOpen, setCmdkOpen] = useState(false)
   // A spec being created (not yet in the list): the editor opens on it directly.
   const [draft, setDraft] = useState<{ path: string; content: string } | null>(null)
   useSpecHotkeys({
     onJump: () => setPaletteOpen(true),
-    onSearch: () => setSearchOpen(true),
     onCommand: () => setCmdkOpen(true),
   })
 
@@ -98,13 +95,6 @@ export default function SpecsPage() {
       shortcut: "⌘P",
       run: () => setPaletteOpen(true),
     },
-    {
-      id: "search",
-      title: "Search specs…",
-      subtitle: "Semantic search over the spec corpus",
-      shortcut: "⌘⇧F",
-      run: () => setSearchOpen(true),
-    },
   ]
 
   if (repoQ.isLoading) return <Spinner />
@@ -115,7 +105,7 @@ export default function SpecsPage() {
 
   return (
     <div className="specs-page">
-      <OverviewCard owner={r.owner} repo={r.name} path="" summaries={{}} />
+      <OverviewCard owner={r.owner} repo={r.name} path="" />
 
       {specsQ.isLoading && <Spinner label="Loading specs…" />}
       <ErrorMessage error={specsQ.error} />
@@ -150,13 +140,6 @@ export default function SpecsPage() {
         specs={specs}
         onSelect={selectSpec}
         onClose={() => setPaletteOpen(false)}
-      />
-      <SpecSearch
-        open={searchOpen}
-        owner={r.owner}
-        repo={r.name}
-        onPick={(path, section) => setSelection(path, section)}
-        onClose={() => setSearchOpen(false)}
       />
       <CommandPalette open={cmdkOpen} commands={commands} onClose={() => setCmdkOpen(false)} />
     </div>
@@ -628,25 +611,15 @@ function handleSpecKeyboardNav(
 }
 
 // useSpecHotkeys wires the Specs tab's palette shortcuts, taking over the
-// browser defaults while the tab is mounted: ⌘K opens the command palette, ⌘P
-// path quick-open (Sublime "go to"), ⌘⇧F semantic spec search.
-function useSpecHotkeys({
-  onJump,
-  onSearch,
-  onCommand,
-}: {
-  onJump: () => void
-  onSearch: () => void
-  onCommand: () => void
-}) {
+// browser defaults while the tab is mounted: ⌘K opens the command palette and
+// ⌘P path quick-open (Sublime "go to").
+function useSpecHotkeys({ onJump, onCommand }: { onJump: () => void; onCommand: () => void }) {
   const jumpRef = useRef(onJump)
   jumpRef.current = onJump
-  const searchRef = useRef(onSearch)
-  searchRef.current = onSearch
   const commandRef = useRef(onCommand)
   commandRef.current = onCommand
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => handleSpecHotkey(e, jumpRef, searchRef, commandRef)
+    const onKey = (e: KeyboardEvent) => handleSpecHotkey(e, jumpRef, commandRef)
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [])
@@ -657,7 +630,6 @@ function useSpecHotkeys({
 function handleSpecHotkey(
   e: KeyboardEvent,
   jumpRef: { current: () => void },
-  searchRef: { current: () => void },
   commandRef: { current: () => void }
 ): void {
   const mod = e.metaKey || e.ctrlKey
@@ -669,8 +641,5 @@ function handleSpecHotkey(
   } else if (key === "p" && !e.shiftKey) {
     e.preventDefault()
     jumpRef.current()
-  } else if (key === "f" && e.shiftKey) {
-    e.preventDefault()
-    searchRef.current()
   }
 }

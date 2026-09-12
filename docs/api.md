@@ -539,51 +539,6 @@ sets it. Max body 64 KiB.
 
 ---
 
-## Intel
-
-Proxies to the `dex` code-intelligence daemon. Shared semantics across this
-group: `503` when dex isn't configured, `404` when the repo isn't indexed by
-dex, `409` when several dex projects share the repo's basename, `502` on a dex
-transport error.
-
-### GET /api/repos/{owner}/{repo}/intel
-Index status. Never fails just because dex is down or the repo isn't indexed —
-those are reported via the flags.
-- `200` → `{"enabled", "found", "service": {"endpoint", "reachable", "model",
-  "version"}, "project": {"root", "chunks", "files", "dim", "embed_model",
-  "last_indexed", "pending_summaries"}}`
-- `404` repo not registered; `502` dex unreachable
-
-### GET /api/repos/{owner}/{repo}/intel/overview
-Repo + package summaries composed at index time.
-- `200` → dex overview payload
-
-### GET /api/repos/{owner}/{repo}/intel/package-graph
-Internal package import DAG. A non-Go or un-graphed project is a `200` with
-status `no-graph` and no nodes, not an error.
-- `200` → dex package-graph payload
-
-### GET /api/repos/{owner}/{repo}/intel/file-summary
-Per-file summary for the blob view. A missing summary is a `200` with an empty
-string.
-- Query: `path` (required)
-- `200` → `{"path", "summary"}`; `400` path missing
-
-### GET /api/repos/{owner}/{repo}/intel/summaries
-Every summary dex has for the repo as one path → prose map. The repo summary is
-keyed `""`; absent paths simply have no prose.
-- `200` → `{"summaries": {"<path>": "<prose>"}}`
-
-### POST /api/repos/{owner}/{repo}/intel/search
-Semantic or structural search, scoped to the repo's dex project. Capped at 20
-hits.
-- Body: `{"query", "kind"?}` — `kind` is `symbol` | `ask` | `callers` |
-  `callees`; anything else (including empty) is plain semantic search
-- `200` → dex search result
-- `400` invalid JSON or empty query
-
----
-
 ## Specs
 
 In-repo markdown specs under `specs/`. See [specs.md](specs.md) for the file
@@ -628,15 +583,6 @@ is the candidate set for a verify pass.
 - `200` → `SpecDriftReport` (`ref`, `specs[]` of `{path, id, status, covers,
   base, changed, last_verified}`); `status` is `uncovered` | `unverified` |
   `stale` | `fresh`
-
-### POST /api/repos/{owner}/{repo}/specs/search
-Semantic search scoped to the `specs/` corpus, each hit attributed to its
-enclosing spec heading. Capped at 20 hits. Same dex availability semantics as
-Intel (`503` / `404` / `409` / `502`).
-- Body: `{"query"}` — required
-- `200` → `SpecSearchResult` (`query`, `hits[]` of `{path, section, line,
-  snippet, score}`)
-- `400` invalid JSON or empty query
 
 ### POST /api/repos/{owner}/{repo}/specs/verify
 Enqueue a spec-verify agent run (read-only tool profile) for one spec. It

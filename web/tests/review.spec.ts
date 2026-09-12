@@ -21,17 +21,6 @@ function routeBlob(page: Page) {
   )
 }
 
-// dex off — keep the intel-gated queries quiet in tests.
-function routeIntelOff(page: Page) {
-  return page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel$/, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ enabled: false, found: false }),
-    })
-  )
-}
-
 test.beforeEach(async ({ page }) => {
   await seedToken(page)
 })
@@ -39,7 +28,6 @@ test.beforeEach(async ({ page }) => {
 test("select a line range in the blob viewer and add an inline comment", async ({ page }) => {
   const state = await mockApi(page)
   await routeBlob(page)
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/blob/src/app.ts")
 
@@ -80,7 +68,6 @@ test("select a line range in the blob viewer and add an inline comment", async (
 test("Ctrl+Enter posts the inline code comment", async ({ page }) => {
   const state = await mockApi(page)
   await routeBlob(page)
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/blob/src/app.ts")
   await expect(page.locator("#L1 .code-line__text")).toContainText("la1")
@@ -99,7 +86,6 @@ test("Ctrl+Enter posts the inline code comment", async ({ page }) => {
 test("shift-click still extends a selection without dragging", async ({ page }) => {
   await mockApi(page)
   await routeBlob(page)
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/blob/src/app.ts")
   await expect(page.locator("#L1 .code-line__text")).toContainText("la1")
@@ -141,7 +127,6 @@ test("review tab groups comments by file, deep-links, and filters by state", asy
   ]
   const state = await mockApi(page, { codeComments: seeded })
   await routeBlob(page)
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/review")
 
@@ -208,7 +193,6 @@ test("review snippet shows ±context lines with the file's own line numbers", as
       }),
     })
   )
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/review")
 
@@ -242,7 +226,6 @@ test("review comment bodies render as markdown", async ({ page }) => {
   ]
   await mockApi(page, { codeComments: seeded })
   await routeBlob(page)
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/review")
 
@@ -258,7 +241,6 @@ test("review comment bodies render as markdown", async ({ page }) => {
 
 test("draft review issue spawns a read-only review agent from the Review tab", async ({ page }) => {
   const state = await mockApi(page)
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/review?ref=main")
 

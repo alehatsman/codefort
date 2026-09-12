@@ -1,7 +1,6 @@
 // Package specs parses moongit's in-repo specifications: human-authored,
 // high-altitude markdown documents stored under specs/ that describe what the
-// code *should* do (the dual of the dex-derived Explore view, which describes
-// what the code *is*).
+// code *should* do — the dual of the code itself, which is what the code *is*.
 //
 // A spec is plain markdown with an optional YAML frontmatter block. The body
 // follows a loose section convention — Intent / Behavior / Checklist /

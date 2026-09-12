@@ -69,7 +69,7 @@ git-hosting, issues, and pull-requests specs defer to it.
   identity is the ssh-transport spec; here identity means a bearer token.
 - **The claim mechanism.** How a claim locks work is the issues spec; this spec
   only states that the claim — not a permission model — is what serializes it.
-- **Agent credential injection.** How a run's token (and LLM/dex creds) are wired
+- **Agent credential injection.** How a run's token (and LLM creds) are wired
   into a container is the agent-runs spec; here only the mint/revoke contract.
 - **Roles, scopes, and per-resource authorization.** Local-trust is the design:
   tokens are identities, and there is deliberately no RBAC matrix, no per-resource

@@ -86,8 +86,6 @@ Environment:
     MOONGIT_BASIC_PASS  HTTP Basic password (paired with MOONGIT_BASIC_USER)
     MOONGIT_SSH_ADDR    listen address for the opt-in git SSH transport (e.g. ":2222"); empty disables SSH (one port)
     MOONGIT_SSH_HOST_KEY  SSH host key path (default "$MOONGIT_DATA_DIR/ssh_host_ed25519_key"); generated if absent
-    MOONGIT_DEX_URL     dex serve base URL for the Intel tab (e.g. http://127.0.0.1:8080; empty disables it)
-    MOONGIT_DEX_TOKEN   bearer token for dex (DEX_SERVE_TOKEN); empty for token-less loopback
 `)
 }
 

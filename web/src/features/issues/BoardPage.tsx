@@ -118,7 +118,7 @@ export default function BoardPage() {
 
   return (
     <div>
-      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
+      <OverviewCard owner={owner} repo={repo} path="" />
 
       <PageHeader title="Issues" actions={<NewIssueForm owner={owner} repo={repo} />}>
         <IssuesViewSwitch />

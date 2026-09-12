@@ -25,7 +25,7 @@ export default function RepoSettingsPage() {
 
   return (
     <div>
-      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
+      <OverviewCard owner={owner} repo={repo} path="" />
       <div className="repo-settings">
         <GeneralSection
           owner={owner}

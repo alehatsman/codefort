@@ -24,8 +24,7 @@ the thing, not the task list.
 | Agent runs: spawn-from-issue, turns, park/resume, handoff branch, cancel | [agent-runs](specs/agent-runs.md) |
 | Event feed — DB-backed SSE, `mgit events` | [events-feed](specs/events-feed.md) |
 | MCP server — 22 tools over stdio | [mcp-server](specs/mcp-server.md) |
-| dex code intelligence (API live; UI tab currently dark) | [code-intel](specs/code-intel.md) |
-| In-repo specs: list, read, write-via-PR, semantic search, deterministic drift | [specs](specs/specs.md) |
+| In-repo specs: list, read, write-via-PR, deterministic drift | [specs](specs/specs.md) |
 | Accounts, repo visibility, membership, and the two access gates | [access-control](specs/access-control.md) |
 | Web SPA: Code, Commits, Issues, Board, Pulls, Pipelines, Review, Specs, Agents, Settings | [web-ui](specs/web-ui.md) |
 | `mgit` client | [cli](specs/cli.md) |
@@ -43,24 +42,13 @@ LLM verify pass that would let a spec graduate to `living` does not. Until this
 lands, specs-as-the-dual-of-code is a half-circuit — we can tell which specs
 *might* have drifted but never that one hasn't.
 
-### 2. Intel / Explore: ship it or cut it
+### 2. Pull-request completeness
 
-The dex-backed API (`/api/repos/{o}/{r}/intel/*`) is live and tested. The web
-route and nav tab are commented out. Two honest outcomes — finish the tab, or
-delete the endpoints and the `MOONGIT_DEX_URL` wiring. Carrying a dark feature
-is the worst of the three.
-
-### 3. Pull-request completeness
-
-- CI run + merge event enqueued on a server-side merge.
 - Server-side rebase of head onto base, worktree-free.
+- Review state does not gate merge: an approval is recorded but the merge
+  endpoint never consults it.
 
-### 4. Agent-run handoff policy
-
-Defined handoff branch naming and a CAS policy, so a second run on the same
-issue can never silently force-overwrite the first one's branch.
-
-### 5. Finish mooncake → provision
+### 3. Finish mooncake → provision
 
 The last tie to the archived tool is the Go quality gate: `mgitci.yml` execs
 `mooncake task ci`, and `ci/Dockerfile` bakes the binary into
@@ -68,12 +56,11 @@ The last tie to the archived tool is the Go quality gate: `mgitci.yml` execs
 rewrite in `alehatsman/go-quality`. Background in
 [docs/ops-provisioning.md](docs/ops-provisioning.md).
 
-### 6. Smaller, unblocked
+### 4. Smaller, unblocked
 
 - Issue search is substring-only over title/body; no ranking.
 - No milestones. Labels + epics cover most of what they'd do — this only earns
   a slot if the epic rollup proves insufficient in practice.
-- `internal/config` has no tests, and it now parses 33 environment variables.
 - Branch protection is a labelled placeholder in Settings. `VISION.md` permits
   "a handful of branch-protection rules" as a coarse convenience; the shape is
   a small allowlist of protected refs checked on the push path, not a rules
@@ -90,6 +77,10 @@ re-proposed:
   hierarchy. moongit hosts a known fleet's repos on a trusted box.
 - **Outbound webhooks.** The pull-based SSE feed is the chosen shape; moongit
   makes no outbound calls, so there is nothing to configure or fail delivering.
+- **Semantic code intelligence.** The dex integration (Intel/Explore, semantic
+  spec search, the agent's dex MCP) was an experiment and was removed in full.
+  Embedding indexes and meaning-based search are a separate tool's job, not
+  moongit's.
 - **A worker tier, an external database, or a microservice split.** One
   process, one SQLite file. This is the feature, not a phase.
 - **Horizontal scale, replication, failover.** Single-writer, one box. Any such

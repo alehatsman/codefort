@@ -36,8 +36,8 @@ type agentSettingsOverride struct {
 // and claims the auth slot alone; else the operator-set OAuth token, then the
 // OAuth-token env, then the API-key env. ANTHROPIC_BASE_URL is the operator-set
 // value when present, else the env. The ephemeral moongit token + server URL
-// let the in-container git/mgit talk to moongitd; the dex bearer/endpoint/
-// project wire the hot index when configured. Order is stable for testability.
+// let the in-container git/mgit talk to moongitd. Order is stable for
+// testability.
 func agentContainerEnv(cfg *config.Config, o agentSettingsOverride, moongitToken, serverURL string) []string {
 	var env []string
 	switch {
@@ -63,15 +63,6 @@ func agentContainerEnv(cfg *config.Config, o agentSettingsOverride, moongitToken
 	if serverURL != "" {
 		env = append(env, "MOONGIT_SERVER="+serverURL)
 	}
-	if cfg.DexURL != "" {
-		env = append(env, "DEX_REMOTE_URL="+cfg.DexURL)
-		if cfg.DexToken != "" {
-			env = append(env, "DEX_SERVE_TOKEN="+cfg.DexToken)
-		}
-		if cfg.DexProject != "" {
-			env = append(env, "DEX_PROJECT="+cfg.DexProject)
-		}
-	}
 	return env
 }
 
@@ -92,8 +83,8 @@ func agentServerURL(cfg *config.Config) string {
 }
 
 // writeAgentMCPConfig writes the claude --mcp-config file into the workspace,
-// registering the stdio MCP servers the agent gets (both reachable at /work and
-// run under --strict-mcp-config, so this file is the agent's whole MCP surface):
+// registering the stdio MCP servers the agent gets (reachable at /work and run
+// under --strict-mcp-config, so this file is the agent's whole MCP surface):
 //
 //   - mgit: the moongit issue/review/pipeline/agent toolset (`mgit mcp`, #158).
 //     Always registered — the per-run MOONGIT_TOKEN + MOONGIT_SERVER ride in the
@@ -101,12 +92,13 @@ func agentServerURL(cfg *config.Config) string {
 //     identity without anything in this file. The run's tool profile (#184) is
 //     passed as `--profile <p>`, so the shim only registers the tools that
 //     profile permits (shim-side enforcement, robust headless — #110).
-//   - dex: the stdio->REST shim (`dex mcp --remote`, dex#6), registered only when
-//     dex is configured. Its bearer/project also ride the env.
+//
+// mgit is currently the only server; the map shape is kept because the config
+// format is a map and a second server would slot in without restructuring.
 //
 // The file therefore always exists for an agent run and carries no secret. It
 // returns the in-container path.
-func writeAgentMCPConfig(hostWorkDir string, cfg *config.Config, toolProfile string) (containerPath string, err error) {
+func writeAgentMCPConfig(hostWorkDir, toolProfile string) (containerPath string, err error) {
 	if toolProfile == "" {
 		toolProfile = storage.DefaultToolProfile
 	}
@@ -115,12 +107,6 @@ func writeAgentMCPConfig(hostWorkDir string, cfg *config.Config, toolProfile str
 			"command": "mgit",
 			"args":    []string{"mcp", "--profile", toolProfile},
 		},
-	}
-	if cfg.DexURL != "" {
-		servers["dex"] = map[string]any{
-			"command": "dex",
-			"args":    []string{"mcp", "--remote", cfg.DexURL},
-		}
 	}
 	b, err := json.MarshalIndent(map[string]any{"mcpServers": servers}, "", "  ")
 	if err != nil {

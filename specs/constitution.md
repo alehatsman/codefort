@@ -41,12 +41,11 @@ one place is what lets the rest of the specs stay short.
 - WHERE notifications flow, they are pull-based: subscribers reach in over the
   authenticated SSE feed and moongit makes no outbound calls (no webhooks), so
   there is nothing to configure or fail delivering.
-- WHERE a capability beyond the core is added (SSH transport, CI, dex code
-  intelligence), it is opt-in and additive: the default deployment stays a single
-  open HTTP port, and turning the capability off never changes the core's
-  behavior.
+- WHERE a capability beyond the core is added (SSH transport, CI, agent runs),
+  it is opt-in and additive: the default deployment stays a single open HTTP
+  port, and turning the capability off never changes the core's behavior.
 - WHERE specs exist, they are the dual of the code: a spec says what the system
-  *should* do, dex Explore shows what it *is*, and the gap between them is drift —
+  *should* do, the code is what it *is*, and the gap between them is drift —
   a signal surfaced to humans, not a merge blocker, at least until the workflow
   earns trust.
 - WHILE the system evolves, simplicity wins: boring, explicit mechanisms (a
@@ -73,6 +72,11 @@ one place is what lets the rest of the specs stay short.
   (any such effort is a separate, explicitly-flagged design).
 - **A webhook / outbound-integration hub.** Pull-based SSE is the chosen feed
   shape; pushing to external systems is not a goal.
+- **Semantic code intelligence.** Embedding indexes, symbol graphs, and
+  meaning-based search over the code or the specs are not moongit's business.
+  The dex integration that once provided them was an experiment and has been
+  removed wholesale; anything in this shape is a separate tool moongit does not
+  depend on.
 - **Restating subsystem detail.** This spec holds principles only; the concrete
   behavior of each capability lives in its own spec.
 
@@ -84,7 +88,7 @@ one place is what lets the rest of the specs stay short.
 - [x] Every write attributed to the acting identity; claim-first coordination
 - [x] Git as source of truth; worktree-free server ops; PR-advanced main; append-only
 - [x] Pull-based SSE feed; no outbound webhooks
-- [x] Beyond-core capabilities (SSH/CI/dex) are opt-in; single open HTTP port default
+- [x] Beyond-core capabilities (SSH/CI/agents) are opt-in; single open HTTP port default
 - [x] Specs are the dual of code; drift is a non-blocking signal
 - [x] Boring/explicit tech; simplicity over abstraction
 - [x] moongit dogfoods its own coordination (issues/claims/PRs/specs)

@@ -10,7 +10,7 @@ import (
 // agentModelClaudeEdit is the sole execution model an agent run can use. The
 // model is stored on the run (see migration 11) and decides what actually
 // runs inside the agent container for each turn — everything else
-// (container, workspace, token, dex, event log, parking, handoff) is shared.
+// (container, workspace, token, MCP config, event log, parking, handoff) is shared.
 // The identifier is canonical in storage so storage/server/runner agree.
 //
 // agentModelClaudeEdit runs `claude -p` directly. Claude edits files in
@@ -32,7 +32,7 @@ type turnInput struct {
 	issue     api.Issue // the run's issue — the task on the first turn
 	message   string    // the follow-up human message; empty on the first turn
 	firstTurn bool      // first turn works the issue; later turns work message
-	mcpPath   string    // dex MCP config path, "" to omit
+	mcpPath   string    // agent MCP config path, "" to omit
 	resume    bool      // follow-up turn resumes the session
 	// verify marks a spec-verify run: a one-shot turn whose task is to classify
 	// the spec at specPath (its content carried verbatim) against the code.

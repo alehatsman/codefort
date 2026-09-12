@@ -983,10 +983,10 @@ func openDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, 
 }
 
 // openAgentDockerSession starts the agent's container like openDockerSession but
-// injects the per-run env (creds, scoped token, dex wiring) and gives it host
+// injects the per-run env (creds, scoped token) and gives it host
 // reachability (host.docker.internal -> the host gateway), so the in-container
-// claude/mgit/dex shim can reach moongitd, the LLM endpoint, and the hot dex
-// index. The container stays alive (sleep infinity) across turns; teardown is
+// claude/mgit shim can reach moongitd and the LLM endpoint. The container
+// stays alive (sleep infinity) across turns; teardown is
 // explicit (it is not removed when a turn's session handle is dropped).
 func openAgentDockerSession(ctx context.Context, logger *slog.Logger, name, workDir, image string, env []string) (jobSession, error) {
 	args := []string{
@@ -995,12 +995,12 @@ func openAgentDockerSession(ctx context.Context, logger *slog.Logger, name, work
 		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		"-v", workDir + ":/work",
 		"-w", "/work",
-		// Reach the host's moongitd / dex / LLM endpoint. WSL2 maps
+		// Reach the host's moongitd / LLM endpoint. WSL2 maps
 		// host-gateway to the host, same as Docker Desktop.
 		"--add-host", "host.docker.internal:host-gateway",
 	}
 	// Pass the per-run secrets (Claude/LLM tokens, the ephemeral moongit token,
-	// dex bearer) via --env-file rather than `-e KEY=VALUE`: the latter puts every
+	// LLM bearer) via --env-file rather than `-e KEY=VALUE`: the latter puts every
 	// value on the docker-run argv (visible in `ps`/proc) and bakes it into
 	// `docker inspect`.Config.Env for the container's whole lifetime. The 0600
 	// file is read by docker only during run and removed right after.

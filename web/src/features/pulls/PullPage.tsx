@@ -87,7 +87,7 @@ export default function PullPage() {
 
   return (
     <div className="pull-page">
-      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
+      <OverviewCard owner={owner} repo={repo} path="" />
 
       {pullQ.isLoading ? (
         <SkeletonText lines={4} />

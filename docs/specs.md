@@ -2,9 +2,9 @@
 
 A **spec** is a human-authored, high-altitude description of what a part of the
 system *should* do. Specs live in the repo as markdown under `specs/`, version
-alongside the code they govern, and are the dual of the dex-derived Explore view
-(what the code *is*). The payoff is continuously diffing the two — drift
-detection — but that builds on this convention.
+alongside the code they govern, and are the dual of the code itself (what the
+code *is*). The payoff is continuously diffing the two — drift detection — but
+that builds on this convention.
 
 This document is the contract. The shared parser is `internal/specs`
 (`specs.Parse`); the list endpoint, the verify pre-pass, and spec quality

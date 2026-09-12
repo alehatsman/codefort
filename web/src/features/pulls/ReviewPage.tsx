@@ -81,7 +81,7 @@ export default function ReviewPage() {
 
   return (
     <div className="repo">
-      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
+      <OverviewCard owner={owner} repo={repo} path="" />
       <h2 className="issue-title">Review comments</h2>
 
       <div className="repo-toolbar">

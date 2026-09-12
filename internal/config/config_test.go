@@ -21,8 +21,6 @@ var allVars = []string{
 	"MOONGIT_DB_PATH",
 	"MOONGIT_REPOS_DIR",
 	"MOONGIT_HOST_DATA_DIR",
-	"MOONGIT_DEX_URL",
-	"MOONGIT_DEX_TOKEN",
 	"MOONGIT_WEB_DIR",
 	"MOONGIT_BASIC_USER",
 	"MOONGIT_BASIC_PASS",
@@ -47,7 +45,6 @@ var allVars = []string{
 	"MOONGIT_AGENT_ANTHROPIC_API_KEY",
 	"MOONGIT_AGENT_LLM_BASE_URL",
 	"MOONGIT_AGENT_SERVER_URL",
-	"MOONGIT_AGENT_DEX_PROJECT",
 	"MOONGIT_AGENT_TURN_TIMEOUT",
 }
 
@@ -98,10 +95,7 @@ func TestLoadDefaults(t *testing.T) {
 		{"AgentDefaultImage", cfg.AgentDefaultImage, "moongit-agent:latest"},
 		// Everything below defaults to empty: each empty default is a feature
 		// that stays off unless explicitly turned on (web UI, basic auth, SSH,
-		// dex, agent credentials).
-		{"DexURL", cfg.DexURL, ""},
-		{"DexToken", cfg.DexToken, ""},
-		{"DexProject", cfg.DexProject, ""},
+		// agent credentials).
 		{"WebDir", cfg.WebDir, ""},
 		{"BasicUser", cfg.BasicUser, ""},
 		{"BasicPass", cfg.BasicPass, ""},
@@ -512,18 +506,6 @@ func TestLoadRateLimitAcceptsFractionsRejectsNegatives(t *testing.T) {
 	}
 }
 
-func TestLoadDexURLTrailingSlashStripped(t *testing.T) {
-	// dex request paths are joined onto this base, so a trailing slash would
-	// produce "//api/..." URLs. Only DexURL gets the treatment.
-	cfg := load(t, "MOONGIT_DEX_URL", "http://127.0.0.1:8080///", "MOONGIT_AGENT_SERVER_URL", "http://x/")
-	if cfg.DexURL != "http://127.0.0.1:8080" {
-		t.Errorf("DexURL = %q, want trailing slashes stripped", cfg.DexURL)
-	}
-	if cfg.AgentServerURL != "http://x/" {
-		t.Errorf("AgentServerURL = %q, want it left verbatim (no trim)", cfg.AgentServerURL)
-	}
-}
-
 func TestLoadPassthroughStrings(t *testing.T) {
 	// Opaque strings (credentials, images, addresses) must arrive byte-exact:
 	// a trimmed or lowercased token authenticates against nothing.
@@ -541,8 +523,6 @@ func TestLoadPassthroughStrings(t *testing.T) {
 		"MOONGIT_AGENT_ANTHROPIC_API_KEY", "sk-ant",
 		"MOONGIT_AGENT_LLM_BASE_URL", "http://gw.local/v1",
 		"MOONGIT_AGENT_SERVER_URL", "http://moongit.local:8080",
-		"MOONGIT_AGENT_DEX_PROJECT", "moongit",
-		"MOONGIT_DEX_TOKEN", "dex-tok",
 	)
 	for _, c := range []struct{ field, got, want string }{
 		{"Addr", cfg.Addr, "127.0.0.1:9999"},
@@ -558,8 +538,6 @@ func TestLoadPassthroughStrings(t *testing.T) {
 		{"AgentAnthropicAPIKey", cfg.AgentAnthropicAPIKey, "sk-ant"},
 		{"AgentLLMBaseURL", cfg.AgentLLMBaseURL, "http://gw.local/v1"},
 		{"AgentServerURL", cfg.AgentServerURL, "http://moongit.local:8080"},
-		{"DexProject", cfg.DexProject, "moongit"},
-		{"DexToken", cfg.DexToken, "dex-tok"},
 	} {
 		if c.got != c.want {
 			t.Errorf("%s = %q, want %q", c.field, c.got, c.want)

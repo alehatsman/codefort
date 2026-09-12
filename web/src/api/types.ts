@@ -427,128 +427,6 @@ export interface MergeConflictResponse {
   conflicts?: string[]
 }
 
-// --- Intel (dex integration) ---
-
-export interface IntelService {
-  endpoint: string
-  reachable: boolean
-  model: string
-  version: string
-}
-
-export interface IntelProject {
-  root: string
-  chunks: number
-  files: number
-  dim: number
-  embed_model: string
-  last_indexed: string
-  pending_summaries: number
-}
-
-export interface Intel {
-  enabled: boolean
-  found: boolean
-  service?: IntelService
-  project?: IntelProject
-}
-
-export type IntelSearchKind = "semantic" | "symbol" | "ask" | "callers" | "callees"
-
-export interface IntelSearchInput {
-  query: string
-  kind: IntelSearchKind
-}
-
-export interface IntelHit {
-  path: string
-  kind: string
-  start_line: number
-  end_line: number
-  score: number
-  role?: string
-  content?: string
-}
-
-export interface IntelSuggestedRead {
-  path: string
-  start_line: number
-  end_line: number
-  reason?: string
-  content?: string
-  truncated?: boolean
-}
-
-export interface IntelAnnotation {
-  nearest_doc?: string
-  tests?: string[]
-  package?: string
-}
-
-export interface IntelGraphNode {
-  id: string
-  qualified_name?: string
-  kind?: string
-}
-
-export interface IntelGraphEdge {
-  from: string
-  to: string
-  kind?: string
-}
-
-export interface IntelGraph {
-  nodes: IntelGraphNode[]
-  edges: IntelGraphEdge[]
-}
-
-export interface IntelPackageSummary {
-  path: string
-  summary: string
-}
-
-export interface IntelOverview {
-  repo_summary?: string
-  packages: IntelPackageSummary[]
-}
-
-// The internal package import DAG dex computed for the repo (its real
-// structure), used to rank and layer the Explore package map instead of
-// guessing roles from path names. status "no-graph" (with no nodes) means a
-// non-Go / un-graphed repo — the UI falls back to the flat summary listing.
-export interface IntelPackageGraphNode {
-  package: string // full Go import path
-  in_degree: number // distinct internal packages importing this one
-  out_degree: number // distinct internal packages it imports
-  page_rank: number
-  is_main?: boolean // executable entry point (Go `package main`); absent from older dex
-}
-
-export interface IntelPackageGraphEdge {
-  from_package: string
-  to_package: string
-}
-
-export interface IntelPackageGraph {
-  status: string
-  hint?: string
-  nodes: IntelPackageGraphNode[]
-  edges: IntelPackageGraphEdge[]
-}
-
-export interface IntelFileSummary {
-  path: string
-  summary: string
-}
-
-// Every dex summary for a repo as a flat path→prose map: "" = repo root,
-// directory paths carry their package summary, file paths their file summary.
-// One map per repo powers both the breadcrumb (ancestor sub-paths) and the
-// file tree (each entry). Paths dex has no prose for are absent.
-export interface IntelSummaries {
-  summaries: Record<string, string>
-}
-
 // --- CI (moongitci) ---
 
 // Mirrors storage.RunStatus. queued -> running -> a terminal state.
@@ -696,25 +574,6 @@ export interface CIEvent {
   data?: Record<string, unknown>
 }
 
-export interface IntelSearchResult {
-  status: string
-  hint?: string
-  hits: IntelHit[]
-  /** Only populated when kind="ask". `answer` is dex's synthesized,
-   *  citation-bearing prose response — the headline of the /ask shape;
-   *  `answer_model` names the chat model that produced it. Both are absent
-   *  when dex's chat leg is unreachable (degrades to the evidence below). */
-  answer?: string
-  answer_model?: string
-  /** Only populated when kind="ask". The CLI prints these and they're more
-   *  actionable than the raw semantic_hits. */
-  next_action?: string
-  avoid?: string
-  suggested_reads?: IntelSuggestedRead[]
-  annotations?: Record<string, IntelAnnotation>
-  graph?: IntelGraph
-}
-
 // ── Specs ──────────────────────────────────────────────────────────────────
 // In-repo markdown specs under specs/ (what the code *should* do). Mirrors the
 // Go api.Spec* wire types.
@@ -807,20 +666,6 @@ export interface SpecDriftItem {
 export interface SpecDriftReport {
   ref: string
   specs: SpecDriftItem[]
-}
-
-export interface SpecSearchHit {
-  path: string
-  /** Enclosing spec heading at/before the match line; empty when none. */
-  section?: string
-  line: number
-  snippet?: string
-  score: number
-}
-
-export interface SpecSearchResult {
-  query: string
-  hits: SpecSearchHit[]
 }
 
 export interface WriteSpecInput {

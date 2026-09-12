@@ -56,8 +56,6 @@ let the operator hand an agent only the tools its job needs.
 - **Choosing a run's profile.** Which profile an agent run is launched with is the
   agent-runs spec; here only what each profile exposes and that it's enforced
   shim-side.
-- **dex's MCP server.** `dex mcp` is a separate shim this one mirrors in shape;
-  the dex toolset is the dex project's concern.
 - **Multi-repo / owner-repo override in one session.** A session is scoped to a
   single resolved repo; cross-repo addressing is out of scope here.
 - **A second source of truth.** The shim adds no behavior beyond the REST API;

@@ -8,8 +8,7 @@ Vite + React 19 SPA. Read this before adding or editing components.
 
 - `src/features/<feature>/` — pages + components + helpers for one feature
   (`issues`, `pulls`, `repo`, `commits`, `pipelines`, `agents`, `specs`,
-  `settings`, and `explore` — which is present but currently unrouted, see
-  ce12340). A feature owns everything specific to it; put new files for a
+  `settings`). A feature owns everything specific to it; put new files for a
   feature here, not in a global drawer.
 - `src/shell/` — cross-cutting app chrome (`Layout`, nav tabs, `Avatar`,
   `Markdown`, `NotFound`, `keyboardNav`, `timeAgo`).

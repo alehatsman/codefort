@@ -457,59 +457,6 @@
   border-radius: 4px;
 }
 
-/* ── Semantic spec search (shares the quickopen shell) ───────────────────── */
-
-.specsearch__status {
-  padding: 10px 14px;
-}
-
-.specsearch__results {
-  list-style: none;
-  margin: 0;
-  padding: 6px;
-  max-height: 55vh;
-  overflow-y: auto;
-}
-
-.specsearch__hit {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  padding: 8px 10px;
-  border: none;
-  border-radius: var(--radius);
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.specsearch__hit:hover {
-  background: var(--accent-muted);
-}
-
-.specsearch__hit-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.specsearch__section {
-  font-weight: 600;
-}
-
-.specsearch__snippet {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  color: var(--fg-muted);
-  font-size: 13px;
-}
-
 @media (max-width: 720px) {
   .specs-layout {
     grid-template-columns: 1fr;

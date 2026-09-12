@@ -11,13 +11,10 @@ import (
 	"github.com/alehatsman/moongit/internal/storage"
 )
 
-func TestAgentContainerEnvOAuthAndDex(t *testing.T) {
+func TestAgentContainerEnvOAuth(t *testing.T) {
 	cfg := &config.Config{
 		AgentClaudeOAuthToken: "oauth",
 		AgentLLMBaseURL:       "http://llm.local",
-		DexURL:                "http://dex.local",
-		DexToken:              "dt",
-		DexProject:            "p",
 	}
 	env := agentContainerEnv(cfg, agentSettingsOverride{}, "mgt_tok", "http://host.docker.internal:8080")
 	want := []string{
@@ -25,9 +22,6 @@ func TestAgentContainerEnvOAuthAndDex(t *testing.T) {
 		"ANTHROPIC_BASE_URL=http://llm.local",
 		"MOONGIT_TOKEN=mgt_tok",
 		"MOONGIT_SERVER=http://host.docker.internal:8080",
-		"DEX_REMOTE_URL=http://dex.local",
-		"DEX_SERVE_TOKEN=dt",
-		"DEX_PROJECT=p",
 	}
 	for _, w := range want {
 		if !contains(env, w) {
@@ -42,15 +36,15 @@ func TestAgentContainerEnvOAuthAndDex(t *testing.T) {
 	}
 }
 
-func TestAgentContainerEnvAPIKeyFallbackNoDex(t *testing.T) {
-	cfg := &config.Config{AgentAnthropicAPIKey: "sk-xyz"} // no OAuth, no dex
+func TestAgentContainerEnvAPIKeyFallback(t *testing.T) {
+	cfg := &config.Config{AgentAnthropicAPIKey: "sk-xyz"} // no OAuth
 	env := agentContainerEnv(cfg, agentSettingsOverride{}, "tok", "url")
 	if !contains(env, "ANTHROPIC_API_KEY=sk-xyz") {
 		t.Errorf("API-key fallback missing: %v", env)
 	}
 	for _, e := range env {
-		if strings.HasPrefix(e, "CLAUDE_CODE_OAUTH_TOKEN=") || strings.HasPrefix(e, "DEX_") {
-			t.Errorf("unexpected env %q (no OAuth, no dex): %v", e, env)
+		if strings.HasPrefix(e, "CLAUDE_CODE_OAUTH_TOKEN=") {
+			t.Errorf("unexpected env %q (no OAuth configured): %v", e, env)
 		}
 	}
 }
@@ -132,23 +126,25 @@ func TestWriteAgentMCPConfig(t *testing.T) {
 			t.Fatalf("config not valid JSON: %v", err)
 		}
 		// No secret rides in the file — bearer/token are env-only.
-		if strings.Contains(string(raw), "DEX_SERVE_TOKEN") || strings.Contains(string(raw), "MOONGIT_TOKEN") {
+		if strings.Contains(string(raw), "MOONGIT_TOKEN") {
 			t.Errorf("MCP config file should carry no secret:\n%s", raw)
 		}
 		return conf.MCPServers
 	}
 
-	// No dex configured -> file still written, mgit registered, no dex server.
 	// An empty profile defaults to "full" in the shim argv.
 	dir := t.TempDir()
-	p, err := writeAgentMCPConfig(dir, &config.Config{}, "")
+	p, err := writeAgentMCPConfig(dir, "")
 	if err != nil {
-		t.Fatalf("writeAgentMCPConfig (no dex): %v", err)
+		t.Fatalf("writeAgentMCPConfig: %v", err)
 	}
 	if p != "/work/"+agentMCPConfigName {
 		t.Errorf("container path = %q, want /work/%s", p, agentMCPConfigName)
 	}
 	servers := readConf(t, dir)
+	if len(servers) != 1 {
+		t.Errorf("mgit should be the only MCP server: %+v", servers)
+	}
 	mgit, ok := servers["mgit"]
 	if !ok || mgit.Command != "mgit" || !sliceContains(mgit.Args, "mcp") {
 		t.Errorf("mgit server config wrong: %+v", servers)
@@ -156,26 +152,18 @@ func TestWriteAgentMCPConfig(t *testing.T) {
 	if !sliceContains(mgit.Args, "--profile") || !sliceContains(mgit.Args, storage.ToolProfileFull) {
 		t.Errorf("mgit args should carry the default profile: %+v", mgit.Args)
 	}
-	if _, ok := servers["dex"]; ok {
-		t.Errorf("dex should be absent when unconfigured: %+v", servers)
-	}
 
-	// Dex configured + review profile -> both servers; mgit carries --profile review.
+	// An explicit profile rides through to the shim argv.
 	dir = t.TempDir()
-	if _, err := writeAgentMCPConfig(dir, &config.Config{DexURL: "http://dex.local"}, storage.ToolProfileReview); err != nil {
-		t.Fatalf("writeAgentMCPConfig (dex): %v", err)
+	if _, err := writeAgentMCPConfig(dir, storage.ToolProfileReview); err != nil {
+		t.Fatalf("writeAgentMCPConfig (review profile): %v", err)
 	}
-	servers = readConf(t, dir)
-	mgit, ok = servers["mgit"]
+	mgit, ok = readConf(t, dir)["mgit"]
 	if !ok {
-		t.Errorf("mgit server missing when dex configured: %+v", servers)
+		t.Fatal("mgit server missing")
 	}
 	if !sliceContains(mgit.Args, "--profile") || !sliceContains(mgit.Args, storage.ToolProfileReview) {
 		t.Errorf("mgit args should carry the review profile: %+v", mgit.Args)
-	}
-	dex, present := servers["dex"]
-	if !present || dex.Command != "dex" || !sliceContains(dex.Args, "http://dex.local") {
-		t.Errorf("dex server config wrong: %+v", servers)
 	}
 }
 

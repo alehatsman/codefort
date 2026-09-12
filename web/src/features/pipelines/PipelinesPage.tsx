@@ -61,7 +61,7 @@ export default function PipelinesPage({ kind = "ci" }: { kind?: RunKind }) {
         <RunDetail owner={r.owner} repo={r.name} runNumber={runNumber as number} />
       ) : (
         <>
-          <OverviewCard owner={r.owner} repo={r.name} path="" summaries={{}} />
+          <OverviewCard owner={r.owner} repo={r.name} path="" />
           <RunList repo={r} kind={kind} />
         </>
       )}

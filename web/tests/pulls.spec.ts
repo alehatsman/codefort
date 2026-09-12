@@ -1,20 +1,8 @@
-import type { Page } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 import { mockApi, type PullRequest, seedToken } from "./mockApi"
 
 // Pull-request workflow (#70): compare two branches, open a PR, review the
 // embedded diff, and merge it (or surface a conflict).
-
-// dex off — keep the intel-gated queries quiet in tests.
-function routeIntelOff(page: Page) {
-  return page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel$/, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ enabled: false, found: false }),
-    })
-  )
-}
 
 function openPR(overrides: Partial<PullRequest> = {}): PullRequest {
   const now = new Date().toISOString()
@@ -40,7 +28,6 @@ test.beforeEach(async ({ page }) => {
 
 test("compare branches and open a pull request", async ({ page }) => {
   const state = await mockApi(page, { branches: ["main", "feature"] })
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/compare")
 
@@ -72,7 +59,6 @@ test("pull request list filters by state", async ({ page }) => {
       }),
     ],
   })
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/pulls")
   // Each state chip carries its glyph (open/closed reuse the issue icons,
@@ -103,7 +89,6 @@ test("pull request list searches title and body", async ({ page }) => {
       openPR({ id: 3, number: 3, title: "Tweak config", body: "wires up the auth token" }),
     ],
   })
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/pulls")
   await expect(page.getByText("Add auth middleware")).toBeVisible()
@@ -128,7 +113,6 @@ test("merge a pull request from its detail page", async ({ page }) => {
     branches: ["main", "feature"],
     pulls: [openPR()],
   })
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/pulls/1")
   await expect(page.getByRole("heading", { name: /Add feature/ })).toBeVisible()
@@ -150,7 +134,6 @@ test("merge surfaces conflicting paths and leaves the PR open", async ({ page })
     pulls: [openPR()],
     conflictPaths: ["src/app.ts", "README.md"],
   })
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/pulls/1")
   await page.getByRole("button", { name: "Merge pull request" }).click()
@@ -167,7 +150,6 @@ test("close a pull request from its detail page", async ({ page }) => {
     branches: ["main", "feature"],
     pulls: [openPR()],
   })
-  await routeIntelOff(page)
 
   await page.goto("/alice/demo/pulls/1")
   await page.getByRole("button", { name: "Close" }).click()

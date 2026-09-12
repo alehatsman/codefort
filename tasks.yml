@@ -22,7 +22,7 @@ version: "1.0"
 
 # The Go quality gate (lint/vuln/scan/ai-lint/arch-snapshot/budget-status/dupl
 # + the fast/full CI gates) comes from the shared **go-quality** module
-# (alehatsman/go-quality), keeping moongit in lockstep with dex + mooncake.
+# (alehatsman/go-quality), keeping moongit in lockstep with the fleet.
 # moongit has no build tags and no bespoke CI stages, so `ci` is just goq/ci.
 #
 # go-quality is fetched from github.com over https (alehatsman/go-quality), so

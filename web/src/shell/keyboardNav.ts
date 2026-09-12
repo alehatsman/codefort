@@ -124,8 +124,6 @@ function handleListNavKey(
 }
 
 // Repo tabs, in the order h/l walk them. Suffixes append to `/owner/repo`.
-// Explore is disabled (ce12340, "disable explore broken, no summaries in dex
-// anymore") — dropped here too so h/l doesn't cycle onto a dead route.
 const TAB_SUFFIXES = ["", "/issues", "/pipelines", "/agents"] as const
 
 /**

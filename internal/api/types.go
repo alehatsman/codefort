@@ -824,26 +824,6 @@ type SpecVerification struct {
 	Stale      bool                     `json:"stale"`
 }
 
-// SpecSearchHit is one semantic-search match within the spec corpus. Path is
-// repo-relative; Section is the enclosing spec heading (the nearest heading at
-// or before Line), empty when none precedes it. Line is the match's 1-based
-// start line, Snippet the matched text, Score dex's relevance (higher = closer).
-type SpecSearchHit struct {
-	Path    string  `json:"path"`
-	Section string  `json:"section,omitempty"`
-	Line    int     `json:"line"`
-	Snippet string  `json:"snippet,omitempty"`
-	Score   float32 `json:"score"`
-}
-
-// SpecSearchResult is the response for POST .../specs/search: dex semantic
-// search scoped to the specs/ corpus. Hits is non-nil and empty (not null)
-// when nothing matches.
-type SpecSearchResult struct {
-	Query string          `json:"query"`
-	Hits  []SpecSearchHit `json:"hits"`
-}
-
 // WriteSpecRequest is the body of PUT .../specs/{path}: commit spec content to a
 // feature branch. Branch defaults to "spec/<filename-stem>" and is never the
 // repo's default branch (specs land via a PR, not a direct push to main). Base

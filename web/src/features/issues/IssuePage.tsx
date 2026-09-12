@@ -62,7 +62,7 @@ export default function IssuePage() {
 
   return (
     <div>
-      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
+      <OverviewCard owner={owner} repo={repo} path="" />
 
       {!editing && (
         <h2 className="issue-title">

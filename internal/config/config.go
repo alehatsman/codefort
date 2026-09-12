@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -109,7 +108,7 @@ type Config struct {
 	AgentTurnTimeout time.Duration
 
 	// AgentDefaultImage is the container image an agent run executes in: the CI
-	// base image plus the Claude CLI and the dex MCP shim (#75). Set via
+	// base image plus the Claude CLI (#75). Set via
 	// MOONGIT_AGENT_DEFAULT_IMAGE. Only used when CIIsolation="docker".
 	AgentDefaultImage string
 
@@ -129,11 +128,6 @@ type Config struct {
 	// http://host.docker.internal:<port-of-Addr>. Set via MOONGIT_AGENT_SERVER_URL.
 	AgentServerURL string
 
-	// DexProject is the dex project id (keyed by the canonical repo root) the
-	// agent's dex MCP queries. Empty omits the dex MCP wiring. Set via
-	// MOONGIT_AGENT_DEX_PROJECT.
-	DexProject string
-
 	// CIRetainRuns caps how many of a repo's most recent CI runs are kept: a
 	// periodic reaper prunes terminal runs beyond this many (and their on-disk
 	// event logs), keeping disk + DB bounded. queued/running runs are never
@@ -146,13 +140,6 @@ type Config struct {
 	// Set via MOONGIT_EVENT_RETAIN (default 10000); zero or negative disables
 	// retention.
 	EventRetain int
-
-	// DexURL is the base URL of a dex `serve` daemon (e.g.
-	// http://127.0.0.1:8080). Empty disables the Intel tab. DexToken is
-	// the bearer token dex was started with (DEX_SERVE_TOKEN); empty when
-	// dex runs token-less on loopback.
-	DexURL   string
-	DexToken string
 
 	// WebDir is the directory holding the built web UI (web/dist). When
 	// set, moongitd serves it as a single-page app with history-API
@@ -199,8 +186,6 @@ func Load() (*Config, error) {
 	cfg.DBPath = envOr("MOONGIT_DB_PATH", filepath.Join(dataDir, "moongit.db"))
 	cfg.ReposDir = envOr("MOONGIT_REPOS_DIR", filepath.Join(dataDir, "repos"))
 	cfg.HostDataDir = envOr("MOONGIT_HOST_DATA_DIR", dataDir)
-	cfg.DexURL = strings.TrimRight(envOr("MOONGIT_DEX_URL", ""), "/")
-	cfg.DexToken = envOr("MOONGIT_DEX_TOKEN", "")
 	cfg.WebDir = envOr("MOONGIT_WEB_DIR", "")
 	cfg.BasicUser = envOr("MOONGIT_BASIC_USER", "")
 	cfg.BasicPass = envOr("MOONGIT_BASIC_PASS", "")
@@ -294,7 +279,6 @@ func Load() (*Config, error) {
 	cfg.AgentAnthropicAPIKey = envOr("MOONGIT_AGENT_ANTHROPIC_API_KEY", "")
 	cfg.AgentLLMBaseURL = envOr("MOONGIT_AGENT_LLM_BASE_URL", "")
 	cfg.AgentServerURL = envOr("MOONGIT_AGENT_SERVER_URL", "")
-	cfg.DexProject = envOr("MOONGIT_AGENT_DEX_PROJECT", "")
 
 	agentTurnTimeout, err := time.ParseDuration(envOr("MOONGIT_AGENT_TURN_TIMEOUT", "15m"))
 	if err != nil {

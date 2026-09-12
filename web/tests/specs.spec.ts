@@ -43,34 +43,6 @@ const CONTENT: Record<string, { title: string; status: string; body: string; met
   },
 }
 
-// Semantic-search result for the ⌘⇧F flow (the dex-backed endpoint is mocked).
-const SEARCH = {
-  query: "verify",
-  hits: [
-    {
-      path: "specs/ssh-transport.md",
-      section: "Behavior",
-      line: 9,
-      snippet: "WHEN pushed THEN verify.",
-      score: 0.92,
-    },
-  ],
-}
-
-// mockSearch intercepts POST .../specs/search. Registered after mockSpecs so it
-// wins (Playwright matches newest-first); non-POST falls through to the GET
-// content/list routes.
-async function mockSearch(page: Page, result: unknown) {
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/specs\/search$/, (route) => {
-    if (route.request().method() !== "POST") return route.fallback()
-    return route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(result),
-    })
-  })
-}
-
 async function mockSpecs(page: Page, list: unknown) {
   // Content endpoint (.../specs/<path>) — registered first; its regex requires
   // a trailing segment so it's disjoint from the list route below.
@@ -199,7 +171,7 @@ test("Specs: ⌘P quick-open fuzzy-jumps to a spec", async ({ page }) => {
   await expect(page.locator(".spec-view__title")).toHaveText("SSH Transport")
 
   // The print shortcut opens the palette instead (the path-jump one, not search).
-  const input = page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")
+  const input = page.locator(".quickopen:not(.cmdk) .quickopen__input")
   await page.keyboard.press("Control+p")
   await expect(input).toBeFocused()
 
@@ -222,45 +194,13 @@ test("Specs: ⌘P quick-open lists every spec and a click selects", async ({ pag
 
   await page.goto("/alice/demo/specs")
   await page.keyboard.press("Control+p")
-  await expect(
-    page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")
-  ).toBeVisible()
+  await expect(page.locator(".quickopen:not(.cmdk) .quickopen__input")).toBeVisible()
 
   // Empty query lists every spec; clicking one opens it.
   await expect(page.locator(".quickopen__item")).toHaveCount(2)
   await page.locator(".quickopen__item", { hasText: "CI Pipeline" }).click()
-  await expect(
-    page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")
-  ).toBeHidden()
+  await expect(page.locator(".quickopen:not(.cmdk) .quickopen__input")).toBeHidden()
   await expect(page.locator(".spec-view__title")).toHaveText("CI Pipeline")
-})
-
-test("Specs: ⌘⇧F semantic search lists hits and deep-links to a section", async ({ page }) => {
-  await seedToken(page)
-  await mockApi(page)
-  await mockSpecs(page, SPECS)
-  await mockSearch(page, SEARCH)
-
-  await page.goto("/alice/demo/specs")
-  await page.keyboard.press("Control+Shift+F")
-  await expect(page.locator(".specsearch .quickopen__input")).toBeFocused()
-
-  // Query → results: a hit shows its section + snippet.
-  await page.locator(".specsearch .quickopen__input").fill("verify")
-  await page.keyboard.press("Enter")
-  const hit = page.locator(".specsearch__hit")
-  await expect(hit).toHaveCount(1)
-  await expect(hit).toContainText("Behavior")
-  await expect(hit).toContainText("WHEN pushed THEN verify.")
-
-  // Picking it opens the spec and deep-links to the section (?path + ?section).
-  await hit.click()
-  await expect(page.locator(".specsearch .quickopen__input")).toBeHidden()
-  await expect(page.locator(".spec-view__title")).toHaveText("SSH Transport")
-  await expect(page).toHaveURL(/[?&]path=specs%2Fssh-transport\.md/)
-  await expect(page).toHaveURL(/[?&]section=Behavior/)
-  // The targeted section heading is present in the rendered spec.
-  await expect(page.locator(".spec-view h2", { hasText: "Behavior" })).toBeVisible()
 })
 
 test("Specs: edit a spec — live preview, save to a branch, PR link", async ({ page }) => {
@@ -312,16 +252,14 @@ test("Specs: ⌘K command palette lists workflows and runs one", async ({ page }
   await expect(page.locator(".cmdk .quickopen__input")).toBeFocused()
 
   // The registry exposes the wired commands.
-  await expect(page.locator(".cmdk__item")).toContainText(["New spec", "Jump to a spec", "Search"])
+  await expect(page.locator(".cmdk__item")).toContainText(["New spec", "Jump to a spec"])
 
   // Filtering narrows; running "Jump" hands off to the quick-open palette.
   await page.locator(".cmdk .quickopen__input").fill("jump")
   await expect(page.locator(".cmdk__item")).toHaveCount(1)
   await page.keyboard.press("Enter")
   await expect(page.locator(".cmdk .quickopen__input")).toBeHidden()
-  await expect(
-    page.locator(".quickopen:not(.specsearch):not(.cmdk) .quickopen__input")
-  ).toBeVisible()
+  await expect(page.locator(".quickopen:not(.cmdk) .quickopen__input")).toBeVisible()
 })
 
 test("Specs: ⌘K → New spec prompts for a name and opens a templated draft", async ({ page }) => {

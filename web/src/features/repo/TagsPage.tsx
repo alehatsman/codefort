@@ -14,7 +14,7 @@ export default function TagsPage() {
 
   return (
     <div className="repo">
-      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
+      <OverviewCard owner={owner} repo={repo} path="" />
 
       <div className="tags-page">
         <h2 className="tags-page__title">Tags</h2>

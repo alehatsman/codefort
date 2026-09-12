@@ -116,7 +116,7 @@ test("issues list: j/k select a row, Enter opens it; h/l switch tabs", async ({ 
 
 test("code view: j/k select files, Enter opens, h/l switch tabs", async ({ page }) => {
   await mockApi(page)
-  // Tree listing + intel (not indexed, so no overview round trip).
+  // Tree listing.
   await page.route(/\/api\/repos\/[^/]+\/[^/]+\/tree(\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,
@@ -129,13 +129,6 @@ test("code view: j/k select files, Enter opens, h/l switch tabs", async ({ page 
           { name: "README.md", path: "README.md", type: "blob", size: 10 },
         ],
       }),
-    })
-  )
-  await page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel$/, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ enabled: false, found: false }),
     })
   )
 

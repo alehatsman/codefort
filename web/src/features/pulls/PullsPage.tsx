@@ -79,7 +79,7 @@ export default function PullsPage() {
 
   return (
     <div className="pulls">
-      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
+      <OverviewCard owner={owner} repo={repo} path="" />
 
       <PageHeader
         title="Pull requests"

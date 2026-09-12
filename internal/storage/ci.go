@@ -150,7 +150,7 @@ const (
 // tool→profile mapping lives in the shim (mgit owns its own toolset); storage
 // only carries the profile name, defaults it, and validates it.
 const (
-	// ToolProfileFull exposes the entire mgit + dex surface (current behavior).
+	// ToolProfileFull exposes the entire mgit tool surface (current behavior).
 	ToolProfileFull = "full"
 	// ToolProfileReview restricts a run to read tools + review_* (+ issue_comment):
 	// the read-only review agent. No issue_claim/set_state/create, no

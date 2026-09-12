@@ -18,7 +18,7 @@ import (
 )
 
 // runMCP serves the moongit toolset over stdio as an MCP server — the
-// `mgit mcp` entrypoint. It mirrors dex's `dex mcp` shim: a pure stdio<->REST
+// `mgit mcp` entrypoint: a pure stdio<->REST
 // proxy that carries no local state. Every tool is a thin wrapper over the same
 // endpoints the CLI subcommands call, so an agent gets issue/review/pipeline
 // primitives without a shell — the channel that works under claude's headless

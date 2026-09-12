@@ -45,7 +45,7 @@ export default function CommitPage() {
 
   return (
     <div className="commit-page">
-      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
+      <OverviewCard owner={owner} repo={repo} path="" />
 
       {commitQ.isLoading ? (
         <SkeletonText lines={4} />

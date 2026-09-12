@@ -2,7 +2,7 @@ version: "2"
 
 # Shared baseline golangci-lint config for Go projects in this fleet.
 #
-# This is the COMMON core reconciled from mooncake + dex: the bug-catching
+# This is the COMMON core reconciled across the fleet: the bug-catching
 # linter selection, the cyclop soft-cap (35), the staticcheck check set, the
 # base gosec excludes, and the revive rule set. Consumers layer their own
 # project-specific `exclusions.rules` on top (each project's excludes are

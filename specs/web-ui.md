@@ -134,19 +134,6 @@ reconstruct: reload is always a valid recovery.
 - IF an addressed resource (repo, issue, run) returns 404, the page renders the
   not-found view naming what was missing.
 
-### The disabled Explore tab
-
-- WHERE the Explore/Intel tab is concerned, it is currently disabled: both its
-  route and its nav tab are commented out (`web/src/App.tsx`,
-  `web/src/shell/RepoTabs.tsx`), the page component still exists unrouted, and
-  its Playwright suite is skipped. The `h`/`l` tab cycle was updated to skip it.
-  The dex intel API it consumes is live — only the UI is dark.
-- WHERE the `/research` and `/summaries` URLs Explore absorbed are concerned,
-  they share its fate and are commented out alongside it, so they 404 directly.
-  They previously redirected *into* `/explore`, which matched no route and landed
-  on the catch-all not-found page — a redirect that implies somewhere to go is
-  worse than an honest 404. All three come back together.
-
 ## Non-goals
 
 - **Frontend conventions.** File layout, the `@/` alias, the `src/ui` component
@@ -183,8 +170,4 @@ reconstruct: reload is always a valid recovery.
 - [x] Theme applied pre-paint via a root attribute over CSS custom properties
 - [x] `/dev/ui` gallery covers the base primitives in both themes
 - [x] Skeleton / empty / inline-error / not-found states on routed pages
-- [x] `/research` + `/summaries` disabled alongside Explore — no redirect to a
-      route that does not exist
-- [ ] Explore tab, route, and its absorbed URLs restored (dex intel API is live;
-      only the UI is dark)
 - [ ] Verified against the code by the verify workflow (flip to `living`)

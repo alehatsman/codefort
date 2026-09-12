@@ -5,9 +5,8 @@ Claude session to work the issue. moongitd opens this image exactly like a CI
 container — `docker run --user <uid:gid> -v <workspace>:/work … sleep infinity`,
 then `docker exec` (see `cmd/moongitd/agent_runner.go`) — so it derives `FROM
 moongit-ci:latest` to inherit the `provision`/`git` contract and the uid:gid
-bind-mount convention, and adds the `claude` CLI plus the dex stdio→REST MCP
-shim on PATH. This directory builds the default agent image,
-`moongit-agent:latest`.
+bind-mount convention, and adds the `claude` CLI plus `mgit` on PATH. This
+directory builds the default agent image, `moongit-agent:latest`.
 
 ## Build
 
@@ -16,24 +15,13 @@ shim on PATH. This directory builds the default agent image,
 > `moongit-ci:latest` first — `provision apply tasks/ci-images.yml` builds that.
 > The manual steps follow for reference / one-off builds.
 
-1. **Drop a `dex` binary** carrying the MCP shim (`dex mcp --remote`, from
-   dex#6) into `agent/dex`. dex pulls in the sqlite-vec cgo bindings, so it must
-   be built with CGO and the `sqlite_fts5` tag — the same build dex itself uses
-   (a `CGO_ENABLED=0` build no longer compiles: "build constraints exclude all
-   Go files in sqlite-vec-go-bindings/cgo"):
+1. **Drop a static `mgit` binary** into `agent/mgit` — a git-ignored build
+   input, not source:
 
    ```sh
-   # from a dex checkout
-   CGO_ENABLED=1 go build -tags sqlite_fts5 -o /path/to/moongit/agent/dex ./cmd/dex
+   # from the moongit repo root
+   CGO_ENABLED=0 go build -o agent/mgit ./cmd/moongit
    ```
-
-   The tag is a compile-time requirement of dex's package graph, not something
-   the shim uses (the shim proxies to a remote `dex serve` and opens no local
-   index). The resulting binary is dynamically linked but runs in the
-   debian-based image as long as the build host's glibc is no newer than the
-   image's.
-
-   `agent/dex` is git-ignored — it's a build input, not source.
 
 2. **Build the image** from the moongit repo root, once `moongit-ci:latest`
    exists (see `ci/README.md`):
@@ -42,14 +30,8 @@ shim on PATH. This directory builds the default agent image,
    docker build -t moongit-agent:latest agent/
    ```
 
-The final `claude --version && dex --version && mgit help && git --version`
-step fails the build early if any tool is missing or not runnable in the
-image.
-
-> **dex#6 dependency.** Until the dex MCP shim (`dex mcp --remote`) ships, an
-> ordinary `dex` binary still builds the image and passes the `--version`
-> self-check, but the agent's dex MCP server won't connect at runtime. Rebuild
-> with a shim-carrying `dex` once dex#6 lands.
+The final `claude --version && mgit help && git --version` step fails the build
+early if any tool is missing or not runnable in the image.
 
 ## Configuration
 
@@ -66,7 +48,6 @@ The runner reads these (see `internal/config/config.go`):
 | `MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN` | — | subscription token (`claude setup-token`) → `CLAUDE_CODE_OAUTH_TOKEN`. |
 | `MOONGIT_AGENT_ANTHROPIC_API_KEY` | — | alternate API-key auth → `ANTHROPIC_API_KEY`. |
 | `MOONGIT_AGENT_LLM_BASE_URL` | — | optional `ANTHROPIC_BASE_URL` override (a local model later). |
-| `MOONGIT_AGENT_DEX_PROJECT` | — | dex project id the agent's MCP queries (empty omits dex). |
 
 **Settings → Agent overrides (#106, no restart):** the operator can set these in
 the UI (persisted in `settings`), and they win over the env per run —
@@ -100,7 +81,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
 - `claude` — the Claude Code CLI (runs on the Node runtime installed here).
   Auth comes from `CLAUDE_CODE_OAUTH_TOKEN` / `ANTHROPIC_API_KEY` injected into
   the container env per run (#77), never baked in.
-- `dex` — the stdio→REST MCP shim, wired via a generated `--mcp-config` (#77).
 - `mgit` — the moongit issue client (`MOONGIT_TOKEN`/`MOONGIT_SERVER` are
   injected per run), exposed to Claude via the MCP shim rather than as a raw
   CLI — Claude itself can't invoke it directly (headless Bash is
@@ -115,8 +95,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang && rm -r
   passwd entry, so `HOME=/tmp` (world-writable, ephemeral) gives claude a place
   for its config/cache/logs. The workspace is bind-mounted at `/work`.
 - It gets `--add-host host.docker.internal:host-gateway` so the in-container
-  claude / mgit / dex shim can reach the host's moongitd, `dex serve`, and the
-  LLM endpoint (#77).
+  claude / mgit shim can reach the host's moongitd and the LLM endpoint (#77).
 - The container is named `moongit-agent-<jobID>`, started detached (`sleep
   infinity`), and **kept alive across turns** (an agent run parks in
   `awaiting_input` between turns). It's removed on finalize; the startup sweep

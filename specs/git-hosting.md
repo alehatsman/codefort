@@ -70,9 +70,9 @@ requests, CI, and agents all assume a repo already lives and moves here.
 - **Repository hosting at scale.** No forks, no per-repo access control lists,
   no LFS, no pack-file GC policy. moongit hosts a small fleet's repos, not a
   public forge.
-- **Semantic code intelligence.** dex-derived Explore (symbols, call graphs,
-  semantic search) is a distinct read surface with its own spec; "browse" here
-  means raw git content only.
+- **Semantic code intelligence.** Symbol indexes, call graphs, and semantic
+  search are not moongit's business (see the constitution's non-goals);
+  "browse" here means raw git content only.
 
 ## Checklist
 

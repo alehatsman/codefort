@@ -5,8 +5,7 @@
 # opens this image exactly like a CI container (`docker run --user <uid:gid>
 # -v <workspace>:/work … sleep infinity`, then `docker exec`), so it derives
 # FROM the CI base to inherit the provision/git contract and the uid:gid
-# bind-mount convention, and adds the `claude` CLI plus the dex stdio->REST MCP
-# shim on PATH.
+# bind-mount convention, and adds the `claude` CLI plus `mgit` on PATH.
 #
 # This is the default agent image
 # (MOONGIT_AGENT_DEFAULT_IMAGE=moongit-agent:latest, parallel to
@@ -14,7 +13,7 @@
 # whose agent needs Go/node/etc. derives its own image FROM moongit-agent.
 #
 # Build (from the moongit repo root) — see agent/README.md:
-#   1. drop a static `dex` binary carrying `dex mcp --remote` into agent/dex
+#   1. drop a static `mgit` binary into agent/mgit
 #   2. docker build -t moongit-agent:latest agent/
 FROM moongit-ci:latest
 
@@ -30,17 +29,10 @@ RUN apt-get update \
  && apt-get autoremove -y \
  && rm -rf /var/lib/apt/lists/*
 
-# dex stdio->REST MCP shim (option A): a static `dex` binary carrying
-# `dex mcp --remote <url>` (dex#6). Dropped in like ci/provision — a build
-# input, not source (agent/dex is git-ignored). The shim only proxies to a
-# remote `dex serve`, so it opens no local index (no FTS5 build tag needed,
-# unlike the host indexer).
-COPY dex /usr/local/bin/dex
-RUN chmod +x /usr/local/bin/dex
-
 # mgit — the moongit issue client, so the agent can comment on the issue it's
 # working (MOONGIT_TOKEN + MOONGIT_SERVER are injected per run, #77). A static
-# build dropped in like dex (agent/mgit is a git-ignored build input).
+# build dropped in like ci/provision — a build input, not source
+# (agent/mgit is git-ignored).
 COPY mgit /usr/local/bin/mgit
 RUN chmod +x /usr/local/bin/mgit
 
@@ -52,6 +44,6 @@ ENV HOME=/tmp
 
 # Fail the build early if any tool the agent needs is missing or unrunnable
 # (mirrors the CI base's `provision --version` check).
-RUN claude --version && dex --version && mgit help >/dev/null && git --version
+RUN claude --version && mgit help >/dev/null && git --version
 
 WORKDIR /work

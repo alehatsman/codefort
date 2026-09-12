@@ -116,7 +116,9 @@ working idiom (`tasks/tools.yml`'s `rq_dir: "{{ home }}/.cache/..."` inline
 `vars:` step), and is verified correct end to end (see Validation, below).
 `--var` on the command line still overrides an inline `vars:` step's value
 (§3.3 precedence: CLI > vars/vars_file > facts), so
-`mooncake_src`/`dex_src`'s per-box override still works the same way.
+`mooncake_src`'s per-box override still works the same way. (The agent task
+also carried a `dex_src` at migration time; the dex integration has since been
+removed wholesale, so that var is gone.)
 
 ## Translations that apply across every task
 
@@ -177,7 +179,8 @@ mechanical substitutions. Flagging only what's non-obvious per task:
   shell/cmd. Final `log` → `shell: echo`.
 - **agent-image** — inline `vars:` (`mooncake_src`, `dex_src`). Three
   guard checks + three cross-repo builds + one `docker build`, plain
-  shell/cmd. Final `log` → `shell: echo`.
+  shell/cmd. Final `log` → `shell: echo`. (Since trimmed: the dex build
+  input went away with the integration.)
 
 ## Invocation table
 

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/alehatsman/moongit/internal/config"
-	"github.com/alehatsman/moongit/internal/dex"
 )
 
 type Server struct {
@@ -20,7 +19,6 @@ type Server struct {
 	db     *sql.DB
 	rdb    *sql.DB
 	logger *slog.Logger
-	dex    *dex.Client // nil when MOONGIT_DEX_URL is unset (Intel disabled)
 
 	// ciSecret gates the loopback /internal/ci/events endpoint and is
 	// injected into the push hook's environment. ciURL is the loopback base
@@ -72,7 +70,6 @@ func New(cfg *config.Config, db, rdb *sql.DB, logger *slog.Logger) *Server {
 		db:       db,
 		rdb:      rdb,
 		logger:   logger,
-		dex:      dex.New(cfg.DexURL, cfg.DexToken),
 		ciSecret: secret,
 		ciURL:    loopbackURL(cfg.Addr),
 		limiter:  lim,
@@ -221,16 +218,8 @@ func (s *Server) apiHandler() http.Handler {
 	mux.HandleFunc("GET /api/settings/agent", s.handleGetAgentSettings)
 	mux.HandleFunc("PUT /api/settings/agent", s.handleUpdateAgentSettings)
 
-	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel", s.handleIntel)
-	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/overview", s.handleIntelOverview)
-	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/package-graph", s.handleIntelPackageGraph)
-	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/file-summary", s.handleIntelFileSummary)
-	mux.HandleFunc("GET /api/repos/{owner}/{repo}/intel/summaries", s.handleIntelSummaries)
-	mux.HandleFunc("POST /api/repos/{owner}/{repo}/intel/search", s.handleIntelSearch)
-
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/specs", s.handleListSpecs)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/specs/drift", s.handleSpecsDrift)
-	mux.HandleFunc("POST /api/repos/{owner}/{repo}/specs/search", s.handleSearchSpecs)
 	mux.HandleFunc("POST /api/repos/{owner}/{repo}/specs/verify", s.handleVerifySpec)
 	mux.HandleFunc("GET /api/repos/{owner}/{repo}/specs/{path...}", s.handleGetSpec)
 	mux.HandleFunc("PUT /api/repos/{owner}/{repo}/specs/{path...}", s.handleWriteSpec)

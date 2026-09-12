@@ -38,7 +38,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 
 	// A spec-verify run targets a spec, not an issue, and finishes one-shot
 	// (no awaiting_input park, no issue handoff). It reuses everything else —
-	// workspace, container, dex MCP, the turn loop.
+	// workspace, container, MCP config, the turn loop.
 	verify := run.Kind == storage.RunKindSpecVerify
 
 	// Gate the task. An issue agent run must serve a real issue (the issue is
@@ -145,7 +145,7 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	r.emit(elog, ci.EventRunStarted, map[string]any{"total_steps": 1})
 
 	// Mint the ephemeral, per-run moongit token and compose the container env
-	// (creds, scoped token, dex wiring). The token is revoked on teardown.
+	// (creds, scoped token). The token is revoked on teardown.
 	moongitToken, err := storage.GenerateTokenString()
 	if err == nil {
 		_, err = storage.CreateToken(r.db, agentTokenName(run.ID), moongitToken)
@@ -167,9 +167,9 @@ func (r *ciRunner) executeAgentRun(parent context.Context, run storage.CIRun) {
 	}
 	env := agentContainerEnv(r.cfg, override, moongitToken, agentServerURL(r.cfg))
 
-	// Generate the agent MCP config (mgit always, dex when configured) into the
+	// Generate the agent MCP config (mgit) into the
 	// workspace.
-	mcpPath, err := writeAgentMCPConfig(workDir, r.cfg, run.ToolProfile)
+	mcpPath, err := writeAgentMCPConfig(workDir, run.ToolProfile)
 	if err != nil {
 		log.Error("agent write mcp config", "err", err)
 		mcpPath = "" // non-fatal: run without MCP servers

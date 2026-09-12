@@ -61,17 +61,6 @@ function routeBlob(page: Page) {
   )
 }
 
-// dex off — keep the intel-gated queries quiet in tests.
-function routeIntelOff(page: Page) {
-  return page.route(/\/api\/repos\/[^/]+\/[^/]+\/intel$/, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ enabled: false, found: false }),
-    })
-  )
-}
-
 test.beforeEach(async ({ page }) => {
   await seedToken(page)
 })
@@ -99,7 +88,6 @@ test("no CI badge when the repo has CI disabled", async ({ page }) => {
 test("file view header shows a CI badge for the file's last commit", async ({ page }) => {
   await mockApi(page, ciSeed())
   await routeBlob(page)
-  await routeIntelOff(page)
   await page.goto("/alice/demo/blob/src/app.ts")
 
   const badge = page.locator(".commit-meta a.commit-ci")

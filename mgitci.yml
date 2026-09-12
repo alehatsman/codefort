@@ -93,9 +93,8 @@ jobs:
   #         cmd: |
   #           set -eu
   #           git clone --depth=1 http://host.docker.internal:8080/alehatsman/mooncake.git /tmp/mooncake
-  #           git clone --depth=1 http://host.docker.internal:8080/alehatsman/dex.git /tmp/dex
   #           printf '{"mooncake_src":"/tmp/mooncake"}' > /tmp/ci-vars.yml
-  #           printf '{"mooncake_src":"/tmp/mooncake","dex_src":"/tmp/dex"}' > /tmp/agent-vars.yml
+  #           printf '{"mooncake_src":"/tmp/mooncake"}' > /tmp/agent-vars.yml
   #           mooncake task ci-images --vars /tmp/ci-vars.yml
   #           mooncake task agent-image --vars /tmp/agent-vars.yml
   #       env:

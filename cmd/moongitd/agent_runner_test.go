@@ -132,9 +132,6 @@ func newAgentHarness(t *testing.T, opts agentTestOpts) agentHarness {
 			AgentTurnTimeout:      time.Minute,
 			AgentDefaultImage:     "moongit-agent:latest",
 			AgentClaudeOAuthToken: "oauth-tok",
-			DexURL:                "http://dex.local",
-			DexToken:              "dex-tok",
-			DexProject:            "proj-1",
 		},
 		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		newAgentSession: func(_ context.Context, _, _, image string, env []string) (jobSession, error) {
@@ -221,7 +218,7 @@ func TestExecuteAgentRunParksAfterTurn1(t *testing.T) {
 }
 
 // The run injects scoped per-run credentials into the container env, mints a
-// real ephemeral moongit token (revoked on teardown), and wires the dex MCP.
+// real ephemeral moongit token (revoked on teardown), and wires the MCP config.
 func TestAgentRunInjectsCredentials(t *testing.T) {
 	h := newAgentHarness(t, agentTestOpts{lines: successTurn})
 	h.r.executeAgentRun(context.Background(), h.run)
@@ -230,9 +227,6 @@ func TestAgentRunInjectsCredentials(t *testing.T) {
 	for k, want := range map[string]string{
 		"CLAUDE_CODE_OAUTH_TOKEN": "oauth-tok",
 		"MOONGIT_SERVER":          "http://host.docker.internal:8080",
-		"DEX_REMOTE_URL":          "http://dex.local",
-		"DEX_SERVE_TOKEN":         "dex-tok",
-		"DEX_PROJECT":             "proj-1",
 	} {
 		if got := envValue(env, k); got != want {
 			t.Errorf("env %s = %q, want %q (all: %v)", k, got, want, env)
@@ -252,7 +246,7 @@ func TestAgentRunInjectsCredentials(t *testing.T) {
 		t.Errorf("token name = %q, want %q", tok.Name, agentTokenName(h.run.ID))
 	}
 
-	// The agent MCP config (mgit + dex) is wired into the launch.
+	// The agent MCP config (mgit) is wired into the launch.
 	if !argvHas(*h.gotArgv, "--mcp-config", "/work/"+agentMCPConfigName) || !argvContains(*h.gotArgv, "--strict-mcp-config") {
 		t.Errorf("argv missing agent MCP config: %v", *h.gotArgv)
 	}

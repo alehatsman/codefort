@@ -49,8 +49,7 @@ lives in the image.
 - WHERE credentials are needed, they are injected per-run into the container and
   never baked into the image: a scoped LLM auth token (operator gateway bearer >
   operator OAuth > env OAuth > env API key), an ephemeral moongit token (revoked
-  on finalize) plus the server URL for in-container git/mgit, and the dex
-  endpoint/bearer/project when a hot index is configured.
+  on finalize) plus the server URL for in-container git/mgit.
 - WHEN a client finishes a parked (`awaiting_input`) run, the run transitions to
   `finishing` and the runner materializes the workspace as a commit on
   `agent/issue-<n>` server-side (no push), posts a summary comment on the issue,
@@ -88,8 +87,6 @@ lives in the image.
 - **The agent container image.** What the image contains, how it's built, and
   how Claude plans internally live outside moongit. This spec stops at the env
   moongit injects and the contract that a turn edits `/work`.
-- **The dex index itself.** Wiring the agent to a configured dex index is in
-  scope; building/serving that index is the code-intel/dex domain.
 - **The events feed.** Run lifecycle may surface on the fleet feed, but the SSE
   feed's delivery and store are the events-feed spec's concern.
 - **Headless command execution.** Bash is not reliably unlockable in a
@@ -108,7 +105,7 @@ lives in the image.
 - [x] Turn 1 in a fresh checked-out workspace + container; park in awaiting_input
 - [x] Follow-up turns queue, resume the session, stream, re-park
 - [x] claude-edit as the single execution model over a shared spine
-- [x] Per-run scoped credentials (LLM auth, ephemeral moongit token, dex) torn down on finalize
+- [x] Per-run scoped credentials (LLM auth, ephemeral moongit token) torn down on finalize
 - [x] Finish = server-side handoff to agent/issue-<n> + summary comment; parked-only
 - [x] Cancel/force-stop from any non-terminal state; discards the workspace
 - [x] Per-turn timeout; schema-tolerant transcript translation

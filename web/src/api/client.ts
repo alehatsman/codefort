@@ -25,13 +25,6 @@ import type {
   CreateRepoInput,
   CreateSSHKeyInput,
   CreateTokenInput,
-  Intel,
-  IntelFileSummary,
-  IntelOverview,
-  IntelPackageGraph,
-  IntelSearchInput,
-  IntelSearchResult,
-  IntelSummaries,
   Issue,
   IssueWithRepo,
   LoginInput,
@@ -47,7 +40,6 @@ import type {
   SpecContent,
   SpecDriftReport,
   SpecList,
-  SpecSearchResult,
   SSHKey,
   Token,
   Tree,
@@ -353,23 +345,6 @@ export const api = {
       method: "DELETE",
     }),
 
-  getIntel: (owner: string, repo: string) => request<Intel>(`/api/repos/${owner}/${repo}/intel`),
-  getIntelOverview: (owner: string, repo: string) =>
-    request<IntelOverview>(`/api/repos/${owner}/${repo}/intel/overview`),
-  getIntelPackageGraph: (owner: string, repo: string) =>
-    request<IntelPackageGraph>(`/api/repos/${owner}/${repo}/intel/package-graph`),
-  getIntelFileSummary: (owner: string, repo: string, path: string) =>
-    request<IntelFileSummary>(
-      `/api/repos/${owner}/${repo}/intel/file-summary?path=${encodeURIComponent(path)}`
-    ),
-  getIntelSummaries: (owner: string, repo: string) =>
-    request<IntelSummaries>(`/api/repos/${owner}/${repo}/intel/summaries`),
-  intelSearch: (owner: string, repo: string, body: IntelSearchInput) =>
-    request<IntelSearchResult>(`/api/repos/${owner}/${repo}/intel/search`, {
-      method: "POST",
-      body,
-    }),
-
   listSpecs: (owner: string, repo: string, ref = "") => {
     const q = new URLSearchParams()
     if (ref) q.set("ref", ref)
@@ -397,11 +372,6 @@ export const api = {
     const qs = q.toString()
     return request<SpecContent>(`/api/repos/${owner}/${repo}/specs/${segs}${qs ? `?${qs}` : ""}`)
   },
-  searchSpecs: (owner: string, repo: string, query: string) =>
-    request<SpecSearchResult>(`/api/repos/${owner}/${repo}/specs/search`, {
-      method: "POST",
-      body: { query },
-    }),
   writeSpec: (owner: string, repo: string, path: string, body: WriteSpecInput) => {
     const rel = path.replace(/^specs\//, "")
     const segs = rel.split("/").map(encodeURIComponent).join("/")

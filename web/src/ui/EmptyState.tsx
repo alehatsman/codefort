@@ -6,7 +6,7 @@ interface Props {
   /**
    * Draws the bordered card frame around the message. Replaces the inline
    * `{ border, borderRadius }` style that was copy-pasted at a few call sites
-   * (ExplorePage, RepoPage) onto the bare `.empty` block.
+   * onto the bare `.empty` block.
    */
   bordered?: boolean
   className?: string

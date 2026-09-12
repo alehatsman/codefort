@@ -65,7 +65,7 @@ The `/api` surface is unaffected by Basic auth — it keeps Bearer-token auth
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `MOONGIT_AGENT_DEFAULT_IMAGE` | `moongit-agent:latest` | Image an agent run executes in — the CI base plus the `claude` CLI, the dex MCP shim, and `mgit` (see `agent/README.md`). Only used when isolation is `docker`. |
+| `MOONGIT_AGENT_DEFAULT_IMAGE` | `moongit-agent:latest` | Image an agent run executes in — the CI base plus the `claude` CLI and `mgit` (see `agent/README.md`). Only used when isolation is `docker`. |
 | `MOONGIT_AGENT_RESERVED` | `2` | Slots of `MOONGIT_MAX_CONCURRENCY` only agent-family runs may take, so a CI backlog can never lock out an agent spawn. Silently clamped to `[0, MOONGIT_MAX_CONCURRENCY]`. |
 | `MOONGIT_AGENT_RUN_TIMEOUT` | `60m` | Whole-session lifetime cap. A run parked in `awaiting_input` past this age is reaped — container torn down, run finalized — so an abandoned session can't hold a container forever. Zero or negative disables the reaper. |
 | `MOONGIT_AGENT_TURN_TIMEOUT` | `15m` | Per-turn wall-clock limit: one `claude` invocation (first turn or follow-up) runs under this deadline; an overrunning turn is killed and errored. Zero or negative disables the per-turn deadline. |
@@ -73,7 +73,6 @@ The `/api` surface is unaffected by Basic auth — it keeps Bearer-token auth
 | `MOONGIT_AGENT_ANTHROPIC_API_KEY` | *(empty)* | Alternate auth path, injected as `ANTHROPIC_API_KEY`. Exactly one credential is needed for the agent to authenticate headlessly. |
 | `MOONGIT_AGENT_LLM_BASE_URL` | *(empty)* | Optional `ANTHROPIC_BASE_URL` override — an Anthropic-compatible gateway now, a local model later. |
 | `MOONGIT_AGENT_SERVER_URL` | `http://host.docker.internal:<port of MOONGIT_ADDR>` | How the in-container agent reaches this moongitd for `mgit` and git. The default routes over the host gateway (the container gets `--add-host host.docker.internal:host-gateway`); override it when moongitd is reachable at a stable address instead. Port falls back to `8080` if `MOONGIT_ADDR` carries none. |
-| `MOONGIT_AGENT_DEX_PROJECT` | *(empty)* | dex project id (keyed by the canonical repo root) the agent's dex MCP queries, injected as `DEX_PROJECT`. Empty omits the project pin from the dex wiring. |
 
 Credentials are **never baked into the image** — they are injected as container
 env at creation and revoked on finalize, alongside an ephemeral per-run moongit
@@ -82,13 +81,6 @@ token named `agent-run-<runID>`.
 Auth precedence inside the container is a single slot, first match wins:
 `ANTHROPIC_AUTH_TOKEN` (Settings only) → `CLAUDE_CODE_OAUTH_TOKEN` from Settings
 → `MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN` → `MOONGIT_AGENT_ANTHROPIC_API_KEY`.
-
-## Code intelligence (dex)
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `MOONGIT_DEX_URL` | *(empty)* | Base URL of a dex `serve` daemon, e.g. `http://127.0.0.1:8080`. Trailing slashes are stripped. Empty disables the Intel tab and omits the agent's dex MCP server entirely. |
-| `MOONGIT_DEX_TOKEN` | *(empty)* | Bearer token dex was started with (`DEX_SERVE_TOKEN`). Leave empty when dex runs token-less on loopback. Only forwarded when `MOONGIT_DEX_URL` is set. |
 
 ## Client (`mgit`)
 
@@ -147,9 +139,8 @@ MOONGIT_BASIC_USER=ops
 MOONGIT_BASIC_PASS=<pass>
 ```
 
-**(c) UI + CI + agent runs.** Adds the agent image, a credential, and dex for
-the Intel tab and the agent's code-intelligence MCP. Credentials can equally be
-set in Settings → Agent instead of the env.
+**(c) UI + CI + agent runs.** Adds the agent image and a credential.
+Credentials can equally be set in Settings → Agent instead of the env.
 
 ```sh
 MOONGIT_ADDR=:8080
@@ -160,9 +151,6 @@ MOONGIT_AGENT_DEFAULT_IMAGE=moongit-agent:latest
 MOONGIT_MAX_CONCURRENCY=6
 MOONGIT_AGENT_RESERVED=2
 MOONGIT_AGENT_CLAUDE_OAUTH_TOKEN=<claude setup-token value>
-MOONGIT_DEX_URL=http://127.0.0.1:8080
-MOONGIT_DEX_TOKEN=<dex serve token>
-MOONGIT_AGENT_DEX_PROJECT=moongit
 MOONGIT_BASIC_USER=ops
 MOONGIT_BASIC_PASS=<pass>
 ```

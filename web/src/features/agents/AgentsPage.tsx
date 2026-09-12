@@ -19,7 +19,7 @@ export default function AgentsPage() {
 
   return (
     <div className="repo">
-      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
+      <OverviewCard owner={owner} repo={repo} path="" />
       <section className="pipelines">
         <div className="pipelines__head">
           <h2 className="pipelines__title">Agents</h2>

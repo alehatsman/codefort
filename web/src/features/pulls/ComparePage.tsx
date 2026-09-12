@@ -58,7 +58,7 @@ export default function ComparePage() {
 
   return (
     <div className="compare">
-      <OverviewCard owner={owner} repo={repo} path="" summaries={{}} />
+      <OverviewCard owner={owner} repo={repo} path="" />
 
       <PageHeader title="Compare branches" />
 

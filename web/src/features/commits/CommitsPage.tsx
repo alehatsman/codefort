@@ -28,7 +28,7 @@ export default function CommitsPage() {
 
   return (
     <div className="commits-page">
-      <OverviewCard owner={owner} repo={repo} path={path} summaries={{}} />
+      <OverviewCard owner={owner} repo={repo} path={path} />
 
       <div className="commits-page__head">
         <h2>Commits</h2>

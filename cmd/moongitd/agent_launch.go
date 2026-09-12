@@ -26,7 +26,7 @@ func agentSessionID(runID int64) string {
 // prompt is the turn's user message (the issue body on turn 1, a follow-up
 // message thereafter). resume picks `--resume` over `--session-id` for
 // follow-up turns on the same session. mcpConfigPath, when set, attaches the
-// agent MCP servers (mgit, plus dex when configured), restricting claude to
+// agent MCP servers (mgit), restricting claude to
 // only the servers in that file (--strict-mcp-config).
 //
 // Permissions: --permission-mode bypassPermissions reliably auto-approves the
@@ -71,8 +71,7 @@ func composeTurnPrompt(issue api.Issue) string {
 // composeAgentSystemPrompt builds the moongit-authored system prompt that
 // orients the agent: who it is, where it's working, the task, and the safety
 // envelope. Credential-dependent workflow (pushing a branch, commenting on the
-// issue) and dex grounding are layered in by #77 / dex#6; this is the baseline
-// that's correct without them.
+// issue) is layered in by #77; this is the baseline that's correct without it.
 func composeAgentSystemPrompt(owner, repo string, issue api.Issue) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "You are an autonomous coding agent working on the moongit repository %s/%s.\n", owner, repo)
@@ -95,7 +94,7 @@ func composeAgentSystemPrompt(owner, repo string, issue api.Issue) string {
 // composeVerifyTurnPrompt is the spec-verify task: hand the agent the spec and
 // ask for a per-line drift classification as structured JSON. The spec content
 // is inlined so the agent doesn't have to find it; covers[] tells it which code
-// to read (via dex + the checkout).
+// to read from the checkout.
 func composeVerifyTurnPrompt(specPath, content string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Verify the spec at %s against the code it governs.\n\n", specPath)
@@ -105,8 +104,8 @@ func composeVerifyTurnPrompt(specPath, content string) string {
 		b.WriteByte('\n')
 	}
 	b.WriteString("```\n\n")
-	b.WriteString("Read the code under the spec's `covers` globs (use the dex tools to search/summarize, ")
-	b.WriteString("and read files under /work). For each behavior and checklist line, decide whether the ")
+	b.WriteString("Read the code under the spec's `covers` globs (the files live under /work). ")
+	b.WriteString("For each behavior and checklist line, decide whether the ")
 	b.WriteString("code bears it out.\n\n")
 	b.WriteString("Output ONLY a single fenced ```json block (no prose outside it) of this shape:\n")
 	b.WriteString("{\n")
@@ -130,7 +129,7 @@ func composeVerifySystemPrompt(owner, repo string) string {
 	b.WriteString("or correct spec. Never judge the spec's correctness, design, or completeness; only report ")
 	b.WriteString("agreement between what the spec says and what the code does.\n\n")
 	b.WriteString("This is READ-ONLY. Do not edit, create, or delete any file; do not run mutating commands. ")
-	b.WriteString("Read /work and use the dex tools to find and summarize the governed code.\n\n")
+	b.WriteString("Read the governed code under /work.\n\n")
 	b.WriteString("Marker meanings: aligned = code bears out the line; drifted = code contradicts it; ")
 	b.WriteString("unverifiable = can't tell from the code; unspecced = code behavior the spec doesn't cover.\n")
 	b.WriteString("Base every verdict on evidence you actually found (cite file:line in the note). If you ")

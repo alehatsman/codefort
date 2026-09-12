@@ -143,3 +143,39 @@ to fix in place rather than defer.
   review remediation. Carried on `ROADMAP.md`.
 - **Shipping or deleting the Intel/Explore tab.** A product call, not a docs
   fix. The review only corrects the README's claim. Carried on `ROADMAP.md`.
+
+## Phase 8 — remove the dex integration  `done`
+
+Added 2026-09-12 by owner decision: dex is a deprecated experiment and is not
+part of moongit's forward direction. This supersedes "Intel / Explore: ship it
+or cut it" on `ROADMAP.md` — the call is *cut*, and the cut is total, not just
+the dark UI tab.
+
+Everything that exists only to talk to a dex server comes out:
+
+- **Backend.** `internal/dex/` (the client), `internal/server/intel.go` and its
+  six `/api/repos/{o}/{r}/intel/*` routes, the `dex` field on `Server`, and the
+  `Intel*` response types in `internal/api/types.go`.
+- **Spec semantic search.** `POST /api/repos/{o}/{r}/specs/search` is a dex
+  search with a `specs/` filter over it — it has no non-dex implementation, so
+  it goes with the client. The spec *list*, *read*, *write-via-PR*, and the
+  deterministic drift classification are untouched; none of them ever called
+  dex.
+- **Config.** `MOONGIT_DEX_URL`, `MOONGIT_DEX_TOKEN`,
+  `MOONGIT_AGENT_DEX_PROJECT`, and the `DEX_*` env the agent container was
+  handed.
+- **Agent wiring.** The dex MCP server in the generated agent MCP config, and
+  the prompt text telling agents to reach for dex tools. `mgit` stays the
+  agent's only MCP server.
+- **Web.** The `explore` feature (already unrouted), the Intel card on the repo
+  overview, the spec search box, the `intel`/`spec-search` query layer, and the
+  specs that mock those endpoints.
+- **Repo furniture.** `web/.dex/`, the `.dex` / `agent/dex` ignore rules, and
+  the dex mentions in `README.md`, `docs/`, and the specs.
+- **`specs/code-intel.md`** is deleted; it governs nothing once the above is
+  gone. `specs/constitution.md` gains dex to its non-goals so this does not get
+  re-proposed.
+
+Deliberately *not* replaced: nothing here grows a hand-rolled substitute.
+Substring search over specs would be a new feature, not a removal, and it can
+earn its own slot if the gap is ever felt.

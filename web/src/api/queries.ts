@@ -45,12 +45,6 @@ export const keys = {
   issueCommits: (owner: string, repo: string, n: number) =>
     ["issueCommits", owner, repo, n] as const,
   comments: (owner: string, repo: string, n: number) => ["comments", owner, repo, n] as const,
-  intel: (owner: string, repo: string) => ["intel", owner, repo] as const,
-  intelOverview: (owner: string, repo: string) => ["intelOverview", owner, repo] as const,
-  intelPackageGraph: (owner: string, repo: string) => ["intelPackageGraph", owner, repo] as const,
-  intelFileSummary: (owner: string, repo: string, path: string) =>
-    ["intelFileSummary", owner, repo, path] as const,
-  intelSummaries: (owner: string, repo: string) => ["intelSummaries", owner, repo] as const,
   specs: (owner: string, repo: string, ref = "") => ["specs", owner, repo, ref] as const,
   spec: (owner: string, repo: string, path: string, ref = "") =>
     ["spec", owner, repo, path, ref] as const,
@@ -330,37 +324,6 @@ export function useIssueCommits(owner: string, repo: string, n: number) {
   })
 }
 
-export function useIntel(owner: string, repo: string) {
-  return useQuery({
-    queryKey: keys.intel(owner, repo),
-    queryFn: () => api.getIntel(owner, repo),
-    enabled: !!owner && !!repo,
-  })
-}
-
-export function useIntelOverview(owner: string, repo: string, enabled: boolean) {
-  return useQuery({
-    queryKey: keys.intelOverview(owner, repo),
-    queryFn: () => api.getIntelOverview(owner, repo),
-    // Two dex round trips per fetch — only run when we know dex is up
-    // and this repo is indexed (gated on useIntel's found flag).
-    enabled: enabled && !!owner && !!repo,
-    staleTime: 5 * 60_000,
-  })
-}
-
-// The internal package import DAG dex computed for the repo — backs the
-// Explore "Map of the codebase" layered ranking. One cheap (no-LLM) dex call,
-// gated on dex up + repo indexed and cached 5m alongside the overview.
-export function useIntelPackageGraph(owner: string, repo: string, enabled: boolean) {
-  return useQuery({
-    queryKey: keys.intelPackageGraph(owner, repo),
-    queryFn: () => api.getIntelPackageGraph(owner, repo),
-    enabled: enabled && !!owner && !!repo,
-    staleTime: 5 * 60_000,
-  })
-}
-
 // The repo's in-repo specs (specs/ markdown + parsed metadata). Cheap git-tree
 // read; cached briefly so tab switches don't refetch on every visit.
 export function useSpecsList(owner: string, repo: string, ref = "") {
@@ -379,28 +342,6 @@ export function useSpec(owner: string, repo: string, path: string, ref = "") {
     queryFn: () => api.getSpec(owner, repo, path, ref),
     enabled: !!owner && !!repo && !!path,
     staleTime: 30_000,
-  })
-}
-
-export function useIntelFileSummary(owner: string, repo: string, path: string, enabled: boolean) {
-  return useQuery({
-    queryKey: keys.intelFileSummary(owner, repo, path),
-    queryFn: () => api.getIntelFileSummary(owner, repo, path),
-    // One dex round trip per file view — gate on dex up + repo indexed.
-    enabled: enabled && !!owner && !!repo && !!path,
-    staleTime: 5 * 60_000,
-  })
-}
-
-// Every dex summary for the repo as one path→prose map — powers both the
-// breadcrumb and the file tree. One cached query per repo (staleTime 5m), so
-// navigating between folders/files reuses it with no extra round trips.
-export function useIntelSummaries(owner: string, repo: string, enabled: boolean) {
-  return useQuery({
-    queryKey: keys.intelSummaries(owner, repo),
-    queryFn: () => api.getIntelSummaries(owner, repo),
-    enabled: enabled && !!owner && !!repo,
-    staleTime: 5 * 60_000,
   })
 }
 

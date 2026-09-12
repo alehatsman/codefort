@@ -13,10 +13,10 @@ covers:
 
 Specs are human-authored, high-altitude descriptions of what the system *should*
 do, stored in the repo under `specs/` and versioned alongside the code they
-govern. They are the dual of the dex-derived Explore view, which describes what
-the code *is* — and the payoff is continuously diffing the two, so a spec that
-no longer matches its code surfaces as drift. This spec describes the Specs
-*feature*: how specs are read, written, searched, and checked for drift. The
+govern. They are the dual of the code itself, which is what the system *is* —
+and the payoff is continuously diffing the two, so a spec that no longer matches
+its code surfaces as drift. This spec describes the Specs *feature*: how specs
+are read, written, and checked for drift. The
 markdown format itself — frontmatter fields, the Intent/Behavior/Non-goals/
 Checklist convention, EARS style — is the contract in `docs/specs.md`, which
 this spec references rather than restates. (This file is itself a spec, and is
@@ -35,8 +35,6 @@ verified by the very workflow it describes.)
   in the bare repo (worktree-free) and returns the branch and commit, never
   writing the default branch directly — so a spec changes through the same pull
   request flow as code.
-- WHEN a client searches specs, the server runs a dex semantic search scoped to
-  the `specs/` corpus, so a spec is findable by meaning, not just by path.
 - WHEN a client requests drift, the server classifies each spec deterministically
   against the code it governs: `uncovered` (no `covers` globs, so drift can't be
   checked), `unverified` (covered but never verified), `stale` (a governed glob
@@ -69,16 +67,15 @@ verified by the very workflow it describes.)
   verify surface.
 - **The web Specs tab.** The tree, status rail, truth gutter, editor, and command
   palette are web-side rendering of this data, specified elsewhere.
-- **dex and the verify agent run.** The semantic index is the code-intel/dex
-  domain; running the LLM verify pass reuses the agent-runs spine. This spec owns
-  the spec data and its deterministic drift, not those engines.
+- **The verify agent run.** Running the LLM verify pass reuses the agent-runs
+  spine. This spec owns the spec data and its deterministic drift, not that
+  engine.
 
 ## Checklist
 
 - [x] List specs on a ref; empty list (not 404) when none
 - [x] Get a spec: raw + parsed structure; malformed frontmatter best-effort
 - [x] Write a spec to a feature branch (worktree-free); changes land via PR
-- [x] Semantic search scoped to the `specs/` corpus
 - [x] Deterministic drift: uncovered / unverified / stale / fresh; fail → stale
 - [x] Verification result model: alignment + per-line markers (match, not quality)
 - [x] Lenient parser: renders on bad metadata; Validate() reports semantic issues
