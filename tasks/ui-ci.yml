@@ -1,4 +1,4 @@
-description: full pre-push web gate — biome, typecheck, config drift, build, test, supply-chain posture, npm audit, ai-lint over tracked files, soft caps
+description: full pre-push web gate — biome, typecheck, config drift, build, test, supply-chain posture, npm audit, ai-lint and ui-lint over tracked files, soft caps
 
 # tq/ci. The checkout is tasks/ui-tools.yml's job and the pin lives there.
 # Every prop tq/ci declares already defaults to what web/ wants, so there is
