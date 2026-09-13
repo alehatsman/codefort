@@ -2,6 +2,13 @@
 
 Vite + React 19 SPA. Read this before adding or editing components.
 
+How the UI is split into pieces and styled is the fleet's
+[ts-quality docs/UI.md](https://github.com/alehatsman/ts-quality/blob/main/docs/UI.md):
+BEM strictly, shared blocks in one base stylesheet, promote a primitive on the second
+consumer, domain→presentation mapping stays in the feature, tokens on `:root`,
+motion and a11y rules, no utility framework / CSS-in-JS / CSS modules. This file is
+only the codefort delta: where things live here, the primitives, the tooling.
+
 ## Structure: organize by feature, import via `@/`
 
 `src/` is grouped by **feature**, not by technical type:
@@ -28,83 +35,42 @@ helpers from it for now (a marked temporary seam — agents will grow its own).
 ## Component library: `src/ui/` is the shared vocabulary
 
 `src/ui/` is the in-repo component library — thin, typed wrappers over the BEM
-blocks in `styles.css`, exported from the `@/ui` barrel. Treat it as the
-default vocabulary: build new pages by composing these, not by hand-stitching
-`className` strings.
+blocks in `styles.css`, exported from the `@/ui` barrel. Build new pages by
+composing these, not by hand-stitching `className` strings.
 
-- **When to add a primitive:** a pattern used by 2+ features (or one you're
-  about to need for a new UI) graduates to `@/ui`. The presentation shell moves
-  into the primitive; the **domain→presentation mapping stays in the feature**
-  (e.g. `StatusIcon` owns the glyph SVGs; `StateIcon`/`CIStatusIcon` map a
-  domain status to a `{glyph, colorClass}` over it). Keep primitives
-  domain-agnostic — pass per-instance styling via a `className`/option prop.
+- **Promotion path (UI.md rule 11) here:** the presentation shell moves into
+  `@/ui`; the domain→presentation mapping stays in the feature (`StatusIcon` owns
+  the glyph SVGs; `StateIcon`/`CIStatusIcon` map a domain status to a
+  `{glyph, colorClass}` over it). Per-instance styling via a `className`/option prop.
 - **Every primitive gets a `/dev/ui` row.** `DevGalleryPage.tsx` is the living
   gallery (our Storybook) and the design-token reference; add a section when you
-  add a primitive or variant, and check it against both color schemes. The
-  schemes are `github` and `monokai` (`src/theme.ts`), switched in
-  Settings → Appearance — not the top bar. Light/dark is a separate axis: the
-  base scheme follows `prefers-color-scheme` via a `@media` block in
+  add a primitive or variant. The schemes are `github` and `monokai`
+  (`src/theme.ts`), switched in Settings → Appearance. Light/dark is a separate
+  axis: the base scheme follows `prefers-color-scheme` via a `@media` block in
   `styles.css`, so a primitive needs checking in both schemes *and* both system
   appearances.
-- **Caller-derived state stays out of the primitive.** Route matching, mutation
-  wiring, etc. live at the call site (see `Tab`'s `active` prop); the primitive
-  owns markup + class composition only.
+- **Caller-derived state stays out of the primitive** (route matching, mutation
+  wiring — see `Tab`'s `active` prop).
 
-## Styling: hand-written semantic BEM, no utility framework
+## Where a block lives here
 
-- Semantic **BEM** — `block__element--modifier` (`board-col`,
-  `board-col__head`, `board-col__head--done`). Theme values are CSS custom
-  properties (`var(--border)`, `var(--fg-muted)`) defined alongside
-  `src/theme.ts`. No Tailwind, no CSS-in-JS, no CSS **modules** (the class
-  names are part of the contract — Playwright specs and the `is-*` / vim-nav
-  selectors target them; hashed names would break that).
-- One class names the thing; modifiers (`--state`, `is-active`, `is-loading`,
-  `is-vim-selected`) toggle variants. State flags use the `is-*` prefix.
-
-### Where a block lives: co-located per feature
-
-- **Feature-specific blocks** live in a co-located stylesheet next to the
-  feature, imported by that feature's pages: `features/<x>/<x>.css` (e.g.
-  `features/issues/issues.css`, `features/pulls/pulls.css`) and
-  `shell/shell.css`. Add a feature's new block to its stylesheet — `import
-  "./<x>.css"` from the feature's page component(s).
-- **The shared base stays in `src/styles.css`**: theme vars + dark-mode
-  `@media`, global resets, utilities (`.muted`, `.small`), the syntax-highlight
-  (`hljs-*`) tokens, and the **design-system primitives** — `.btn`, `.card`,
+- **Feature-specific blocks:** a co-located stylesheet, `features/<x>/<x>.css`
+  (e.g. `features/issues/issues.css`, `features/pulls/pulls.css`) and
+  `shell/shell.css`, imported by that feature's page component(s).
+- **The shared base is `src/styles.css`:** theme vars + dark-mode `@media`, global
+  resets, utilities (`.muted`, `.small`), the syntax-highlight (`hljs-*`) tokens,
+  and the design-system primitives — `.btn`, `.card`,
   `.input`/`.select`/`.textarea`/`.field`, `.badge`, `.chip`, the app shell
-  (`.app`/`.topbar`/`.main`/`.tabs`), and any block used directly across more
-  than one feature (e.g. `comment`, `issue-row`, `markdown-body`, `diff-file`).
-- Rule of thumb: used by one feature → that feature's stylesheet; used by the
-  `ui/` primitives or across features → base `styles.css`. Vite bundles all of
-  it into one CSS file in prod; the split is for source locality, not runtime
-  scoping.
-
-## Composing className: use `clsx`, not template-literal ternaries
-
-`clsx` is a dependency. Conditional classes go through it — never
-`` `base ${cond ? "x" : ""}` `` (that leaves a trailing space / empty token).
-
-```tsx
-import clsx from "clsx"
-
-// conditional modifier — object form
-<div className={clsx("board-col", { "is-over": isOver })} />
-<Link className={clsx("tab", { "is-active": isActive })} />
-
-// optional passthrough className — clsx drops undefined cleanly
-<div className={clsx("commit-meta", className)} />
-```
-
-Pure interpolation into a modifier (no conditional) stays a plain template
-literal — `clsx` adds nothing there, so don't force it:
-
-```tsx
-<span className={`ci-badge ci-badge--${status}`} />        // fine
-<td className={`diff-code diff-code--${kind}`} />          // fine
-```
-
-Rule of thumb: a `?`/`&&` in the className → `clsx`. Just `${value}` → template
-literal.
+  (`.app`/`.topbar`/`.main`/`.tabs`), and any block used across more than one
+  feature (`comment`, `issue-row`, `markdown-body`, `diff-file`).
+- Vite bundles all of it into one CSS file in prod; the split is for source
+  locality, not runtime scoping. Class names are part of the contract — Playwright
+  specs and the `is-*` / vim-nav selectors target them.
+- **Conditional classes go through `clsx`** (UI.md rule 8): a `?`/`&&` in the
+  className → `clsx`; a plain `${value}` interpolation stays a template literal.
+- Modifier words are hyphenated (`--in-progress`), not the API's `in_progress`;
+  map the enum at the call site. ui-lint flags the six underscored ones that
+  exist today as warnings.
 
 ## Lint + format: Biome
 
@@ -116,7 +82,12 @@ literal.
 Style: **no semicolons** (`semi: false`). Imports are auto-ordered by Biome
 (don't hand-sort). a11y rules are error-level — fix the violation rather than
 demote the rule; suppress a deliberate exception inline with a justified
-`// biome-ignore lint/a11y/<rule>: <reason>`.
+`// biome-ignore lint/a11y/<rule>: <reason>`. Keep `biome.json` strict JSON: a
+comment in it makes Biome silently run with defaults (rename to `biome.jsonc` if
+one is ever needed; config-check flags the broken case).
+
+The gate's ui-lint step (`provision apply tasks/ui-ci.yml`) reports BEM and
+raw color/radius/duration literals in stylesheets as warnings.
 
 ## Tests: Playwright
 

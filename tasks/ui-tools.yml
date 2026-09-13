@@ -3,10 +3,13 @@ description: check out ts-quality and install the web gate's tools (npm ci + Pla
 steps:
   # The pin lives here and nowhere else in this repo. Bump it in one place.
   # No tag past v0.1.0 exists upstream yet (v0.1.0 predates the provision
-  # migration and is mooncake-only); pinned to main HEAD until a v0.2.0-style
-  # tag lands. Re-pin to a tag then.
+  # migration and is mooncake-only); pinned to a main commit until a v0.2.0-style
+  # tag lands. Re-pin to a tag then. This one is ts-quality#4 (docs/UI.md +
+  # the ui-lint gate step) on top of #3 (gate runs the consumer's typecheck
+  # script; biome.jsonc is the consumer file, though strict-JSON biome.json
+  # still passes config-check).
   - vars:
-      tq_ref: 6cf4279755c1bd5b697e94427e3001338252f026
+      tq_ref: 90f45feeb8d4939ba826182f101124e3d567591d
       tq_dir: "{{ home }}/.cache/provision/tools/ts-quality"
 
   - name: "ts-quality at {{ tq_ref }}"

@@ -1,4 +1,4 @@
-description: fast pre-commit web gate — lockfile drift, biome over staged files, typecheck, ai-lint over staged, soft caps. No build, no test, no network
+description: fast pre-commit web gate — lockfile drift, biome over staged files, typecheck, ai-lint and ui-lint over staged, soft caps. No build, no test, no network
 
 # tq/fast. The checkout is tasks/ui-tools.yml's job and the pin lives there.
 steps:
