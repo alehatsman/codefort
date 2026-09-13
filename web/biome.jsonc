@@ -1,8 +1,14 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
+  // biome.jsonc, not biome.json: Biome reads the latter as strict JSON and,
+  // on a parse error, runs with defaults (no excludes) instead of failing.
+  // ts-quality's baseline, copied in by tasks/ui-sync-config.yml. Extended,
+  // never edited; tasks/ui-config-check.yml reports drift.
   "extends": ["./biome.base.json"],
   "plugins": ["./biome-plugins/prefer-function-decls.grit"],
   "files": {
+    // No leading "**": the baseline supplies the catch-all, and Biome's
+    // noBiomeFirstException errors on a second one over an extended config.
     "includes": [
       "!**/node_modules",
       "!**/dist",
