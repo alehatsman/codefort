@@ -4,12 +4,15 @@ steps:
   # The pin lives here and nowhere else in this repo. Bump it in one place.
   # No tag past v0.1.0 exists upstream yet (v0.1.0 predates the provision
   # migration and is mooncake-only); pinned to a main commit until a v0.2.0-style
-  # tag lands. Re-pin to a tag then. This one is ts-quality#4 (docs/UI.md +
-  # the ui-lint gate step) on top of #3 (gate runs the consumer's typecheck
-  # script; biome.jsonc is the consumer file, though strict-JSON biome.json
-  # still passes config-check).
+  # tag lands. Re-pin to a tag then. This one is ts-quality#7 (+#9): the
+  # baseline's files.includes starts with "**" so biome actually scans
+  # sources (before it, every consumer whose own includes were all negations
+  # matched no files and lint passed vacuously), and config-check's
+  # biome-first-exception fails a stale base copy. #4 before it is docs/UI.md
+  # and the ui-lint step; #3 is what runs the consumer's typecheck script and
+  # makes biome.jsonc the consumer file.
   - vars:
-      tq_ref: 90f45feeb8d4939ba826182f101124e3d567591d
+      tq_ref: 4bcca6101689c394b73ea88bf63ce524beb9f6f2
       tq_dir: "{{ home }}/.cache/provision/tools/ts-quality"
 
   - name: "ts-quality at {{ tq_ref }}"

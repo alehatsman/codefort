@@ -6,9 +6,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "baseUrl": ".",
+    // No baseUrl (removed in TS 7, ts-quality docs/TS.md rule 7): a relative
+    // paths entry resolves against this file's directory on its own.
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,

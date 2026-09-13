@@ -74,7 +74,8 @@ composing these, not by hand-stitching `className` strings.
 
 ## Lint + format: Biome
 
-`biome.json` governs both. Run before committing:
+`biome.jsonc` governs both (extending ts-quality's `biome.base.json`). Run before
+committing:
 
 - `npm run lint` — check (CI-equivalent)
 - `npm run lint:fix` — check + autofix/format
@@ -82,9 +83,10 @@ composing these, not by hand-stitching `className` strings.
 Style: **no semicolons** (`semi: false`). Imports are auto-ordered by Biome
 (don't hand-sort). a11y rules are error-level — fix the violation rather than
 demote the rule; suppress a deliberate exception inline with a justified
-`// biome-ignore lint/a11y/<rule>: <reason>`. Keep `biome.json` strict JSON: a
-comment in it makes Biome silently run with defaults (rename to `biome.jsonc` if
-one is ever needed; config-check flags the broken case).
+`// biome-ignore lint/a11y/<rule>: <reason>`. The consumer file is `biome.jsonc`
+on purpose: Biome reads a `biome.json` as strict JSON and, on a parse error, runs
+with defaults instead of failing. Never demote a rule there without a comment
+saying why; config-check reports every rule switched off.
 
 The gate's ui-lint step (`provision apply tasks/ui-ci.yml`) reports BEM and
 raw color/radius/duration literals in stylesheets as warnings.

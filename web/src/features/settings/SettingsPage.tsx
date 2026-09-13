@@ -453,8 +453,8 @@ function CustomEndpointFields({
       <h3 className="settings__subtitle">Custom endpoint</h3>
       <p className="muted small">
         Point agent runs at an Anthropic-compatible gateway or local model. The base URL is injected
-        as <code>ANTHROPIC_BASE_URL</code> (overriding <code>CODEFORT_AGENT_LLM_BASE_URL</code>); the
-        auth token as <code>ANTHROPIC_AUTH_TOKEN</code>, which then becomes the agent's auth
+        as <code>ANTHROPIC_BASE_URL</code> (overriding <code>CODEFORT_AGENT_LLM_BASE_URL</code>);
+        the auth token as <code>ANTHROPIC_AUTH_TOKEN</code>, which then becomes the agent's auth
         (replacing the Claude token above). The token is stored write-only — it's never shown again.
         Leave both blank to use Anthropic directly.
       </p>
@@ -753,8 +753,8 @@ function SSHKeysSection() {
       <h2 className="settings__title">SSH keys</h2>
       <p className="muted settings__lead">
         Public keys authenticate git over SSH (clone/push). A key inherits its token's identity, so
-        a push lands as that token's name. Set <code>CODEFORT_SSH_ADDR</code> on the server to enable
-        the transport.
+        a push lands as that token's name. Set <code>CODEFORT_SSH_ADDR</code> on the server to
+        enable the transport.
       </p>
 
       <form className="settings__create settings__create--stacked" onSubmit={submit}>

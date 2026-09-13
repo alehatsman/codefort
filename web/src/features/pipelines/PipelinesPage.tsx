@@ -255,8 +255,8 @@ function RunListHead({
           </>
         ) : (
           <>
-            Runs trigger on push when an <code>codefort.yml</code> is present at the pushed commit, or
-            on demand for any ref above.
+            Runs trigger on push when an <code>codefort.yml</code> is present at the pushed commit,
+            or on demand for any ref above.
           </>
         )}
       </p>
@@ -321,9 +321,9 @@ function CIDisabledCard({ owner, repo }: { owner: string; repo: string }) {
           <strong>CI is disabled for this repository.</strong>
         </p>
         <p className="muted small">
-          When enabled, pushing a commit that contains an <code>codefort.yml</code> runs its pipeline.
-          Each job runs in a throwaway container off the configured CI image, so repo-authored
-          commands stay isolated from the host.
+          When enabled, pushing a commit that contains an <code>codefort.yml</code> runs its
+          pipeline. Each job runs in a throwaway container off the configured CI image, so
+          repo-authored commands stay isolated from the host.
         </p>
         <Button
           variant="primary"
